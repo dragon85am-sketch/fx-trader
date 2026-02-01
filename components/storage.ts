@@ -35,15 +35,29 @@ export type OnboardingState = {
   setup?: OnboardingSetup;
 };
 
+const DEFAULT_ONBOARDING: OnboardingState = {
+  completed: false,
+  step: 0,
+  tradesCount: 0,
+};
+
 export function getOnboarding(): OnboardingState {
-  if (typeof window === "undefined") return { completed: false, step: 0, tradesCount: 0 };
+  if (typeof window === "undefined") return DEFAULT_ONBOARDING;
+
   try {
     const raw = localStorage.getItem(K.onboarding);
-    if (!raw) return { completed: false, step: 0, tradesCount: 0 };
-    const parsed = JSON.parse(raw) as OnboardingState;
-    return { completed: false, step: 0, tradesCount: 0, ...parsed };
+    if (!raw) return DEFAULT_ONBOARDING;
+
+    const parsed = JSON.parse(raw) as Partial<OnboardingState>;
+
+    return {
+      completed: parsed.completed ?? false,
+      step: parsed.step ?? 0,
+      tradesCount: parsed.tradesCount ?? 0,
+      setup: parsed.setup ?? { setup: "", tf: "", session: "" },
+    };
   } catch {
-    return { completed: false, step: 0, tradesCount: 0 };
+    return DEFAULT_ONBOARDING;
   }
 }
 
