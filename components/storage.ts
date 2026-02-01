@@ -1,3 +1,4 @@
+getOnboarding()
 export type OnboardingSetup = { setup: string; tf: string; session: string };
 
 export type TradeSide = "LONG" | "SHORT";
