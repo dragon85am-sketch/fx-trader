@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { setPaid } from "@/components/storage";
+import { setPaid } from "../../components/storage";
 
 export default function SuccessClient() {
   const router = useRouter();
