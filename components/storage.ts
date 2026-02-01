@@ -1,7 +1,11 @@
-getOnboarding()
-export type OnboardingSetup = { setup: string; tf: string; session: string };
+export type OnboardingSetup = {
+  setup: string;
+  tf: string;
+  session: string;
+};
 
 export type TradeSide = "LONG" | "SHORT";
+
 export type Trade = {
   id: string;
   date: string; // YYYY-MM-DD
@@ -21,13 +25,23 @@ const K = {
   trades: "fxtrader_trades",
 } as const;
 
+/* =========================
+   PAID
+========================= */
+
 export function getPaid(): boolean {
   if (typeof window === "undefined") return false;
   return localStorage.getItem(K.paid) === "true";
 }
+
 export function setPaid(v: boolean) {
+  if (typeof window === "undefined") return;
   localStorage.setItem(K.paid, v ? "true" : "false");
 }
+
+/* =========================
+   ONBOARDING
+========================= */
 
 export type OnboardingState = {
   completed: boolean;
@@ -43,42 +57,106 @@ const DEFAULT_ONBOARDING: OnboardingState = {
 };
 
 export function getOnboarding(): OnboardingState {
-  if (typeof window === "undefined") return DEFAULT_ONBOARDING;
+  if (typeof window === "undefined") {
+    return { ...DEFAULT_ONBOARDING };
+  }
 
   try {
     const raw = localStorage.getItem(K.onboarding);
-    if (!raw) return DEFAULT_ONBOARDING;
+    if (!raw) return { ...DEFAULT_ONBOARDING };
 
     const parsed = JSON.parse(raw) as Partial<OnboardingState>;
 
     return {
-      completed: parsed.completed ?? false,
-      step: parsed.step ?? 0,
-      tradesCount: parsed.tradesCount ?? 0,
-      setup: parsed.setup ?? { setup: "", tf: "", session: "" },
+      completed: parsed.completed ?? DEFAULT_ONBOARDING.completed,
+      step: parsed.step ?? DEFAULT_ONBOARDING.step,
+      tradesCount: parsed.tradesCount ?? DEFAULT_ONBOARDING.tradesCount,
+      setup: parsed.setup,
     };
   } catch {
-    return DEFAULT_ONBOARDING;
+    return { ...DEFAULT_ONBOARDING };
   }
 }
 
-export function setOnboarding(s: OnboardingState) {
-  localStorage.setItem(K.onboarding, JSON.stringify(s));
+export function setOnboarding(state: OnboardingState) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(K.onboarding, JSON.stringify(state));
 }
 
+/* =========================
+   TRADES
+========================= */
+
 const seedTrades: Trade[] = [
-  { id: "t1", date: "2026-01-28", market: "BTCUSDT", tf: "M1", side: "SHORT", setup: "M1 1–2–3", resultR: 1.6, mistake: "Brak", session: "NY", notes: "Pullback do mid BB, odrzucenie i kontynuacja." },
-  { id: "t2", date: "2026-01-29", market: "BTCUSDT", tf: "M1", side: "SHORT", setup: "M1 1–2–3", resultR: -1, mistake: "Brak potwierdzenia", session: "London", notes: "Zbyt szybkie wejście (brak zamknięcia świecy sygnałowej)." },
-  { id: "t3", date: "2026-01-30", market: "BTCUSDT", tf: "M1", side: "LONG", setup: "M1 retest mid BB", resultR: 1.1, mistake: "Brak", session: "NY", notes: "Trend z M5 w górę, czysty retest." },
-  { id: "t4", date: "2026-01-31", market: "BTCUSDT", tf: "M1", side: "SHORT", setup: "M1 1–2–3", resultR: 2.0, mistake: "Brak", session: "London", notes: "TP1 na dolnej BB, reszta na LL." },
-  { id: "t5", date: "2026-01-31", market: "BTCUSDT", tf: "M1", side: "SHORT", setup: "M1 1–2–3", resultR: -1, mistake: "FOMO", session: "NY", notes: "Wejście po impulsie – złamana zasada." },
+  {
+    id: "t1",
+    date: "2026-01-28",
+    market: "BTCUSDT",
+    tf: "M1",
+    side: "SHORT",
+    setup: "M1 1–2–3",
+    resultR: 1.6,
+    mistake: "Brak",
+    session: "NY",
+    notes: "Pullback do mid BB, odrzucenie i kontynuacja.",
+  },
+  {
+    id: "t2",
+    date: "2026-01-29",
+    market: "BTCUSDT",
+    tf: "M1",
+    side: "SHORT",
+    setup: "M1 1–2–3",
+    resultR: -1,
+    mistake: "Brak potwierdzenia",
+    session: "London",
+    notes: "Zbyt szybkie wejście (brak zamknięcia świecy sygnałowej).",
+  },
+  {
+    id: "t3",
+    date: "2026-01-30",
+    market: "BTCUSDT",
+    tf: "M1",
+    side: "LONG",
+    setup: "M1 retest mid BB",
+    resultR: 1.1,
+    mistake: "Brak",
+    session: "NY",
+    notes: "Trend z M5 w górę, czysty retest.",
+  },
+  {
+    id: "t4",
+    date: "2026-01-31",
+    market: "BTCUSDT",
+    tf: "M1",
+    side: "SHORT",
+    setup: "M1 1–2–3",
+    resultR: 2.0,
+    mistake: "Brak",
+    session: "London",
+    notes: "TP1 na dolnej BB, reszta na LL.",
+  },
+  {
+    id: "t5",
+    date: "2026-01-31",
+    market: "BTCUSDT",
+    tf: "M1",
+    side: "SHORT",
+    setup: "M1 1–2–3",
+    resultR: -1,
+    mistake: "FOMO",
+    session: "NY",
+    notes: "Wejście po impulsie – złamana zasada.",
+  },
 ];
 
 export function getTrades(): Trade[] {
   if (typeof window === "undefined") return seedTrades;
+
   try {
     const raw = localStorage.getItem(K.trades);
     if (!raw) return seedTrades;
+
     const parsed = JSON.parse(raw) as Trade[];
     return Array.isArray(parsed) ? parsed : seedTrades;
   } catch {
@@ -87,5 +165,6 @@ export function getTrades(): Trade[] {
 }
 
 export function setTrades(trades: Trade[]) {
+  if (typeof window === "undefined") return;
   localStorage.setItem(K.trades, JSON.stringify(trades));
 }
