@@ -8,10 +8,8 @@ export default function SuccessClient() {
   const router = useRouter();
 
   useEffect(() => {
-    setPaid(true);
-    router.replace("/app");
-  }, [router]);
-
+  setPaid(true);
+}, []);
   return (
     <main style={{ minHeight: "70vh", display: "grid", placeItems: "center" }}>
       <div style={{ textAlign: "center" }}>
