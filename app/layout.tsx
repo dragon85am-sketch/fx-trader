@@ -4,7 +4,7 @@ import Nav from "../components/Nav";
 
 
 export const metadata: Metadata = {
-  title: "FX Trader – Premium",
+  title: "FX Trade – Premium",
   description: "Edukacja tradingowa + dashboard PRO + journal.",
 };
 
@@ -15,7 +15,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Nav />
         {children}
         <footer className="text-center text-zinc-500 text-sm py-10 px-6">
-          © {new Date().getFullYear()} FX Trader. Edukacja, nie porady inwestycyjne.
+          © {new Date().getFullYear()} FX Trade. Edukacja, nie porady inwestycyjne.
         </footer>
       </body>
     </html>

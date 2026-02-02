@@ -166,5 +166,31 @@ export function getTrades(): Trade[] {
 
 export function setTrades(trades: Trade[]) {
   if (typeof window === "undefined") return;
+
+  // 1) zapis trade'ów
   localStorage.setItem(K.trades, JSON.stringify(trades));
+
+  // 2) automatycznie aktualizuj onboarding
+  try {
+    const raw = localStorage.getItem(K.onboarding);
+    const current = raw ? (JSON.parse(raw) as Partial<OnboardingState>) : {};
+
+    const tradesCount = Math.min(10, Array.isArray(trades) ? trades.length : 0);
+    const completed = tradesCount >= 10;
+
+    // ✅ jeśli krok jest mniejszy niż 3, ustaw go na 3 (bo trade liczymy od kroku 3)
+    const currentStep = typeof current.step === "number" ? current.step : 0;
+    const step = completed ? 5 : Math.max(3, currentStep);
+
+    const next: OnboardingState = {
+      completed,
+      step,
+      tradesCount,
+      setup: current.setup as any,
+    };
+
+    localStorage.setItem(K.onboarding, JSON.stringify(next));
+  } catch {
+    // nie blokuj zapisu trade
+  }
 }

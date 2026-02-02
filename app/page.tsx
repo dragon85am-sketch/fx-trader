@@ -9,7 +9,7 @@ export default function Home() {
     <main>
       <section className="px-6 py-20 text-center">
         <motion.h1 initial={{ opacity: 0, y: -14 }} animate={{ opacity: 1, y: 0 }} className="text-4xl md:text-5xl font-bold mb-6">
-          FX TRADER
+          FX TRADE
         </motion.h1>
         <p className="text-zinc-400 max-w-2xl mx-auto mb-8">
           Praktyczna edukacja tradingowa oparta na strukturze rynku, dyscyplinie i statystyce. Bez sygnałów. Bez obietnic.
