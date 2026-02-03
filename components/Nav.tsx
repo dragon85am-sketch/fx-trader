@@ -26,7 +26,8 @@ export default function Nav() {
   }
 
   return (
-    <div className="sticky top-0 z-50 border-b border-zinc-900 bg-zinc-950/70 backdrop-blur">
+    <div className="sticky top-0 z-50 border-b border-white/10 bg-blue-950/40 backdrop-blur-xl">
+
       <div className="mx-auto max-w-6xl px-6 py-4 flex items-center justify-between">
         <Link href="/" className="font-bold tracking-widest text-sm md:text-base">
   FX TRADE

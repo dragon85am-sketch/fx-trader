@@ -2,4 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
-:root { color-scheme: dark; }
+/* poprawne dla dark UI */
+:root {
+  color-scheme: dark;
+}
+
+/* twardy fallback – zawsze czytelne */
+html,
+body {
+  background-color: #020617; /* slate-950 */
+  color: #e4e4e7; /* zinc-200 */
+}
