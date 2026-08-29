@@ -4,63 +4,112 @@ import AdminPayoutActions from "@/components/AdminPayoutActions";
 import PayoutStatusBadge from "@/components/PayoutStatusBadge";
 import StripeBalanceCard from "@/components/admin/StripeBalanceCard";
 
+type AffiliateStatRow = {
+  id: string;
+  userId: string;
+  totalEarned: number;
+  pendingCommission: number;
+  availablePayout: number;
+};
+
+type AffiliateUserRow = {
+  id: string;
+  email: string | null;
+  name: string | null;
+};
+
+type PayoutRow = {
+  id: string;
+  amount: number;
+  status: string;
+  createdAt: Date;
+  stripeTransferId: string | null;
+  user: {
+    email: string | null;
+    name: string | null;
+    stripeAccountId: string | null;
+    payoutsEnabled: boolean;
+  };
+};
+
 function formatEuro(value: number) {
-  return `${value}â‚¬`;
+  return `${value.toFixed(2)}€`;
 }
 
 export default async function AdminPayoutsPage() {
   await requireServerAdmin();
 
-const affiliateStats = await prisma.affiliateStat.findMany({
-  orderBy: {
-    totalEarned: "desc",
-  },
-});
-const affiliateUserIds = affiliateStats.map((stat) => stat.userId);
-
-const affiliateUsers = await prisma.user.findMany({
-  where: {
-    id: {
-      in: affiliateUserIds,
+  const affiliateStats = (await prisma.affiliateStat.findMany({
+    orderBy: {
+      totalEarned: "desc",
     },
-  },
-  select: {
-    id: true,
-    email: true,
-    name: true,
-  },
-});
-  const payouts = await prisma.payoutRequest.findMany({
-    orderBy: { createdAt: "desc" },
-    include: {
-      user: {
-       select: {
-  email: true,
-  name: true,
-  stripeAccountId: true,
-  payoutsEnabled: true,
-},
+  })) as AffiliateStatRow[];
+
+  const affiliateUserIds = affiliateStats.map(
+    (stat: AffiliateStatRow) => stat.userId
+  );
+
+  const affiliateUsers = (await prisma.user.findMany({
+    where: {
+      id: {
+        in: affiliateUserIds,
       },
     },
-  });
+    select: {
+      id: true,
+      email: true,
+      name: true,
+    },
+  })) as AffiliateUserRow[];
 
-  const pendingCount = payouts.filter((p) => p.status === "Pending").length;
-  const approvedCount = payouts.filter((p) => p.status === "Approved").length;
-  const paidCount = payouts.filter((p) => p.status === "Paid").length;
-  const rejectedCount = payouts.filter((p) => p.status === "Rejected").length;
-  const totalAmount = payouts.reduce((sum, p) => sum + p.amount, 0);
+  const payouts = (await prisma.payoutRequest.findMany({
+    orderBy: {
+      createdAt: "desc",
+    },
+    include: {
+      user: {
+        select: {
+          email: true,
+          name: true,
+          stripeAccountId: true,
+          payoutsEnabled: true,
+        },
+      },
+    },
+  })) as PayoutRow[];
+
+  const pendingCount = payouts.filter(
+    (payout: PayoutRow) => payout.status === "Pending"
+  ).length;
+
+  const approvedCount = payouts.filter(
+    (payout: PayoutRow) => payout.status === "Approved"
+  ).length;
+
+  const paidCount = payouts.filter(
+    (payout: PayoutRow) => payout.status === "Paid"
+  ).length;
+
+  const rejectedCount = payouts.filter(
+    (payout: PayoutRow) => payout.status === "Rejected"
+  ).length;
+
+  const totalAmount = payouts.reduce(
+    (sum: number, payout: PayoutRow) => sum + payout.amount,
+    0
+  );
 
   return (
     <div className="space-y-6 p-6 text-white">
       <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-        <h1 className="text-2xl font-semibold">Admin â€” wypÅ‚aty</h1>
+        <h1 className="text-2xl font-semibold">Admin — wypłaty</h1>
 
         <div className="mb-6">
           <StripeBalanceCard />
         </div>
 
         <p className="mt-2 text-sm text-white/55">
-          ZarzÄ…dzanie payout requestami uÅ¼ytkownikÃ³w.
+          Zarządzanie payout requestami użytkowników.
         </p>
 
         <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
@@ -68,6 +117,7 @@ const affiliateUsers = await prisma.user.findMany({
             <div className="text-xs uppercase tracking-[0.18em] text-white/40">
               Pending
             </div>
+
             <div className="mt-2 text-2xl font-semibold text-amber-300">
               {pendingCount}
             </div>
@@ -77,6 +127,7 @@ const affiliateUsers = await prisma.user.findMany({
             <div className="text-xs uppercase tracking-[0.18em] text-white/40">
               Approved
             </div>
+
             <div className="mt-2 text-2xl font-semibold text-blue-300">
               {approvedCount}
             </div>
@@ -86,6 +137,7 @@ const affiliateUsers = await prisma.user.findMany({
             <div className="text-xs uppercase tracking-[0.18em] text-white/40">
               Paid
             </div>
+
             <div className="mt-2 text-2xl font-semibold text-emerald-300">
               {paidCount}
             </div>
@@ -95,6 +147,7 @@ const affiliateUsers = await prisma.user.findMany({
             <div className="text-xs uppercase tracking-[0.18em] text-white/40">
               Rejected
             </div>
+
             <div className="mt-2 text-2xl font-semibold text-rose-300">
               {rejectedCount}
             </div>
@@ -102,8 +155,9 @@ const affiliateUsers = await prisma.user.findMany({
 
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
             <div className="text-xs uppercase tracking-[0.18em] text-white/40">
-              ÅÄ…czna kwota
+              Łączna kwota
             </div>
+
             <div className="mt-2 text-2xl font-semibold text-cyan-300">
               {formatEuro(totalAmount)}
             </div>
@@ -129,15 +183,23 @@ const affiliateUsers = await prisma.user.findMany({
           <tbody>
             {payouts.length === 0 ? (
               <tr>
-                <td colSpan={8} className="py-6 text-center text-zinc-400">
-                  Brak wnioskÃ³w
+                <td
+                  colSpan={8}
+                  className="py-6 text-center text-zinc-400"
+                >
+                  Brak wniosków
                 </td>
               </tr>
             ) : (
-              payouts.map((payout) => (
-                <tr key={payout.id} className="border-t border-white/10">
+              payouts.map((payout: PayoutRow) => (
+                <tr
+                  key={payout.id}
+                  className="border-t border-white/10"
+                >
                   <td className="px-4 py-4">
-                    {new Date(payout.createdAt).toLocaleDateString("pl-PL")}
+                    {new Date(
+                      payout.createdAt
+                    ).toLocaleDateString("pl-PL")}
                   </td>
 
                   <td className="px-4 py-4 font-medium">
@@ -145,7 +207,7 @@ const affiliateUsers = await prisma.user.findMany({
                   </td>
 
                   <td className="px-4 py-4 text-zinc-300">
-                    {payout.user.email}
+                    {payout.user.email || "-"}
                   </td>
 
                   <td className="px-4 py-4 font-semibold text-blue-300">
@@ -155,35 +217,38 @@ const affiliateUsers = await prisma.user.findMany({
                   <td className="px-4 py-4">
                     <PayoutStatusBadge status={payout.status} />
                   </td>
+
                   <td className="px-4 py-4">
-  {payout.user.payoutsEnabled ? (
-    <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs text-emerald-300">
-      Connected
-    </span>
-  ) : payout.user.stripeAccountId ? (
-    <span className="rounded-full bg-amber-500/10 px-2.5 py-1 text-xs text-amber-300">
-      Pending
-    </span>
-  ) : (
-    <span className="rounded-full bg-red-500/10 px-2.5 py-1 text-xs text-red-300">
-      Not connected
-    </span>
-  )}
-</td>
-                 <td className="px-4 py-4">
-  {payout.stripeTransferId ? (
-    <a
-      href={`https://dashboard.stripe.com/test/transfers/${payout.stripeTransferId}`}
-      target="_blank"
-      rel="noreferrer"
-      className="text-cyan-400 hover:text-cyan-300"
-    >
-      Open
-    </a>
-  ) : (
-    "-"
-  )}
-</td>
+                    {payout.user.payoutsEnabled ? (
+                      <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs text-emerald-300">
+                        Connected
+                      </span>
+                    ) : payout.user.stripeAccountId ? (
+                      <span className="rounded-full bg-amber-500/10 px-2.5 py-1 text-xs text-amber-300">
+                        Pending
+                      </span>
+                    ) : (
+                      <span className="rounded-full bg-red-500/10 px-2.5 py-1 text-xs text-red-300">
+                        Not connected
+                      </span>
+                    )}
+                  </td>
+
+                  <td className="px-4 py-4">
+                    {payout.stripeTransferId ? (
+                      <a
+                        href={`https://dashboard.stripe.com/test/transfers/${payout.stripeTransferId}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-cyan-400 hover:text-cyan-300"
+                      >
+                        Open
+                      </a>
+                    ) : (
+                      "-"
+                    )}
+                  </td>
+
                   <td className="px-4 py-4">
                     <AdminPayoutActions
                       payoutId={payout.id}
@@ -222,34 +287,49 @@ const affiliateUsers = await prisma.user.findMany({
           <tbody>
             {affiliateStats.length === 0 ? (
               <tr>
-                <td colSpan={5} className="py-6 text-center text-zinc-400">
+                <td
+                  colSpan={5}
+                  className="py-6 text-center text-zinc-400"
+                >
                   Brak danych afiliacyjnych
                 </td>
               </tr>
             ) : (
-              affiliateStats.map((affiliate) => (
-                <tr key={affiliate.id} className="border-t border-white/10">
-                  <td className="px-4 py-4 font-medium">
-                    {affiliateUsers.find((user) => user.id === affiliate.userId)?.name || "Brak"}
-                  </td>
+              affiliateStats.map(
+                (affiliate: AffiliateStatRow) => {
+                  const affiliateUser = affiliateUsers.find(
+                    (user: AffiliateUserRow) =>
+                      user.id === affiliate.userId
+                  );
 
-                  <td className="px-4 py-4 text-zinc-300">
-                    {affiliateUsers.find((user) => user.id === affiliate.userId)?.email || "-"}
-                  </td>
+                  return (
+                    <tr
+                      key={affiliate.id}
+                      className="border-t border-white/10"
+                    >
+                      <td className="px-4 py-4 font-medium">
+                        {affiliateUser?.name || "Brak"}
+                      </td>
 
-                  <td className="px-4 py-4 text-emerald-300">
-                    â‚¬{affiliate.totalEarned.toFixed(2)}
-                  </td>
+                      <td className="px-4 py-4 text-zinc-300">
+                        {affiliateUser?.email || "-"}
+                      </td>
 
-                  <td className="px-4 py-4 text-amber-300">
-                    â‚¬{affiliate.pendingCommission.toFixed(2)}
-                  </td>
+                      <td className="px-4 py-4 text-emerald-300">
+                        €{affiliate.totalEarned.toFixed(2)}
+                      </td>
 
-                  <td className="px-4 py-4 text-cyan-300">
-                    â‚¬{affiliate.availablePayout.toFixed(2)}
-                  </td>
-                </tr>
-              ))
+                      <td className="px-4 py-4 text-amber-300">
+                        €{affiliate.pendingCommission.toFixed(2)}
+                      </td>
+
+                      <td className="px-4 py-4 text-cyan-300">
+                        €{affiliate.availablePayout.toFixed(2)}
+                      </td>
+                    </tr>
+                  );
+                }
+              )
             )}
           </tbody>
         </table>

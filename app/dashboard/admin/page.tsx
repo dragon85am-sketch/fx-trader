@@ -9,9 +9,37 @@ import { requireAdmin } from "@/lib/auth";
 
 import Stripe from "stripe";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  
-});
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+
+
+type AdminUserRow = {
+  id: string;
+  email: string;
+  name: string | null;
+  role: string;
+  isPremium: boolean;
+  isBanned: boolean;
+  premiumUntil: Date | null;
+  createdAt: Date;
+};
+
+type AffiliateStatRow = {
+  id: string;
+  totalEarned: number;
+  pendingCommission: number;
+  availablePayout: number;
+  user: {
+    email: string | null;
+    name: string | null;
+  } | null;
+};
+
+type ActivityRow = {
+  id: string;
+  message: string;
+  type: string;
+  createdAt: Date;
+};
 
 function AdminStatCard({
   label,
@@ -96,27 +124,40 @@ export default async function AdminPage() {
   }),
 ]);
 
-  const totalUsers = users.length;
-  const premiumUsers = users.filter((user) => user.isPremium).length;
-  const bannedUsers = users.filter((user) => user.isBanned).length;
-  const admins = users.filter((user) => user.role === "admin").length;
+  const typedUsers: AdminUserRow[] = users.map((user: AdminUserRow) => ({
+    id: user.id,
+    email: user.email ?? "",
+    name: user.name,
+    role: user.role,
+    isPremium: user.isPremium,
+    isBanned: user.isBanned,
+    premiumUntil: user.premiumUntil,
+    createdAt: user.createdAt,
+  }));
+  const typedAffiliateStats = affiliateStats as AffiliateStatRow[];
+  const typedActivities = activities as ActivityRow[];
 
-  const affiliateRevenue = affiliateStats.reduce(
+  const totalUsers = typedUsers.length;
+  const premiumUsers = typedUsers.filter((user) => user.isPremium).length;
+  const bannedUsers = typedUsers.filter((user) => user.isBanned).length;
+  const admins = typedUsers.filter((user) => user.role === "admin").length;
+
+  const affiliateRevenue = typedAffiliateStats.reduce(
     (sum, stat) => sum + stat.totalEarned,
     0
   );
 
-  const affiliatePending = affiliateStats.reduce(
+  const affiliatePending = typedAffiliateStats.reduce(
     (sum, stat) => sum + stat.pendingCommission,
     0
   );
 
-  const affiliateAvailable = affiliateStats.reduce(
+  const affiliateAvailable = typedAffiliateStats.reduce(
     (sum, stat) => sum + stat.availablePayout,
     0
   );
 
-  const affiliateCount = affiliateStats.length;
+  const affiliateCount = typedAffiliateStats.length;
   const activeSubscriptions = subscriptions.data.length;
 
   const mrr =
@@ -131,7 +172,7 @@ export default async function AdminPage() {
       return sum + amount;
     }, 0) / 100;
 
-  const usersChartData = users
+  const usersChartData = typedUsers
     .slice()
     .reverse()
     .map((user, index) => ({
@@ -222,7 +263,7 @@ export default async function AdminPage() {
     </thead>
 
     <tbody>
-      {affiliateStats
+      {typedAffiliateStats
         .slice()
         .sort((a, b) => b.totalEarned - a.totalEarned)
         .slice(0, 10)
@@ -345,7 +386,7 @@ export default async function AdminPage() {
         </div>
 
         <div className="divide-y divide-white/5">
-          {activities.map((activity) => (
+          {typedActivities.map((activity) => (
             <div
               key={activity.id}
               className="flex items-center justify-between px-6 py-4"
@@ -366,7 +407,7 @@ export default async function AdminPage() {
             </div>
           ))}
 
-          {activities.length === 0 && (
+          {typedActivities.length === 0 && (
             <div className="px-6 py-8 text-center text-sm text-white/40">
               No activity yet.
             </div>
@@ -374,7 +415,7 @@ export default async function AdminPage() {
         </div>
       </div>
 
-      <AdminUsersTable users={users} />
+      <AdminUsersTable users={typedUsers} />
     </div>
   );
 }

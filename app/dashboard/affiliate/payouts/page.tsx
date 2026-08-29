@@ -10,7 +10,11 @@ type TokenPayload = {
   role: "admin" | "user";
 };
 
-type PayoutStatus = "Pending" | "Approved" | "Paid" | "Rejected";
+type PayoutStatus =
+  | "Pending"
+  | "Approved"
+  | "Paid"
+  | "Rejected";
 
 type Payout = {
   id: string;
@@ -19,35 +23,63 @@ type Payout = {
   createdAt: Date;
 };
 
-function normalizeStatus(status: string): PayoutStatus {
-  if (status === "Approved") return "Approved";
-  if (status === "Paid") return "Paid";
-  if (status === "Rejected") return "Rejected";
+type DbPayout = {
+  id: string;
+  amount: number;
+  status: string;
+  createdAt: Date;
+};
+
+function normalizeStatus(
+  status: string
+): PayoutStatus {
+  if (status === "Approved") {
+    return "Approved";
+  }
+
+  if (status === "Paid") {
+    return "Paid";
+  }
+
+  if (status === "Rejected") {
+    return "Rejected";
+  }
+
   return "Pending";
 }
 
-function getStatusStyles(status: PayoutStatus) {
+function getStatusStyles(
+  status: PayoutStatus
+) {
   switch (status) {
     case "Approved":
       return "bg-blue-500/10 text-blue-300 border-blue-400/20";
+
     case "Paid":
       return "bg-emerald-500/10 text-emerald-300 border-emerald-400/20";
+
     case "Rejected":
       return "bg-red-500/10 text-red-300 border-red-400/20";
+
     case "Pending":
     default:
       return "bg-amber-500/10 text-amber-300 border-amber-400/20";
   }
 }
 
-function getStatusLabel(status: PayoutStatus) {
+function getStatusLabel(
+  status: PayoutStatus
+) {
   switch (status) {
     case "Approved":
       return "Zatwierdzona";
+
     case "Paid":
-      return "OpÅ‚acona";
+      return "Opłacona";
+
     case "Rejected":
       return "Odrzucona";
+
     case "Pending":
     default:
       return "Oczekuje";
@@ -56,7 +88,9 @@ function getStatusLabel(status: PayoutStatus) {
 
 export default async function PayoutsPage() {
   const cookieStore = await cookies();
-  const token = cookieStore.get("token")?.value;
+
+  const token =
+    cookieStore.get("token")?.value;
 
   let payouts: Payout[] = [];
 
@@ -67,25 +101,39 @@ export default async function PayoutsPage() {
         process.env.JWT_SECRET!
       ) as TokenPayload;
 
-      const dbPayouts = await prisma.payoutRequest.findMany({
-        where: { userId: decoded.userId },
-        orderBy: { createdAt: "desc" },
-        select: {
-          id: true,
-          amount: true,
-          status: true,
-          createdAt: true,
-        },
-      });
+      const dbPayouts =
+        (await prisma.payoutRequest.findMany({
+          where: {
+            userId: decoded.userId,
+          },
 
-      payouts = dbPayouts.map((p) => ({
-        id: p.id,
-        amount: p.amount,
-        status: normalizeStatus(p.status),
-        createdAt: p.createdAt,
-      }));
+          orderBy: {
+            createdAt: "desc",
+          },
+
+          select: {
+            id: true,
+            amount: true,
+            status: true,
+            createdAt: true,
+          },
+        })) as DbPayout[];
+
+      payouts = dbPayouts.map(
+        (p: DbPayout): Payout => ({
+          id: p.id,
+          amount: p.amount,
+          status: normalizeStatus(
+            p.status
+          ),
+          createdAt: p.createdAt,
+        })
+      );
     } catch (err) {
-      console.error("PayoutsPage error:", err);
+      console.error(
+        "PayoutsPage error:",
+        err
+      );
     }
   }
 
@@ -93,9 +141,13 @@ export default async function PayoutsPage() {
     <div className="p-6 text-white">
       <div className="mb-6 flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Historia wypÅ‚at</h1>
+          <h1 className="text-2xl font-semibold">
+            Historia wypłat
+          </h1>
+
           <p className="mt-1 text-sm text-zinc-400">
-            Tutaj widzisz wszystkie swoje wnioski o wypÅ‚atÄ™.
+            Tutaj widzisz wszystkie swoje
+            wnioski o wypłatę.
           </p>
         </div>
 
@@ -103,7 +155,7 @@ export default async function PayoutsPage() {
           href="/dashboard/affiliate"
           className="rounded-xl border border-white/10 px-4 py-2 text-sm text-zinc-300 transition hover:bg-white/5"
         >
-          PowrÃ³t
+          Powrót
         </Link>
       </div>
 
@@ -115,41 +167,63 @@ export default async function PayoutsPage() {
         <table className="w-full text-sm">
           <thead className="bg-white/[0.04] text-zinc-400">
             <tr>
-              <th className="px-4 py-3 text-left">Data</th>
-              <th className="px-4 py-3 text-left">Kwota</th>
-              <th className="px-4 py-3 text-left">Status</th>
+              <th className="px-4 py-3 text-left">
+                Data
+              </th>
+
+              <th className="px-4 py-3 text-left">
+                Kwota
+              </th>
+
+              <th className="px-4 py-3 text-left">
+                Status
+              </th>
             </tr>
           </thead>
 
           <tbody>
             {payouts.length === 0 ? (
               <tr>
-                <td colSpan={3} className="py-6 text-center text-zinc-400">
-                  Brak wypÅ‚at
+                <td
+                  colSpan={3}
+                  className="py-6 text-center text-zinc-400"
+                >
+                  Brak wypłat
                 </td>
               </tr>
             ) : (
-              payouts.map((p) => (
-                <tr key={p.id} className="border-t border-white/10">
-                  <td className="px-4 py-4">
-                    {new Date(p.createdAt).toLocaleDateString("pl-PL")}
-                  </td>
+              payouts.map(
+                (p: Payout) => (
+                  <tr
+                    key={p.id}
+                    className="border-t border-white/10"
+                  >
+                    <td className="px-4 py-4">
+                      {new Date(
+                        p.createdAt
+                      ).toLocaleDateString(
+                        "pl-PL"
+                      )}
+                    </td>
 
-                  <td className="px-4 py-4 font-semibold text-blue-300">
-                    {p.amount}â‚¬
-                  </td>
+                    <td className="px-4 py-4 font-semibold text-blue-300">
+                      {p.amount.toFixed(2)}€
+                    </td>
 
-                  <td className="px-4 py-4">
-                    <span
-                      className={`rounded-full border px-2 py-1 text-xs ${getStatusStyles(
-                        p.status
-                      )}`}
-                    >
-                      {getStatusLabel(p.status)}
-                    </span>
-                  </td>
-                </tr>
-              ))
+                    <td className="px-4 py-4">
+                      <span
+                        className={`rounded-full border px-2 py-1 text-xs ${getStatusStyles(
+                          p.status
+                        )}`}
+                      >
+                        {getStatusLabel(
+                          p.status
+                        )}
+                      </span>
+                    </td>
+                  </tr>
+                )
+              )
             )}
           </tbody>
         </table>
