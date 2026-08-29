@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
@@ -19,21 +19,21 @@ export async function PATCH(req: Request) {
 
     if (!currentPassword || !newPassword || !confirmPassword) {
       return NextResponse.json(
-        { error: "Wszystkie pola są wymagane" },
+        { error: "Wszystkie pola sÄ… wymagane" },
         { status: 400 }
       );
     }
 
     if (newPassword.length < 6) {
       return NextResponse.json(
-        { error: "Nowe hasło musi mieć co najmniej 6 znaków" },
+        { error: "Nowe hasÅ‚o musi mieÄ‡ co najmniej 6 znakÃ³w" },
         { status: 400 }
       );
     }
 
     if (newPassword !== confirmPassword) {
       return NextResponse.json(
-        { error: "Nowe hasła nie są takie same" },
+        { error: "Nowe hasÅ‚a nie sÄ… takie same" },
         { status: 400 }
       );
     }
@@ -48,7 +48,7 @@ export async function PATCH(req: Request) {
 
     if (!user || !user.password) {
       return NextResponse.json(
-        { error: "Nie znaleziono użytkownika lub hasła" },
+        { error: "Nie znaleziono uÅ¼ytkownika lub hasÅ‚a" },
         { status: 404 }
       );
     }
@@ -57,7 +57,7 @@ export async function PATCH(req: Request) {
 
     if (!passwordOk) {
       return NextResponse.json(
-        { error: "Aktualne hasło jest nieprawidłowe" },
+        { error: "Aktualne hasÅ‚o jest nieprawidÅ‚owe" },
         { status: 400 }
       );
     }
@@ -66,7 +66,7 @@ export async function PATCH(req: Request) {
 
     if (sameAsOld) {
       return NextResponse.json(
-        { error: "Nowe hasło musi być inne niż obecne" },
+        { error: "Nowe hasÅ‚o musi byÄ‡ inne niÅ¼ obecne" },
         { status: 400 }
       );
     }
@@ -82,12 +82,12 @@ export async function PATCH(req: Request) {
 
     return NextResponse.json({
       ok: true,
-      message: "Hasło zostało zmienione",
+      message: "HasÅ‚o zostaÅ‚o zmienione",
     });
   } catch (error) {
     console.error("PATCH /api/settings/password error:", error);
     return NextResponse.json(
-      { error: "Błąd serwera" },
+      { error: "BÅ‚Ä…d serwera" },
       { status: 500 }
     );
   }

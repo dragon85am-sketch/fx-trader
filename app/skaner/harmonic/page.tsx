@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React from "react";
 import {
@@ -156,11 +156,11 @@ async function fetchLiveCandles(
   const payload = await res.json();
 
   if (!res.ok) {
-    throw new Error(payload?.message || "Nie udało się pobrać świec z Twelve Data.");
+    throw new Error(payload?.message || "Nie udaÅ‚o siÄ™ pobraÄ‡ Å›wiec z Twelve Data.");
   }
 
   if (!Array.isArray(payload?.values)) {
-    throw new Error(payload?.message || "Twelve Data nie zwróciło danych OHLC.");
+    throw new Error(payload?.message || "Twelve Data nie zwrÃ³ciÅ‚o danych OHLC.");
   }
 
   return normalizeTwelveCandles(payload.values);
@@ -677,7 +677,7 @@ export default function HarmonicScannerPage() {
       setResults([found]);
       setActiveSetup(found);
       setScanMessage(
-        `Znaleziono ${formacja} ${direction} • jakość ${best.score}%`
+        `Znaleziono ${formacja} ${direction} â€¢ jakoÅ›Ä‡ ${best.score}%`
       );
     } catch (error) {
       setResults([]);
@@ -685,7 +685,7 @@ export default function HarmonicScannerPage() {
       setChartError(
         error instanceof Error
           ? error.message
-          : "Nie udało się wykonać skanowania."
+          : "Nie udaÅ‚o siÄ™ wykonaÄ‡ skanowania."
       );
     } finally {
       setScanning(false);
@@ -710,7 +710,7 @@ export default function HarmonicScannerPage() {
     setAutoScanning(true);
     setScanning(false);
     setChartError(null);
-    setScanMessage("AUTO SCAN uruchomiony — analizuję wszystkie instrumenty i timeframe'y...");
+    setScanMessage("AUTO SCAN uruchomiony â€” analizujÄ™ wszystkie instrumenty i timeframe'y...");
     setAutoProgress({
       done: 0,
       total: AUTO_SCAN_SYMBOLS.length * AUTO_SCAN_TFS.length,
@@ -799,7 +799,7 @@ export default function HarmonicScannerPage() {
 
       if (!deduped.length) {
         setScanMessage(
-          "AUTO SCAN zakończony — brak aktywnych formacji 70%+ w aktualnie zeskanowanych rynkach."
+          "AUTO SCAN zakoÅ„czony â€” brak aktywnych formacji 70%+ w aktualnie zeskanowanych rynkach."
         );
         return;
       }
@@ -813,7 +813,7 @@ export default function HarmonicScannerPage() {
       setCandles(best.candles);
       setLastLiveUpdate(new Date());
       setScanMessage(
-        `AUTO SCAN: znaleziono ${deduped.length} aktywnych formacji. Najlepsza: ${best.symbol} ${best.tf} ${best.name} ${best.direction} • ${best.score}%`
+        `AUTO SCAN: znaleziono ${deduped.length} aktywnych formacji. Najlepsza: ${best.symbol} ${best.tf} ${best.name} ${best.direction} â€¢ ${best.score}%`
       );
     } finally {
       setAutoScanning(false);
@@ -851,7 +851,7 @@ export default function HarmonicScannerPage() {
         );
 
         if (!next.length) {
-          throw new Error("Brak świec dla wybranego instrumentu i interwału.");
+          throw new Error("Brak Å›wiec dla wybranego instrumentu i interwaÅ‚u.");
         }
 
         setCandles(next);
@@ -860,7 +860,7 @@ export default function HarmonicScannerPage() {
       } catch (error) {
         if ((error as Error)?.name === "AbortError") return;
         setChartError(
-          error instanceof Error ? error.message : "Błąd pobierania danych."
+          error instanceof Error ? error.message : "BÅ‚Ä…d pobierania danych."
         );
       } finally {
         if (!silent) setChartLoading(false);
@@ -874,7 +874,7 @@ export default function HarmonicScannerPage() {
     void loadCandles(controller.signal);
 
     // Live candle refresh. 5 s is responsive enough for the UI while avoiding
-    // excessive REST requests. Increase to 10–15 s if your plan has a low API limit.
+    // excessive REST requests. Increase to 10â€“15 s if your plan has a low API limit.
     const interval = window.setInterval(() => {
       void loadCandles(controller.signal, true);
     }, 5000);
@@ -964,7 +964,7 @@ export default function HarmonicScannerPage() {
           </div>
           <h1 className="mt-1 text-[28px] font-bold">Harmonic Scanner</h1>
           <p className="mt-1 text-[10px] text-sky-100/45">
-            Wybierz instrument, TF, formację i kierunek. SKANUJ pobiera realne świece Twelve Data i pokazuje X-A-B-C-D tylko wtedy, gdy układ spełnia reguły harmoniczne.
+            Wybierz instrument, TF, formacjÄ™ i kierunek. SKANUJ pobiera realne Å›wiece Twelve Data i pokazuje X-A-B-C-D tylko wtedy, gdy ukÅ‚ad speÅ‚nia reguÅ‚y harmoniczne.
           </p>
         </section>
 
@@ -1062,7 +1062,7 @@ export default function HarmonicScannerPage() {
               <span>{scanMessage}</span>
               {autoScanning ? (
                 <span className="whitespace-nowrap text-[8px] text-cyan-200">
-                  {autoProgress.done}/{autoProgress.total} rynków
+                  {autoProgress.done}/{autoProgress.total} rynkÃ³w
                 </span>
               ) : null}
             </div>
@@ -1079,7 +1079,7 @@ export default function HarmonicScannerPage() {
             <div className="mt-3 max-h-[610px] space-y-2 overflow-y-auto pr-1">
               {!results.length ? (
                 <div className="rounded-xl border border-dashed border-[#0d579e] bg-[#041b36]/50 p-4 text-center text-[8px] text-sky-100/40">
-                  Kliknij SKANUJ. Wynik pojawi się tylko wtedy, gdy prawdziwe świece spełnią proporcje wybranej formacji.
+                  Kliknij SKANUJ. Wynik pojawi siÄ™ tylko wtedy, gdy prawdziwe Å›wiece speÅ‚niÄ… proporcje wybranej formacji.
                 </div>
               ) : null}
 
@@ -1097,7 +1097,7 @@ export default function HarmonicScannerPage() {
                     <Star className="h-3.5 w-3.5 text-slate-500" />
                     <div className="min-w-0 flex-1">
                       <div className="text-[7px] text-slate-500">
-                        {r.symbol} · {r.tf}
+                        {r.symbol} Â· {r.tf}
                       </div>
                       <div className="text-[10px] font-bold">{r.name}</div>
                       <div
@@ -1139,7 +1139,7 @@ export default function HarmonicScannerPage() {
               <div className="flex h-[675px] items-center justify-center rounded-2xl border border-[#0d579e] bg-[#061426]">
                 <div className="flex items-center gap-2 text-[10px] text-sky-100/60">
                   <Loader2 className="h-4 w-4 animate-spin text-cyan-400" />
-                  Ładowanie świec LIVE...
+                  Åadowanie Å›wiec LIVE...
                 </div>
               </div>
             ) : chartError && candles.length === 0 ? (
@@ -1154,7 +1154,7 @@ export default function HarmonicScannerPage() {
                   onClick={() => void loadCandles(undefined)}
                   className="rounded-lg border border-cyan-400/25 bg-cyan-400/10 px-3 py-2 text-[8px] font-bold text-cyan-300"
                 >
-                  Spróbuj ponownie
+                  SprÃ³buj ponownie
                 </button>
               </div>
             ) : (
@@ -1171,13 +1171,13 @@ export default function HarmonicScannerPage() {
 
             {chartError && candles.length > 0 ? (
               <div className="absolute bottom-3 right-3 z-20 rounded-lg border border-amber-400/20 bg-[#03172f]/90 px-2.5 py-1.5 text-[7px] text-amber-200 backdrop-blur">
-                LIVE chwilowo niedostępne — pokazuję ostatnie poprawne świece.
+                LIVE chwilowo niedostÄ™pne â€” pokazujÄ™ ostatnie poprawne Å›wiece.
               </div>
             ) : null}
           </div>
 
           <aside className="rounded-2xl border border-[#0d579e] bg-[#061426] p-4">
-            <h2 className="text-[12px] font-bold">Szczegóły</h2>
+            <h2 className="text-[12px] font-bold">SzczegÃ³Å‚y</h2>
 
             <div className="mt-4 flex items-center justify-between">
               <div className="text-[16px] font-bold text-fuchsia-400">
@@ -1195,7 +1195,7 @@ export default function HarmonicScannerPage() {
             </div>
 
             <div className="mt-2 text-[8px] text-slate-500">
-              {activeSetup.symbol} · {activeSetup.tf}
+              {activeSetup.symbol} Â· {activeSetup.tf}
             </div>
 
             {pattern ? (
@@ -1208,7 +1208,7 @@ export default function HarmonicScannerPage() {
                   {pattern.points.map((p) => (
                     <div key={p.label} className="flex justify-between text-[8px]">
                       <span className="text-slate-500">
-                        {p.label} · candle {p.index}
+                        {p.label} Â· candle {p.index}
                       </span>
                       <span className="font-semibold">
                         {p.price.toFixed(4)}
@@ -1289,7 +1289,7 @@ export default function HarmonicScannerPage() {
                 Aktywne formacje harmoniczne ({activeRows.length})
               </h2>
               <p className="mt-1 text-[8px] text-sky-100/40">
-                Aktualne setupy z PRZ, SL, TP i RRR. Kliknij wiersz, aby otworzyć formację na wykresie.
+                Aktualne setupy z PRZ, SL, TP i RRR. Kliknij wiersz, aby otworzyÄ‡ formacjÄ™ na wykresie.
               </p>
             </div>
 
@@ -1310,9 +1310,9 @@ export default function HarmonicScannerPage() {
                     "TF",
                     "Formacja",
                     "Kierunek",
-                    "Trafność",
+                    "TrafnoÅ›Ä‡",
                     "Wiek",
-                    "Wejście / PRZ",
+                    "WejÅ›cie / PRZ",
                     "SL",
                     "TP1",
                     "TP2",
@@ -1412,3 +1412,4 @@ export default function HarmonicScannerPage() {
     </main>
   );
 }
+

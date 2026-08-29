@@ -1,4 +1,4 @@
-import { cookies } from "next/headers";
+﻿import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
@@ -24,12 +24,12 @@ export async function POST() {
 
     if (!stat || stat.availablePayout <= 0) {
       return NextResponse.json(
-        { error: "Brak środków do wypłaty" },
+        { error: "Brak Å›rodkÃ³w do wypÅ‚aty" },
         { status: 400 }
       );
     }
 
-    // 🔥 CREATE PAYOUT
+    // ðŸ”¥ CREATE PAYOUT
     await prisma.payoutRequest.create({
       data: {
         userId,
@@ -38,7 +38,7 @@ export async function POST() {
       },
     });
 
-    // 🔥 RESET SALDA
+    // ðŸ”¥ RESET SALDA
     await prisma.affiliateStat.update({
       where: { userId },
       data: {
@@ -50,7 +50,7 @@ export async function POST() {
   } catch (e) {
     console.error("PAYOUT ERROR:", e);
     return NextResponse.json(
-      { error: "Błąd serwera" },
+      { error: "BÅ‚Ä…d serwera" },
       { status: 500 }
     );
   }

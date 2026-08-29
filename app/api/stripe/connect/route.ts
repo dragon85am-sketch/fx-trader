@@ -1,11 +1,9 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2026-03-25.dahlia",
-});
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 export async function POST() {
   try {
@@ -30,12 +28,14 @@ export async function POST() {
 
     if (!user) {
       return NextResponse.json(
-        { error: "Nie znaleziono użytkownika" },
+        { error: "Nie znaleziono uÅ¼ytkownika" },
         { status: 404 }
       );
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const appUrl =
+      process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+
     console.log("CONNECT APP URL:", appUrl);
 
     let accountId = user.stripeAccountId;
@@ -43,17 +43,22 @@ export async function POST() {
     if (!accountId) {
       const account = await stripe.accounts.create({
         type: "express",
-        email: user.email,
+        email: user.email || undefined,
         capabilities: {
-          transfers: { requested: true },
+          transfers: {
+            requested: true,
+          },
         },
       });
 
       accountId = account.id;
+
       console.log("CONNECT ACCOUNT CREATED:", accountId);
 
       await prisma.user.update({
-        where: { id: user.id },
+        where: {
+          id: user.id,
+        },
         data: {
           stripeAccountId: accountId,
         },
@@ -80,10 +85,15 @@ export async function POST() {
 
     return NextResponse.json(
       {
-        error: "Nie udało się rozpocząć onboardingu Stripe Connect",
-        details: error instanceof Error ? error.message : "Unknown error",
+        error: "Nie udaÅ‚o siÄ™ rozpoczÄ…Ä‡ onboardingu Stripe Connect",
+        details:
+          error instanceof Error
+            ? error.message
+            : "Unknown error",
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 }

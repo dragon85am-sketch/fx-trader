@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React from "react";
 import type { CandlestickData, UTCTimestamp } from "lightweight-charts";
@@ -271,8 +271,8 @@ function normTime(t: any): number {
 }
 
 /**
- * Jeśli liveCandle aktualizuje tę samą świecę co ostatnia w candles,
- * to ta ostatnia NIE jest zamknięta -> bierzemy candles[length-2].
+ * JeÅ›li liveCandle aktualizuje tÄ™ samÄ… Å›wiecÄ™ co ostatnia w candles,
+ * to ta ostatnia NIE jest zamkniÄ™ta -> bierzemy candles[length-2].
  */
 function getLastClosedCandle(candles: Candle[], liveCandle?: CandlestickData | Candle | null): Candle | null {
   if (!candles.length) return null;
@@ -288,7 +288,7 @@ function getLastClosedCandle(candles: Candle[], liveCandle?: CandlestickData | C
   return last;
 }
 
-/** dotknięcie entry (wick lub body) */
+/** dotkniÄ™cie entry (wick lub body) */
 function isEntryTouched(c: Candle | null, entry: number) {
   if (!c) return false;
   const lo = Math.min(c.low, c.high);
@@ -309,11 +309,11 @@ export default function ScannerChart({
   zoneTicks = 20,
   slBufferTicks = 2,
 }: Props) {
-  // pending = wykryte levele, ale jeszcze NIE zamrożone
+  // pending = wykryte levele, ale jeszcze NIE zamroÅ¼one
   const [armed, setArmed] = React.useState(false);
   const [pending, setPending] = React.useState<{ side?: "BUY" | "SELL"; levels?: Levels } | null>(null);
 
-  // frozen = zamrożone levele po spełnieniu warunku na ZAMKNIĘTEJ świecy
+  // frozen = zamroÅ¼one levele po speÅ‚nieniu warunku na ZAMKNIÄ˜TEJ Å›wiecy
   const [frozen, setFrozen] = React.useState<{ ready: boolean; side?: "BUY" | "SELL"; levels?: Levels }>({ ready: false });
 
   // HA / RENKO UI state
@@ -321,7 +321,7 @@ export default function ScannerChart({
   const [renko, setRenko] = React.useState(false);
   const [renkoBoxSize, setRenkoBoxSize] = React.useState<number | undefined>(undefined);
 
-  // 1) wykryj setup -> ustaw pending (ale nie zamrażaj)
+  // 1) wykryj setup -> ustaw pending (ale nie zamraÅ¼aj)
   React.useEffect(() => {
     const safe = (candles ?? []).map(toCandle);
 
@@ -341,7 +341,7 @@ export default function ScannerChart({
       return;
     }
 
-    // jeśli już zamrożone — nie zmieniaj
+    // jeÅ›li juÅ¼ zamroÅ¼one â€” nie zmieniaj
     if (frozen.levels) {
       setFrozen((p) => ({ ...p, ready: true }));
       return;
@@ -355,13 +355,13 @@ export default function ScannerChart({
       return;
     }
 
-    // mamy levels => uzbrój (pending) i czekaj na ZAMKNIĘTĄ świecę dotykającą entry
+    // mamy levels => uzbrÃ³j (pending) i czekaj na ZAMKNIÄ˜TÄ„ Å›wiecÄ™ dotykajÄ…cÄ… entry
     setFrozen({ ready: true });
     setArmed(true);
     setPending({ side: res.side, levels: res.levels });
   }, [candles, trend, liquidityPct, tickSize, slBufferTicks, zoneTicks, frozen.levels]);
 
-  // 2) zamroź dopiero gdy ZAMKNIĘTA świeca dotknie entry
+  // 2) zamroÅº dopiero gdy ZAMKNIÄ˜TA Å›wieca dotknie entry
   React.useEffect(() => {
     if (!armed) return;
     if (frozen.levels) return;
@@ -379,7 +379,7 @@ export default function ScannerChart({
 
   const ready = frozen.ready;
 
-  // ✅ pokaż levele nawet jak jeszcze nie zamrożone (pending)
+  // âœ… pokaÅ¼ levele nawet jak jeszcze nie zamroÅ¼one (pending)
   const levelsToShow = frozen.levels ?? pending?.levels ?? null;
   const hasLevelsToShow = !!levelsToShow;
 
@@ -391,7 +391,7 @@ export default function ScannerChart({
       <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 flex-wrap">
           <div className="text-sm font-semibold text-slate-100">
-            {symbol} {tf ? <span className="text-slate-300/70">• {tf}</span> : null}
+            {symbol} {tf ? <span className="text-slate-300/70">â€¢ {tf}</span> : null}
           </div>
 
           <div className="flex items-center gap-2">
@@ -467,14 +467,14 @@ export default function ScannerChart({
         <div className="text-xs text-white/70">
           {hasLevelsToShow ? (
             <>
-              <span className="text-white font-semibold">{frozen.side ?? pending?.side ?? "—"}</span>
-              <span className="text-white/50"> • </span>
+              <span className="text-white font-semibold">{frozen.side ?? pending?.side ?? "â€”"}</span>
+              <span className="text-white/50"> â€¢ </span>
               RR <span className="text-white">{levelsToShow!.rr.toFixed(2)}</span>
-              <span className="text-white/30"> • </span>
-              <span className="text-white/60">Zones: ±{zoneTicks} ticks</span>
+              <span className="text-white/30"> â€¢ </span>
+              <span className="text-white/60">Zones: Â±{zoneTicks} ticks</span>
             </>
           ) : (
-            <span className="text-white/40">—</span>
+            <span className="text-white/40">â€”</span>
           )}
         </div>
       </div>

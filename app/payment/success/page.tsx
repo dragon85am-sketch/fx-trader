@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -98,11 +98,11 @@ export default function PaymentSuccessPage() {
             <Loader2 className="mx-auto h-12 w-12 animate-spin text-sky-400" />
 
             <h1 className="mt-5 text-2xl font-black">
-              Płatność przyjęta
+              PÅ‚atnoÅ›Ä‡ przyjÄ™ta
             </h1>
 
             <p className="mt-2 text-sm leading-6 text-slate-300">
-              Potwierdzamy płatność i aktywujemy Twoje konto Premium.
+              Potwierdzamy pÅ‚atnoÅ›Ä‡ i aktywujemy Twoje konto Premium.
             </p>
 
             <div className="mt-6 rounded-2xl border border-sky-400/10 bg-black/10 px-4 py-4">
@@ -123,7 +123,7 @@ export default function PaymentSuccessPage() {
               </div>
 
               <p className="mt-3 text-xs text-slate-400">
-                Może to potrwać kilka sekund.
+                MoÅ¼e to potrwaÄ‡ kilka sekund.
               </p>
             </div>
           </>
@@ -134,11 +134,11 @@ export default function PaymentSuccessPage() {
             <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-400" />
 
             <h1 className="mt-5 text-2xl font-black">
-              Dostęp Premium aktywowany
+              DostÄ™p Premium aktywowany
             </h1>
 
             <p className="mt-2 text-sm text-slate-300">
-              Wszystko gotowe. Przekierowujemy Cię do dashboardu...
+              Wszystko gotowe. Przekierowujemy CiÄ™ do dashboardu...
             </p>
           </>
         )}
@@ -148,17 +148,17 @@ export default function PaymentSuccessPage() {
             <AlertCircle className="mx-auto h-12 w-12 text-amber-400" />
 
             <h1 className="mt-5 text-2xl font-black">
-              Aktywacja trwa dłużej
+              Aktywacja trwa dÅ‚uÅ¼ej
             </h1>
 
             <p className="mt-2 text-sm leading-6 text-slate-300">
-              Płatność została przyjęta, ale nadal czekamy na
+              PÅ‚atnoÅ›Ä‡ zostaÅ‚a przyjÄ™ta, ale nadal czekamy na
               potwierdzenie aktywacji konta Premium.
             </p>
 
             <p className="mt-2 text-xs leading-5 text-slate-400">
-              Nie wykonuj ponownie płatności. Spróbuj ponownie
-              sprawdzić dostęp.
+              Nie wykonuj ponownie pÅ‚atnoÅ›ci. SprÃ³buj ponownie
+              sprawdziÄ‡ dostÄ™p.
             </p>
 
             <button
@@ -167,7 +167,7 @@ export default function PaymentSuccessPage() {
               className="mt-6 inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 px-6 py-3 font-bold transition hover:brightness-110"
             >
               <RefreshCw className="h-4 w-4" />
-              Sprawdź ponownie
+              SprawdÅº ponownie
             </button>
           </>
         )}

@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+﻿import { NextRequest } from "next/server";
 
 export async function GET(req: NextRequest) {
   try {
@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
 
     const data = await res.json();
 
-    // ===== DEBUG (możesz usunąć później) =====
+    // ===== DEBUG (moÅ¼esz usunÄ…Ä‡ pÃ³Åºniej) =====
     console.log("FINNHUB RESPONSE:", {
       symbol,
       resolution,

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React from "react";
 import Link from "next/link";
@@ -157,7 +157,7 @@ function ZoneChart({ side }: { side: "BUY" | "SELL" }) {
             buy ? "bottom-2 text-emerald-300" : "top-2 text-rose-300"
           )}
         >
-          {buy ? "STREFA POPYTU" : "STREFA PODAŻY"}
+          {buy ? "STREFA POPYTU" : "STREFA PODAÅ»Y"}
         </span>
       </div>
 
@@ -216,7 +216,7 @@ function EntryChart({ side }: { side: "BUY" | "SELL" }) {
           buy ? "top-8 text-emerald-300" : "bottom-8 text-rose-300"
         )}
       >
-        WEJŚCIE ↘
+        WEJÅšCIE â†˜
       </div>
 
       <div
@@ -318,7 +318,7 @@ function SetupCard({ side, title, bias, confirmations }: SetupCardProps) {
         <div className="grid gap-2">
           {confirmations.map((item) => (
             <div key={item} className="flex gap-2 text-[10px] text-sky-100/65">
-              <span className={buy ? "text-emerald-400" : "text-rose-400"}>✓</span>
+              <span className={buy ? "text-emerald-400" : "text-rose-400"}>âœ“</span>
               <span>{item}</span>
             </div>
           ))}
@@ -332,15 +332,15 @@ export default function DayTradingPage() {
   const paid = true;
 
   const checklist = [
-    "Określiłem trend na H1",
-    "Zaznaczyłem strefę popytu / podaży",
+    "OkreÅ›liÅ‚em trend na H1",
+    "ZaznaczyÅ‚em strefÄ™ popytu / podaÅ¼y",
     "Czekam na setup na M15",
-    "Świeca sygnałowa potwierdzona",
+    "Åšwieca sygnaÅ‚owa potwierdzona",
     "SL ustawiony za swingiem",
     "RR minimum 1.5R",
-    "Ryzyko maks. 1–1.5%",
-    "Zarządzam pozycją zgodnie z planem",
-    "Zamykam pozycję przed końcem sesji",
+    "Ryzyko maks. 1â€“1.5%",
+    "ZarzÄ…dzam pozycjÄ… zgodnie z planem",
+    "Zamykam pozycjÄ™ przed koÅ„cem sesji",
   ];
 
   return (
@@ -353,7 +353,7 @@ export default function DayTradingPage() {
           <div className="relative grid gap-6 xl:grid-cols-[1.05fr_.95fr] xl:items-center">
             <div>
               <div className="mb-3 inline-flex items-center gap-2 rounded-xl border border-amber-400/25 bg-amber-500/10 px-3 py-2">
-                <span className="text-xl">♛</span>
+                <span className="text-xl">â™›</span>
                 <span className="text-[10px] font-black uppercase tracking-[.20em] text-amber-300">
                   FX TRADE PREMIUM
                 </span>
@@ -367,17 +367,17 @@ export default function DayTradingPage() {
               </h1>
 
               <div className="mt-2 text-sm font-black uppercase tracking-[.16em] text-cyan-300 md:text-base">
-                Trend • Struktura • Strefy • Timing
+                Trend â€¢ Struktura â€¢ Strefy â€¢ Timing
               </div>
 
               <p className="mt-4 max-w-3xl text-sm leading-6 text-sky-100/60">
                 Profesjonalna strategia dzienna oparta na trendzie, strukturze rynku i
-                precyzyjnym wejściu. Proste zasady. Jasny plan. Konsekwentne wyniki.
+                precyzyjnym wejÅ›ciu. Proste zasady. Jasny plan. Konsekwentne wyniki.
               </p>
 
               <div className="mt-5 flex flex-wrap gap-2">
                 <Pill className="border-cyan-400/20 bg-cyan-400/10 text-cyan-200">
-                  H1 → M15
+                  H1 â†’ M15
                 </Pill>
                 <Pill className="border-emerald-400/20 bg-emerald-400/10 text-emerald-200">
                   RR 2R+
@@ -402,48 +402,48 @@ export default function DayTradingPage() {
         {/* CHARACTERISTICS */}
         <section className="rounded-[20px] border border-cyan-400/15 bg-[#04111f] p-4">
           <div className="mb-4 flex items-center gap-2">
-            <span className="text-xl text-amber-300">◎</span>
+            <span className="text-xl text-amber-300">â—Ž</span>
             <h2 className="text-[15px] font-black uppercase tracking-[.08em] text-cyan-300">
               Charakterystyka strategii
             </h2>
           </div>
 
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <Metric icon="📈" label="Timeframe" value="M15 / H1" sub="Analiza H1 • Wejście M15" />
-            <Metric icon="◷" label="Sesje" value="London / New York" sub="08:00–12:00 • 14:00–18:00" />
-            <Metric icon="↗" label="Średni RR" value="2.0R+" sub="Minimum 1.5R" />
-            <Metric icon="⌛" label="Średni czas" value="1–4 godziny" sub="Pozycje zamykane tego samego dnia" />
+            <Metric icon="ðŸ“ˆ" label="Timeframe" value="M15 / H1" sub="Analiza H1 â€¢ WejÅ›cie M15" />
+            <Metric icon="â—·" label="Sesje" value="London / New York" sub="08:00â€“12:00 â€¢ 14:00â€“18:00" />
+            <Metric icon="â†—" label="Åšredni RR" value="2.0R+" sub="Minimum 1.5R" />
+            <Metric icon="âŒ›" label="Åšredni czas" value="1â€“4 godziny" sub="Pozycje zamykane tego samego dnia" />
           </div>
         </section>
 
         {/* RULES */}
         <section className="rounded-[20px] border border-cyan-400/15 bg-[#04111f] p-5">
           <div className="mb-5 flex items-center gap-2">
-            <span className="text-xl">⚙</span>
+            <span className="text-xl">âš™</span>
             <h2 className="text-[15px] font-black uppercase tracking-[.08em] text-cyan-300">
-              Zasady działania
+              Zasady dziaÅ‚ania
             </h2>
           </div>
 
           <div className="grid items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-3 min-[1700px]:grid-cols-5">
-            <Step n={1} icon="📊" title="Analiza trendu H1" image="/strategie/day-trading/rules/rule-1-trend.png">
-              Określ kierunek rynku. Szukaj HH/HL dla BUY lub LH/LL dla SELL.
-              Pomocniczo użyj EMA 50/200.
+            <Step n={1} icon="ðŸ“Š" title="Analiza trendu H1" image="/strategie/day-trading/rules/rule-1-trend.png">
+              OkreÅ›l kierunek rynku. Szukaj HH/HL dla BUY lub LH/LL dla SELL.
+              Pomocniczo uÅ¼yj EMA 50/200.
             </Step>
-            <Step n={2} icon="▣" title="Znajdź strefę" image="/strategie/day-trading/rules/rule-2-zone.png">
-              Zidentyfikuj wsparcie, opór, FVG, Order Block lub kluczowy poziom
-              płynności.
+            <Step n={2} icon="â–£" title="ZnajdÅº strefÄ™" image="/strategie/day-trading/rules/rule-2-zone.png">
+              Zidentyfikuj wsparcie, opÃ³r, FVG, Order Block lub kluczowy poziom
+              pÅ‚ynnoÅ›ci.
             </Step>
-            <Step n={3} icon="🎯" title="Wejście M15" image="/strategie/day-trading/rules/rule-3-entry.png">
+            <Step n={3} icon="ðŸŽ¯" title="WejÅ›cie M15" image="/strategie/day-trading/rules/rule-3-entry.png">
               Szukaj pin bara, engulfingu, breakout + retestu albo silnej reakcji ze
               strefy.
             </Step>
-            <Step n={4} icon="〽" title="Zarządzaj pozycją" image="/strategie/day-trading/rules/rule-4-manage.png">
-              SL za swingiem. TP 1.5R–3R. Po 1R możesz przesunąć SL na BE lub realizować
-              część zysku.
+            <Step n={4} icon="ã€½" title="ZarzÄ…dzaj pozycjÄ…" image="/strategie/day-trading/rules/rule-4-manage.png">
+              SL za swingiem. TP 1.5Râ€“3R. Po 1R moÅ¼esz przesunÄ…Ä‡ SL na BE lub realizowaÄ‡
+              czÄ™Å›Ä‡ zysku.
             </Step>
-            <Step n={5} icon="🛡" title="Zamknięcie" image="/strategie/day-trading/rules/rule-5-risk.png">
-              Nie trzymaj pozycji na noc. Zamknij przed końcem sesji lub po osiągnięciu
+            <Step n={5} icon="ðŸ›¡" title="ZamkniÄ™cie" image="/strategie/day-trading/rules/rule-5-risk.png">
+              Nie trzymaj pozycji na noc. Zamknij przed koÅ„cem sesji lub po osiÄ…gniÄ™ciu
               celu.
             </Step>
           </div>
@@ -452,18 +452,18 @@ export default function DayTradingPage() {
         {/* MAPA DNIA */}
         <section className="rounded-[20px] border border-cyan-400/15 bg-[#04111f] p-4">
           <div className="mb-4 flex items-center gap-2">
-            <span className="text-xl text-cyan-300">⌖</span>
+            <span className="text-xl text-cyan-300">âŒ–</span>
             <h2 className="text-[15px] font-black uppercase tracking-[.08em] text-cyan-300">
-              Mapa dnia przed wejściem
+              Mapa dnia przed wejÅ›ciem
             </h2>
           </div>
 
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             {[
               ["1", "Bias H1", "Najpierw ustal kierunek: BUY, SELL albo brak trade."],
-              ["2", "Kluczowe strefy", "Zaznacz wsparcie, opór, FVG, Order Block i płynność."],
-              ["3", "Scenariusz A / B", "Zapisz co musi się wydarzyć, aby wejście było ważne."],
-              ["4", "Timing M15", "Czekaj na reakcję świecową, breakout + retest lub engulfing."],
+              ["2", "Kluczowe strefy", "Zaznacz wsparcie, opÃ³r, FVG, Order Block i pÅ‚ynnoÅ›Ä‡."],
+              ["3", "Scenariusz A / B", "Zapisz co musi siÄ™ wydarzyÄ‡, aby wejÅ›cie byÅ‚o waÅ¼ne."],
+              ["4", "Timing M15", "Czekaj na reakcjÄ™ Å›wiecowÄ…, breakout + retest lub engulfing."],
             ].map(([n, title, desc]) => (
               <div key={title} className="rounded-xl border border-cyan-400/10 bg-[#071728] p-4">
                 <div className="flex items-center gap-2">
@@ -483,9 +483,9 @@ export default function DayTradingPage() {
         {/* SETUPS */}
         <section className="rounded-[20px] border border-cyan-400/15 bg-[#04111f] p-4">
           <div className="mb-4 flex items-center gap-2">
-            <span className="text-xl text-cyan-300">☆</span>
+            <span className="text-xl text-cyan-300">â˜†</span>
             <h2 className="text-[15px] font-black uppercase tracking-[.08em] text-cyan-300">
-              Przykłady setupów
+              PrzykÅ‚ady setupÃ³w
             </h2>
           </div>
 
@@ -497,10 +497,10 @@ export default function DayTradingPage() {
               confirmations={[
                 "Trend wzrostowy H1 (HH/HL)",
                 "Cena w strefie popytu / wsparcia / FVG / Order Block",
-                "Silna reakcja świecowa na M15",
+                "Silna reakcja Å›wiecowa na M15",
                 "Pin Bar / Engulfing / Breakout + Retest",
                 "SL za swing low",
-                "RR minimum 1.5R — cel 2R+",
+                "RR minimum 1.5R â€” cel 2R+",
               ]}
             />
 
@@ -510,11 +510,11 @@ export default function DayTradingPage() {
               bias="TREND SPADKOWY"
               confirmations={[
                 "Trend spadkowy H1 (LH/LL)",
-                "Cena w strefie podaży / oporu / FVG / Order Block",
-                "Silna reakcja świecowa na M15",
+                "Cena w strefie podaÅ¼y / oporu / FVG / Order Block",
+                "Silna reakcja Å›wiecowa na M15",
                 "Pin Bar / Engulfing / Breakout + Retest",
                 "SL za swing high",
-                "RR minimum 1.5R — cel 2R+",
+                "RR minimum 1.5R â€” cel 2R+",
               ]}
             />
           </div>
@@ -525,7 +525,7 @@ export default function DayTradingPage() {
           <Card className="border-cyan-400/15 bg-[#04111f]">
             <CardContent className="p-5">
               <div className="mb-4 flex items-center gap-2">
-                <span className="text-xl">☑</span>
+                <span className="text-xl">â˜‘</span>
                 <h3 className="text-[14px] font-black uppercase text-cyan-300">
                   Checklista tradera
                 </h3>
@@ -548,18 +548,18 @@ export default function DayTradingPage() {
           <Card className="border-cyan-400/15 bg-[#04111f]">
             <CardContent className="p-5">
               <div className="mb-4 flex items-center gap-2">
-                <span className="text-xl">🛡</span>
+                <span className="text-xl">ðŸ›¡</span>
                 <h3 className="text-[14px] font-black uppercase text-cyan-300">
-                  Zarządzanie ryzykiem
+                  ZarzÄ…dzanie ryzykiem
                 </h3>
               </div>
 
               <div className="space-y-3">
                 {[
-                  ["%", "Ryzyko na trade", "Maks. 1%–1.5% kapitału"],
-                  ["⚖", "RR minimalne", "1.5R — celuj w 2R+"],
-                  ["◔", "Częściowa realizacja", "TP1: 1R • TP2: 2R+"],
-                  ["↗", "Przesuwanie SL", "Po 1R ustaw SL na BE"],
+                  ["%", "Ryzyko na trade", "Maks. 1%â€“1.5% kapitaÅ‚u"],
+                  ["âš–", "RR minimalne", "1.5R â€” celuj w 2R+"],
+                  ["â—”", "CzÄ™Å›ciowa realizacja", "TP1: 1R â€¢ TP2: 2R+"],
+                  ["â†—", "Przesuwanie SL", "Po 1R ustaw SL na BE"],
                 ].map(([icon, title, text]) => (
                   <div
                     key={title}
@@ -583,7 +583,7 @@ export default function DayTradingPage() {
           <Card className="border-cyan-400/15 bg-[#04111f]">
             <CardContent className="p-5">
               <div className="mb-4 flex items-center gap-2">
-                <span className="text-xl">🌐</span>
+                <span className="text-xl">ðŸŒ</span>
                 <h3 className="text-[14px] font-black uppercase text-cyan-300">
                   Najlepsze sesje
                 </h3>
@@ -591,9 +591,9 @@ export default function DayTradingPage() {
 
               <div className="space-y-3">
                 {[
-                  ["🇬🇧", "LONDYN", "08:00 – 12:00", "NAJLEPSZA"],
-                  ["🇺🇸", "NOWY JORK", "14:00 – 18:00", "BARDZO DOBRA"],
-                  ["🇬🇧🇺🇸", "NAKŁADANIE SESJI", "13:00 – 16:00", "IDEALNA"],
+                  ["ðŸ‡¬ðŸ‡§", "LONDYN", "08:00 â€“ 12:00", "NAJLEPSZA"],
+                  ["ðŸ‡ºðŸ‡¸", "NOWY JORK", "14:00 â€“ 18:00", "BARDZO DOBRA"],
+                  ["ðŸ‡¬ðŸ‡§ðŸ‡ºðŸ‡¸", "NAKÅADANIE SESJI", "13:00 â€“ 16:00", "IDEALNA"],
                 ].map(([flag, name, time, rating]) => (
                   <div
                     key={name}
@@ -605,7 +605,7 @@ export default function DayTradingPage() {
                       <div className="mt-1 text-[11px] text-sky-100/60">{time}</div>
                     </div>
                     <div className="text-right">
-                      <div className="mb-1 text-lg text-emerald-400">▮▮▮</div>
+                      <div className="mb-1 text-lg text-emerald-400">â–®â–®â–®</div>
                       <div className="text-[8px] font-black text-cyan-300">{rating}</div>
                     </div>
                   </div>
@@ -619,23 +619,23 @@ export default function DayTradingPage() {
         <section className="rounded-[20px] border border-amber-400/20 bg-[linear-gradient(90deg,#0b1420,#111728,#0b1420)] p-5">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-4">
-              <div className="text-3xl text-amber-300">💡</div>
+              <div className="text-3xl text-amber-300">ðŸ’¡</div>
               <div>
                 <div className="text-[15px] font-black uppercase tracking-[.08em] text-amber-300">
-                  Pamiętaj
+                  PamiÄ™taj
                 </div>
                 <div className="mt-1 text-sm font-semibold text-white">
-                  PLAN + DYSCYPLINA + CIERPLIWOŚĆ = SUKCES
+                  PLAN + DYSCYPLINA + CIERPLIWOÅšÄ† = SUKCES
                 </div>
                 <div className="mt-1 text-[11px] text-sky-100/50">
-                  Nie szukaj transakcji na siłę — czekaj na idealny setup zgodny z planem.
+                  Nie szukaj transakcji na siÅ‚Ä™ â€” czekaj na idealny setup zgodny z planem.
                 </div>
               </div>
             </div>
 
             <div className="flex gap-2">
               <Link href="/strategie">
-                <Button variant="outline">← Strategie</Button>
+                <Button variant="outline">â† Strategie</Button>
               </Link>
 
               {!paid ? (
@@ -650,3 +650,4 @@ export default function DayTradingPage() {
     </main>
   );
 }
+

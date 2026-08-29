@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 
@@ -49,12 +49,12 @@ export async function PATCH(req: Request) {
     return NextResponse.json({
       ok: true,
       user: updatedUser,
-      message: "Ustawienia zostały zapisane",
+      message: "Ustawienia zostaÅ‚y zapisane",
     });
   } catch (error) {
     console.error("PATCH /api/settings/profile error:", error);
     return NextResponse.json(
-      { error: "Błąd serwera" },
+      { error: "BÅ‚Ä…d serwera" },
       { status: 500 }
     );
   }

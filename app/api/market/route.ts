@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 
 const SYMBOL_MAP: Record<string, string> = {
   EURUSD: "EUR/USD",
@@ -88,3 +88,4 @@ export async function GET(request: Request) {
     );
   }
 }
+

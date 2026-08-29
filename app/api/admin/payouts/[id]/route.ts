@@ -5,9 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { sendEmail } from "@/lib/email";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2026-03-25.dahlia",
-});
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 type PatchContext = {
   params: Promise<{ id: string }>;

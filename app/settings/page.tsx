@@ -1,4 +1,4 @@
-import { requireServerUser } from "@/lib/server-auth";
+﻿import { requireServerUser } from "@/lib/server-auth";
 import SettingsClient from "@/components/settings/SettingsClient";
 
 export default async function SettingsPage() {

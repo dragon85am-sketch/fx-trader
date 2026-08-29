@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import {
@@ -19,7 +19,7 @@ type ScannerCard = {
   title: string;
   description: string;
   href: string;
-  badge: "POPULARNY" | "PREMIUM" | "NOWOŚĆ";
+  badge: "POPULARNY" | "PREMIUM" | "NOWOÅšÄ†";
   image: string;
   accent: "blue" | "green" | "violet" | "cyan" | "gold";
   features: string[];
@@ -37,7 +37,7 @@ const scanners: ScannerCard[] = [
       "Pary walutowe Forex",
       "Filtry techniczne (EMA, RSI, ADX)",
       "Poziomy wsparcia i oporu",
-      "Sygnały wejścia i wyjścia",
+      "SygnaÅ‚y wejÅ›cia i wyjÅ›cia",
     ],
   },
   {
@@ -49,14 +49,14 @@ const scanners: ScannerCard[] = [
     accent: "green",
     features: [
       "Formacje harmoniczne (Gartley, Bat)",
-      "Automatyczne wykrywanie wzorców",
+      "Automatyczne wykrywanie wzorcÃ³w",
       "Poziomy Fibo i PRZ",
-      "Wskaźnik skuteczności formacji",
+      "WskaÅºnik skutecznoÅ›ci formacji",
     ],
   },
   {
     title: "PRO SESSION Scanner",
-    description: "GOLD & US30 · New York Session",
+    description: "GOLD & US30 Â· New York Session",
     href: "/skaner/pro",
     badge: "PREMIUM",
     image: "/pro-session-scanner-card.png",
@@ -72,25 +72,25 @@ const scanners: ScannerCard[] = [
     title: "Alpha Scanner",
     description: "AI market scanner with confirmations",
     href: "/skaner/alpha",
-    badge: "NOWOŚĆ",
+    badge: "NOWOÅšÄ†",
     image: "/alpha-scanner.png",
     accent: "cyan",
     features: [
-      "AI analiza rynków",
+      "AI analiza rynkÃ³w",
       "Potwierdzenia wieloczynnikowe",
       "Skanowanie sentymentu",
       "Inteligentne alerty i powiadomienia",
     ],
   },  {
     title: "GOLD Scalping Scanner",
-    description: "XAUUSD · Momentum Scalping M1 / M5",
+    description: "XAUUSD Â· Momentum Scalping M1 / M5",
     href: "/skaner/gold",
-    badge: "NOWOŚĆ",
+    badge: "NOWOÅšÄ†",
     image: "/gold-scalping-scanner.png",
     accent: "gold",
     features: [
       "XAUUSD scalping M1 / M5",
-      "Momentum Score ≥ 70",
+      "Momentum Score â‰¥ 70",
       "Liquidity Sweep + BOS / CHOCH",
       "Setup Score + Entry / SL / TP",
     ],
@@ -147,7 +147,7 @@ function Badge({ badge }: { badge: ScannerCard["badge"] }) {
   const cls =
     badge === "PREMIUM"
       ? "border-violet-400/25 bg-violet-500/10 text-violet-300"
-      : badge === "NOWOŚĆ"
+      : badge === "NOWOÅšÄ†"
       ? "border-cyan-400/25 bg-cyan-500/10 text-cyan-300"
       : "border-sky-400/25 bg-sky-500/10 text-sky-300";
 
@@ -199,8 +199,8 @@ export default function SkanerPage() {
 
             <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
               {[
-                [ScanSearch, "5", "Skanery dostępne"],
-                [TrendingUp, "10+", "Rynki obsługiwane"],
+                [ScanSearch, "5", "Skanery dostÄ™pne"],
+                [TrendingUp, "10+", "Rynki obsÅ‚ugiwane"],
                 [Zap, "24/7", "Skanowanie realtime"],
                 [BrainCircuit, "AI", "Inteligentne analizy"],
               ].map(([Icon, value, label], index) => {
@@ -281,7 +281,7 @@ export default function SkanerPage() {
                   href={scanner.href}
                   className={`mt-5 flex w-full items-center justify-center gap-2 rounded-[9px] border px-4 py-2.5 text-[10px] font-bold text-white transition hover:brightness-110 ${a.button}`}
                 >
-                  Otwórz skaner
+                  OtwÃ³rz skaner
                   <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
               </article>
@@ -300,14 +300,14 @@ export default function SkanerPage() {
               <div>
                 <h3 className="text-[14px] font-semibold">Inteligentne skanowanie rynku</h3>
                 <p className="mt-1 max-w-[760px] text-[9px] leading-4 text-sky-100/45">
-                  Nasze skanery wykorzystują zaawansowane algorytmy do analizy rynku w czasie rzeczywistym.
-                  Wybierz skaner dopasowany do Twojej strategii i zacznij znajdować najlepsze okazje.
+                  Nasze skanery wykorzystujÄ… zaawansowane algorytmy do analizy rynku w czasie rzeczywistym.
+                  Wybierz skaner dopasowany do Twojej strategii i zacznij znajdowaÄ‡ najlepsze okazje.
                 </p>
               </div>
             </div>
 
             <button className="inline-flex items-center justify-center gap-2 rounded-[9px] border border-cyan-300/35 bg-[linear-gradient(90deg,#0b67c2,#089bd8)] px-4 py-2.5 text-[9px] font-semibold text-white shadow-[0_0_18px_rgba(34,211,238,.16)] transition hover:brightness-110 hover:shadow-[0_0_26px_rgba(34,211,238,.28)]">
-              Jak używać skanerów?
+              Jak uÅ¼ywaÄ‡ skanerÃ³w?
               <ArrowRight className="h-3.5 w-3.5" />
             </button>
           </div>
@@ -316,3 +316,4 @@ export default function SkanerPage() {
     </main>
   );
 }
+

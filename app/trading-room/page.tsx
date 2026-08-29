@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import TradingRoomPanel from "@/components/trading-room/TradingRoomPanel";
 

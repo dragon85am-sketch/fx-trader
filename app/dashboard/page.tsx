@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requirePremiumUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
@@ -42,7 +42,7 @@ type DashboardCard = {
 const cards: DashboardCard[] = [
   {
     title: "Journal",
-    description: "Dziennik tradingowy i analiza zagrań.",
+    description: "Dziennik tradingowy i analiza zagraÅ„.",
     href: "/journal",
     stat: "24 WPISY",
     icon: BookOpen,
@@ -52,14 +52,14 @@ const cards: DashboardCard[] = [
     description: "Live market, raporty i performance AI.",
     href: "/trading-room",
     badge: "LIVE",
-    stat: "6 MODUŁÓW",
+    stat: "6 MODUÅÃ“W",
     icon: CandlestickChart,
   },
   {
     title: "Profit Calendar",
-    description: "Kalendarz wyników i podsumowań tradingu.",
+    description: "Kalendarz wynikÃ³w i podsumowaÅ„ tradingu.",
     href: "/trading-room?tab=calendar",
-    stat: "MIESIĘCZNY VIEW",
+    stat: "MIESIÄ˜CZNY VIEW",
     icon: CalendarDays,
   },
   {
@@ -79,7 +79,7 @@ const cards: DashboardCard[] = [
   },
   {
     title: "Affiliate Hub",
-    description: "Panel partnera, kampanie, prowizje i wypłaty.",
+    description: "Panel partnera, kampanie, prowizje i wypÅ‚aty.",
     href: "/dashboard/affiliate",
     badge: "NEW",
     stat: "385 AVG",
@@ -87,14 +87,14 @@ const cards: DashboardCard[] = [
   },
   {
     title: "Education",
-    description: "FX Trade Academy, setupy i bonusowe materiały.",
+    description: "FX Trade Academy, setupy i bonusowe materiaÅ‚y.",
     href: "/education",
     stat: "12 LEKCJI",
     icon: GraduationCap,
   },
   {
     title: "Sesje / Webinary",
-    description: "Dołącz do sesji live i webinarów premium.",
+    description: "DoÅ‚Ä…cz do sesji live i webinarÃ³w premium.",
     href: "/sesje",
     badge: "LIVE",
     stat: "2 W TYM TYGODNIU",
@@ -251,7 +251,7 @@ function ModuleCard({
           </span>
 
           <span className="inline-flex items-center gap-1 rounded-full border border-[#0d579e] bg-[#156ca9] px-3 py-1.5 text-[10px] font-medium text-sky-50/90 transition group-hover:border-sky-400/50 group-hover:bg-[#1b88ca]">
-            Otwórz
+            OtwÃ³rz
             <ArrowUpRight className="h-3 w-3" />
           </span>
         </div>
@@ -269,7 +269,7 @@ export default async function DashboardPage() {
 
   const authUser = auth.user;
 
-  let userName = "Użytkownik";
+  let userName = "UÅ¼ytkownik";
   let clicks = 0;
   let sales = 0;
   let conversion = 0;
@@ -290,7 +290,7 @@ export default async function DashboardPage() {
       }),
     ]);
 
-    userName = user?.name || user?.email || "Użytkownik";
+    userName = user?.name || user?.email || "UÅ¼ytkownik";
     clicks = dashboardStat?.clicks ?? 0;
     sales = dashboardStat?.sales ?? 0;
     conversion = dashboardStat?.conversion ?? 0;
@@ -321,7 +321,7 @@ export default async function DashboardPage() {
           <div>
             <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[.16em] text-sky-100/65">
               <span>FX TRADE</span>
-              <span className="text-sky-500/70">›</span>
+              <span className="text-sky-500/70">â€º</span>
               <span>DASHBOARD</span>
             </div>
 
@@ -371,7 +371,7 @@ export default async function DashboardPage() {
                 </div>
               </div>
 
-              <span className="text-sky-100/55">⌄</span>
+              <span className="text-sky-100/55">âŒ„</span>
             </div>
           </div>
         </div>
@@ -383,7 +383,7 @@ export default async function DashboardPage() {
           <div className="flex h-[60px] items-center justify-between rounded-[12px] border border-[#0d579e] bg-[linear-gradient(145deg,#2087c8_0%,#176fae_52%,#105b93_100%)] px-5">
             <div>
               <div className="text-[10px] text-sky-100/55">
-                Zalogowany użytkownik
+                Zalogowany uÅ¼ytkownik
               </div>
               <div className="mt-1 text-[12px] text-sky-100/70">
                 {userName}
@@ -395,7 +395,7 @@ export default async function DashboardPage() {
 
           <StatusCard label="SYSTEM" value="Online" accent icon={Activity} />
           <StatusCard label="SIGNALS" value="3 Active" icon={TrendingUp} />
-          <StatusCard label="SALDO" value="4,280€" accent icon={WalletCards} />
+          <StatusCard label="SALDO" value="4,280â‚¬" accent icon={WalletCards} />
           <StatusCard label="ALERTY" value="12" icon={Bell} />
 
           <div className="flex h-[60px] items-center justify-between rounded-[12px] border border-[#0d579e] bg-[linear-gradient(145deg,#2087c8_0%,#176fae_52%,#105b93_100%)] px-4">
@@ -414,7 +414,7 @@ export default async function DashboardPage() {
               </div>
             </div>
 
-            <span className="text-sky-200/45">⌄</span>
+            <span className="text-sky-200/45">âŒ„</span>
           </div>
         </div>
 
@@ -441,8 +441,8 @@ export default async function DashboardPage() {
               </div>
 
               <p className="mt-4 max-w-[570px] text-[12px] leading-5 text-sky-100/62">
-                Główny panel Twojej aplikacji. Szybki dostęp do trading room,
-                skanerów, strategii, afiliacji i materiałów edukacyjnych w jednym
+                GÅ‚Ã³wny panel Twojej aplikacji. Szybki dostÄ™p do trading room,
+                skanerÃ³w, strategii, afiliacji i materiaÅ‚Ã³w edukacyjnych w jednym
                 miejscu.
               </p>
 
@@ -456,12 +456,12 @@ export default async function DashboardPage() {
               <StatusCard label="SIGNALS" value="3 Active" accent />
               <StatusCard
                 label="AFFILIATE"
-                value={`${affiliateTotal}€`}
+                value={`${affiliateTotal}â‚¬`}
                 accent
               />
               <StatusCard
                 label="THIS WEEK"
-                value={`${monthlyPnl >= 0 ? "+" : ""}${monthlyPnl}€`}
+                value={`${monthlyPnl >= 0 ? "+" : ""}${monthlyPnl}â‚¬`}
                 accent={monthlyPnl >= 0}
               />
             </div>
@@ -470,12 +470,12 @@ export default async function DashboardPage() {
 
         {/* KPI */}
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <KpiCard label="KLIKNIĘCIA" value={String(clicks)} icon={TrendingUp} />
-          <KpiCard label="SPRZEDAŻE" value={String(sales)} icon={ShoppingCart} />
+          <KpiCard label="KLIKNIÄ˜CIA" value={String(clicks)} icon={TrendingUp} />
+          <KpiCard label="SPRZEDAÅ»E" value={String(sales)} icon={ShoppingCart} />
           <KpiCard label="KONWERSJA" value={`${conversion}%`} icon={PieChart} />
           <KpiCard
-            label="ZYSK MIESIĄCA"
-            value={`${monthlyPnl >= 0 ? "+" : ""}${monthlyPnl}€`}
+            label="ZYSK MIESIÄ„CA"
+            value={`${monthlyPnl >= 0 ? "+" : ""}${monthlyPnl}â‚¬`}
             icon={TrendingUp}
             positive={monthlyPnl >= 0}
           />
@@ -492,3 +492,4 @@ export default async function DashboardPage() {
     </section>
   );
 }
+

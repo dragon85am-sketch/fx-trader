@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React from "react";
 import {
@@ -81,8 +81,8 @@ type MarketState = {
 const TWELVE_SYMBOLS: Record<ScannerSymbol, string> = {
   XAUUSD: "XAU/USD",
 
-  // Jeśli Twelve Data nie zaakceptuje DJI,
-  // zmienimy później tylko ten ticker.
+  // JeÅ›li Twelve Data nie zaakceptuje DJI,
+  // zmienimy pÃ³Åºniej tylko ten ticker.
   US30: "DJI",
 };
 
@@ -285,7 +285,7 @@ async function fetchCandles(
     data.values.length === 0
   ) {
     throw new Error(
-      `${symbol} ${interval}: brak danych świecowych`,
+      `${symbol} ${interval}: brak danych Å›wiecowych`,
     );
   }
 
@@ -304,7 +304,7 @@ function formatPrice(
     value === undefined ||
     !Number.isFinite(value)
   ) {
-    return "—";
+    return "â€”";
   }
 
   return value.toLocaleString(
@@ -567,7 +567,7 @@ export default function ProScanner() {
             m1.length < 30
           ) {
             throw new Error(
-              `${symbol}: za mało świec M1`,
+              `${symbol}: za maÅ‚o Å›wiec M1`,
             );
           }
 
@@ -575,7 +575,7 @@ export default function ProScanner() {
             m5.length < 12
           ) {
             throw new Error(
-              `${symbol}: za mało świec M5`,
+              `${symbol}: za maÅ‚o Å›wiec M5`,
             );
           }
 
@@ -708,7 +708,7 @@ export default function ProScanner() {
   React.useEffect(() => {
     void runScan();
 
-    // wykonujemy tylko po pierwszym wejściu
+    // wykonujemy tylko po pierwszym wejÅ›ciu
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -756,19 +756,19 @@ export default function ProScanner() {
                     M5 Bias
                   </span>
 
-                  <span>→</span>
+                  <span>â†’</span>
 
                   <span>
                     M1 Timing
                   </span>
 
-                  <span>·</span>
+                  <span>Â·</span>
 
                   <span>
                     New York Session
                   </span>
 
-                  <span>·</span>
+                  <span>Â·</span>
 
                   <span>
                     Twelve Data
@@ -1008,7 +1008,7 @@ export default function ProScanner() {
               </div>
 
               <div className="mt-4 border-t border-sky-300/15 pt-4 text-[9px] leading-5 text-sky-200/45">
-                60+ FORMING · 80+ READY · 90+ A+
+                60+ FORMING Â· 80+ READY Â· 90+ A+
               </div>
             </section>
           </aside>
@@ -1050,7 +1050,7 @@ export default function ProScanner() {
                       </h2>
 
                       <span className="rounded-md border border-sky-300/15 bg-[#0b2b52]/80 px-2 py-1 text-[8px] font-bold text-sky-100/55">
-                        M5 → M1
+                        M5 â†’ M1
                       </span>
                     </div>
 
@@ -1111,10 +1111,10 @@ export default function ProScanner() {
                 {selectedSymbol ===
                 "US30" ? (
                   <p className="mt-3 text-[9px] leading-5 text-sky-100/55">
-                    Jeśli GOLD działa,
-                    a US30 zwraca błąd,
+                    JeÅ›li GOLD dziaÅ‚a,
+                    a US30 zwraca bÅ‚Ä…d,
                     sprawdzimy ticker
-                    indeksu dostępny w
+                    indeksu dostÄ™pny w
                     Twoim planie Twelve
                     Data.
                   </p>
@@ -1158,7 +1158,7 @@ export default function ProScanner() {
                 priceAction={
                   scanner.direction ===
                   "WAIT"
-                    ? "WAIT · NO TRADE"
+                    ? "WAIT Â· NO TRADE"
                     : scanner.priceAction
                 }
                 direction={
@@ -1257,7 +1257,7 @@ export default function ProScanner() {
                           "_",
                           " ",
                         )}`
-                      : "Czekamy na BOS / CHOCH po reakcji z płynności."
+                      : "Czekamy na BOS / CHOCH po reakcji z pÅ‚ynnoÅ›ci."
                   }
                 />
 
@@ -1271,12 +1271,12 @@ export default function ProScanner() {
                   }
                   description={`VWAP ${
                     scanner.vwapConfirmed
-                      ? "✓"
-                      : "—"
-                  } · Momentum ${
+                      ? "âœ“"
+                      : "â€”"
+                  } Â· Momentum ${
                     scanner.momentumConfirmed
-                      ? "✓"
-                      : "—"
+                      ? "âœ“"
+                      : "â€”"
                   }`}
                 />
               </div>
@@ -1440,7 +1440,7 @@ export default function ProScanner() {
                       <div className="mt-2 text-[9px] leading-5 text-sky-200/45">
                         Scanner czeka na
                         setup o odpowiedniej
-                        jakości.
+                        jakoÅ›ci.
                       </div>
                     </div>
                   ) : (
@@ -1492,7 +1492,7 @@ export default function ProScanner() {
 
                       <div className="flex items-center justify-between rounded-xl border border-emerald-400/10 bg-emerald-500/[0.035] px-3 py-3">
                         <span className="text-[9px] text-sky-100/55">
-                          TP1 · 1R
+                          TP1 Â· 1R
                         </span>
 
                         <span className="font-mono text-[12px] font-black text-emerald-300">
@@ -1505,7 +1505,7 @@ export default function ProScanner() {
 
                       <div className="flex items-center justify-between rounded-xl border border-emerald-400/10 bg-emerald-500/[0.035] px-3 py-3">
                         <span className="text-[9px] text-sky-100/55">
-                          TP2 · 2R
+                          TP2 Â· 2R
                         </span>
 
                         <span className="font-mono text-[12px] font-black text-emerald-300">
@@ -1609,15 +1609,15 @@ export default function ProScanner() {
 
             <div className="flex flex-col gap-2 border-t border-sky-300/10 px-1 pt-4 text-[8px] leading-4 text-sky-200/30 sm:flex-row sm:items-center sm:justify-between">
               <span>
-                Scanner edukacyjny ·
-                wyniki nie stanowią
+                Scanner edukacyjny Â·
+                wyniki nie stanowiÄ…
                 rekomendacji
                 inwestycyjnej.
               </span>
 
               <span>
-                GOLD / US30 · M5
-                Bias → M1 Timing
+                GOLD / US30 Â· M5
+                Bias â†’ M1 Timing
               </span>
             </div>
           </section>

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useState } from "react";
@@ -22,22 +22,22 @@ const features = [
   {
     icon: GraduationCap,
     title: "Kurs Premium",
-    text: "Pełna edukacja tradingowa krok po kroku",
+    text: "PeÅ‚na edukacja tradingowa krok po kroku",
   },
   {
     icon: BarChart3,
     title: "Dashboard PRO",
-    text: "Setupy, sesje, analizy i narzędzia premium",
+    text: "Setupy, sesje, analizy i narzÄ™dzia premium",
   },
   {
     icon: LineChart,
     title: "Trading Journal",
-    text: "Statystyki, analiza wyników i rozwój procesu",
+    text: "Statystyki, analiza wynikÃ³w i rozwÃ³j procesu",
   },
   {
     icon: BookOpen,
-    title: "Strategie i materiały",
-    text: "Checklisty, strategie i materiały edukacyjne",
+    title: "Strategie i materiaÅ‚y",
+    text: "Checklisty, strategie i materiaÅ‚y edukacyjne",
   },
 ];
 
@@ -57,14 +57,14 @@ export default function PaywallPage() {
       const data = await res.json();
 
       if (!res.ok || !data?.url) {
-        setError(data?.error || "Nie udało się uruchomić płatności.");
+        setError(data?.error || "Nie udaÅ‚o siÄ™ uruchomiÄ‡ pÅ‚atnoÅ›ci.");
         return;
       }
 
       window.location.href = data.url;
     } catch (err) {
       console.error("CHECKOUT ERROR:", err);
-      setError("Wystąpił błąd podczas uruchamiania płatności.");
+      setError("WystÄ…piÅ‚ bÅ‚Ä…d podczas uruchamiania pÅ‚atnoÅ›ci.");
     } finally {
       setLoading(false);
     }
@@ -97,11 +97,11 @@ export default function PaywallPage() {
           </div>
 
           <h1 className="text-3xl font-black tracking-[-0.03em] md:text-4xl">
-            Odblokuj pełny dostęp
+            Odblokuj peÅ‚ny dostÄ™p
           </h1>
 
           <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-slate-400">
-            Wszystkie narzędzia, strategie, edukacja i dashboard PRO w jednym miejscu.
+            Wszystkie narzÄ™dzia, strategie, edukacja i dashboard PRO w jednym miejscu.
           </p>
         </div>
 
@@ -114,21 +114,21 @@ export default function PaywallPage() {
                 <div className="flex items-center gap-2 text-sky-300">
                   <Sparkles className="h-5 w-5" />
                   <span className="text-xs font-bold uppercase tracking-[0.15em]">
-                    Pełny dostęp do platformy
+                    PeÅ‚ny dostÄ™p do platformy
                   </span>
                 </div>
 
                 <div className="mt-3 flex items-end gap-2">
                   <span className="text-5xl font-black tracking-[-0.05em]">
-                    99 €
+                    99 â‚¬
                   </span>
                   <span className="pb-1.5 text-sm font-semibold text-sky-300">
-                    / miesiąc
+                    / miesiÄ…c
                   </span>
                 </div>
 
                 <p className="mt-2 text-xs text-slate-400">
-                  Subskrypcja odnawiana automatycznie co miesiąc.
+                  Subskrypcja odnawiana automatycznie co miesiÄ…c.
                 </p>
               </div>
 
@@ -138,9 +138,9 @@ export default function PaywallPage() {
                 </div>
 
                 <div>
-                  <div className="text-xs font-bold">Bezpieczna płatność</div>
+                  <div className="text-xs font-bold">Bezpieczna pÅ‚atnoÅ›Ä‡</div>
                   <div className="mt-1 text-[10px] text-slate-400">
-                    Obsługiwana przez Stripe
+                    ObsÅ‚ugiwana przez Stripe
                   </div>
                 </div>
               </div>
@@ -193,7 +193,7 @@ export default function PaywallPage() {
               ) : (
                 <>
                   <LockKeyhole className="h-5 w-5" />
-                  Kup dostęp — 99 € / mies.
+                  Kup dostÄ™p â€” 99 â‚¬ / mies.
                   <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" />
                 </>
               )}
@@ -202,7 +202,7 @@ export default function PaywallPage() {
             <div className="mt-4 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[10px] text-slate-400">
               <span className="flex items-center gap-1.5">
                 <ShieldCheck className="h-3.5 w-3.5 text-sky-400" />
-                Szyfrowane połączenie
+                Szyfrowane poÅ‚Ä…czenie
               </span>
               <span className="flex items-center gap-1.5">
                 <Headphones className="h-3.5 w-3.5 text-sky-400" />
@@ -210,7 +210,7 @@ export default function PaywallPage() {
               </span>
               <span className="flex items-center gap-1.5">
                 <Check className="h-3.5 w-3.5 text-emerald-400" />
-                Dostęp po zaksięgowaniu płatności
+                DostÄ™p po zaksiÄ™gowaniu pÅ‚atnoÅ›ci
               </span>
             </div>
 
@@ -219,16 +219,17 @@ export default function PaywallPage() {
               className="mx-auto mt-5 flex w-fit items-center gap-2 text-xs font-semibold text-slate-400 transition hover:text-sky-300"
             >
               <ArrowLeft className="h-4 w-4" />
-              Wróć na stronę główną
+              WrÃ³Ä‡ na stronÄ™ gÅ‚Ã³wnÄ…
             </Link>
           </div>
         </section>
 
         <p className="mt-5 text-center text-[10px] leading-5 text-slate-500">
-          Subskrypcja 99 € miesięcznie. Płatność odnawia się automatycznie co miesiąc.
-          Dostęp do platformy jest aktywny przy aktywnej subskrypcji.
+          Subskrypcja 99 â‚¬ miesiÄ™cznie. PÅ‚atnoÅ›Ä‡ odnawia siÄ™ automatycznie co miesiÄ…c.
+          DostÄ™p do platformy jest aktywny przy aktywnej subskrypcji.
         </p>
       </div>
     </main>
   );
 }
+

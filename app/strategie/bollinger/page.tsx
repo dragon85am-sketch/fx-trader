@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import React from "react";
@@ -7,31 +7,31 @@ const rules = [
   {
     n: 1,
     title: "Trend i kontekst",
-    text: "Określ kierunek trendu na H1. Dla BUY cena powinna być nad SMA 20, dla SELL pod SMA 20.",
+    text: "OkreÅ›l kierunek trendu na H1. Dla BUY cena powinna byÄ‡ nad SMA 20, dla SELL pod SMA 20.",
     image: "/strategie/bollinger/rules/rule-1-trend.png",
   },
   {
     n: 2,
-    title: "Dotknięcie pasma",
-    text: "Cena dotyka dolnego lub górnego pasma Bollingera. Szukaj reakcji przy zwiększonej zmienności.",
+    title: "DotkniÄ™cie pasma",
+    text: "Cena dotyka dolnego lub gÃ³rnego pasma Bollingera. Szukaj reakcji przy zwiÄ™kszonej zmiennoÅ›ci.",
     image: "/strategie/bollinger/rules/rule-2-touch.png",
   },
   {
     n: 3,
-    title: "Sygnał wejścia",
-    text: "Wejście po zamknięciu świecy sygnałowej zgodnej z kierunkiem trendu albo po wybiciu i retescie.",
+    title: "SygnaÅ‚ wejÅ›cia",
+    text: "WejÅ›cie po zamkniÄ™ciu Å›wiecy sygnaÅ‚owej zgodnej z kierunkiem trendu albo po wybiciu i retescie.",
     image: "/strategie/bollinger/rules/rule-3-entry.png",
   },
   {
     n: 4,
-    title: "Zarządzanie",
-    text: "SL za przeciwnym pasmem lub swingiem. TP 1.2R–1.4R albo przy kolejnym paśmie.",
+    title: "ZarzÄ…dzanie",
+    text: "SL za przeciwnym pasmem lub swingiem. TP 1.2Râ€“1.4R albo przy kolejnym paÅ›mie.",
     image: "/strategie/bollinger/rules/rule-4-manage.png",
   },
   {
     n: 5,
-    title: "Zarządzaj ryzykiem",
-    text: "Ryzykuj maksymalnie 1–2% kapitału na jedną transakcję. Nie zwiększaj pozycji po stracie.",
+    title: "ZarzÄ…dzaj ryzykiem",
+    text: "Ryzykuj maksymalnie 1â€“2% kapitaÅ‚u na jednÄ… transakcjÄ™. Nie zwiÄ™kszaj pozycji po stracie.",
     image: "/strategie/bollinger/rules/rule-5-risk.png",
   },
 ];
@@ -119,7 +119,7 @@ function SetupPanel({
           buy ? "text-emerald-300/70" : "text-rose-300/70"
         }`}
       >
-        {buy ? "POWRÓT LUB WYBICIE W GÓRĘ" : "POWRÓT LUB WYBICIE W DÓŁ"}
+        {buy ? "POWRÃ“T LUB WYBICIE W GÃ“RÄ˜" : "POWRÃ“T LUB WYBICIE W DÃ“Å"}
       </div>
 
       <div className="mt-4 overflow-hidden rounded-xl border border-white/10 bg-[#020b18]">
@@ -140,13 +140,13 @@ function SetupPanel({
 export default function BollingerBandsStrategyPage() {
   const checklist = [
     "Trend zgodny z H1",
-    "Cena przy dolnym / górnym paśmie",
-    "Świeca sygnałowa potwierdzona",
-    "Cena względem SMA 20 potwierdzona",
+    "Cena przy dolnym / gÃ³rnym paÅ›mie",
+    "Åšwieca sygnaÅ‚owa potwierdzona",
+    "Cena wzglÄ™dem SMA 20 potwierdzona",
     "RR minimum 1.2R",
     "SL w logicznym miejscu",
-    "Zarządzanie pozycją aktywne",
-    "Brak emocji — działam według planu",
+    "ZarzÄ…dzanie pozycjÄ… aktywne",
+    "Brak emocji â€” dziaÅ‚am wedÅ‚ug planu",
     "Dziennik transakcji prowadzony",
   ];
 
@@ -159,7 +159,7 @@ export default function BollingerBandsStrategyPage() {
             <div className="p-5 lg:p-7">
               <div className="flex flex-wrap items-center gap-3">
                 <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-cyan-400/25 bg-cyan-500/15 text-3xl">
-                  ◫
+                  â—«
                 </div>
 
                 <div>
@@ -173,27 +173,27 @@ export default function BollingerBandsStrategyPage() {
                   </div>
 
                   <div className="mt-2 flex items-center gap-2 text-amber-400">
-                    <span className="text-xl">★★★★★</span>
+                    <span className="text-xl">â˜…â˜…â˜…â˜…â˜…</span>
                     <span className="text-xs text-slate-300">4.8</span>
                   </div>
                 </div>
               </div>
 
               <p className="mt-5 max-w-3xl text-sm leading-6 text-slate-400">
-                Wykorzystaj zmienność rynku, wybicia i powroty do pasm Bollingera.
-                Strategia łączy Bollinger Bands 20/2, SMA 20 i potwierdzenie świecy.
+                Wykorzystaj zmiennoÅ›Ä‡ rynku, wybicia i powroty do pasm Bollingera.
+                Strategia Å‚Ä…czy Bollinger Bands 20/2, SMA 20 i potwierdzenie Å›wiecy.
               </p>
 
               <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                <Metric label="Skuteczność" value="84%" icon="📊" />
-                <Metric label="Interwały" value="M5 · M15 · H1" icon="▦" />
-                <Metric label="RR" value="1.2 – 1.4" icon="🎯" />
-                <Metric label="Czas trwania" value="15 min – 4 godz." icon="◷" />
-                <Metric label="Sesje" value="London / NY" icon="🌐" />
+                <Metric label="SkutecznoÅ›Ä‡" value="84%" icon="ðŸ“Š" />
+                <Metric label="InterwaÅ‚y" value="M5 Â· M15 Â· H1" icon="â–¦" />
+                <Metric label="RR" value="1.2 â€“ 1.4" icon="ðŸŽ¯" />
+                <Metric label="Czas trwania" value="15 min â€“ 4 godz." icon="â—·" />
+                <Metric label="Sesje" value="London / NY" icon="ðŸŒ" />
               </div>
 
               <div className="mt-5 flex flex-wrap items-center gap-2">
-                <span className="mr-2 text-[11px] text-slate-400">Najlepiej działa na:</span>
+                <span className="mr-2 text-[11px] text-slate-400">Najlepiej dziaÅ‚a na:</span>
                 {["EURUSD", "GBPUSD", "US30", "XAUUSD"].map((x) => (
                   <span
                     key={x}
@@ -219,7 +219,7 @@ export default function BollingerBandsStrategyPage() {
         {/* RULES */}
         <section className="rounded-[22px] border border-cyan-400/15 bg-[#061425] p-4">
           <h2 className="mb-4 text-[16px] font-black uppercase tracking-[.08em] text-cyan-300">
-            Zasady działania
+            Zasady dziaÅ‚ania
           </h2>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 min-[1700px]:grid-cols-5">
@@ -257,17 +257,17 @@ export default function BollingerBandsStrategyPage() {
             </h3>
             <div className="mt-4 space-y-2">
               {[
-                "Sprawdź trend na H1",
+                "SprawdÅº trend na H1",
                 "Zaznacz poziomy wsparcia / oporu",
                 "Dodaj Bollinger Bands (20, 2)",
-                "Sprawdź kierunek SMA 20",
-                "Oceń zmienność rynku",
-                "Poczekaj na dotknięcie pasma",
-                "Szukaj świecy sygnałowej",
-                "Zaplanuj wejście, SL i TP",
+                "SprawdÅº kierunek SMA 20",
+                "OceÅ„ zmiennoÅ›Ä‡ rynku",
+                "Poczekaj na dotkniÄ™cie pasma",
+                "Szukaj Å›wiecy sygnaÅ‚owej",
+                "Zaplanuj wejÅ›cie, SL i TP",
               ].map((x) => (
                 <div key={x} className="flex gap-2 text-[11px] text-slate-300">
-                  <span className="text-cyan-400">●</span>
+                  <span className="text-cyan-400">â—</span>
                   {x}
                 </div>
               ))}
@@ -276,14 +276,14 @@ export default function BollingerBandsStrategyPage() {
 
           <div className="rounded-[22px] border border-cyan-400/15 bg-[#061425] p-5">
             <h3 className="text-[14px] font-black uppercase text-cyan-300">
-              Zarządzanie pozycją
+              ZarzÄ…dzanie pozycjÄ…
             </h3>
             <div className="mt-4 space-y-3">
               {[
-                ["BE", "Po osiągnięciu 1R przenieś SL na Break Even."],
+                ["BE", "Po osiÄ…gniÄ™ciu 1R przenieÅ› SL na Break Even."],
                 ["Trailing Stop", "Przesuwaj SL za SMA 20 lub kolejne minima / maksima."],
-                ["Częściowa realizacja", "Zamknij 50% pozycji przy 1.2R, resztę prowadź do 1.4R."],
-                ["Zamknięcie ręczne", "Wyjdź przy wybiciu przeciwnego pasma lub silnym odwróceniu."],
+                ["CzÄ™Å›ciowa realizacja", "Zamknij 50% pozycji przy 1.2R, resztÄ™ prowadÅº do 1.4R."],
+                ["ZamkniÄ™cie rÄ™czne", "WyjdÅº przy wybiciu przeciwnego pasma lub silnym odwrÃ³ceniu."],
               ].map(([t, d]) => (
                 <div key={t} className="rounded-xl border border-cyan-400/10 bg-[#07182c] p-3">
                   <div className="text-[10px] font-black uppercase text-cyan-300">{t}</div>
@@ -299,9 +299,9 @@ export default function BollingerBandsStrategyPage() {
             </h3>
             <div className="mt-4 space-y-3">
               {[
-                ["🇬🇧", "LONDON", "08:00 – 12:00", "NAJLEPSZA"],
-                ["🇺🇸", "NOWY JORK", "14:00 – 18:00", "BARDZO DOBRA"],
-                ["🇬🇧🇺🇸", "NAKŁADANIE SESJI", "13:00 – 16:00", "IDEALNA"],
+                ["ðŸ‡¬ðŸ‡§", "LONDON", "08:00 â€“ 12:00", "NAJLEPSZA"],
+                ["ðŸ‡ºðŸ‡¸", "NOWY JORK", "14:00 â€“ 18:00", "BARDZO DOBRA"],
+                ["ðŸ‡¬ðŸ‡§ðŸ‡ºðŸ‡¸", "NAKÅADANIE SESJI", "13:00 â€“ 16:00", "IDEALNA"],
               ].map(([flag, name, time, rate]) => (
                 <div
                   key={name}
@@ -340,10 +340,10 @@ export default function BollingerBandsStrategyPage() {
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <div className="text-lg font-black uppercase tracking-[.08em] text-violet-300">
-                PLAN + DYSCYPLINA + CIERPLIWOŚĆ = SUKCES
+                PLAN + DYSCYPLINA + CIERPLIWOÅšÄ† = SUKCES
               </div>
               <div className="mt-1 text-[11px] text-slate-400">
-                Bollinger Bands pokazuje zmienność — Ty podejmujesz decyzję.
+                Bollinger Bands pokazuje zmiennoÅ›Ä‡ â€” Ty podejmujesz decyzjÄ™.
               </div>
             </div>
 
@@ -351,7 +351,7 @@ export default function BollingerBandsStrategyPage() {
               href="/strategie"
               className="rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-5 py-3 text-[11px] font-black text-cyan-200 transition hover:bg-cyan-500/20"
             >
-              ← Wróć do strategii
+              â† WrÃ³Ä‡ do strategii
             </Link>
           </div>
         </section>
@@ -359,3 +359,4 @@ export default function BollingerBandsStrategyPage() {
     </main>
   );
 }
+

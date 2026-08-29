@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import React from "react";
@@ -7,31 +7,31 @@ const rules = [
   {
     n: 1,
     title: "Trend (kierunek)",
-    text: "Określ kierunek trendu na wyższym interwale D1 lub H4. Cena powinna być zgodna z EMA 50/200.",
+    text: "OkreÅ›l kierunek trendu na wyÅ¼szym interwale D1 lub H4. Cena powinna byÄ‡ zgodna z EMA 50/200.",
     type: "trend",
   },
   {
     n: 2,
     title: "Strefa kluczowa",
-    text: "Zidentyfikuj wsparcie / opór, strefę supply & demand, FVG albo Order Block.",
+    text: "Zidentyfikuj wsparcie / opÃ³r, strefÄ™ supply & demand, FVG albo Order Block.",
     type: "zone",
   },
   {
     n: 3,
-    title: "Wejście",
-    text: "Wejście dopiero po zamknięciu cegły Renko w kierunku trendu po wybiciu lub reakcji ze strefy.",
+    title: "WejÅ›cie",
+    text: "WejÅ›cie dopiero po zamkniÄ™ciu cegÅ‚y Renko w kierunku trendu po wybiciu lub reakcji ze strefy.",
     type: "entry",
   },
   {
     n: 4,
-    title: "Zarządzanie",
-    text: "SL ustaw za ostatnim swingiem lub strefą. TP 1.2R–1.6R albo kolejna strefa.",
+    title: "ZarzÄ…dzanie",
+    text: "SL ustaw za ostatnim swingiem lub strefÄ…. TP 1.2Râ€“1.6R albo kolejna strefa.",
     type: "manage",
   },
   {
     n: 5,
-    title: "Zarządzaj ryzykiem",
-    text: "Ryzykuj maksymalnie 1–2% kapitału na jedną transakcję. Dyscyplina to podstawa.",
+    title: "ZarzÄ…dzaj ryzykiem",
+    text: "Ryzykuj maksymalnie 1â€“2% kapitaÅ‚u na jednÄ… transakcjÄ™. Dyscyplina to podstawa.",
     type: "risk",
   },
 ];
@@ -90,7 +90,7 @@ function RenkoMini({
             up ? "right-5 top-10 text-emerald-300" : "right-5 bottom-10 text-rose-300"
           } text-[10px] font-black`}
         >
-          {up ? "BUY ↗" : "SELL ↘"}
+          {up ? "BUY â†—" : "SELL â†˜"}
         </div>
       ) : null}
 
@@ -205,19 +205,19 @@ function SetupBox({ side }: { side: "BUY" | "SELL" }) {
 
 export default function RenkoStrategyPage() {
   const buyConfirmations = [
-    "Trend wzrostowy D1 / H4 (cena powyżej EMA 50/200)",
-    "Cegła Renko zamyka się powyżej strefy",
-    "Momentum: ADX > 20 lub rosnący wolumen",
+    "Trend wzrostowy D1 / H4 (cena powyÅ¼ej EMA 50/200)",
+    "CegÅ‚a Renko zamyka siÄ™ powyÅ¼ej strefy",
+    "Momentum: ADX > 20 lub rosnÄ…cy wolumen",
     "Brak dywergencji na RSI",
-    "Kierunek zgodny z aktywną sesją",
+    "Kierunek zgodny z aktywnÄ… sesjÄ…",
   ];
 
   const sellConfirmations = [
-    "Trend spadkowy D1 / H4 (cena poniżej EMA 50/200)",
-    "Cegła Renko zamyka się poniżej strefy",
-    "Momentum: ADX > 20 lub rosnący wolumen",
+    "Trend spadkowy D1 / H4 (cena poniÅ¼ej EMA 50/200)",
+    "CegÅ‚a Renko zamyka siÄ™ poniÅ¼ej strefy",
+    "Momentum: ADX > 20 lub rosnÄ…cy wolumen",
     "Brak dywergencji na RSI",
-    "Kierunek zgodny z aktywną sesją",
+    "Kierunek zgodny z aktywnÄ… sesjÄ…",
   ];
 
   return (
@@ -229,7 +229,7 @@ export default function RenkoStrategyPage() {
             <div className="p-5 lg:p-7">
               <div className="flex flex-wrap items-center gap-3">
                 <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-400/25 bg-violet-500/15 text-3xl">
-                  ◈
+                  â—ˆ
                 </div>
 
                 <div>
@@ -243,27 +243,27 @@ export default function RenkoStrategyPage() {
                   </div>
 
                   <div className="mt-2 flex items-center gap-2 text-amber-400">
-                    <span className="text-xl">★★★★★</span>
+                    <span className="text-xl">â˜…â˜…â˜…â˜…â˜…</span>
                     <span className="text-xs text-slate-300">4.8</span>
                   </div>
                 </div>
               </div>
 
               <p className="mt-5 max-w-3xl text-sm leading-6 text-slate-400">
-                Czysty wykres Renko filtrujący szum i pokazujący trend.
-                Prosta struktura, jasne strefy i wejścia zgodne z kierunkiem rynku.
+                Czysty wykres Renko filtrujÄ…cy szum i pokazujÄ…cy trend.
+                Prosta struktura, jasne strefy i wejÅ›cia zgodne z kierunkiem rynku.
               </p>
 
               <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                <Metric label="Skuteczność" value="83%" icon="📊" />
-                <Metric label="Interwały" value="Renko 10 · 20 · 30" icon="▦" />
-                <Metric label="RR" value="1.2 – 1.6" icon="🎯" />
-                <Metric label="Czas trwania" value="30 min – kilka dni" icon="◷" />
-                <Metric label="Sesje" value="London / NY" icon="🌐" />
+                <Metric label="SkutecznoÅ›Ä‡" value="83%" icon="ðŸ“Š" />
+                <Metric label="InterwaÅ‚y" value="Renko 10 Â· 20 Â· 30" icon="â–¦" />
+                <Metric label="RR" value="1.2 â€“ 1.6" icon="ðŸŽ¯" />
+                <Metric label="Czas trwania" value="30 min â€“ kilka dni" icon="â—·" />
+                <Metric label="Sesje" value="London / NY" icon="ðŸŒ" />
               </div>
 
               <div className="mt-5 flex flex-wrap items-center gap-2">
-                <span className="mr-2 text-[11px] text-slate-400">Najlepiej działa na:</span>
+                <span className="mr-2 text-[11px] text-slate-400">Najlepiej dziaÅ‚a na:</span>
                 {["EURUSD", "XAUUSD", "US30", "NAS100"].map((x) => (
                   <span
                     key={x}
@@ -289,7 +289,7 @@ export default function RenkoStrategyPage() {
         {/* RULES */}
         <section className="rounded-[22px] border border-violet-400/15 bg-[#061425] p-4">
           <h2 className="mb-4 text-[16px] font-black uppercase tracking-[.08em] text-violet-300">
-            Zasady działania
+            Zasady dziaÅ‚ania
           </h2>
 
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 min-[1700px]:grid-cols-5">
@@ -332,7 +332,7 @@ export default function RenkoStrategyPage() {
             <div className="mt-4 space-y-2">
               {buyConfirmations.map((x) => (
                 <div key={x} className="flex gap-2 text-[11px] text-slate-300">
-                  <span className="text-emerald-400">●</span>
+                  <span className="text-emerald-400">â—</span>
                   {x}
                 </div>
               ))}
@@ -344,7 +344,7 @@ export default function RenkoStrategyPage() {
             <div className="mt-4 space-y-2">
               {sellConfirmations.map((x) => (
                 <div key={x} className="flex gap-2 text-[11px] text-slate-300">
-                  <span className="text-rose-400">●</span>
+                  <span className="text-rose-400">â—</span>
                   {x}
                 </div>
               ))}
@@ -360,15 +360,15 @@ export default function RenkoStrategyPage() {
             </h3>
             <div className="mt-4 space-y-2">
               {[
-                "Sprawdź kierunek na D1 / H4",
+                "SprawdÅº kierunek na D1 / H4",
                 "Zaznacz kluczowe strefy S/R",
-                "Otwórz wykres Renko 10 / 20 / 30",
+                "OtwÃ³rz wykres Renko 10 / 20 / 30",
                 "Poczekaj na test strefy",
-                "Szukaj wejścia zgodnego z trendem",
-                "Zarządzaj pozycją zgodnie z planem",
+                "Szukaj wejÅ›cia zgodnego z trendem",
+                "ZarzÄ…dzaj pozycjÄ… zgodnie z planem",
               ].map((x) => (
                 <div key={x} className="flex gap-2 text-[11px] text-slate-300">
-                  <span className="text-violet-400">●</span>
+                  <span className="text-violet-400">â—</span>
                   {x}
                 </div>
               ))}
@@ -377,14 +377,14 @@ export default function RenkoStrategyPage() {
 
           <div className="rounded-[22px] border border-violet-400/15 bg-[#061425] p-5">
             <h3 className="text-[14px] font-black uppercase text-violet-300">
-              Zarządzanie pozycją
+              ZarzÄ…dzanie pozycjÄ…
             </h3>
             <div className="mt-4 space-y-3">
               {[
-                ["BE", "Po osiągnięciu 1R przenieś SL na Break Even."],
-                ["Trailing Stop", "Przesuwaj SL za każdy nowy swing Renko."],
-                ["Częściowa realizacja", "Zamknij 50% przy 1.2R–1.6R."],
-                ["Zamknij ręcznie", "Wyjdź przy silnym sygnale przeciwnym."],
+                ["BE", "Po osiÄ…gniÄ™ciu 1R przenieÅ› SL na Break Even."],
+                ["Trailing Stop", "Przesuwaj SL za kaÅ¼dy nowy swing Renko."],
+                ["CzÄ™Å›ciowa realizacja", "Zamknij 50% przy 1.2Râ€“1.6R."],
+                ["Zamknij rÄ™cznie", "WyjdÅº przy silnym sygnale przeciwnym."],
               ].map(([t, d]) => (
                 <div key={t} className="rounded-xl border border-violet-400/10 bg-[#07182c] p-3">
                   <div className="text-[10px] font-black uppercase text-violet-300">{t}</div>
@@ -400,9 +400,9 @@ export default function RenkoStrategyPage() {
             </h3>
             <div className="mt-4 space-y-3">
               {[
-                ["🇬🇧", "LONDON", "08:00 – 12:00", "NAJLEPSZA"],
-                ["🇺🇸", "NOWY JORK", "14:00 – 18:00", "BARDZO DOBRA"],
-                ["🇬🇧🇺🇸", "NAKŁADANIE SESJI", "13:00 – 16:00", "IDEALNA"],
+                ["ðŸ‡¬ðŸ‡§", "LONDON", "08:00 â€“ 12:00", "NAJLEPSZA"],
+                ["ðŸ‡ºðŸ‡¸", "NOWY JORK", "14:00 â€“ 18:00", "BARDZO DOBRA"],
+                ["ðŸ‡¬ðŸ‡§ðŸ‡ºðŸ‡¸", "NAKÅADANIE SESJI", "13:00 â€“ 16:00", "IDEALNA"],
               ].map(([flag, name, time, rate]) => (
                 <div
                   key={name}
@@ -429,12 +429,12 @@ export default function RenkoStrategyPage() {
             {[
               "Trend zgodny z D1 / H4",
               "Strefa wsparcia / oporu potwierdzona",
-              "Wejście zgodne z kierunkiem trendu",
-              "Zamknięcie cegły Renko poza strefą",
+              "WejÅ›cie zgodne z kierunkiem trendu",
+              "ZamkniÄ™cie cegÅ‚y Renko poza strefÄ…",
               "RR minimum 1.2R",
               "SL w logicznym miejscu",
-              "Zarządzanie pozycją aktywne",
-              "Brak emocji — zgodnie z planem",
+              "ZarzÄ…dzanie pozycjÄ… aktywne",
+              "Brak emocji â€” zgodnie z planem",
               "Dziennik transakcji prowadzony",
             ].map((x) => (
               <label key={x} className="flex items-center gap-2 text-[11px] text-slate-300">
@@ -450,10 +450,10 @@ export default function RenkoStrategyPage() {
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <div className="text-lg font-black uppercase tracking-[.08em] text-violet-300">
-                PLAN + DYSCYPLINA + CIERPLIWOŚĆ = SUKCES
+                PLAN + DYSCYPLINA + CIERPLIWOÅšÄ† = SUKCES
               </div>
               <div className="mt-1 text-[11px] text-slate-400">
-                Handluj prostotą. Renko pokazuje trend, ale to plan kontroluje ryzyko.
+                Handluj prostotÄ…. Renko pokazuje trend, ale to plan kontroluje ryzyko.
               </div>
             </div>
 
@@ -461,7 +461,7 @@ export default function RenkoStrategyPage() {
               href="/strategie"
               className="rounded-xl border border-violet-400/20 bg-violet-500/10 px-5 py-3 text-[11px] font-black text-violet-200 transition hover:bg-violet-500/20"
             >
-              ← Wróć do strategii
+              â† WrÃ³Ä‡ do strategii
             </Link>
           </div>
         </section>
@@ -469,3 +469,4 @@ export default function RenkoStrategyPage() {
     </main>
   );
 }
+

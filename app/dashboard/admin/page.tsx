@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+﻿import { redirect } from "next/navigation";
 
 import AdminUsersTable from "@/components/admin/AdminUsersTable";
 import AdminUsersChart from "@/components/admin/AdminUsersChart";
@@ -10,7 +10,7 @@ import { requireAdmin } from "@/lib/auth";
 import Stripe from "stripe";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2026-03-25.dahlia",
+  
 });
 
 function AdminStatCard({
@@ -154,7 +154,7 @@ export default async function AdminPage() {
         </h1>
 
         <p className="mt-2 text-white/50">
-          Zarządzanie użytkownikami i subskrypcjami
+          ZarzÄ…dzanie uÅ¼ytkownikami i subskrypcjami
         </p>
 
         <a
@@ -172,10 +172,10 @@ export default async function AdminPage() {
         <AdminStatCard label="Admins" value={admins} />
         <AdminStatCard
           label="Affiliate Revenue"
-          value={`${affiliateRevenue}€`}
+          value={`${affiliateRevenue}â‚¬`}
         />
         <AdminStatCard label="Active Subs" value={activeSubscriptions} />
-        <AdminStatCard label="MRR" value={`${mrr.toFixed(2)}€`} />
+        <AdminStatCard label="MRR" value={`${mrr.toFixed(2)}â‚¬`} />
       </div>
 
       <div className="mb-8">
@@ -190,11 +190,11 @@ export default async function AdminPage() {
         <AdminStatCard label="Affiliates" value={affiliateCount} />
         <AdminStatCard
           label="Affiliate Pending"
-          value={`${affiliatePending}€`}
+          value={`${affiliatePending}â‚¬`}
         />
         <AdminStatCard
           label="Affiliate Available"
-          value={`${affiliateAvailable}€`}
+          value={`${affiliateAvailable}â‚¬`}
         />
       </div>
 <div className="mb-8 overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03]">
@@ -204,7 +204,7 @@ export default async function AdminPage() {
     </h2>
 
     <p className="mt-1 text-sm text-white/40">
-      Najlepsi partnerzy według zarobków
+      Najlepsi partnerzy wedÅ‚ug zarobkÃ³w
     </p>
   </div>
 
@@ -233,17 +233,17 @@ export default async function AdminPage() {
           >
             <td className="px-6 py-4 text-xl">
   {index === 0
-    ? "🥇"
+    ? "ðŸ¥‡"
     : index === 1
-    ? "🥈"
+    ? "ðŸ¥ˆ"
     : index === 2
-    ? "🥉"
+    ? "ðŸ¥‰"
     : `#${index + 1}`}
 </td>
 
             <td className="px-6 py-4 font-medium">
   {affiliate.user?.name || "Brak"}
-  {index === 0 && " 👑"}
+  {index === 0 && " ðŸ‘‘"}
 </td>
             <td className="px-6 py-4 text-white/50">
               {affiliate.user?.email || "-"}
@@ -254,15 +254,15 @@ export default async function AdminPage() {
             </td>
 
             <td className="px-6 py-4 text-emerald-300">
-              €{affiliate.totalEarned.toFixed(2)}
+              â‚¬{affiliate.totalEarned.toFixed(2)}
             </td>
 
             <td className="px-6 py-4 text-amber-300">
-              €{affiliate.pendingCommission.toFixed(2)}
+              â‚¬{affiliate.pendingCommission.toFixed(2)}
             </td>
 
             <td className="px-6 py-4 text-cyan-300">
-              €{affiliate.availablePayout.toFixed(2)}
+              â‚¬{affiliate.availablePayout.toFixed(2)}
             </td>
           </tr>
         ))}
@@ -276,7 +276,7 @@ export default async function AdminPage() {
           </h2>
 
           <p className="mt-1 text-sm text-white/40">
-            Ostatnie płatności Stripe
+            Ostatnie pÅ‚atnoÅ›ci Stripe
           </p>
         </div>
 

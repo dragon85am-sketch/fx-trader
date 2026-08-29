@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LESSON_CONTENT } from "@/components/LessonContent";
 
@@ -355,11 +355,12 @@ function renderLessonBlock(block: any, index: number) {
 export default function ModulPage({
   params,
 }: {
-  params: { modul: string };
+  params: Promise<{ modul: string }>;
 }) {
+  const { modul } = use(params);
   const router = useRouter();
 
-  const moduleData = useMemo(() => COURSE_DATA[params.modul], [params.modul]);
+  const moduleData = useMemo(() => COURSE_DATA[modul], [modul]);
 
   const [activeLesson, setActiveLesson] = useState(0);
 
@@ -385,7 +386,7 @@ export default function ModulPage({
 
   useEffect(() => {
     const savedIndex = localStorage.getItem(
-      `module-${params.modul}-activeLesson`
+      `module-${modul}-activeLesson`
     );
 
     if (savedIndex !== null) {
@@ -393,18 +394,18 @@ export default function ModulPage({
     } else {
       setActiveLesson(0);
     }
-  }, [params.modul]);
+  }, [modul]);
 
   useEffect(() => {
     localStorage.setItem(
-      `module-${params.modul}-activeLesson`,
+      `module-${modul}-activeLesson`,
       String(activeLesson)
     );
-  }, [params.modul, activeLesson]);
+  }, [modul, activeLesson]);
 
   useEffect(() => {
-    localStorage.setItem("lastOpenedModule", params.modul);
-  }, [params.modul]);
+    localStorage.setItem("lastOpenedModule", modul);
+  }, [modul]);
 
   if (!moduleData) {
     return (
@@ -427,7 +428,7 @@ export default function ModulPage({
   const quizPassed =
     isQuizLesson && active.quizKey ? !!passedQuizzes[active.quizKey] : false;
 
-  const currentModuleNumber = Number(params.modul);
+  const currentModuleNumber = Number(modul);
   const hasNextModule = currentModuleNumber < 18;
   const nextModuleHref = `/education/kurs/${currentModuleNumber + 1}`;
   const isLastLesson = activeLesson === moduleData.lessons.length - 1;
@@ -442,7 +443,7 @@ export default function ModulPage({
     !isQuizLesson && active.contentKey ? LESSON_CONTENT[active.contentKey] : null;
 
   const activeLessonStorageKey =
-    active.contentKey || active.quizKey || `${params.modul}-${activeLesson}`;
+    active.contentKey || active.quizKey || `${modul}-${activeLesson}`;
 
   const markLessonAsCompleted = () => {
     const updated = {
@@ -509,7 +510,7 @@ export default function ModulPage({
                 : false;
 
             const lessonKey =
-              lesson.contentKey || lesson.quizKey || `${params.modul}-${index}`;
+              lesson.contentKey || lesson.quizKey || `${modul}-${index}`;
 
             const lessonCompleted = !!completedLessons[lessonKey];
             const isActiveLesson = activeLesson === index;

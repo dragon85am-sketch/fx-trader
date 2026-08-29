@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -57,7 +57,7 @@ export default function LoginPage() {
         setError(
           data?.details ||
             data?.error ||
-            `Błąd logowania (${res.status})`
+            `BÅ‚Ä…d logowania (${res.status})`
         );
         return;
       }
@@ -67,7 +67,7 @@ export default function LoginPage() {
       setError(
         err instanceof Error
           ? err.message
-          : "Problem z połączeniem z serwerem"
+          : "Problem z poÅ‚Ä…czeniem z serwerem"
       );
     } finally {
       setLoading(false);
@@ -125,14 +125,14 @@ export default function LoginPage() {
               <div className="mb-2 flex items-center justify-between gap-3">
                 <label className="flex items-center gap-2 text-sm font-medium text-slate-200">
                   <LockKeyhole className="h-4 w-4 text-sky-400" />
-                  Hasło
+                  HasÅ‚o
                 </label>
 
                 <Link
                   href="/forgot-password"
                   className="text-[13px] font-semibold text-cyan-300 transition hover:text-cyan-200"
                 >
-                  Nie pamiętasz hasła?
+                  Nie pamiÄ™tasz hasÅ‚a?
                 </Link>
               </div>
 
@@ -142,7 +142,7 @@ export default function LoginPage() {
                   type={showPassword ? "text" : "password"}
                   autoComplete="current-password"
                   className="w-full rounded-2xl border border-sky-500/45 bg-[#06172f]/85 px-12 py-4 pr-14 text-[16px] text-white outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/10"
-                  placeholder="••••••••"
+                  placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -152,7 +152,7 @@ export default function LoginPage() {
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-sky-300"
-                  aria-label={showPassword ? "Ukryj hasło" : "Pokaż hasło"}
+                  aria-label={showPassword ? "Ukryj hasÅ‚o" : "PokaÅ¼ hasÅ‚o"}
                 >
                   {showPassword ? (
                     <EyeOff className="h-5 w-5" />
@@ -175,13 +175,13 @@ export default function LoginPage() {
               className="flex w-full items-center justify-center gap-3 rounded-2xl border border-cyan-300/25 bg-[linear-gradient(90deg,#0ea5e9,#2563eb_55%,#1d4ed8)] py-4 text-[17px] font-bold text-white shadow-[0_10px_35px_rgba(37,99,235,.30)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <TrendingUp className="h-5 w-5" />
-              {loading ? "Logowanie..." : "Zaloguj się"}
+              {loading ? "Logowanie..." : "Zaloguj siÄ™"}
             </button>
 
             <div className="flex items-center gap-4 py-1">
               <div className="h-px flex-1 bg-white/10" />
               <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                lub zaloguj się
+                lub zaloguj siÄ™
               </span>
               <div className="h-px flex-1 bg-white/10" />
             </div>
@@ -193,7 +193,7 @@ export default function LoginPage() {
               <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white text-[15px] font-black text-blue-600">
                 G
               </span>
-              Zaloguj się przez Google
+              Zaloguj siÄ™ przez Google
             </button>
 
             <div className="flex items-start gap-3 rounded-2xl border border-blue-500/20 bg-[#071a34]/80 px-4 py-4">
@@ -206,7 +206,7 @@ export default function LoginPage() {
                   Bezpieczne logowanie
                 </div>
                 <div className="mt-1 text-sm text-slate-400">
-                  Twoje konto i sesja są chronione.
+                  Twoje konto i sesja sÄ… chronione.
                 </div>
               </div>
             </div>
@@ -217,7 +217,7 @@ export default function LoginPage() {
                 className="inline-flex min-w-[220px] items-center justify-center gap-2 rounded-2xl border border-blue-500/40 bg-[#06172f]/70 px-6 py-3.5 text-[15px] font-semibold text-sky-300 transition hover:border-sky-400/70 hover:bg-[#0a2344] hover:text-sky-200"
               >
                 <ArrowLeft className="h-5 w-5" />
-                Wróć
+                WrÃ³Ä‡
               </Link>
             </div>
           </form>
@@ -226,3 +226,4 @@ export default function LoginPage() {
     </main>
   );
 }
+

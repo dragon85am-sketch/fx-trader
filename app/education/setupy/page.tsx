@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -15,31 +15,31 @@ import {
 
 const SETUPY = [
   {
-    title: "1–2–3",
-    desc: "Prosta, ale skuteczna struktura wejścia w trend. Idealna do szybkiego skalpowania.",
+    title: "1â€“2â€“3",
+    desc: "Prosta, ale skuteczna struktura wejÅ›cia w trend. Idealna do szybkiego skalpowania.",
     href: "/education/setupy/123",
     badge: "POPULARNY",
     timeframe: "M1 - M5",
-    level: "Łatwy",
+    level: "Åatwy",
     winRate: "75%",
     rr: "1.6 : 1",
     image: "/setup-123.png",
     accent: "sky",
     checks: [
-      "Trend jest wyraźny",
-      "Cena tworzy strukturę 1–2–3",
-      "Wejście po wybiciu punktu 3",
-      "SL pod/powyżej punktu 2",
+      "Trend jest wyraÅºny",
+      "Cena tworzy strukturÄ™ 1â€“2â€“3",
+      "WejÅ›cie po wybiciu punktu 3",
+      "SL pod/powyÅ¼ej punktu 2",
       "TP na kolejnym poziomie / RR 1:2+",
     ],
   },
   {
     title: "Retest",
-    desc: "Wejście po reteście kluczowego poziomu. Bardzo dobre przy wybiciach.",
+    desc: "WejÅ›cie po reteÅ›cie kluczowego poziomu. Bardzo dobre przy wybiciach.",
     href: "/education/setupy/retest",
     badge: "NOWY",
     timeframe: "M1 - M15",
-    level: "Średni",
+    level: "Åšredni",
     winRate: "72%",
     rr: "1.8 : 1",
     image: "/setup-retest.png",
@@ -47,29 +47,29 @@ const SETUPY = [
     checks: [
       "Zidentyfikuj kluczowy poziom",
       "Wybicie z poziomu",
-      "Powrót ceny (retest)",
-      "Formacja świecowa potwierdzająca",
+      "PowrÃ³t ceny (retest)",
+      "Formacja Å›wiecowa potwierdzajÄ…ca",
       "SL za poziomem",
       "TP na kolejnym poziomie / RR 1:2+",
     ],
   },
   {
     title: "Pullback",
-    desc: "Wejście w trend po zdrowym cofnięciu. Wysoka skuteczność przy trendach.",
+    desc: "WejÅ›cie w trend po zdrowym cofniÄ™ciu. Wysoka skutecznoÅ›Ä‡ przy trendach.",
     href: "/education/setupy/pullback",
     badge: "POPULARNY",
     timeframe: "M5 - M15",
-    level: "Średni",
+    level: "Åšredni",
     winRate: "80%",
     rr: "2.0 : 1",
     image: "/setup-pullback.png",
     accent: "cyan",
     checks: [
-      "Trend jest wyraźny",
-      "Cena wykonuje cofnięcie",
-      "Strefa popytu/podaży",
-      "Formacja potwierdzająca",
-      "SL za strefą",
+      "Trend jest wyraÅºny",
+      "Cena wykonuje cofniÄ™cie",
+      "Strefa popytu/podaÅ¼y",
+      "Formacja potwierdzajÄ…ca",
+      "SL za strefÄ…",
       "TP na kolejnym poziomie / RR 1:2+",
     ],
   },
@@ -111,7 +111,7 @@ export default function SetupyPage() {
             className="inline-flex items-center gap-2 rounded-[9px] border border-[#0d579e] bg-[#052348] px-3 py-2 text-[9px] font-semibold text-sky-100/75 transition hover:bg-[#0a3264] hover:text-white"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
-            Wróć do Education
+            WrÃ³Ä‡ do Education
           </Link>
         </div>
 
@@ -131,18 +131,18 @@ export default function SetupyPage() {
                 </div>
                 <h1 className="mt-1 text-[28px] font-semibold tracking-tight">Setupy</h1>
                 <p className="mt-1 max-w-[620px] text-[11px] leading-5 text-sky-100/50">
-                  Konkretne zasady, checklisty i przykłady dla każdego setupu.
-                  Na start 3 główne setupy do scalpingu i intraday.
+                  Konkretne zasady, checklisty i przykÅ‚ady dla kaÅ¼dego setupu.
+                  Na start 3 gÅ‚Ã³wne setupy do scalpingu i intraday.
                 </p>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
               {[
-                [BookOpen, "3", "Setupy dostępne"],
+                [BookOpen, "3", "Setupy dostÄ™pne"],
                 [Clock3, "M1 - M15", "Timeframe"],
-                [Target, "1.8 : 1", "Średni RR"],
-                [Star, "78%", "Skuteczność"],
+                [Target, "1.8 : 1", "Åšredni RR"],
+                [Star, "78%", "SkutecznoÅ›Ä‡"],
               ].map(([Icon, value, label], index) => {
                 const StatIcon = Icon as typeof BookOpen;
 
@@ -252,7 +252,7 @@ export default function SetupyPage() {
                     <div className="flex items-center justify-between gap-4">
                       <div>
                         <div className="text-[8px] uppercase tracking-[.12em] text-sky-100/40">
-                          Średni RR
+                          Åšredni RR
                         </div>
                         <div className={`mt-1 text-[22px] font-bold ${accentText}`}>{setup.rr}</div>
                       </div>
@@ -271,7 +271,7 @@ export default function SetupyPage() {
                     href={setup.href}
                     className={`mt-4 inline-flex w-full items-center justify-center gap-2 rounded-[9px] border ${borderClass} bg-[#0b4078] px-4 py-2.5 shadow-[0_0_18px_rgba(56,189,248,.08)] text-[10px] font-bold ${accentText} transition hover:bg-[#0a3264]`}
                   >
-                    Otwórz setup
+                    OtwÃ³rz setup
                     <ArrowUpRight className="h-3.5 w-3.5" />
                   </Link>
                 </div>
@@ -285,15 +285,15 @@ export default function SetupyPage() {
           <div className="rounded-[14px] border border-[#0d579e] bg-[linear-gradient(145deg,#0d477f,#082f5d_60%,#06284f)] p-5 shadow-[0_0_26px_rgba(14,165,233,.11),inset_0_1px_0_rgba(255,255,255,.05)]">
             <div className="flex items-center gap-2">
               <GraduationCap className="h-5 w-5 text-sky-300" />
-              <h2 className="text-[15px] font-semibold">Jak korzystać z setupów?</h2>
+              <h2 className="text-[15px] font-semibold">Jak korzystaÄ‡ z setupÃ³w?</h2>
             </div>
 
             <div className="mt-5 grid gap-4 md:grid-cols-4">
               {[
                 [TrendingUp, "Wybierz setup", "Dobierz setup do aktualnej sytuacji rynkowej."],
-                [BookOpen, "Sprawdź checklistę", "Upewnij się, że spełnione są wszystkie warunki."],
-                [ShieldCheck, "Zarządzaj pozycją", "Stosuj plan zarządzania ryzykiem i trzymaj się planu."],
-                [BarChart3, "Analizuj i notuj", "Zapisuj każdy trade w journalu i analizuj wyniki."],
+                [BookOpen, "SprawdÅº checklistÄ™", "Upewnij siÄ™, Å¼e speÅ‚nione sÄ… wszystkie warunki."],
+                [ShieldCheck, "ZarzÄ…dzaj pozycjÄ…", "Stosuj plan zarzÄ…dzania ryzykiem i trzymaj siÄ™ planu."],
+                [BarChart3, "Analizuj i notuj", "Zapisuj kaÅ¼dy trade w journalu i analizuj wyniki."],
               ].map(([Icon, title, desc], index) => {
                 const StepIcon = Icon as typeof BookOpen;
 
@@ -313,13 +313,13 @@ export default function SetupyPage() {
           <div className="rounded-[14px] border border-[#0d579e] bg-[linear-gradient(145deg,#0d477f,#082f5d_60%,#06284f)] p-5 shadow-[0_0_26px_rgba(14,165,233,.11),inset_0_1px_0_rgba(255,255,255,.05)]">
             <div className="flex items-center gap-2">
               <Star className="h-5 w-5 text-sky-300" />
-              <h2 className="text-[15px] font-semibold">Najczęściej używane</h2>
+              <h2 className="text-[15px] font-semibold">NajczÄ™Å›ciej uÅ¼ywane</h2>
             </div>
 
             <div className="mt-5 grid gap-5 md:grid-cols-[1fr_150px] md:items-center">
               <div className="space-y-4">
                 {[
-                  ["1–2–3", 64, "bg-sky-400"],
+                  ["1â€“2â€“3", 64, "bg-sky-400"],
                   ["Pullback", 24, "bg-cyan-400"],
                   ["Retest", 12, "bg-violet-400"],
                 ].map(([label, value, bar]) => (
@@ -339,7 +339,7 @@ export default function SetupyPage() {
                 <div className="flex h-[115px] w-[115px] items-center justify-center rounded-full border-[10px] border-sky-500/20 border-t-sky-400 border-r-sky-400">
                   <div className="text-center">
                     <div className="text-[24px] font-bold">78%</div>
-                    <div className="mt-1 text-[8px] text-sky-100/40">Średnia skuteczność</div>
+                    <div className="mt-1 text-[8px] text-sky-100/40">Åšrednia skutecznoÅ›Ä‡</div>
                   </div>
                 </div>
               </div>
@@ -351,3 +351,4 @@ export default function SetupyPage() {
     </main>
   );
 }
+

@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import Stripe from "stripe";
 
 import { prisma } from "@/lib/prisma";
@@ -80,7 +80,7 @@ export async function POST() {
 
     return NextResponse.json(
       {
-        error: "Nie udało się rozpocząć onboardingu Stripe Connect",
+        error: "Nie udaÅ‚o siÄ™ rozpoczÄ…Ä‡ onboardingu Stripe Connect",
       },
       {
         status: 500,

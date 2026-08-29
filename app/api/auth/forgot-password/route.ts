@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 
 import { prisma } from "@/lib/prisma";
@@ -36,11 +36,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         success: true,
         message:
-          "Jeżeli konto z tym adresem istnieje, wysłaliśmy link do resetowania hasła.",
+          "JeÅ¼eli konto z tym adresem istnieje, wysÅ‚aliÅ›my link do resetowania hasÅ‚a.",
       });
     }
 
-    // Unieważniamy wcześniejsze tokeny tego użytkownika.
+    // UniewaÅ¼niamy wczeÅ›niejsze tokeny tego uÅ¼ytkownika.
     await prisma.passwordResetToken.deleteMany({
       where: { userId: user.id },
     });
@@ -48,13 +48,13 @@ export async function POST(req: NextRequest) {
     // Surowy token trafia tylko do linku w emailu.
     const resetToken = crypto.randomBytes(32).toString("hex");
 
-    // W bazie przechowujemy wyłącznie hash.
+    // W bazie przechowujemy wyÅ‚Ä…cznie hash.
     const tokenHash = crypto
       .createHash("sha256")
       .update(resetToken)
       .digest("hex");
 
-    // Link ważny przez 30 minut.
+    // Link waÅ¼ny przez 30 minut.
     const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
 
     await prisma.passwordResetToken.create({
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
 
     await sendEmail({
       to: user.email,
-      subject: "Reset hasła — FX Trade",
+      subject: "Reset hasÅ‚a â€” FX Trade",
       html: `
         <div style="font-family:Arial,sans-serif;background:#06182d;padding:40px 20px;color:#fff">
           <div style="max-width:600px;margin:0 auto;background:#0b2748;border:1px solid #135b94;border-radius:18px;padding:32px">
@@ -83,14 +83,14 @@ export async function POST(req: NextRequest) {
               PROFESSIONAL TRADING
             </p>
 
-            <h2 style="color:#fff">Resetowanie hasła</h2>
+            <h2 style="color:#fff">Resetowanie hasÅ‚a</h2>
 
             <p style="color:#b7c8dc;line-height:1.7">
-              Otrzymaliśmy prośbę o zmianę hasła do Twojego konta FX Trade.
+              OtrzymaliÅ›my proÅ›bÄ™ o zmianÄ™ hasÅ‚a do Twojego konta FX Trade.
             </p>
 
             <p style="color:#b7c8dc;line-height:1.7">
-              Kliknij poniższy przycisk, aby ustawić nowe hasło.
+              Kliknij poniÅ¼szy przycisk, aby ustawiÄ‡ nowe hasÅ‚o.
             </p>
 
             <div style="margin:32px 0">
@@ -98,16 +98,16 @@ export async function POST(req: NextRequest) {
                 href="${resetUrl}"
                 style="display:inline-block;padding:15px 28px;background:#168cf5;color:#fff;text-decoration:none;border-radius:10px;font-weight:bold"
               >
-                Ustaw nowe hasło
+                Ustaw nowe hasÅ‚o
               </a>
             </div>
 
             <p style="color:#7f9ab8;font-size:13px">
-              Link jest ważny przez 30 minut.
+              Link jest waÅ¼ny przez 30 minut.
             </p>
 
             <p style="color:#7f9ab8;font-size:13px">
-              Jeśli nie prosiłeś o zmianę hasła, możesz zignorować tę wiadomość.
+              JeÅ›li nie prosiÅ‚eÅ› o zmianÄ™ hasÅ‚a, moÅ¼esz zignorowaÄ‡ tÄ™ wiadomoÅ›Ä‡.
             </p>
           </div>
         </div>
@@ -119,14 +119,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       message:
-        "Jeżeli konto z tym adresem istnieje, wysłaliśmy link do resetowania hasła.",
+        "JeÅ¼eli konto z tym adresem istnieje, wysÅ‚aliÅ›my link do resetowania hasÅ‚a.",
     });
   } catch (error) {
     console.error("FORGOT PASSWORD ERROR:", error);
 
     return NextResponse.json(
-      { error: "Nie udało się rozpocząć resetowania hasła." },
+      { error: "Nie udaÅ‚o siÄ™ rozpoczÄ…Ä‡ resetowania hasÅ‚a." },
       { status: 500 }
     );
   }
 }
+

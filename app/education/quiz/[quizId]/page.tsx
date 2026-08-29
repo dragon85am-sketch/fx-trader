@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { use, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { QUIZ_CONTENT } from "@/components/QuizContent";
@@ -30,26 +30,40 @@ const QUIZ_TO_MODULE_MAP: Record<string, string> = {
 export default function QuizPage({
   params,
 }: {
-  params: { quizId: string };
+  params: Promise<{ quizId: string }>;
 }) {
+  const { quizId } = use(params);
+
   const router = useRouter();
-  const quiz = QUIZ_CONTENT[params.quizId];
+  const quiz = QUIZ_CONTENT[quizId];
 
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [submitted, setSubmitted] = useState(false);
 
   const score = useMemo(() => {
-    if (!quiz) return { correct: 0, total: 0, percent: 0, passed: false };
+    if (!quiz) {
+      return {
+        correct: 0,
+        total: 0,
+        percent: 0,
+        passed: false,
+      };
+    }
 
     const correct = quiz.questions.reduce((acc, q) => {
       return acc + (answers[q.id] === q.correctIndex ? 1 : 0);
     }, 0);
 
     const total = quiz.questions.length;
-    const percent = Math.round((correct / total) * 100);
+    const percent = total > 0 ? Math.round((correct / total) * 100) : 0;
     const passed = percent >= quiz.passPercent;
 
-    return { correct, total, percent, passed };
+    return {
+      correct,
+      total,
+      percent,
+      passed,
+    };
   }, [answers, quiz]);
 
   if (!quiz) {
@@ -59,7 +73,7 @@ export default function QuizPage({
           Quiz nie został znaleziony
         </h1>
 
-        <p className="text-gray-400 mb-6">ID: {params.quizId}</p>
+        <p className="text-gray-400 mb-6">ID: {quizId}</p>
 
         <Link
           href="/education/kurs"
@@ -71,11 +85,14 @@ export default function QuizPage({
     );
   }
 
-  const currentModule = Number(QUIZ_TO_MODULE_MAP[params.quizId] ?? "0");
+  const currentModule = Number(QUIZ_TO_MODULE_MAP[quizId] ?? "0");
   const hasNextModule = currentModule < 18;
   const nextModule = currentModule + 1;
 
-  const handleSelect = (questionId: string, optionIndex: number) => {
+  const handleSelect = (
+    questionId: string,
+    optionIndex: number
+  ) => {
     if (submitted) return;
 
     setAnswers((prev) => ({
@@ -93,20 +110,37 @@ export default function QuizPage({
       localStorage.getItem("passedQuizzes") || "{}"
     );
 
-    passedQuizzes[params.quizId] = true;
-    localStorage.setItem("passedQuizzes", JSON.stringify(passedQuizzes));
+    passedQuizzes[quizId] = true;
 
-    localStorage.setItem(`module-${currentModule}-activeLesson`, "0");
+    localStorage.setItem(
+      "passedQuizzes",
+      JSON.stringify(passedQuizzes)
+    );
+
+    localStorage.setItem(
+      `module-${currentModule}-activeLesson`,
+      "0"
+    );
 
     if (hasNextModule) {
-      localStorage.setItem("lastOpenedModule", String(nextModule));
-      localStorage.setItem(`module-${nextModule}-activeLesson`, "0");
+      localStorage.setItem(
+        "lastOpenedModule",
+        String(nextModule)
+      );
+
+      localStorage.setItem(
+        `module-${nextModule}-activeLesson`,
+        "0"
+      );
 
       setTimeout(() => {
         router.push(`/education/kurs/${nextModule}`);
       }, 800);
     } else {
-      localStorage.setItem("lastOpenedModule", String(currentModule));
+      localStorage.setItem(
+        "lastOpenedModule",
+        String(currentModule)
+      );
 
       setTimeout(() => {
         router.push("/education/kurs/koniec");
@@ -114,12 +148,22 @@ export default function QuizPage({
     }
   };
 
-  const allAnswered = quiz.questions.every((q) => answers[q.id] !== undefined);
+  const handleReset = () => {
+    setAnswers({});
+    setSubmitted(false);
+  };
+
+  const allAnswered = quiz.questions.every(
+    (q) => answers[q.id] !== undefined
+  );
 
   return (
     <div className="p-10 space-y-8">
       <div>
-        <h1 className="text-3xl font-bold text-white mb-2">{quiz.title}</h1>
+        <h1 className="text-3xl font-bold text-white mb-2">
+          {quiz.title}
+        </h1>
+
         <p className="text-gray-400">
           Aby zaliczyć quiz potrzebujesz {quiz.passPercent}% poprawnych
           odpowiedzi
@@ -139,7 +183,9 @@ export default function QuizPage({
                 : "Quiz zaliczony — ukończyłeś cały kurs..."}
             </p>
           ) : (
-            <p className="text-red-400 font-medium">Quiz niezaliczony</p>
+            <p className="text-red-400 font-medium">
+              Quiz niezaliczony
+            </p>
           )}
         </div>
       )}
@@ -159,28 +205,42 @@ export default function QuizPage({
             <div className="space-y-3">
               {question.options.map((option, optionIndex) => {
                 const isSelected = selected === optionIndex;
-                const isCorrect = question.correctIndex === optionIndex;
+                const isCorrect =
+                  question.correctIndex === optionIndex;
 
                 let style =
                   "border border-white/10 bg-black/20 text-gray-300";
 
                 if (!submitted && isSelected) {
-                  style = "border-blue-500 bg-blue-600/20 text-white";
+                  style =
+                    "border-blue-500 bg-blue-600/20 text-white";
                 }
 
                 if (submitted && isCorrect) {
-                  style = "border-green-500 bg-green-600/20 text-white";
+                  style =
+                    "border-green-500 bg-green-600/20 text-white";
                 }
 
-                if (submitted && isSelected && !isCorrect) {
-                  style = "border-red-500 bg-red-600/20 text-white";
+                if (
+                  submitted &&
+                  isSelected &&
+                  !isCorrect
+                ) {
+                  style =
+                    "border-red-500 bg-red-600/20 text-white";
                 }
 
                 return (
                   <button
                     key={optionIndex}
-                    onClick={() => handleSelect(question.id, optionIndex)}
-                    className={`w-full text-left px-4 py-3 rounded-lg ${style}`}
+                    type="button"
+                    onClick={() =>
+                      handleSelect(
+                        question.id,
+                        optionIndex
+                      )
+                    }
+                    className={`w-full text-left px-4 py-3 rounded-lg transition ${style}`}
                   >
                     {option}
                   </button>
@@ -190,31 +250,38 @@ export default function QuizPage({
 
             {submitted && question.explanation && (
               <div className="mt-4 text-sm text-gray-400">
-                <b>Wyjaśnienie:</b> {question.explanation}
+                <b>Wyjaśnienie:</b>{" "}
+                {question.explanation}
               </div>
             )}
           </div>
         );
       })}
 
-      <div className="flex gap-4">
+      <div className="flex gap-4 flex-wrap">
         <button
+          type="button"
           onClick={handleSubmit}
           disabled={!allAnswered || submitted}
-          className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg disabled:opacity-40"
+          className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg disabled:opacity-40 disabled:cursor-not-allowed"
         >
           Sprawdź wynik
         </button>
 
         <button
-          onClick={() => {
-            setAnswers({});
-            setSubmitted(false);
-          }}
+          type="button"
+          onClick={handleReset}
           className="px-6 py-3 bg-white/5 border border-white/10 text-white rounded-lg"
         >
           Resetuj quiz
         </button>
+
+        <Link
+          href={`/education/kurs/${currentModule}`}
+          className="px-6 py-3 bg-white/5 border border-white/10 text-white rounded-lg"
+        >
+          Wróć do modułu
+        </Link>
       </div>
     </div>
   );

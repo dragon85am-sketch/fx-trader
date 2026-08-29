@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 
 type Payload = {
   event?: "SCANNER_ON" | "ENTRY_FROZEN";
@@ -39,12 +39,12 @@ function esc(s: string) {
 }
 
 function fmtNum(n?: number, dp = 5) {
-  if (typeof n !== "number" || !Number.isFinite(n)) return "—";
+  if (typeof n !== "number" || !Number.isFinite(n)) return "â€”";
   return n.toFixed(dp);
 }
 
 function fmtPct(x?: number, dp = 2) {
-  if (typeof x !== "number" || !Number.isFinite(x)) return "—";
+  if (typeof x !== "number" || !Number.isFinite(x)) return "â€”";
   return `${x.toFixed(dp)}%`;
 }
 
@@ -152,7 +152,7 @@ function buildCaption(body: Payload) {
 
   const timeStr = pickTimeStr(body);
 
-  const sideEmoji = side === "BUY" ? "🟢" : side === "SELL" ? "🔴" : "⚪";
+  const sideEmoji = side === "BUY" ? "ðŸŸ¢" : side === "SELL" ? "ðŸ”´" : "âšª";
 
   const canCalc =
     typeof entry === "number" &&
@@ -180,21 +180,21 @@ function buildCaption(body: Payload) {
   }
 
   const rrValue = computeAutoRR({ side, entry, sl, tp1, rr: body.rr });
-  const rrStr = rrValue !== null ? rrValue.toFixed(2) : "—";
+  const rrStr = rrValue !== null ? rrValue.toFixed(2) : "â€”";
 
   const slInfo =
     slDistPct === null
       ? ""
       : isFxSymbol(symbol)
-        ? ` <i>(odstęp: ${fmtPct(slDistPct)} • ${slDistPips} pips)</i>`
-        : ` <i>(odstęp: ${fmtPct(slDistPct)})</i>`;
+        ? ` <i>(odstÄ™p: ${fmtPct(slDistPct)} â€¢ ${slDistPips} pips)</i>`
+        : ` <i>(odstÄ™p: ${fmtPct(slDistPct)})</i>`;
 
   const tp1Info =
     tp1DistPct === null
       ? ""
       : isFxSymbol(symbol)
-        ? ` <i>(odstęp: ${fmtPct(tp1DistPct)} • ${tp1DistPips} pips)</i>`
-        : ` <i>(odstęp: ${fmtPct(tp1DistPct)})</i>`;
+        ? ` <i>(odstÄ™p: ${fmtPct(tp1DistPct)} â€¢ ${tp1DistPips} pips)</i>`
+        : ` <i>(odstÄ™p: ${fmtPct(tp1DistPct)})</i>`;
 
   const sym = esc(symbol);
   const tfStr = tf ? esc(tf) : "";
@@ -202,37 +202,37 @@ function buildCaption(body: Payload) {
 
   if (event === "SCANNER_ON") {
     return (
-      `<b>📌 Instrument:</b> <code>${sym}</code>` +
-      (tfStr ? `  •  <b>TF:</b> <code>${tfStr}</code>` : "") +
-      (side ? `  •  <b>Side:</b> ${sideEmoji} <b>${esc(side)}</b>` : "") +
+      `<b>ðŸ“Œ Instrument:</b> <code>${sym}</code>` +
+      (tfStr ? `  â€¢  <b>TF:</b> <code>${tfStr}</code>` : "") +
+      (side ? `  â€¢  <b>Side:</b> ${sideEmoji} <b>${esc(side)}</b>` : "") +
       `\n` +
       (typeof liquidity === "number"
-        ? `<b>💧 Liquidity:</b> <b>${Math.round(liquidity)}%</b>`
-        : `<b>💧 Liquidity:</b> <b>—</b>`) +
+        ? `<b>ðŸ’§ Liquidity:</b> <b>${Math.round(liquidity)}%</b>`
+        : `<b>ðŸ’§ Liquidity:</b> <b>â€”</b>`) +
       `\n` +
-      (timeStrEsc ? `\n<b>🕒 Time:</b> <code>${timeStrEsc}</code>` : "") +
-      `\n<b>🧠 FxTrade</b>`
+      (timeStrEsc ? `\n<b>ðŸ•’ Time:</b> <code>${timeStrEsc}</code>` : "") +
+      `\n<b>ðŸ§  FxTrade</b>`
     );
   }
 
   return (
-    `<b>📌 Instrument:</b> <code>${sym}</code>` +
-    (tfStr ? `  •  <b>TF:</b> <code>${tfStr}</code>` : "") +
-    (side ? `  •  <b>Side:</b> ${sideEmoji} <b>${esc(side)}</b>` : "") +
+    `<b>ðŸ“Œ Instrument:</b> <code>${sym}</code>` +
+    (tfStr ? `  â€¢  <b>TF:</b> <code>${tfStr}</code>` : "") +
+    (side ? `  â€¢  <b>Side:</b> ${sideEmoji} <b>${esc(side)}</b>` : "") +
     `\n` +
     (typeof liquidity === "number"
-      ? `<b>💧 Liquidity:</b> <b>${Math.round(liquidity)}%</b>`
-      : `<b>💧 Liquidity:</b> <b>—</b>`) +
-    `  •  <b>🎯 RR:</b> <b>${rrStr}</b>\n\n` +
-    `<b>📍 Poziomy</b>\n` +
-    `• <b>Entry:</b> <code>${fmtNum(entry)}</code>\n` +
-    `• <b>SL:</b> <code>${fmtNum(sl)}</code>${slInfo}\n\n` +
-    `<b>✅ Take Profit</b>\n` +
-    `• <b>TP1:</b> <code>${fmtNum(tp1)}</code>${tp1Info}\n` +
-    `• <b>TP2:</b> <code>${fmtNum(tp2)}</code>\n` +
-    `• <b>TP3:</b> <code>${fmtNum(tp3)}</code>\n` +
-    (timeStrEsc ? `\n<b>🕒 Time:</b> <code>${timeStrEsc}</code>\n` : `\n`) +
-    `<b>🧠 FxTrade</b>`
+      ? `<b>ðŸ’§ Liquidity:</b> <b>${Math.round(liquidity)}%</b>`
+      : `<b>ðŸ’§ Liquidity:</b> <b>â€”</b>`) +
+    `  â€¢  <b>ðŸŽ¯ RR:</b> <b>${rrStr}</b>\n\n` +
+    `<b>ðŸ“ Poziomy</b>\n` +
+    `â€¢ <b>Entry:</b> <code>${fmtNum(entry)}</code>\n` +
+    `â€¢ <b>SL:</b> <code>${fmtNum(sl)}</code>${slInfo}\n\n` +
+    `<b>âœ… Take Profit</b>\n` +
+    `â€¢ <b>TP1:</b> <code>${fmtNum(tp1)}</code>${tp1Info}\n` +
+    `â€¢ <b>TP2:</b> <code>${fmtNum(tp2)}</code>\n` +
+    `â€¢ <b>TP3:</b> <code>${fmtNum(tp3)}</code>\n` +
+    (timeStrEsc ? `\n<b>ðŸ•’ Time:</b> <code>${timeStrEsc}</code>\n` : `\n`) +
+    `<b>ðŸ§  FxTrade</b>`
   );
 }
 
@@ -241,7 +241,7 @@ export async function POST(req: Request) {
     const token = process.env.TELEGRAM_BOT_TOKEN;
     const chatId = process.env.TELEGRAM_CHAT_ID;
 
-    // FORUM/WĄTEK (opcjonalnie)
+    // FORUM/WÄ„TEK (opcjonalnie)
     const threadIdRaw = process.env.TELEGRAM_THREAD_ID;
     const threadId =
       threadIdRaw && /^\d+$/.test(threadIdRaw) ? Number(threadIdRaw) : undefined;
@@ -257,16 +257,16 @@ export async function POST(req: Request) {
 
     const body = (await req.json()) as Payload;
 
-    // 1) Tu sprawdzisz czy skaner w ogóle wywołuje endpoint:
-    console.log("🔥 TELEGRAM NOTIFY PAYLOAD:", JSON.stringify(body, null, 2));
+    // 1) Tu sprawdzisz czy skaner w ogÃ³le wywoÅ‚uje endpoint:
+    console.log("ðŸ”¥ TELEGRAM NOTIFY PAYLOAD:", JSON.stringify(body, null, 2));
 
     const caption = buildCaption(body);
     const photoUrl = body.imageUrl || logoUrl;
 
-    // wspólne pole dla forum topic
+    // wspÃ³lne pole dla forum topic
     const threadPart = threadId ? { message_thread_id: threadId } : {};
 
-    // 2) Jeśli nie masz photoUrl -> sendMessage
+    // 2) JeÅ›li nie masz photoUrl -> sendMessage
     if (!photoUrl) {
       const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
         method: "POST",
@@ -281,7 +281,7 @@ export async function POST(req: Request) {
       });
 
       const data = await res.json();
-      console.log("📨 TELEGRAM sendMessage status:", res.status, "resp:", data);
+      console.log("ðŸ“¨ TELEGRAM sendMessage status:", res.status, "resp:", data);
 
       if (!res.ok) {
         return NextResponse.json({ ok: false, telegram: data }, { status: 500 });
@@ -290,8 +290,8 @@ export async function POST(req: Request) {
     }
 
     // 3) sendPhoto (UWAGA: caption limit ~1024 znaki)
-    // Jeśli caption bywa długi, Telegram odrzuci — dlatego tniemy bezpiecznie.
-    const safeCaption = caption.length > 1000 ? caption.slice(0, 1000) + "…" : caption;
+    // JeÅ›li caption bywa dÅ‚ugi, Telegram odrzuci â€” dlatego tniemy bezpiecznie.
+    const safeCaption = caption.length > 1000 ? caption.slice(0, 1000) + "â€¦" : caption;
 
     const res = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
       method: "POST",
@@ -306,10 +306,10 @@ export async function POST(req: Request) {
     });
 
     const data = await res.json();
-    console.log("📸 TELEGRAM sendPhoto status:", res.status, "resp:", data);
+    console.log("ðŸ“¸ TELEGRAM sendPhoto status:", res.status, "resp:", data);
 
     if (!res.ok) {
-      // fallback: jak foto nie przejdzie, wyślij sam tekst
+      // fallback: jak foto nie przejdzie, wyÅ›lij sam tekst
       const res2 = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -322,7 +322,7 @@ export async function POST(req: Request) {
         }),
       });
       const data2 = await res2.json();
-      console.log("↩️ TELEGRAM fallback sendMessage status:", res2.status, "resp:", data2);
+      console.log("â†©ï¸ TELEGRAM fallback sendMessage status:", res2.status, "resp:", data2);
 
       if (!res2.ok) {
         return NextResponse.json(
@@ -336,7 +336,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, mode: "photo" });
   } catch (e: any) {
-    console.error("❌ TELEGRAM NOTIFY ERROR:", e);
+    console.error("âŒ TELEGRAM NOTIFY ERROR:", e);
     return NextResponse.json({ ok: false, error: e?.message ?? "Unknown error" }, { status: 500 });
   }
 }

@@ -1,4 +1,4 @@
-// app/api/oanda/instruments/route.ts
+﻿// app/api/oanda/instruments/route.ts
 import { NextResponse } from "next/server";
 import { tryOanda, oandaFetch } from "@/lib/oandaClient";
 import { getCachedInstruments, setCachedInstruments } from "@/lib/oandaResolver";

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import {
@@ -37,23 +37,23 @@ const tiles = [
   {
     title: "Gotowe Setupy",
     description:
-      "Gotowe setupy wejścia, zarządzania pozycją i analizy na przykładach.",
+      "Gotowe setupy wejÅ›cia, zarzÄ…dzania pozycjÄ… i analizy na przykÅ‚adach.",
     icon: TrendingUp,
     href: "/education/setupy",
     badge: "NOWE",
-    meta: "16 materiałów",
+    meta: "16 materiaÅ‚Ã³w",
     time: "6h 15m",
     accent: "blue",
     image: "/education/setups-chess.png",
   },
   {
-    title: "Materiały bonusowe",
+    title: "MateriaÅ‚y bonusowe",
     description:
-      "Dodatkowe poradniki, checklisty, e-booki i narzędzia dla traderów.",
+      "Dodatkowe poradniki, checklisty, e-booki i narzÄ™dzia dla traderÃ³w.",
     icon: Lightbulb,
     href: "/education/bonusy",
     badge: "",
-    meta: "8 materiałów",
+    meta: "8 materiaÅ‚Ã³w",
     time: "2h 45m",
     accent: "green",
     image: "/education/bonus-gift.png",
@@ -62,40 +62,40 @@ const tiles = [
 
 const popularMaterials = [
   {
-    title: "Price Action – Struktura Rynku",
-    description: "Zrozum strukturę rynku i wykorzystuj ją w swoich zagraniach.",
+    title: "Price Action â€“ Struktura Rynku",
+    description: "Zrozum strukturÄ™ rynku i wykorzystuj jÄ… w swoich zagraniach.",
     type: "LEKCJA",
     time: "24 min",
-    level: "Średni",
+    level: "Åšredni",
     rating: "4.9",
     image: "/education/price-action.png",
   },
   {
-    title: "Wskaźniki – Trend i Momentum",
-    description: "Skuteczne wykorzystanie wskaźników trendu i momentum.",
+    title: "WskaÅºniki â€“ Trend i Momentum",
+    description: "Skuteczne wykorzystanie wskaÅºnikÃ³w trendu i momentum.",
     type: "LEKCJA",
     time: "32 min",
-    level: "Średni",
+    level: "Åšredni",
     rating: "4.8",
     image: "/education/momentum.png",
   },
   {
-    title: "Zarządzanie ryzykiem",
-    description: "Jak chronić kapitał i zarządzać ryzykiem jak profesjonalista.",
+    title: "ZarzÄ…dzanie ryzykiem",
+    description: "Jak chroniÄ‡ kapitaÅ‚ i zarzÄ…dzaÄ‡ ryzykiem jak profesjonalista.",
     type: "PORADNIK",
     time: "18 min",
-    level: "Łatwy",
+    level: "Åatwy",
     rating: "4.9",
     image: "/education/risk-management.png",
   },
 ];
 
 const learningPath = [
-  { title: "Podstawy tradingu", meta: "8 / 8 materiałów", progress: 100 },
-  { title: "Analiza techniczna", meta: "12 / 12 materiałów", progress: 100 },
-  { title: "Zarządzanie ryzykiem", meta: "5 / 8 materiałów", progress: 63 },
-  { title: "Strategie tradingowe", meta: "0 / 10 materiałów", progress: 0 },
-  { title: "Psychologia tradera", meta: "0 / 6 materiałów", progress: 0 },
+  { title: "Podstawy tradingu", meta: "8 / 8 materiaÅ‚Ã³w", progress: 100 },
+  { title: "Analiza techniczna", meta: "12 / 12 materiaÅ‚Ã³w", progress: 100 },
+  { title: "ZarzÄ…dzanie ryzykiem", meta: "5 / 8 materiaÅ‚Ã³w", progress: 63 },
+  { title: "Strategie tradingowe", meta: "0 / 10 materiaÅ‚Ã³w", progress: 0 },
+  { title: "Psychologia tradera", meta: "0 / 6 materiaÅ‚Ã³w", progress: 0 },
 ];
 
 function MiniCandles() {
@@ -219,13 +219,13 @@ export default function EducationPage() {
                   Edukacja
                 </h1>
                 <p className="mt-2 max-w-md text-[12px] leading-5 text-slate-300/75">
-                  Rozwijaj swoje umiejętności i stań się lepszym traderem.
+                  Rozwijaj swoje umiejÄ™tnoÅ›ci i staÅ„ siÄ™ lepszym traderem.
                 </p>
                 <Link
                   href="/education/kurs"
                   className="mt-5 inline-flex items-center gap-2 rounded-xl border border-cyan-400/50 bg-gradient-to-r from-blue-600 to-sky-500 px-5 py-3 text-[11px] font-bold shadow-[0_10px_30px_rgba(14,165,233,.2)] transition hover:-translate-y-0.5 hover:brightness-110"
                 >
-                  Kontynuuj naukę <ArrowRight className="h-4 w-4" />
+                  Kontynuuj naukÄ™ <ArrowRight className="h-4 w-4" />
                 </Link>
               </div>
             </div>
@@ -234,10 +234,10 @@ export default function EducationPage() {
 
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
               {[
-                [BookOpen, "54", "Materiały", "Wiedza w Twoim zasięgu"],
-                [Clock3, "29 h 45 min", "Łączny czas nauki", "Inwestycja w siebie"],
-                [TrendingUp, "87%", "Postęp nauki", "Świetna robota!"],
-                [Trophy, "12", "Certyfikaty", "Zdobyte osiągnięcia"],
+                [BookOpen, "54", "MateriaÅ‚y", "Wiedza w Twoim zasiÄ™gu"],
+                [Clock3, "29 h 45 min", "ÅÄ…czny czas nauki", "Inwestycja w siebie"],
+                [TrendingUp, "87%", "PostÄ™p nauki", "Åšwietna robota!"],
+                [Trophy, "12", "Certyfikaty", "Zdobyte osiÄ…gniÄ™cia"],
               ].map(([Icon, value, label, sub], index) => {
                 const StatIcon = Icon as typeof BookOpen;
                 return (
@@ -308,7 +308,7 @@ export default function EducationPage() {
                     {tile.description}
                   </p>
                   <div className="mt-auto flex items-center gap-3 border-t border-white/[.07] pt-4 text-[9px] text-slate-400">
-                    <span>{tile.meta}</span><span>•</span><span>{tile.time}</span>
+                    <span>{tile.meta}</span><span>â€¢</span><span>{tile.time}</span>
                     <span className="ml-auto flex h-8 w-8 items-center justify-center rounded-full border border-blue-400/40 text-blue-300 transition group-hover:translate-x-1">
                       <ArrowRight className="h-4 w-4" />
                     </span>
@@ -330,17 +330,17 @@ export default function EducationPage() {
                 </div>
               </div>
               <div>
-                <h2 className="text-[17px] font-bold">Twój postęp w nauce</h2>
-                <p className="mt-2 text-[11px] font-semibold">Świetna robota! 🔥</p>
+                <h2 className="text-[17px] font-bold">TwÃ³j postÄ™p w nauce</h2>
+                <p className="mt-2 text-[11px] font-semibold">Åšwietna robota! ðŸ”¥</p>
                 <p className="mt-1 text-[10px] leading-5 text-slate-400">
-                  Kontynuuj naukę i zdobywaj nowe umiejętności.
+                  Kontynuuj naukÄ™ i zdobywaj nowe umiejÄ™tnoÅ›ci.
                 </p>
               </div>
             </div>
 
             <div>
               <div className="mb-3 text-[10px] text-slate-300">
-                <b className="text-white">47 z 54</b> materiałów ukończonych
+                <b className="text-white">47 z 54</b> materiaÅ‚Ã³w ukoÅ„czonych
               </div>
               <div className="h-3 overflow-hidden rounded-full bg-[#05284c] shadow-inner">
                 <div className="h-full w-[87%] rounded-full bg-gradient-to-r from-blue-600 via-sky-400 to-cyan-300 shadow-[0_0_18px_rgba(34,211,238,.35)]" />
@@ -351,7 +351,7 @@ export default function EducationPage() {
               href="/education/kurs"
               className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-400/40 bg-gradient-to-r from-blue-600 to-sky-500 px-4 py-3 text-[10px] font-bold shadow-[0_10px_30px_rgba(37,99,235,.18)] hover:brightness-110"
             >
-              Kontynuuj naukę <ArrowRight className="h-4 w-4" />
+              Kontynuuj naukÄ™ <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
         </section>
@@ -363,10 +363,10 @@ export default function EducationPage() {
               <div>
                 <div className="flex items-center gap-2">
                   <Star className="h-5 w-5 text-sky-400" />
-                  <h2 className="text-[17px] font-bold">Popularne materiały</h2>
+                  <h2 className="text-[17px] font-bold">Popularne materiaÅ‚y</h2>
                 </div>
                 <p className="mt-1 text-[9px] text-slate-500">
-                  Najczęściej oglądane i najwyżej oceniane materiały
+                  NajczÄ™Å›ciej oglÄ…dane i najwyÅ¼ej oceniane materiaÅ‚y
                 </p>
               </div>
               <button className="rounded-xl border border-sky-400/35 bg-blue-500/[.06] px-4 py-2.5 text-[9px] font-semibold text-sky-300 hover:bg-blue-500/10">
@@ -399,7 +399,7 @@ export default function EducationPage() {
                     <span>{item.level}</span>
                     <span className="flex items-center gap-1 text-amber-300"><Star className="h-3.5 w-3.5 fill-current" />{item.rating}</span>
                     <button className="inline-flex items-center gap-2 rounded-[9px] border border-blue-500/40 bg-blue-500/[.06] px-3 py-2.5 font-semibold text-white hover:bg-blue-500/15">
-                      <PlayCircle className="h-4 w-4 text-blue-300" /> Otwórz materiał
+                      <PlayCircle className="h-4 w-4 text-blue-300" /> OtwÃ³rz materiaÅ‚
                     </button>
                   </div>
                 </div>
@@ -411,7 +411,7 @@ export default function EducationPage() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Target className="h-5 w-5 text-cyan-300" />
-                <h2 className="text-[17px] font-bold">Twoja ścieżka nauki</h2>
+                <h2 className="text-[17px] font-bold">Twoja Å›cieÅ¼ka nauki</h2>
               </div>
               <span className="rounded-lg border border-sky-400/35 px-3 py-2 text-[8px] text-blue-300">Plan nauki</span>
             </div>
@@ -461,10 +461,10 @@ export default function EducationPage() {
         {/* BENEFITS */}
         <section className="grid gap-3 rounded-[18px] border border-sky-400/30 bg-[linear-gradient(90deg,#0a3f73,#08345f,#0a3f73)] p-3 shadow-[0_0_28px_rgba(14,165,233,.12)] md:grid-cols-2 xl:grid-cols-4">
           {[
-            [Clock3, "Ucz się w swoim tempie", "Dostęp do materiałów 24/7", "text-emerald-300"],
-            [Rocket, "Praktyczna wiedza", "Realne przykłady i case study", "text-blue-300"],
-            [Sparkles, "Ekspercka jakość", "Materiały od profesjonalnych traderów", "text-violet-300"],
-            [Trophy, "Certyfikaty", "Zdobywaj certyfikaty i wyróżnij się", "text-amber-300"],
+            [Clock3, "Ucz siÄ™ w swoim tempie", "DostÄ™p do materiaÅ‚Ã³w 24/7", "text-emerald-300"],
+            [Rocket, "Praktyczna wiedza", "Realne przykÅ‚ady i case study", "text-blue-300"],
+            [Sparkles, "Ekspercka jakoÅ›Ä‡", "MateriaÅ‚y od profesjonalnych traderÃ³w", "text-violet-300"],
+            [Trophy, "Certyfikaty", "Zdobywaj certyfikaty i wyrÃ³Å¼nij siÄ™", "text-amber-300"],
           ].map(([Icon, title, desc, color]) => {
             const BenefitIcon = Icon as typeof Clock3;
             return (

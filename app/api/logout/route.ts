@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 
 export async function POST() {
   const res = NextResponse.json({ ok: true });
@@ -8,7 +8,7 @@ export async function POST() {
     sameSite: "lax",
     secure: false,
     path: "/",
-    maxAge: 0, // 🔥 usuwa cookie
+    maxAge: 0, // ðŸ”¥ usuwa cookie
   });
 
   return res;

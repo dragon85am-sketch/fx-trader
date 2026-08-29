@@ -1,4 +1,4 @@
-import { prisma } from "../../../lib/prisma";
+﻿import { prisma } from "../../../lib/prisma";
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
@@ -27,14 +27,14 @@ export async function POST(req: Request) {
 
     if (!email || !password) {
       return Response.json(
-        { error: "Email i hasło są wymagane" },
+        { error: "Email i hasÅ‚o sÄ… wymagane" },
         { status: 400 }
       );
     }
 
     if (password.length < 8) {
       return Response.json(
-        { error: "Hasło musi mieć minimum 8 znaków" },
+        { error: "HasÅ‚o musi mieÄ‡ minimum 8 znakÃ³w" },
         { status: 400 }
       );
     }
@@ -43,7 +43,7 @@ export async function POST(req: Request) {
       console.error("Brak JWT_SECRET");
 
       return Response.json(
-        { error: "Błąd konfiguracji serwera" },
+        { error: "BÅ‚Ä…d konfiguracji serwera" },
         { status: 500 }
       );
     }
@@ -59,7 +59,7 @@ export async function POST(req: Request) {
 
     if (existingUser) {
       return Response.json(
-        { error: "Użytkownik już istnieje" },
+        { error: "UÅ¼ytkownik juÅ¼ istnieje" },
         { status: 409 }
       );
     }
@@ -89,8 +89,8 @@ export async function POST(req: Request) {
     }
 
     /*
-     * Nowy użytkownik powstaje bez Premium.
-     * Dostęp zostanie aktywowany dopiero przez Stripe webhook.
+     * Nowy uÅ¼ytkownik powstaje bez Premium.
+     * DostÄ™p zostanie aktywowany dopiero przez Stripe webhook.
      */
     const user = await prisma.user.create({
       data: {
@@ -115,7 +115,7 @@ export async function POST(req: Request) {
 
     /*
      * Automatyczne logowanie po rejestracji.
-     * Dzięki temu /api/stripe/checkout może od razu użyć requireAuth().
+     * DziÄ™ki temu /api/stripe/checkout moÅ¼e od razu uÅ¼yÄ‡ requireAuth().
      */
     const token = jwt.sign(
       {
@@ -138,7 +138,7 @@ export async function POST(req: Request) {
     });
 
     /*
-     * Referral cookie nie jest już potrzebne po utworzeniu konta.
+     * Referral cookie nie jest juÅ¼ potrzebne po utworzeniu konta.
      */
     cookieStore.delete(REF_COOKIE_NAME);
 
@@ -156,7 +156,7 @@ export async function POST(req: Request) {
         },
 
         /*
-         * RegisterPage może po sukcesie przejść bezpośrednio tutaj.
+         * RegisterPage moÅ¼e po sukcesie przejÅ›Ä‡ bezpoÅ›rednio tutaj.
          */
         redirectTo: "/checkout",
       },
@@ -169,7 +169,7 @@ export async function POST(req: Request) {
 
     return Response.json(
       {
-        error: "Błąd serwera",
+        error: "BÅ‚Ä…d serwera",
       },
       {
         status: 500,
@@ -177,3 +177,4 @@ export async function POST(req: Request) {
     );
   }
 }
+

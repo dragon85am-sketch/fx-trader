@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
@@ -7,11 +7,11 @@ const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const appUrl = process.env.NEXT_PUBLIC_APP_URL;
 
 if (!stripeSecretKey) {
-  throw new Error("Brak STRIPE_SECRET_KEY w zmiennych środowiskowych");
+  throw new Error("Brak STRIPE_SECRET_KEY w zmiennych Å›rodowiskowych");
 }
 
 const stripe = new Stripe(stripeSecretKey, {
-  apiVersion: "2026-03-25.dahlia",
+  
 });
 
 export async function POST() {
@@ -41,7 +41,7 @@ export async function POST() {
 
     if (!user) {
       return NextResponse.json(
-        { error: "Nie znaleziono użytkownika" },
+        { error: "Nie znaleziono uÅ¼ytkownika" },
         { status: 404 }
       );
     }
@@ -69,9 +69,10 @@ export async function POST() {
 
     return NextResponse.json(
       {
-        error: "Nie udało się otworzyć zarządzania subskrypcją",
+        error: "Nie udaÅ‚o siÄ™ otworzyÄ‡ zarzÄ…dzania subskrypcjÄ…",
       },
       { status: 500 }
     );
   }
 }
+

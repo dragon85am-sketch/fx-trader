@@ -1,15 +1,16 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { requireAdmin } from "@/lib/auth";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2026-03-25.dahlia",
-});
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 export async function GET() {
   try {
     const auth = await requireAdmin();
-    if (!auth.ok) return auth.response;
+
+    if (!auth.ok) {
+      return auth.response;
+    }
 
     const balance = await stripe.balance.retrieve();
 
@@ -29,7 +30,7 @@ export async function GET() {
 
     return NextResponse.json(
       {
-        error: "Nie udało się pobrać salda Stripe",
+        error: "Nie udaÅ‚o siÄ™ pobraÄ‡ salda Stripe",
         details: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 }

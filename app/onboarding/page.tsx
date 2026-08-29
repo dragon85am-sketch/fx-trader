@@ -1,9 +1,9 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Button, Card, CardContent, Input, Label, Pill } from "../../../components/ui";
-import { getOnboarding, setOnboarding, getPaid } from "../../../components/storage";
+import { Button, Card, CardContent, Input, Label, Pill } from "../../components/ui"
+import { getOnboarding, setOnboarding, getPaid } from "../../components/storage"
 
 export default function Onboarding() {
   const paid = typeof window !== "undefined" ? getPaid() : false;
@@ -25,8 +25,8 @@ export default function Onboarding() {
       <main className="px-6 py-16 max-w-2xl mx-auto">
         <Card><CardContent>
           <h1 className="text-2xl font-bold mb-2">Onboarding</h1>
-          <p className="text-zinc-400 mb-6">Onboarding jest dostępny po zakupie.</p>
-          <Link href="/paywall"><Button className="py-6 text-lg">Odblokuj dostęp – 99€</Button></Link>
+          <p className="text-zinc-400 mb-6">Onboarding jest dostÄ™pny po zakupie.</p>
+          <Link href="/paywall"><Button className="py-6 text-lg">Odblokuj dostÄ™p â€“ 99â‚¬</Button></Link>
         </CardContent></Card>
       </main>
     );
@@ -36,9 +36,9 @@ export default function Onboarding() {
     return (
       <main className="px-6 py-16 max-w-2xl mx-auto">
         <Card><CardContent>
-          <h1 className="text-2xl font-bold mb-2">Onboarding ukończony ✅</h1>
-          <p className="text-zinc-400 mb-6">Masz odblokowany pełny dashboard PRO.</p>
-          <Link href="/app"><Button className="py-6 text-lg">Przejdź do dashboardu</Button></Link>
+          <h1 className="text-2xl font-bold mb-2">Onboarding ukoÅ„czony âœ…</h1>
+          <p className="text-zinc-400 mb-6">Masz odblokowany peÅ‚ny dashboard PRO.</p>
+          <Link href="/app"><Button className="py-6 text-lg">PrzejdÅº do dashboardu</Button></Link>
         </CardContent></Card>
       </main>
     );
@@ -55,7 +55,7 @@ export default function Onboarding() {
         <Card><CardContent>
           <h2 className="text-xl font-semibold mb-2">Start</h2>
           <p className="text-zinc-400 mb-4">
-            To nie jest platforma sygnałowa. To system, który pokaże Ci dlaczego zarabiasz albo tracisz.
+            To nie jest platforma sygnaÅ‚owa. To system, ktÃ³ry pokaÅ¼e Ci dlaczego zarabiasz albo tracisz.
           </p>
           <Button className="py-6 text-lg" onClick={() => {
             const next = { ...state, step: 1, tradesCount: 0, completed: false };
@@ -73,7 +73,7 @@ export default function Onboarding() {
             {[
               "Gram TYLKO 1 setup",
               "Gram TYLKO 1 TF",
-              "Wpisuję KAŻDY trade do journala",
+              "WpisujÄ™ KAÅ»DY trade do journala",
               "Oceniam proces, nie wynik",
             ].map((t, idx) => (
               <label key={idx} className="flex items-center gap-2">
@@ -97,27 +97,27 @@ export default function Onboarding() {
             <Button className="py-6 text-lg" disabled={!canProceedRules} onClick={() => {
               const next = { ...state, step: 2 } as any;
               setOnboarding(next); setState(next);
-            }}>Akceptuję zasady i idę dalej</Button>
+            }}>AkceptujÄ™ zasady i idÄ™ dalej</Button>
           </div>
         </CardContent></Card>
       )}
 
       {step === 2 && (
         <Card><CardContent>
-          <h2 className="text-xl font-semibold mb-2">Wybierz setup (bez zmiany do końca)</h2>
+          <h2 className="text-xl font-semibold mb-2">Wybierz setup (bez zmiany do koÅ„ca)</h2>
           <p className="text-zinc-400 mb-4">Przez pierwsze 10 trade nie zmieniasz setupu. Chcemy czystych danych.</p>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
               <Label>Setup</Label>
               <select className="mt-1 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm"
-                defaultValue="M1 1–2–3"
+                defaultValue="M1 1â€“2â€“3"
                 onChange={(e)=> {
                   const next = { ...state, setup: { ...(state as any).setup, setup: e.target.value } } as any;
                   setState(next); setOnboarding(next);
                 }}
               >
-                <option>M1 1–2–3</option>
+                <option>M1 1â€“2â€“3</option>
                 <option>M1 retest mid BB</option>
               </select>
             </div>
@@ -151,7 +151,7 @@ export default function Onboarding() {
           </div>
 
           <div className="mt-6 flex gap-2 flex-wrap">
-            <Link href="/app"><Button variant="outline">Wróć</Button></Link>
+            <Link href="/app"><Button variant="outline">WrÃ³Ä‡</Button></Link>
             <Button className="py-6 text-lg" onClick={() => {
               const next = { ...state, step: 3, tradesCount: 0 } as any;
               setOnboarding(next); setState(next);
@@ -165,7 +165,7 @@ export default function Onboarding() {
         <Card><CardContent>
           <h2 className="text-xl font-semibold mb-2">Tryb 10 trade</h2>
           <p className="text-zinc-400 mb-4">
-            Dodawaj trade w Journalu. Po 10 trade zobaczysz analizę i odblokujesz pełną wersję.
+            Dodawaj trade w Journalu. Po 10 trade zobaczysz analizÄ™ i odblokujesz peÅ‚nÄ… wersjÄ™.
           </p>
           <div className="flex flex-wrap gap-2 items-center">
             <Pill>{tradesCount}/10 trade</Pill>
@@ -175,14 +175,15 @@ export default function Onboarding() {
           </div>
 
           <div className="mt-6 flex gap-2 flex-wrap">
-            <Link href="/app"><Button className="py-6 text-lg">Idę do Journal</Button></Link>
+            <Link href="/app"><Button className="py-6 text-lg">IdÄ™ do Journal</Button></Link>
           </div>
 
           <p className="text-xs text-zinc-500 mt-4">
-            Uwaga: w tej paczce licznik zwiększa się automatycznie po dodaniu trade w Journalu.
+            Uwaga: w tej paczce licznik zwiÄ™ksza siÄ™ automatycznie po dodaniu trade w Journalu.
           </p>
         </CardContent></Card>
       )}
     </main>
   );
 }
+

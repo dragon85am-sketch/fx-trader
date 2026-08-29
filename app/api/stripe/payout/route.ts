@@ -1,10 +1,10 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2026-03-25.dahlia",
+  
 });
 
 export async function POST(req: Request) {
@@ -28,7 +28,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // 💸 transfer (ważne: amount w centach)
+    // ðŸ’¸ transfer (waÅ¼ne: amount w centach)
     const transfer = await stripe.transfers.create({
       amount: amount * 100,
       currency: "eur",
@@ -43,7 +43,7 @@ export async function POST(req: Request) {
     console.error("PAYOUT ERROR:", error);
 
     return NextResponse.json(
-      { error: "Błąd wypłaty" },
+      { error: "BÅ‚Ä…d wypÅ‚aty" },
       { status: 500 }
     );
   }

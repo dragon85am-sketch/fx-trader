@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useTranslation } from "@/hooks/useTranslation";
+
 import { useLanguage } from "@/components/LanguageProvider";
 type DeleteAccountModalProps = {
   open: boolean;

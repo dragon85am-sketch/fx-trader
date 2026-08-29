@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
@@ -63,12 +63,12 @@ function ResetPasswordContent() {
     setMessage("");
 
     if (!token) {
-      setError("Brak tokenu resetowania hasła.");
+      setError("Brak tokenu resetowania hasÅ‚a.");
       return;
     }
 
     if (!passwordValid) {
-      setError("Sprawdź wymagania dotyczące nowego hasła.");
+      setError("SprawdÅº wymagania dotyczÄ…ce nowego hasÅ‚a.");
       return;
     }
 
@@ -90,17 +90,17 @@ function ResetPasswordContent() {
       const data = (await res.json()) as ResetPasswordResponse;
 
       if (!res.ok) {
-        setError(data.error || "Nie udało się zmienić hasła.");
+        setError(data.error || "Nie udaÅ‚o siÄ™ zmieniÄ‡ hasÅ‚a.");
         return;
       }
 
       setSuccess(true);
       setMessage(
         data.message ||
-          "Hasło zostało zmienione. Możesz się teraz zalogować."
+          "HasÅ‚o zostaÅ‚o zmienione. MoÅ¼esz siÄ™ teraz zalogowaÄ‡."
       );
     } catch {
-      setError("Problem z połączeniem z serwerem.");
+      setError("Problem z poÅ‚Ä…czeniem z serwerem.");
     } finally {
       setLoading(false);
     }
@@ -115,18 +115,18 @@ function ResetPasswordContent() {
           </div>
 
           <h1 className="mt-5 text-3xl font-black">
-            Nieprawidłowy link
+            NieprawidÅ‚owy link
           </h1>
 
           <p className="mx-auto mt-3 max-w-[500px] text-sm leading-6 text-slate-400">
-            W adresie brakuje tokenu resetowania hasła. Poproś o nowy link.
+            W adresie brakuje tokenu resetowania hasÅ‚a. PoproÅ› o nowy link.
           </p>
 
           <Link
             href="/forgot-password"
             className="mt-7 inline-flex items-center justify-center gap-2 rounded-2xl border border-cyan-300/30 bg-[linear-gradient(90deg,#0ea5e9,#2563eb)] px-6 py-3.5 font-bold text-white"
           >
-            Wyślij nowy link
+            WyÅ›lij nowy link
           </Link>
         </div>
       </ResetShell>
@@ -143,11 +143,11 @@ function ResetPasswordContent() {
             </div>
 
             <h1 className="mt-5 text-3xl font-black tracking-tight">
-              Ustaw nowe hasło
+              Ustaw nowe hasÅ‚o
             </h1>
 
             <p className="mx-auto mt-3 max-w-[520px] text-sm leading-6 text-slate-400">
-              Wpisz nowe hasło do swojego konta FX Trade.
+              Wpisz nowe hasÅ‚o do swojego konta FX Trade.
             </p>
           </div>
 
@@ -155,7 +155,7 @@ function ResetPasswordContent() {
             <div>
               <label className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-200">
                 <LockKeyhole className="h-4 w-4 text-sky-400" />
-                Nowe hasło
+                Nowe hasÅ‚o
               </label>
 
               <div className="relative">
@@ -166,7 +166,7 @@ function ResetPasswordContent() {
                   autoComplete="new-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
+                  placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
                   className="w-full rounded-2xl border border-sky-500/45 bg-[#06172f]/85 px-12 py-4 pr-14 text-[16px] text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/10"
                   required
                 />
@@ -175,7 +175,7 @@ function ResetPasswordContent() {
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-sky-300"
-                  aria-label={showPassword ? "Ukryj hasło" : "Pokaż hasło"}
+                  aria-label={showPassword ? "Ukryj hasÅ‚o" : "PokaÅ¼ hasÅ‚o"}
                 >
                   {showPassword ? (
                     <EyeOff className="h-5 w-5" />
@@ -189,7 +189,7 @@ function ResetPasswordContent() {
             <div>
               <label className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-200">
                 <LockKeyhole className="h-4 w-4 text-sky-400" />
-                Powtórz hasło
+                PowtÃ³rz hasÅ‚o
               </label>
 
               <div className="relative">
@@ -200,7 +200,7 @@ function ResetPasswordContent() {
                   autoComplete="new-password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="••••••••"
+                  placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
                   className="w-full rounded-2xl border border-sky-500/45 bg-[#06172f]/85 px-12 py-4 pr-14 text-[16px] text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/10"
                   required
                 />
@@ -210,7 +210,7 @@ function ResetPasswordContent() {
                   onClick={() => setShowConfirmPassword((v) => !v)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-sky-300"
                   aria-label={
-                    showConfirmPassword ? "Ukryj hasło" : "Pokaż hasło"
+                    showConfirmPassword ? "Ukryj hasÅ‚o" : "PokaÅ¼ hasÅ‚o"
                   }
                 >
                   {showConfirmPassword ? (
@@ -224,7 +224,7 @@ function ResetPasswordContent() {
 
             <div className="grid gap-2 sm:grid-cols-2">
               <PasswordRule ok={passwordRules.length}>
-                Minimum 8 znaków
+                Minimum 8 znakÃ³w
               </PasswordRule>
 
               <PasswordRule ok={passwordRules.number}>
@@ -236,7 +236,7 @@ function ResetPasswordContent() {
               </PasswordRule>
 
               <PasswordRule ok={passwordRules.match}>
-                Hasła są identyczne
+                HasÅ‚a sÄ… identyczne
               </PasswordRule>
             </div>
 
@@ -252,7 +252,7 @@ function ResetPasswordContent() {
               className="flex w-full items-center justify-center gap-3 rounded-2xl border border-cyan-300/25 bg-[linear-gradient(90deg,#0ea5e9,#2563eb_55%,#1d4ed8)] py-4 text-[16px] font-bold text-white shadow-[0_10px_35px_rgba(37,99,235,.30)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <ShieldCheck className="h-5 w-5" />
-              {loading ? "Zapisywanie..." : "Zmień hasło"}
+              {loading ? "Zapisywanie..." : "ZmieÅ„ hasÅ‚o"}
             </button>
           </form>
         </>
@@ -263,7 +263,7 @@ function ResetPasswordContent() {
           </div>
 
           <h1 className="mt-5 text-3xl font-black">
-            Hasło zmienione
+            HasÅ‚o zmienione
           </h1>
 
           <p className="mx-auto mt-3 max-w-[520px] text-sm leading-6 text-slate-300">
@@ -274,7 +274,7 @@ function ResetPasswordContent() {
             href="/login"
             className="mt-7 inline-flex min-w-[220px] items-center justify-center gap-2 rounded-2xl border border-cyan-300/25 bg-[linear-gradient(90deg,#0ea5e9,#2563eb_55%,#1d4ed8)] px-6 py-3.5 font-bold text-white shadow-[0_10px_35px_rgba(37,99,235,.30)] transition hover:brightness-110"
           >
-            Przejdź do logowania
+            PrzejdÅº do logowania
           </Link>
         </div>
       )}
@@ -286,7 +286,7 @@ function ResetPasswordContent() {
             className="inline-flex items-center justify-center gap-2 text-sm font-semibold text-sky-300 transition hover:text-cyan-200"
           >
             <ArrowLeft className="h-4 w-4" />
-            Wróć do logowania
+            WrÃ³Ä‡ do logowania
           </Link>
         </div>
       ) : null}
@@ -356,7 +356,7 @@ export default function ResetPasswordPage() {
       fallback={
         <ResetShell>
           <div className="py-10 text-center text-slate-300">
-            Ładowanie...
+            Åadowanie...
           </div>
         </ResetShell>
       }
@@ -365,3 +365,4 @@ export default function ResetPasswordPage() {
     </Suspense>
   );
 }
+

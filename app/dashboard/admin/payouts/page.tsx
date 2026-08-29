@@ -1,11 +1,11 @@
-import { prisma } from "@/lib/prisma";
+﻿import { prisma } from "@/lib/prisma";
 import { requireServerAdmin } from "@/lib/server-auth";
 import AdminPayoutActions from "@/components/AdminPayoutActions";
 import PayoutStatusBadge from "@/components/PayoutStatusBadge";
 import StripeBalanceCard from "@/components/admin/StripeBalanceCard";
 
 function formatEuro(value: number) {
-  return `${value}€`;
+  return `${value}â‚¬`;
 }
 
 export default async function AdminPayoutsPage() {
@@ -53,14 +53,14 @@ const affiliateUsers = await prisma.user.findMany({
   return (
     <div className="space-y-6 p-6 text-white">
       <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-        <h1 className="text-2xl font-semibold">Admin — wypłaty</h1>
+        <h1 className="text-2xl font-semibold">Admin â€” wypÅ‚aty</h1>
 
         <div className="mb-6">
           <StripeBalanceCard />
         </div>
 
         <p className="mt-2 text-sm text-white/55">
-          Zarządzanie payout requestami użytkowników.
+          ZarzÄ…dzanie payout requestami uÅ¼ytkownikÃ³w.
         </p>
 
         <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
@@ -102,7 +102,7 @@ const affiliateUsers = await prisma.user.findMany({
 
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
             <div className="text-xs uppercase tracking-[0.18em] text-white/40">
-              Łączna kwota
+              ÅÄ…czna kwota
             </div>
             <div className="mt-2 text-2xl font-semibold text-cyan-300">
               {formatEuro(totalAmount)}
@@ -130,7 +130,7 @@ const affiliateUsers = await prisma.user.findMany({
             {payouts.length === 0 ? (
               <tr>
                 <td colSpan={8} className="py-6 text-center text-zinc-400">
-                  Brak wniosków
+                  Brak wnioskÃ³w
                 </td>
               </tr>
             ) : (
@@ -238,15 +238,15 @@ const affiliateUsers = await prisma.user.findMany({
                   </td>
 
                   <td className="px-4 py-4 text-emerald-300">
-                    €{affiliate.totalEarned.toFixed(2)}
+                    â‚¬{affiliate.totalEarned.toFixed(2)}
                   </td>
 
                   <td className="px-4 py-4 text-amber-300">
-                    €{affiliate.pendingCommission.toFixed(2)}
+                    â‚¬{affiliate.pendingCommission.toFixed(2)}
                   </td>
 
                   <td className="px-4 py-4 text-cyan-300">
-                    €{affiliate.availablePayout.toFixed(2)}
+                    â‚¬{affiliate.availablePayout.toFixed(2)}
                   </td>
                 </tr>
               ))

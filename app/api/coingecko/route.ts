@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+﻿import { NextRequest } from "next/server";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
     return Response.json({ error: "Missing symbol" }, { status: 400 });
   }
 
-  // mapowanie symbol → coingecko id
+  // mapowanie symbol â†’ coingecko id
   const map: Record<string, string> = {
     BTCUSDT: "bitcoin",
     ETHUSDT: "ethereum",
@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
     return Response.json({ error: "Unsupported symbol" }, { status: 400 });
   }
 
-  // timeframe → days
+  // timeframe â†’ days
   const tfMap: Record<string, number> = {
     "1m": 1,
     "5m": 1,
@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
     return Response.json({ error: "No data from CoinGecko", data });
   }
 
-  // konwersja → candles (pseudo OHLC)
+  // konwersja â†’ candles (pseudo OHLC)
   const candles = data.prices.map((p: any, i: number) => {
     const price = p[1];
 

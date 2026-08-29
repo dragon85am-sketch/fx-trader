@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import {
@@ -24,36 +24,36 @@ const buyM5 = [
 const buyM1 = [
   "Setup zgodny z biasem",
   "Formacja / odrzucenie",
-  "BOS / CHOCH w górę",
-  "Świeca sygnałowa",
-  "Nie wchodzę kontra",
+  "BOS / CHOCH w gÃ³rÄ™",
+  "Åšwieca sygnaÅ‚owa",
+  "Nie wchodzÄ™ kontra",
 ];
 
 const sellM5 = [
   "Jasna struktura LH/LL",
   "Trend spadkowy",
   "Cena przy punkcie reakcji",
-  "Strefa podaży / opór",
+  "Strefa podaÅ¼y / opÃ³r",
   "Jest miejsce na target",
 ];
 
 const sellM1 = [
   "Setup zgodny z biasem",
   "Formacja / odrzucenie",
-  "BOS / CHOCH w dół",
-  "Świeca sygnałowa",
-  "Nie wchodzę kontra",
+  "BOS / CHOCH w dÃ³Å‚",
+  "Åšwieca sygnaÅ‚owa",
+  "Nie wchodzÄ™ kontra",
 ];
 
 const keyRules = [
   "Handluj tylko w zgodzie z biasem M5",
-  "Czekaj aż cena dotrze do punktu reakcji",
-  "M1 służy tylko do precyzyjnego wejścia",
+  "Czekaj aÅ¼ cena dotrze do punktu reakcji",
+  "M1 sÅ‚uÅ¼y tylko do precyzyjnego wejÅ›cia",
   "SL zawsze za swingiem (logiczny)",
   "RR minimum 1.5R",
-  "Nie goń ceny",
-  "Brak setupu = brak wejścia",
-  "Dyscyplina = długoterminowe wyniki",
+  "Nie goÅ„ ceny",
+  "Brak setupu = brak wejÅ›cia",
+  "Dyscyplina = dÅ‚ugoterminowe wyniki",
 ];
 
 function Checklist({
@@ -275,7 +275,7 @@ export default function ScalpingPage() {
                 M1 <span className="text-blue-400">TIMING</span>
               </h1>
               <p className="mt-1 text-[10px] font-semibold uppercase tracking-[.08em] text-slate-300">
-                Scalping strategia — proste zasady, wysoka selekcja
+                Scalping strategia â€” proste zasady, wysoka selekcja
               </p>
             </div>
           </div>
@@ -292,19 +292,19 @@ export default function ScalpingPage() {
               {
                 nr: "2",
                 title: "Cena w punkcie reakcji",
-                desc: "Swing • baza • HH / LL",
+                desc: "Swing â€¢ baza â€¢ HH / LL",
                 icon: Target,
               },
               {
                 nr: "3",
                 title: "M1 setup zgodny z biasem",
-                desc: "M1 wejście, M5 kierunek",
+                desc: "M1 wejÅ›cie, M5 kierunek",
                 icon: Crosshair,
               },
               {
                 nr: "4",
                 title: "SL logiczny",
-                desc: "Za swingiem • RR min. 1.5R",
+                desc: "Za swingiem â€¢ RR min. 1.5R",
                 icon: ShieldCheck,
               },
             ].map((x) => {
@@ -340,12 +340,12 @@ export default function ScalpingPage() {
                 <div className="my-3 h-px bg-white/10" />
 
                 <div className="text-[10px] font-black uppercase text-emerald-400">
-                  Zarządzanie ryzykiem
+                  ZarzÄ…dzanie ryzykiem
                 </div>
                 <div className="mt-2 space-y-1 text-[9px] text-slate-300">
                   <div>SL za swing low</div>
                   <div>RR minimum 1.5R</div>
-                  <div>Ryzyko 0.5% – 1%</div>
+                  <div>Ryzyko 0.5% â€“ 1%</div>
                 </div>
               </div>
 
@@ -361,7 +361,7 @@ export default function ScalpingPage() {
                   <Checklist
                     title="Warunki M5 Buy"
                     items={[
-                      "M5 ma jasną strukturę HH/HL",
+                      "M5 ma jasnÄ… strukturÄ™ HH/HL",
                       "Cena przy punkcie reakcji",
                       "Trend wzrostowy",
                       "Jest miejsce na target",
@@ -373,7 +373,7 @@ export default function ScalpingPage() {
               {/* M1 */}
               <div className="border-b border-r border-emerald-500/30 p-2 lg:border-b-0">
                 <ImagePanel
-                  title="Krok 2: M1 Timing (wejście)"
+                  title="Krok 2: M1 Timing (wejÅ›cie)"
                   tf="M1"
                   src="/images/strategies/m1-buy-timing.png"
                 />
@@ -384,9 +384,9 @@ export default function ScalpingPage() {
                     items={[
                       "M1 zgodny z biasem",
                       "Sweep liquidity + odrzucenie",
-                      "BOS / CHOCH w górę",
-                      "Retest zakończony akceptacją",
-                      "Wejście po świecy sygnałowej",
+                      "BOS / CHOCH w gÃ³rÄ™",
+                      "Retest zakoÅ„czony akceptacjÄ…",
+                      "WejÅ›cie po Å›wiecy sygnaÅ‚owej",
                     ]}
                   />
                 </div>
@@ -401,7 +401,7 @@ export default function ScalpingPage() {
                     "Sweep liquidity",
                     "BOS / CHOCH",
                     "Retest",
-                    "Świeca sygnałowa",
+                    "Åšwieca sygnaÅ‚owa",
                   ]}
                 />
               </div>
@@ -429,12 +429,12 @@ export default function ScalpingPage() {
                 <div className="my-3 h-px bg-white/10" />
 
                 <div className="text-[10px] font-black uppercase text-rose-400">
-                  Zarządzanie ryzykiem
+                  ZarzÄ…dzanie ryzykiem
                 </div>
                 <div className="mt-2 space-y-1 text-[9px] text-slate-300">
                   <div>SL za swing high</div>
                   <div>RR minimum 1.5R</div>
-                  <div>Ryzyko 0.5% – 1%</div>
+                  <div>Ryzyko 0.5% â€“ 1%</div>
                 </div>
               </div>
 
@@ -451,7 +451,7 @@ export default function ScalpingPage() {
                   <Checklist
                     title="Warunki M5 Sell"
                     items={[
-                      "M5 ma jasną strukturę LH/LL",
+                      "M5 ma jasnÄ… strukturÄ™ LH/LL",
                       "Cena przy punkcie reakcji",
                       "Trend spadkowy",
                       "Jest miejsce na target",
@@ -464,7 +464,7 @@ export default function ScalpingPage() {
               {/* M1 */}
               <div className="border-b border-r border-rose-500/30 p-2 lg:border-b-0">
                 <ImagePanel
-                  title="Krok 2: M1 Timing (wejście)"
+                  title="Krok 2: M1 Timing (wejÅ›cie)"
                   tf="M1"
                   src="/images/strategies/m1-sell-timing.png"
                   tone="sell"
@@ -476,9 +476,9 @@ export default function ScalpingPage() {
                     items={[
                       "M1 zgodny z biasem",
                       "Sweep liquidity + odrzucenie",
-                      "BOS / CHOCH w dół",
-                      "Retest zakończony odrzuceniem",
-                      "Wejście po świecy sygnałowej",
+                      "BOS / CHOCH w dÃ³Å‚",
+                      "Retest zakoÅ„czony odrzuceniem",
+                      "WejÅ›cie po Å›wiecy sygnaÅ‚owej",
                     ]}
                     tone="sell"
                   />
@@ -494,7 +494,7 @@ export default function ScalpingPage() {
                     "Sweep liquidity",
                     "BOS / CHOCH",
                     "Retest",
-                    "Świeca sygnałowa",
+                    "Åšwieca sygnaÅ‚owa",
                   ]}
                   tone="sell"
                 />
@@ -512,10 +512,10 @@ export default function ScalpingPage() {
             {/* formations */}
             <div className="bg-[#061426] p-4">
               <div className="mb-1 text-[12px] font-black uppercase tracking-[.04em]">
-                Formacje M1 (przykłady)
+                Formacje M1 (przykÅ‚ady)
               </div>
               <p className="mb-4 text-[8px] text-slate-500">
-                Najczęstsze świece potwierdzające wejście po reakcji / retescie.
+                NajczÄ™stsze Å›wiece potwierdzajÄ…ce wejÅ›cie po reakcji / retescie.
               </p>
 
               <div className="mb-2 text-[9px] font-black uppercase text-emerald-400">
@@ -578,7 +578,7 @@ export default function ScalpingPage() {
             {/* sample trade */}
             <div className="bg-[#061426] p-3">
               <div className="mb-3 text-[11px] font-black uppercase tracking-[.04em]">
-                Przykładowy Trade BUY
+                PrzykÅ‚adowy Trade BUY
               </div>
 
               <div className="grid gap-2 md:grid-cols-2">
@@ -586,16 +586,16 @@ export default function ScalpingPage() {
                   <div className="text-[8px] font-bold text-emerald-300">M5 (BIAS)</div>
                   <img
                     src="/images/strategies/m5-buy-bias.png"
-                    alt="Przykładowy trade M5"
+                    alt="PrzykÅ‚adowy trade M5"
                     className="mt-1 h-[120px] w-full object-contain"
                   />
                 </div>
 
                 <div className="rounded-lg border border-white/10 bg-[#020a14] p-2">
-                  <div className="text-[8px] font-bold text-sky-300">M1 (WEJŚCIE)</div>
+                  <div className="text-[8px] font-bold text-sky-300">M1 (WEJÅšCIE)</div>
                   <img
                     src="/images/strategies/m1-buy-timing.png"
-                    alt="Przykładowy trade M1"
+                    alt="PrzykÅ‚adowy trade M1"
                     className="mt-1 h-[120px] w-full object-contain"
                   />
                 </div>
@@ -606,10 +606,10 @@ export default function ScalpingPage() {
           {/* FOOTER */}
           <div className="grid gap-px border-t border-white/10 bg-white/10 sm:grid-cols-4">
             {[
-              ["M5", "Powód dlaczego?"],
+              ["M5", "PowÃ³d dlaczego?"],
               ["M1", "Moment kiedy?"],
               ["PLAN", "Dyscyplina = sukces"],
-              ["RISK", "Zarządzaj ryzykiem"],
+              ["RISK", "ZarzÄ…dzaj ryzykiem"],
             ].map(([a, b]) => (
               <div key={a} className="bg-[#020a14] px-4 py-3">
                 <div className="text-[9px] font-black text-sky-300">{a}</div>
@@ -622,3 +622,4 @@ export default function ScalpingPage() {
     </main>
   );
 }
+

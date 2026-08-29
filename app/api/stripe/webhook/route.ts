@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
 import { sendEmail } from "@/lib/email";
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   const body = await req.text();
 
   const stripe = new Stripe(stripeSecretKey, {
-    apiVersion: "2026-03-25.dahlia",
+    
   });
 
   let event: Stripe.Event;
@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
 
         if (!user) {
           console.error(
-            "❌ invoice.paid: nie znaleziono użytkownika",
+            "âŒ invoice.paid: nie znaleziono uÅ¼ytkownika",
             {
               invoiceId: invoice.id,
               userId,
@@ -150,16 +150,16 @@ export async function POST(req: NextRequest) {
             : invoice.customer?.id ?? null;
 
         /*
-         * Wykrywamy anulowanie zarówno przez:
+         * Wykrywamy anulowanie zarÃ³wno przez:
          *
          * cancel_at_period_end === true
          *
-         * jak również:
+         * jak rÃ³wnieÅ¼:
          *
          * cancel_at === current_period_end
          *
-         * ponieważ w naszym Customer Portal Stripe
-         * korzysta właśnie z drugiego wariantu.
+         * poniewaÅ¼ w naszym Customer Portal Stripe
+         * korzysta wÅ‚aÅ›nie z drugiego wariantu.
          */
         let cancelAtPeriodEnd = false;
 
@@ -214,7 +214,7 @@ export async function POST(req: NextRequest) {
         });
 
         console.log(
-          "✅ SUBSCRIPTION PAID / PREMIUM EXTENDED:",
+          "âœ… SUBSCRIPTION PAID / PREMIUM EXTENDED:",
           user.id,
           currentPeriodEnd.toISOString(),
           {
@@ -237,12 +237,12 @@ export async function POST(req: NextRequest) {
           event.data.object as Stripe.Invoice;
 
         /*
-         * Nie wyłączamy Premium natychmiast.
+         * Nie wyÅ‚Ä…czamy Premium natychmiast.
          *
-         * Użytkownik zachowuje dostęp do premiumUntil.
+         * UÅ¼ytkownik zachowuje dostÄ™p do premiumUntil.
          */
         console.warn(
-          "⚠️ SUBSCRIPTION PAYMENT FAILED:",
+          "âš ï¸ SUBSCRIPTION PAYMENT FAILED:",
           invoice.id
         );
 
@@ -295,7 +295,7 @@ export async function POST(req: NextRequest) {
 
         if (!user) {
           console.error(
-            "❌ customer.subscription.updated: nie znaleziono użytkownika",
+            "âŒ customer.subscription.updated: nie znaleziono uÅ¼ytkownika",
             {
               subscriptionId:
                 subscription.id,
@@ -337,7 +337,7 @@ export async function POST(req: NextRequest) {
             | null;
 
         /*
-         * Stripe może oznaczyć anulowanie:
+         * Stripe moÅ¼e oznaczyÄ‡ anulowanie:
          *
          * cancel_at_period_end = true
          *
@@ -355,7 +355,7 @@ export async function POST(req: NextRequest) {
           );
 
         console.log(
-          "🔎 STRIPE CANCEL DEBUG:",
+          "ðŸ”Ž STRIPE CANCEL DEBUG:",
           {
             subscriptionId:
               subscription.id,
@@ -395,7 +395,7 @@ export async function POST(req: NextRequest) {
             data: {
               /*
                * Premium pozostaje aktywne nawet gdy
-               * anulowanie zostało zaplanowane.
+               * anulowanie zostaÅ‚o zaplanowane.
                */
               isPremium: true,
 
@@ -420,8 +420,8 @@ export async function POST(req: NextRequest) {
 
           console.log(
             cancelAtPeriodEnd
-              ? "⚠️ SUBSCRIPTION CANCELLED AT PERIOD END:"
-              : "✅ SUBSCRIPTION UPDATED / ACTIVE:",
+              ? "âš ï¸ SUBSCRIPTION CANCELLED AT PERIOD END:"
+              : "âœ… SUBSCRIPTION UPDATED / ACTIVE:",
 
             user.id,
 
@@ -455,7 +455,7 @@ export async function POST(req: NextRequest) {
           status === "unpaid"
         ) {
           /*
-           * Nie wyłączamy Premium natychmiast.
+           * Nie wyÅ‚Ä…czamy Premium natychmiast.
            *
            * Zachowujemy premiumUntil.
            */
@@ -482,7 +482,7 @@ export async function POST(req: NextRequest) {
           });
 
           console.warn(
-            "⚠️ SUBSCRIPTION PAYMENT STATUS:",
+            "âš ï¸ SUBSCRIPTION PAYMENT STATUS:",
             user.id,
             status
           );
@@ -523,7 +523,7 @@ export async function POST(req: NextRequest) {
           });
 
           console.log(
-            "❌ SUBSCRIPTION NO LONGER ACTIVE:",
+            "âŒ SUBSCRIPTION NO LONGER ACTIVE:",
             user.id,
             status
           );
@@ -538,7 +538,7 @@ export async function POST(req: NextRequest) {
         }
 
         console.log(
-          "ℹ️ SUBSCRIPTION STATUS:",
+          "â„¹ï¸ SUBSCRIPTION STATUS:",
           user.id,
           status
         );
@@ -610,7 +610,7 @@ export async function POST(req: NextRequest) {
 
         if (!user) {
           console.error(
-            "❌ customer.subscription.deleted: nie znaleziono użytkownika",
+            "âŒ customer.subscription.deleted: nie znaleziono uÅ¼ytkownika",
             {
               subscriptionId:
                 subscription.id,
@@ -639,8 +639,8 @@ export async function POST(req: NextRequest) {
               new Date(),
 
             /*
-             * Subskrypcja już zakończona.
-             * Nie ma już zaplanowanego anulowania.
+             * Subskrypcja juÅ¼ zakoÅ„czona.
+             * Nie ma juÅ¼ zaplanowanego anulowania.
              */
             cancelAtPeriodEnd:
               false,
@@ -648,7 +648,7 @@ export async function POST(req: NextRequest) {
         });
 
         console.log(
-          "❌ SUBSCRIPTION ENDED - PREMIUM DISABLED:",
+          "âŒ SUBSCRIPTION ENDED - PREMIUM DISABLED:",
           user.id
         );
 
@@ -686,7 +686,7 @@ export async function POST(req: NextRequest) {
         });
 
         console.log(
-          "✅ Stripe Connect account synced:",
+          "âœ… Stripe Connect account synced:",
           account.id
         );
 
@@ -715,7 +715,7 @@ export async function POST(req: NextRequest) {
         });
 
         console.log(
-          "✅ Transfer created:",
+          "âœ… Transfer created:",
           transfer.id
         );
 
@@ -744,7 +744,7 @@ export async function POST(req: NextRequest) {
         });
 
         console.log(
-          "⚠️ Transfer reversed:",
+          "âš ï¸ Transfer reversed:",
           transfer.id
         );
 
@@ -833,7 +833,7 @@ export async function POST(req: NextRequest) {
 
         if (!buyer) {
           console.error(
-            "❌ checkout.session.completed: nie znaleziono użytkownika",
+            "âŒ checkout.session.completed: nie znaleziono uÅ¼ytkownika",
             {
               sessionId,
               metadataUserId,
@@ -919,17 +919,17 @@ export async function POST(req: NextRequest) {
         });
 
         console.log(
-          "✅ PREMIUM ACTIVATED:",
+          "âœ… PREMIUM ACTIVATED:",
           buyer.id
         );
 
         console.log(
-          "✅ STRIPE CUSTOMER SAVED:",
+          "âœ… STRIPE CUSTOMER SAVED:",
           stripeCustomerId
         );
 
         console.log(
-          "✅ STRIPE SUBSCRIPTION SAVED:",
+          "âœ… STRIPE SUBSCRIPTION SAVED:",
           stripeSubscriptionId
         );
 
@@ -942,17 +942,17 @@ export async function POST(req: NextRequest) {
             to: buyer.email,
 
             subject:
-              "Witamy w FX-TRADER 🚀",
+              "Witamy w FX-TRADER ðŸš€",
 
             html: `
               <div style="font-family:Arial,sans-serif;line-height:1.6">
 
                 <h2>
-                  Dziękujemy za zakup 🚀
+                  DziÄ™kujemy za zakup ðŸš€
                 </h2>
 
                 <p>
-                  Twój dostęp do FX TRADE został aktywowany.
+                  TwÃ³j dostÄ™p do FX TRADE zostaÅ‚ aktywowany.
                 </p>
 
                 <p>
@@ -960,7 +960,7 @@ export async function POST(req: NextRequest) {
                 </p>
 
                 <p>
-                  Możesz teraz zalogować się do platformy:
+                  MoÅ¼esz teraz zalogowaÄ‡ siÄ™ do platformy:
                 </p>
 
                 <a
@@ -975,11 +975,11 @@ export async function POST(req: NextRequest) {
                     margin-top:10px;
                   "
                 >
-                  Zaloguj się
+                  Zaloguj siÄ™
                 </a>
 
                 <p style="margin-top:30px">
-                  Do zobaczenia w dashboardzie 👋
+                  Do zobaczenia w dashboardzie ðŸ‘‹
                 </p>
 
                 <p>
@@ -997,7 +997,7 @@ export async function POST(req: NextRequest) {
 
         if (!buyer.referredByUserId) {
           console.log(
-            "ℹ️ Zakup bez polecenia - Premium aktywne"
+            "â„¹ï¸ Zakup bez polecenia - Premium aktywne"
           );
 
           return NextResponse.json({
@@ -1020,7 +1020,7 @@ export async function POST(req: NextRequest) {
           buyer.id
         ) {
           console.log(
-            "⚠️ Self-referral - pomijam prowizję"
+            "âš ï¸ Self-referral - pomijam prowizjÄ™"
           );
 
           return NextResponse.json({
@@ -1051,7 +1051,7 @@ export async function POST(req: NextRequest) {
 
         if (existingSale) {
           console.log(
-            "⚠️ Duplikat webhooka affiliate - pomijam prowizję"
+            "âš ï¸ Duplikat webhooka affiliate - pomijam prowizjÄ™"
           );
 
           return NextResponse.json({
@@ -1214,21 +1214,21 @@ export async function POST(req: NextRequest) {
                 </h2>
 
                 <p>
-                  Cześć ${
+                  CzeÅ›Ä‡ ${
                     referrer.name ||
                     "Partnerze"
                   },
                 </p>
 
                 <p>
-                  Właśnie naliczyliśmy nową prowizję za sprzedaż FX Trade Education.
+                  WÅ‚aÅ›nie naliczyliÅ›my nowÄ… prowizjÄ™ za sprzedaÅ¼ FX Trade Education.
                 </p>
 
                 <p>
                   <strong>
                     Prowizja:
                   </strong>
-                  ${commission}€
+                  ${commission}â‚¬
                 </p>
 
                 <p>
@@ -1239,7 +1239,7 @@ export async function POST(req: NextRequest) {
                 </p>
 
                 <p>
-                  Możesz sprawdzić szczegóły w swoim Affiliate Hub.
+                  MoÅ¼esz sprawdziÄ‡ szczegÃ³Å‚y w swoim Affiliate Hub.
                 </p>
 
               </div>
@@ -1248,7 +1248,7 @@ export async function POST(req: NextRequest) {
         }
 
         console.log(
-          "✅ PROWIZJA DODANA"
+          "âœ… PROWIZJA DODANA"
         );
 
         return NextResponse.json({
@@ -1269,7 +1269,7 @@ export async function POST(req: NextRequest) {
 
       default: {
         console.log(
-          "ℹ️ Event:",
+          "â„¹ï¸ Event:",
           event.type
         );
 

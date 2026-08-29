@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import React from "react";
@@ -7,31 +7,31 @@ const rules = [
   {
     n: 1,
     title: "Trend (kierunek)",
-    text: "Określ kierunek trendu na H4 / H1. Dla BUY SuperTrend powinien być zielony i rosnący, dla SELL czerwony i spadkowy.",
+    text: "OkreÅ›l kierunek trendu na H4 / H1. Dla BUY SuperTrend powinien byÄ‡ zielony i rosnÄ…cy, dla SELL czerwony i spadkowy.",
     image: "/strategie/supertrend/rules/rule-1-trend.png",
   },
   {
     n: 2,
     title: "Strefa kluczowa",
-    text: "Zaznacz wsparcie / opór, strefę podaży lub popytu, FVG albo zniesienie Fibo 38.2%–61.8%.",
+    text: "Zaznacz wsparcie / opÃ³r, strefÄ™ podaÅ¼y lub popytu, FVG albo zniesienie Fibo 38.2%â€“61.8%.",
     image: "/strategie/supertrend/rules/rule-2-zone.png",
   },
   {
     n: 3,
-    title: "Wejście",
-    text: "Wejście dopiero po zamknięciu świecy po właściwej stronie linii SuperTrend i po reakcji ze strefy.",
+    title: "WejÅ›cie",
+    text: "WejÅ›cie dopiero po zamkniÄ™ciu Å›wiecy po wÅ‚aÅ›ciwej stronie linii SuperTrend i po reakcji ze strefy.",
     image: "/strategie/supertrend/rules/rule-3-entry.png",
   },
   {
     n: 4,
-    title: "Zarządzanie",
-    text: "SL ustaw po drugiej stronie SuperTrend lub za swingiem. TP 1.2R–1.5R albo kolejna strefa.",
+    title: "ZarzÄ…dzanie",
+    text: "SL ustaw po drugiej stronie SuperTrend lub za swingiem. TP 1.2Râ€“1.5R albo kolejna strefa.",
     image: "/strategie/supertrend/rules/rule-4-manage.png",
   },
   {
     n: 5,
-    title: "Zarządzaj ryzykiem",
-    text: "Ryzykuj maksymalnie 1–2% kapitału na transakcję. Nie zwiększaj ryzyka po stracie.",
+    title: "ZarzÄ…dzaj ryzykiem",
+    text: "Ryzykuj maksymalnie 1â€“2% kapitaÅ‚u na transakcjÄ™. Nie zwiÄ™kszaj ryzyka po stracie.",
     image: "/strategie/supertrend/rules/rule-5-risk.png",
   },
 ];
@@ -140,14 +140,14 @@ function SetupPanel({
 export default function SuperTrendStrategyPage() {
   const checklist = [
     "Trend zgodny z H4 / H1",
-    "Cena względem SuperTrend potwierdzona",
+    "Cena wzglÄ™dem SuperTrend potwierdzona",
     "Strefa wsparcia / oporu potwierdzona",
-    "Wejście zgodne z kierunkiem trendu",
+    "WejÅ›cie zgodne z kierunkiem trendu",
     "RR minimum 1.2R",
     "SL za SuperTrend lub swingiem",
-    "Zarządzanie pozycją aktywne",
-    "Brak emocji — działam zgodnie z planem",
-    "Dziennik transakcji uzupełniony",
+    "ZarzÄ…dzanie pozycjÄ… aktywne",
+    "Brak emocji â€” dziaÅ‚am zgodnie z planem",
+    "Dziennik transakcji uzupeÅ‚niony",
   ];
 
   return (
@@ -159,7 +159,7 @@ export default function SuperTrendStrategyPage() {
             <div className="p-5 lg:p-7">
               <div className="flex flex-wrap items-center gap-3">
                 <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-pink-400/25 bg-pink-500/15 text-3xl">
-                  ◔
+                  â—”
                 </div>
 
                 <div>
@@ -173,27 +173,27 @@ export default function SuperTrendStrategyPage() {
                   </div>
 
                   <div className="mt-2 flex items-center gap-2 text-amber-400">
-                    <span className="text-xl">★★★★★</span>
+                    <span className="text-xl">â˜…â˜…â˜…â˜…â˜…</span>
                     <span className="text-xs text-slate-300">4.7</span>
                   </div>
                 </div>
               </div>
 
               <p className="mt-5 max-w-3xl text-sm leading-6 text-slate-400">
-                Podążaj za trendem z wykorzystaniem wskaźnika SuperTrend. Strategia łączy
-                kierunek H4/H1, reakcję ze strefy i potwierdzenie świecy.
+                PodÄ…Å¼aj za trendem z wykorzystaniem wskaÅºnika SuperTrend. Strategia Å‚Ä…czy
+                kierunek H4/H1, reakcjÄ™ ze strefy i potwierdzenie Å›wiecy.
               </p>
 
               <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                <Metric label="Skuteczność" value="86%" icon="📊" />
-                <Metric label="Interwały" value="M15 · H1 · H4" icon="▦" />
-                <Metric label="RR" value="1.2 – 1.5" icon="🎯" />
-                <Metric label="Czas trwania" value="1 – 6 godzin" icon="◷" />
-                <Metric label="Sesje" value="London / NY" icon="🌐" />
+                <Metric label="SkutecznoÅ›Ä‡" value="86%" icon="ðŸ“Š" />
+                <Metric label="InterwaÅ‚y" value="M15 Â· H1 Â· H4" icon="â–¦" />
+                <Metric label="RR" value="1.2 â€“ 1.5" icon="ðŸŽ¯" />
+                <Metric label="Czas trwania" value="1 â€“ 6 godzin" icon="â—·" />
+                <Metric label="Sesje" value="London / NY" icon="ðŸŒ" />
               </div>
 
               <div className="mt-5 flex flex-wrap items-center gap-2">
-                <span className="mr-2 text-[11px] text-slate-400">Najlepiej działa na:</span>
+                <span className="mr-2 text-[11px] text-slate-400">Najlepiej dziaÅ‚a na:</span>
                 {["EURUSD", "USDJPY", "US30", "XAUUSD"].map((x) => (
                   <span
                     key={x}
@@ -219,7 +219,7 @@ export default function SuperTrendStrategyPage() {
         {/* RULES */}
         <section className="rounded-[22px] border border-pink-400/15 bg-[#061425] p-4">
           <h2 className="mb-4 text-[16px] font-black uppercase tracking-[.08em] text-pink-300">
-            Zasady działania
+            Zasady dziaÅ‚ania
           </h2>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 min-[1700px]:grid-cols-5">
@@ -257,15 +257,15 @@ export default function SuperTrendStrategyPage() {
             </h3>
             <div className="mt-4 space-y-2">
               {[
-                "Sprawdź trend na H4 / H1",
+                "SprawdÅº trend na H4 / H1",
                 "Zaznacz kluczowe strefy S/R",
                 "Dodaj SuperTrend (10, 3)",
-                "Określ potencjalne scenariusze",
-                "Czekaj na potwierdzenie wejścia",
-                "Zarządzaj pozycją zgodnie z planem",
+                "OkreÅ›l potencjalne scenariusze",
+                "Czekaj na potwierdzenie wejÅ›cia",
+                "ZarzÄ…dzaj pozycjÄ… zgodnie z planem",
               ].map((x) => (
                 <div key={x} className="flex gap-2 text-[11px] text-slate-300">
-                  <span className="text-pink-400">●</span>
+                  <span className="text-pink-400">â—</span>
                   {x}
                 </div>
               ))}
@@ -274,14 +274,14 @@ export default function SuperTrendStrategyPage() {
 
           <div className="rounded-[22px] border border-pink-400/15 bg-[#061425] p-5">
             <h3 className="text-[14px] font-black uppercase text-pink-300">
-              Zarządzanie pozycją
+              ZarzÄ…dzanie pozycjÄ…
             </h3>
             <div className="mt-4 space-y-3">
               {[
-                ["BE", "Po osiągnięciu 1R przenieś SL na Break Even."],
-                ["Trailing Stop", "Przesuwaj SL razem z linią SuperTrend."],
-                ["Częściowa realizacja", "Zamknij 50% pozycji przy 1.2R–1.5R."],
-                ["Zamknięcie ręczne", "Wyjdź po zmianie koloru SuperTrend lub silnym odwróceniu."],
+                ["BE", "Po osiÄ…gniÄ™ciu 1R przenieÅ› SL na Break Even."],
+                ["Trailing Stop", "Przesuwaj SL razem z liniÄ… SuperTrend."],
+                ["CzÄ™Å›ciowa realizacja", "Zamknij 50% pozycji przy 1.2Râ€“1.5R."],
+                ["ZamkniÄ™cie rÄ™czne", "WyjdÅº po zmianie koloru SuperTrend lub silnym odwrÃ³ceniu."],
               ].map(([t, d]) => (
                 <div key={t} className="rounded-xl border border-pink-400/10 bg-[#07182c] p-3">
                   <div className="text-[10px] font-black uppercase text-pink-300">{t}</div>
@@ -297,9 +297,9 @@ export default function SuperTrendStrategyPage() {
             </h3>
             <div className="mt-4 space-y-3">
               {[
-                ["🇬🇧", "LONDON", "08:00 – 12:00", "NAJLEPSZA"],
-                ["🇺🇸", "NOWY JORK", "14:00 – 18:00", "BARDZO DOBRA"],
-                ["🇬🇧🇺🇸", "NAKŁADANIE SESJI", "13:00 – 16:00", "IDEALNA"],
+                ["ðŸ‡¬ðŸ‡§", "LONDON", "08:00 â€“ 12:00", "NAJLEPSZA"],
+                ["ðŸ‡ºðŸ‡¸", "NOWY JORK", "14:00 â€“ 18:00", "BARDZO DOBRA"],
+                ["ðŸ‡¬ðŸ‡§ðŸ‡ºðŸ‡¸", "NAKÅADANIE SESJI", "13:00 â€“ 16:00", "IDEALNA"],
               ].map(([flag, name, time, rate]) => (
                 <div
                   key={name}
@@ -338,10 +338,10 @@ export default function SuperTrendStrategyPage() {
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <div className="text-lg font-black uppercase tracking-[.08em] text-pink-300">
-                PLAN + DYSCYPLINA + CIERPLIWOŚĆ = SUKCES
+                PLAN + DYSCYPLINA + CIERPLIWOÅšÄ† = SUKCES
               </div>
               <div className="mt-1 text-[11px] text-slate-400">
-                SuperTrend pokaże Ci trend — Ty podążaj za nim konsekwentnie.
+                SuperTrend pokaÅ¼e Ci trend â€” Ty podÄ…Å¼aj za nim konsekwentnie.
               </div>
             </div>
 
@@ -349,7 +349,7 @@ export default function SuperTrendStrategyPage() {
               href="/strategie"
               className="rounded-xl border border-pink-400/20 bg-pink-500/10 px-5 py-3 text-[11px] font-black text-pink-200 transition hover:bg-pink-500/20"
             >
-              ← Wróć do strategii
+              â† WrÃ³Ä‡ do strategii
             </Link>
           </div>
         </section>
@@ -357,3 +357,4 @@ export default function SuperTrendStrategyPage() {
     </main>
   );
 }
+

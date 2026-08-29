@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 
 const BINANCE_BASE = "https://api.binance.com";
 
@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
     console.error("BINANCE PROXY ERROR:", error);
 
     return NextResponse.json(
-      { error: "Nie udało się pobrać danych z Binance" },
+      { error: "Nie udaÅ‚o siÄ™ pobraÄ‡ danych z Binance" },
       { status: 500 }
     );
   }

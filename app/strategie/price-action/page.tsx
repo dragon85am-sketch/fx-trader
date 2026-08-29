@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import React from "react";
@@ -7,31 +7,31 @@ const rules = [
   {
     n: 1,
     title: "Struktura rynku",
-    text: "Określ strukturę rynku na H1/H4. Szukaj HH/HL w trendzie wzrostowym lub LH/LL w trendzie spadkowym.",
+    text: "OkreÅ›l strukturÄ™ rynku na H1/H4. Szukaj HH/HL w trendzie wzrostowym lub LH/LL w trendzie spadkowym.",
     image: "/strategie/price-action/rules/rule-1-structure.png",
   },
   {
     n: 2,
     title: "Strefa kluczowa",
-    text: "Zaznacz wsparcie, opór, poprzednie szczyty/dołki, linię trendu, strefę podaży lub popytu.",
+    text: "Zaznacz wsparcie, opÃ³r, poprzednie szczyty/doÅ‚ki, liniÄ™ trendu, strefÄ™ podaÅ¼y lub popytu.",
     image: "/strategie/price-action/rules/rule-2-zone.png",
   },
   {
     n: 3,
-    title: "Sygnał świecowy",
-    text: "Szukaj świecy sygnałowej w strefie: pin bar, engulfing, inside bar, fakey lub rejection.",
+    title: "SygnaÅ‚ Å›wiecowy",
+    text: "Szukaj Å›wiecy sygnaÅ‚owej w strefie: pin bar, engulfing, inside bar, fakey lub rejection.",
     image: "/strategie/price-action/rules/rule-3-candle.png",
   },
   {
     n: 4,
-    title: "Zarządzanie",
-    text: "SL ustaw za swingiem lub strefą. TP 1.2R–1.6R albo przy kolejnym poziomie/strukturze.",
+    title: "ZarzÄ…dzanie",
+    text: "SL ustaw za swingiem lub strefÄ…. TP 1.2Râ€“1.6R albo przy kolejnym poziomie/strukturze.",
     image: "/strategie/price-action/rules/rule-4-manage.png",
   },
   {
     n: 5,
-    title: "Zarządzaj ryzykiem",
-    text: "Ryzykuj maksymalnie 1–2% kapitału na transakcję. Nie zwiększaj pozycji po stracie.",
+    title: "ZarzÄ…dzaj ryzykiem",
+    text: "Ryzykuj maksymalnie 1â€“2% kapitaÅ‚u na transakcjÄ™. Nie zwiÄ™kszaj pozycji po stracie.",
     image: "/strategie/price-action/rules/rule-5-risk.png",
   },
 ];
@@ -141,16 +141,16 @@ export default function PriceActionStrategyPage() {
   const checklist = [
     "Struktura trendu potwierdzona",
     "Strefa wsparcia / oporu zidentyfikowana",
-    "Formacja świecowa potwierdzona",
-    "Kierunek zgodny z wyższym TF",
+    "Formacja Å›wiecowa potwierdzona",
+    "Kierunek zgodny z wyÅ¼szym TF",
     "RR minimum 1.2R",
-    "SL za swingiem lub strefą",
+    "SL za swingiem lub strefÄ…",
     "Brak dywergencji",
     "Wolumen potwierdza ruch",
-    "Zarządzanie pozycją zaplanowane",
-    "Częściowa realizacja zaplanowana",
+    "ZarzÄ…dzanie pozycjÄ… zaplanowane",
+    "CzÄ™Å›ciowa realizacja zaplanowana",
     "Dziennik transakcji prowadzony",
-    "Emocje pod kontrolą",
+    "Emocje pod kontrolÄ…",
   ];
 
   return (
@@ -162,7 +162,7 @@ export default function PriceActionStrategyPage() {
             <div className="p-5 lg:p-7">
               <div className="flex flex-wrap items-center gap-3">
                 <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-emerald-400/25 bg-emerald-500/15 text-3xl">
-                  ◫
+                  â—«
                 </div>
 
                 <div>
@@ -176,27 +176,27 @@ export default function PriceActionStrategyPage() {
                   </div>
 
                   <div className="mt-2 flex items-center gap-2 text-amber-400">
-                    <span className="text-xl">★★★★★</span>
+                    <span className="text-xl">â˜…â˜…â˜…â˜…â˜…</span>
                     <span className="text-xs text-slate-300">4.6</span>
                   </div>
                 </div>
               </div>
 
               <p className="mt-5 max-w-3xl text-sm leading-6 text-slate-400">
-                Klasyczne Price Action, struktura rynku i potwierdzenia świecowe.
-                Bez przeładowania wskaźnikami — czytasz zachowanie ceny i reakcję na kluczowych poziomach.
+                Klasyczne Price Action, struktura rynku i potwierdzenia Å›wiecowe.
+                Bez przeÅ‚adowania wskaÅºnikami â€” czytasz zachowanie ceny i reakcjÄ™ na kluczowych poziomach.
               </p>
 
               <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                <Metric label="Skuteczność" value="78%" icon="📊" />
-                <Metric label="Interwały" value="M5 · H1 · H4" icon="▦" />
-                <Metric label="RR" value="1.2 – 1.6" icon="🎯" />
-                <Metric label="Czas trwania" value="1 – kilka dni" icon="◷" />
-                <Metric label="Sesje" value="Cały tydzień" icon="🌐" />
+                <Metric label="SkutecznoÅ›Ä‡" value="78%" icon="ðŸ“Š" />
+                <Metric label="InterwaÅ‚y" value="M5 Â· H1 Â· H4" icon="â–¦" />
+                <Metric label="RR" value="1.2 â€“ 1.6" icon="ðŸŽ¯" />
+                <Metric label="Czas trwania" value="1 â€“ kilka dni" icon="â—·" />
+                <Metric label="Sesje" value="CaÅ‚y tydzieÅ„" icon="ðŸŒ" />
               </div>
 
               <div className="mt-5 flex flex-wrap items-center gap-2">
-                <span className="mr-2 text-[11px] text-slate-400">Najlepiej działa na:</span>
+                <span className="mr-2 text-[11px] text-slate-400">Najlepiej dziaÅ‚a na:</span>
                 {["EURUSD", "GBPUSD", "US30", "XAUUSD"].map((x) => (
                   <span
                     key={x}
@@ -222,7 +222,7 @@ export default function PriceActionStrategyPage() {
         {/* RULES */}
         <section className="rounded-[22px] border border-emerald-400/15 bg-[#061425] p-4">
           <h2 className="mb-4 text-[16px] font-black uppercase tracking-[.08em] text-emerald-300">
-            Zasady działania
+            Zasady dziaÅ‚ania
           </h2>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 min-[1700px]:grid-cols-5">
@@ -260,15 +260,15 @@ export default function PriceActionStrategyPage() {
             </h3>
             <div className="mt-4 space-y-2">
               {[
-                "Sprawdź strukturę na H1 / H4",
+                "SprawdÅº strukturÄ™ na H1 / H4",
                 "Zaznacz kluczowe strefy wsparcia / oporu",
                 "Zidentyfikuj trend i kierunek",
-                "Szukaj formacji świecowych",
-                "Przeanalizuj wolumen i zmienność",
-                "Zaplanuj wejście, SL i TP",
+                "Szukaj formacji Å›wiecowych",
+                "Przeanalizuj wolumen i zmiennoÅ›Ä‡",
+                "Zaplanuj wejÅ›cie, SL i TP",
               ].map((x) => (
                 <div key={x} className="flex gap-2 text-[11px] text-slate-300">
-                  <span className="text-emerald-400">●</span>
+                  <span className="text-emerald-400">â—</span>
                   {x}
                 </div>
               ))}
@@ -277,14 +277,14 @@ export default function PriceActionStrategyPage() {
 
           <div className="rounded-[22px] border border-emerald-400/15 bg-[#061425] p-5">
             <h3 className="text-[14px] font-black uppercase text-emerald-300">
-              Zarządzanie pozycją
+              ZarzÄ…dzanie pozycjÄ…
             </h3>
             <div className="mt-4 space-y-3">
               {[
-                ["BE", "Po osiągnięciu 1R przenieś SL na Break Even."],
-                ["Trailing Stop", "Przesuwaj SL za swingiem lub świecą."],
-                ["Częściowa realizacja", "Zamknij 50% pozycji przy 1.2R–1.6R."],
-                ["Zamknięcie ręczne", "Wyjdź po zmianie struktury lub mocnym sygnale przeciwnym."],
+                ["BE", "Po osiÄ…gniÄ™ciu 1R przenieÅ› SL na Break Even."],
+                ["Trailing Stop", "Przesuwaj SL za swingiem lub Å›wiecÄ…."],
+                ["CzÄ™Å›ciowa realizacja", "Zamknij 50% pozycji przy 1.2Râ€“1.6R."],
+                ["ZamkniÄ™cie rÄ™czne", "WyjdÅº po zmianie struktury lub mocnym sygnale przeciwnym."],
               ].map(([t, d]) => (
                 <div key={t} className="rounded-xl border border-emerald-400/10 bg-[#07182c] p-3">
                   <div className="text-[10px] font-black uppercase text-emerald-300">{t}</div>
@@ -300,9 +300,9 @@ export default function PriceActionStrategyPage() {
             </h3>
             <div className="mt-4 space-y-3">
               {[
-                ["🇬🇧", "LONDON", "08:00 – 12:00", "NAJLEPSZA"],
-                ["🇺🇸", "NOWY JORK", "14:00 – 18:00", "BARDZO DOBRA"],
-                ["🇬🇧🇺🇸", "NAKŁADANIE SESJI", "13:00 – 16:00", "IDEALNA"],
+                ["ðŸ‡¬ðŸ‡§", "LONDON", "08:00 â€“ 12:00", "NAJLEPSZA"],
+                ["ðŸ‡ºðŸ‡¸", "NOWY JORK", "14:00 â€“ 18:00", "BARDZO DOBRA"],
+                ["ðŸ‡¬ðŸ‡§ðŸ‡ºðŸ‡¸", "NAKÅADANIE SESJI", "13:00 â€“ 16:00", "IDEALNA"],
               ].map(([flag, name, time, rate]) => (
                 <div
                   key={name}
@@ -341,10 +341,10 @@ export default function PriceActionStrategyPage() {
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <div className="text-lg font-black uppercase tracking-[.08em] text-emerald-300">
-                PLAN + DYSCYPLINA + CIERPLIWOŚĆ = SUKCES
+                PLAN + DYSCYPLINA + CIERPLIWOÅšÄ† = SUKCES
               </div>
               <div className="mt-1 text-[11px] text-slate-400">
-                Price Action to czysta gra rynku. Zrozum, obserwuj i działaj.
+                Price Action to czysta gra rynku. Zrozum, obserwuj i dziaÅ‚aj.
               </div>
             </div>
 
@@ -352,7 +352,7 @@ export default function PriceActionStrategyPage() {
               href="/strategie"
               className="rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-5 py-3 text-[11px] font-black text-emerald-200 transition hover:bg-emerald-500/20"
             >
-              ← Wróć do strategii
+              â† WrÃ³Ä‡ do strategii
             </Link>
           </div>
         </section>
@@ -360,3 +360,4 @@ export default function PriceActionStrategyPage() {
     </main>
   );
 }
+

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -13,9 +13,10 @@ export default function SuccessClient() {
   return (
     <main style={{ minHeight: "70vh", display: "grid", placeItems: "center" }}>
       <div style={{ textAlign: "center" }}>
-        <h1>✅ Płatność udana</h1>
-        <p>Przenoszę Cię do panelu…</p>
+        <h1>âœ… PÅ‚atnoÅ›Ä‡ udana</h1>
+        <p>PrzenoszÄ™ CiÄ™ do paneluâ€¦</p>
       </div>
     </main>
   );
 }
+

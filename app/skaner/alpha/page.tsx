@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import React from "react";
@@ -371,14 +371,14 @@ export default function AlphaScannerPage() {
           const looksLikeHtml = raw.trim().startsWith("<");
           throw new Error(
             looksLikeHtml
-              ? "Endpoint /api/twelve-data zwrócił HTML zamiast JSON. Sprawdź route.ts."
-              : `Nieprawidłowa odpowiedź API: ${raw.slice(0, 140)}`
+              ? "Endpoint /api/twelve-data zwrÃ³ciÅ‚ HTML zamiast JSON. SprawdÅº route.ts."
+              : `NieprawidÅ‚owa odpowiedÅº API: ${raw.slice(0, 140)}`
           );
         }
 
         if (!response.ok || data?.status === "error" || data?.error) {
           throw new Error(
-            data?.message || data?.error || "Nie udało się pobrać świec z Twelve Data."
+            data?.message || data?.error || "Nie udaÅ‚o siÄ™ pobraÄ‡ Å›wiec z Twelve Data."
           );
         }
 
@@ -412,7 +412,7 @@ export default function AlphaScannerPage() {
 
         if (!next.length) {
           throw new Error(
-            data?.message || `Twelve Data nie zwróciło świec dla ${setup.instrument} ${setup.tf}.`
+            data?.message || `Twelve Data nie zwrÃ³ciÅ‚o Å›wiec dla ${setup.instrument} ${setup.tf}.`
           );
         }
 
@@ -435,14 +435,14 @@ export default function AlphaScannerPage() {
           setLastUpdated(new Date(cached.fetchedAt));
           setDataSource("CACHE");
           setError(
-            `${e instanceof Error ? e.message : "Błąd Twelve Data"} · pokazuję ostatnie dane z cache`
+            `${e instanceof Error ? e.message : "BÅ‚Ä…d Twelve Data"} Â· pokazujÄ™ ostatnie dane z cache`
           );
           return cached.candles;
         }
 
         setCandles([]);
         setDataSource(null);
-        setError(e instanceof Error ? e.message : "Błąd pobierania Twelve Data");
+        setError(e instanceof Error ? e.message : "BÅ‚Ä…d pobierania Twelve Data");
         return [];
       } finally {
         delete inFlightRef.current[cacheKey];
@@ -556,7 +556,7 @@ export default function AlphaScannerPage() {
   }, [candles, selected]);
 
   const formatLevel = (value: number) => {
-    if (!Number.isFinite(value)) return "—";
+    if (!Number.isFinite(value)) return "â€”";
     if (selected.instrument === "EURUSD" || selected.instrument === "GBPUSD")
       return value.toFixed(5);
     if (selected.instrument === "USDJPY") return value.toFixed(3);
@@ -595,7 +595,7 @@ export default function AlphaScannerPage() {
 
           <div className="flex items-center gap-3">
             <div className="rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-2 text-[11px] font-bold text-emerald-300">
-              ● SMART CACHE
+              â— SMART CACHE
             </div>
 
             <button
@@ -706,7 +706,7 @@ export default function AlphaScannerPage() {
                 active={liquidity === "Medium"}
                 onClick={() => setLiquidity("Medium")}
               >
-                Medium (40–70%)
+                Medium (40â€“70%)
               </FilterButton>
             </div>
           </div>
@@ -826,7 +826,7 @@ export default function AlphaScannerPage() {
 
             <div className="mt-2 flex flex-wrap items-center justify-between gap-2 px-1 text-[9px] text-white/35">
               <span>
-                Dane: {dataSource === "CACHE" ? "cache" : dataSource === "API" ? "Twelve Data API" : "—"}
+                Dane: {dataSource === "CACHE" ? "cache" : dataSource === "API" ? "Twelve Data API" : "â€”"}
               </span>
               <span>
                 {lastUpdated
@@ -923,23 +923,23 @@ export default function AlphaScannerPage() {
               <div className="flex items-center justify-between border-b border-sky-300/15 px-4 py-3">
                 <div>
                   <div className="text-[16px] font-bold text-white">
-                    {selected.instrument} · {selected.tf}
+                    {selected.instrument} Â· {selected.tf}
                   </div>
                   <div className="mt-1 text-[9px] text-white/40">
-                    Full Chart · Twelve Data · {selected.priceAction}
+                    Full Chart Â· Twelve Data Â· {selected.priceAction}
                   </div>
                 </div>
 
                 <div className="flex items-center gap-3">
                   <span className="hidden text-[9px] text-white/35 sm:inline">
-                    ESC — zamknij
+                    ESC â€” zamknij
                   </span>
                   <button
                     type="button"
                     onClick={() => setFullChart(false)}
                     className="rounded-xl border border-sky-300/15 bg-sky-300/[0.06] px-4 py-2 text-[11px] font-semibold text-white/80 transition hover:bg-sky-300/[0.12]"
                   >
-                    Zamknij ✕
+                    Zamknij âœ•
                   </button>
                 </div>
               </div>
@@ -967,3 +967,4 @@ export default function AlphaScannerPage() {
     </main>
   );
 }
+

@@ -1,4 +1,4 @@
-import { cookies } from "next/headers";
+﻿import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
@@ -45,7 +45,7 @@ function getStatusLabel(status: PayoutStatus) {
     case "Approved":
       return "Zatwierdzona";
     case "Paid":
-      return "Opłacona";
+      return "OpÅ‚acona";
     case "Rejected":
       return "Odrzucona";
     case "Pending":
@@ -93,9 +93,9 @@ export default async function PayoutsPage() {
     <div className="p-6 text-white">
       <div className="mb-6 flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Historia wypłat</h1>
+          <h1 className="text-2xl font-semibold">Historia wypÅ‚at</h1>
           <p className="mt-1 text-sm text-zinc-400">
-            Tutaj widzisz wszystkie swoje wnioski o wypłatę.
+            Tutaj widzisz wszystkie swoje wnioski o wypÅ‚atÄ™.
           </p>
         </div>
 
@@ -103,7 +103,7 @@ export default async function PayoutsPage() {
           href="/dashboard/affiliate"
           className="rounded-xl border border-white/10 px-4 py-2 text-sm text-zinc-300 transition hover:bg-white/5"
         >
-          Powrót
+          PowrÃ³t
         </Link>
       </div>
 
@@ -125,7 +125,7 @@ export default async function PayoutsPage() {
             {payouts.length === 0 ? (
               <tr>
                 <td colSpan={3} className="py-6 text-center text-zinc-400">
-                  Brak wypłat
+                  Brak wypÅ‚at
                 </td>
               </tr>
             ) : (
@@ -136,7 +136,7 @@ export default async function PayoutsPage() {
                   </td>
 
                   <td className="px-4 py-4 font-semibold text-blue-300">
-                    {p.amount}€
+                    {p.amount}â‚¬
                   </td>
 
                   <td className="px-4 py-4">

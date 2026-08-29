@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 
@@ -26,7 +26,7 @@ export async function GET() {
   } catch (error) {
     console.error("GET /api/affiliate/payouts error:", error);
     return NextResponse.json(
-      { error: "Nie udało się pobrać historii wypłat" },
+      { error: "Nie udaÅ‚o siÄ™ pobraÄ‡ historii wypÅ‚at" },
       { status: 500 }
     );
   }
@@ -52,7 +52,7 @@ export async function POST() {
 
     if (affiliateStat.availablePayout < 50) {
       return NextResponse.json(
-        { error: "Minimalna wypłata to 50€" },
+        { error: "Minimalna wypÅ‚ata to 50â‚¬" },
         { status: 400 }
       );
     }
@@ -68,7 +68,7 @@ export async function POST() {
 
     if (existingPayout) {
       return NextResponse.json(
-        { error: "Masz już aktywny wniosek o wypłatę" },
+        { error: "Masz juÅ¼ aktywny wniosek o wypÅ‚atÄ™" },
         { status: 400 }
       );
     }
@@ -93,12 +93,12 @@ export async function POST() {
     return NextResponse.json({
       ok: true,
       payout,
-      message: "Wniosek o wypłatę został utworzony",
+      message: "Wniosek o wypÅ‚atÄ™ zostaÅ‚ utworzony",
     });
   } catch (error) {
     console.error("POST /api/affiliate/payouts error:", error);
     return NextResponse.json(
-      { error: "Wystąpił błąd podczas tworzenia wypłaty" },
+      { error: "WystÄ…piÅ‚ bÅ‚Ä…d podczas tworzenia wypÅ‚aty" },
       { status: 500 }
     );
   }

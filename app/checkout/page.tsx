@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Image from "next/image";
 import { useState } from "react";
@@ -21,12 +21,12 @@ const features = [
   {
     icon: BarChart3,
     title: "Skaner Rynku PRO",
-    text: "Zaawansowany skaner setupów z sygnałami w czasie rzeczywistym",
+    text: "Zaawansowany skaner setupÃ³w z sygnaÅ‚ami w czasie rzeczywistym",
   },
   {
     icon: BarChart3,
     title: "Wykresy Premium",
-    text: "Profesjonalne wykresy i narzędzia do analizy technicznej",
+    text: "Profesjonalne wykresy i narzÄ™dzia do analizy technicznej",
   },
   {
     icon: GraduationCap,
@@ -36,12 +36,12 @@ const features = [
   {
     icon: Video,
     title: "Trading Room",
-    text: "Codzienne analizy, setupy i edukacja na żywo",
+    text: "Codzienne analizy, setupy i edukacja na Å¼ywo",
   },
   {
     icon: BookOpen,
     title: "Edukacja",
-    text: "Kursy, webinary i materiały dla każdego tradera",
+    text: "Kursy, webinary i materiaÅ‚y dla kaÅ¼dego tradera",
   },
   {
     icon: BarChart3,
@@ -50,8 +50,8 @@ const features = [
   },
   {
     icon: Users,
-    title: "Społeczność FX TRADE",
-    text: "Dołącz do społeczności traderów i rozwijaj się razem z nami",
+    title: "SpoÅ‚ecznoÅ›Ä‡ FX TRADE",
+    text: "DoÅ‚Ä…cz do spoÅ‚ecznoÅ›ci traderÃ³w i rozwijaj siÄ™ razem z nami",
   },
   {
     icon: Headphones,
@@ -65,9 +65,9 @@ const included = [
   "Wykresy Premium",
   "Wszystkie strategie",
   "Trading Room",
-  "Pełna edukacja",
+  "PeÅ‚na edukacja",
   "Trading Journal",
-  "Społeczność FX TRADE",
+  "SpoÅ‚ecznoÅ›Ä‡ FX TRADE",
   "Wsparcie 24/7",
 ];
 
@@ -85,14 +85,14 @@ export default function CheckoutPage() {
       const data = await res.json();
 
       if (!res.ok || !data?.url) {
-        alert(data?.error || "Nie udało się uruchomić płatności");
+        alert(data?.error || "Nie udaÅ‚o siÄ™ uruchomiÄ‡ pÅ‚atnoÅ›ci");
         return;
       }
 
       window.location.href = data.url;
     } catch (error) {
       console.error("CHECKOUT ERROR:", error);
-      alert("Błąd podczas uruchamiania płatności");
+      alert("BÅ‚Ä…d podczas uruchamiania pÅ‚atnoÅ›ci");
     } finally {
       setLoading(false);
     }
@@ -177,7 +177,7 @@ export default function CheckoutPage() {
               href="/login"
               className="hidden rounded-lg border border-sky-400/25 bg-[#071628] px-4 py-2.5 text-[11px] font-semibold text-slate-200 transition hover:border-sky-400/45 sm:block"
             >
-              Zaloguj się
+              Zaloguj siÄ™
             </Link>
 
             <button
@@ -186,7 +186,7 @@ export default function CheckoutPage() {
               disabled={loading}
               className="rounded-lg bg-gradient-to-r from-sky-500 via-blue-600 to-blue-700 px-4 py-2.5 text-[11px] font-bold shadow-[0_0_26px_rgba(37,99,235,.28)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {loading ? "Przekierowanie..." : "Kup dostęp do platformy"}
+              {loading ? "Przekierowanie..." : "Kup dostÄ™p do platformy"}
             </button>
           </div>
         </div>
@@ -198,14 +198,14 @@ export default function CheckoutPage() {
       <section className="relative z-10 mx-auto max-w-[1040px] px-5 py-10">
         <div className="text-center">
           <h1 className="text-[34px] font-black tracking-[-0.03em] sm:text-[46px]">
-            Odbierz pełny dostęp do{" "}
+            Odbierz peÅ‚ny dostÄ™p do{" "}
             <span className="bg-gradient-to-r from-sky-400 via-blue-500 to-blue-600 bg-clip-text text-transparent">
               FX TRADE
             </span>
           </h1>
 
           <p className="mt-2 text-sm text-slate-400">
-            Profesjonalne narzędzia dla wymagających traderów
+            Profesjonalne narzÄ™dzia dla wymagajÄ…cych traderÃ³w
           </p>
         </div>
 
@@ -216,12 +216,12 @@ export default function CheckoutPage() {
           <section className="rounded-[22px] border border-sky-400/30 bg-gradient-to-b from-[#0A315A]/95 to-[#04162A]/95 p-5 shadow-[0_25px_70px_rgba(0,0,0,.28)] backdrop-blur-md">
             <div className="mx-auto flex w-fit items-center gap-2 rounded-full border border-sky-400/35 bg-sky-500/[0.08] px-4 py-2 text-[10px] font-bold uppercase tracking-[0.22em] text-sky-300">
               <Crown className="h-4 w-4" />
-              Dostęp Premium
+              DostÄ™p Premium
             </div>
 
             <div className="mt-5 text-center">
               <h2 className="text-[24px] font-black">
-                Pełny dostęp do platformy
+                PeÅ‚ny dostÄ™p do platformy
               </h2>
             </div>
 
@@ -252,10 +252,10 @@ export default function CheckoutPage() {
           <section className="rounded-[22px] border border-sky-400/30 bg-gradient-to-b from-[#0A315A]/95 to-[#04162A]/95 p-5 shadow-[0_25px_70px_rgba(0,0,0,.28)] backdrop-blur-md">
             <div>
               <h2 className="text-[20px] font-black">
-                Płatność za dostęp do platformy
+                PÅ‚atnoÅ›Ä‡ za dostÄ™p do platformy
               </h2>
               <p className="mt-1 text-[11px] text-slate-300">
-                Subskrypcja miesięczna – pełny dostęp do FX TRADE
+                Subskrypcja miesiÄ™czna â€“ peÅ‚ny dostÄ™p do FX TRADE
               </p>
             </div>
 
@@ -269,15 +269,15 @@ export default function CheckoutPage() {
                   <div>
                     <div className="text-sm font-bold">FX TRADE PREMIUM</div>
                     <div className="text-[10px] text-slate-400">
-                      Pełny dostęp do platformy
+                      PeÅ‚ny dostÄ™p do platformy
                     </div>
                   </div>
                 </div>
 
                 <div className="text-right">
-                  <div className="text-[32px] font-black">99 €</div>
+                  <div className="text-[32px] font-black">99 â‚¬</div>
                   <div className="text-[12px] font-bold text-sky-400">
-                    / miesiąc
+                    / miesiÄ…c
                   </div>
                 </div>
               </div>
@@ -305,10 +305,10 @@ export default function CheckoutPage() {
             >
               <Lock className="h-5 w-5" />
               <span>
-                {loading ? "PRZEKIEROWANIE DO STRIPE..." : "KUP DOSTĘP DO PLATFORMY"}
+                {loading ? "PRZEKIEROWANIE DO STRIPE..." : "KUP DOSTÄ˜P DO PLATFORMY"}
                 {!loading ? (
                   <span className="block text-[13px]">
-                    99 € / MIES.
+                    99 â‚¬ / MIES.
                   </span>
                 ) : null}
               </span>
@@ -321,10 +321,10 @@ export default function CheckoutPage() {
               <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-sky-400" />
               <div>
                 <div className="text-[11px] font-bold text-white">
-                  Bezpieczna płatność obsługiwana przez Stripe
+                  Bezpieczna pÅ‚atnoÅ›Ä‡ obsÅ‚ugiwana przez Stripe
                 </div>
                 <div className="mt-1 text-[10px] leading-4 text-slate-400">
-                  Twoje dane są chronione i szyfrowane.
+                  Twoje dane sÄ… chronione i szyfrowane.
                 </div>
               </div>
             </div>
@@ -333,10 +333,10 @@ export default function CheckoutPage() {
               <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-sky-400" />
               <div>
                 <div className="text-[11px] font-bold text-white">
-                  Aktywacja po płatności
+                  Aktywacja po pÅ‚atnoÅ›ci
                 </div>
                 <div className="mt-1 text-[10px] leading-4 text-slate-400">
-                  Po zaksięgowaniu płatności otrzymujesz dostęp do funkcji platformy.
+                  Po zaksiÄ™gowaniu pÅ‚atnoÅ›ci otrzymujesz dostÄ™p do funkcji platformy.
                 </div>
               </div>
             </div>
@@ -349,25 +349,25 @@ export default function CheckoutPage() {
         <div className="mt-6 grid overflow-hidden rounded-[18px] border border-sky-400/20 bg-[#071b33]/80 sm:grid-cols-3">
           <InfoBox
             icon={<Lock className="h-7 w-7" />}
-            title="Bezpieczna płatność"
-            text="Szyfrowane połączenie SSL i ochrona Twoich danych."
+            title="Bezpieczna pÅ‚atnoÅ›Ä‡"
+            text="Szyfrowane poÅ‚Ä…czenie SSL i ochrona Twoich danych."
           />
           <InfoBox
             icon={<Headphones className="h-7 w-7" />}
             title="Wsparcie 24/7"
-            text="Nasz zespół jest dostępny przez cały tydzień."
+            text="Nasz zespÃ³Å‚ jest dostÄ™pny przez caÅ‚y tydzieÅ„."
           />
           <InfoBox
             icon={<Users className="h-7 w-7" />}
-            title="Społeczność FX TRADE"
-            text="Rozwijaj swoje umiejętności razem z innymi traderami."
+            title="SpoÅ‚ecznoÅ›Ä‡ FX TRADE"
+            text="Rozwijaj swoje umiejÄ™tnoÅ›ci razem z innymi traderami."
           />
         </div>
 
         <div className="mt-6 text-center text-[11px] leading-5 text-slate-400">
-          Subskrypcja 99 € miesięcznie. Płatność odnawia się automatycznie co miesiąc.
+          Subskrypcja 99 â‚¬ miesiÄ™cznie. PÅ‚atnoÅ›Ä‡ odnawia siÄ™ automatycznie co miesiÄ…c.
           <br />
-          Anulowanie subskrypcji odbywa się zgodnie z warunkami płatności i ustawieniami konta.
+          Anulowanie subskrypcji odbywa siÄ™ zgodnie z warunkami pÅ‚atnoÅ›ci i ustawieniami konta.
         </div>
       </section>
     </main>
@@ -395,3 +395,4 @@ function InfoBox({
     </div>
   );
 }
+

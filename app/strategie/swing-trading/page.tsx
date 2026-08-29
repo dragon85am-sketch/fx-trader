@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React from "react";
 import Link from "next/link";
@@ -111,15 +111,15 @@ export default function SwingTradingPage() {
   const paid = true;
 
   const checklist = [
-    "Określiłem trend na D1",
+    "OkreÅ›liÅ‚em trend na D1",
     "Cena jest w kluczowej strefie",
     "Czekam na potwierdzenie H4 / H1",
     "SL ustawiony za swingiem",
-    "RR minimum 1.5R–3R+",
-    "Ryzyko maks. 1–2%",
-    "Zarządzam pozycją zgodnie z planem",
+    "RR minimum 1.5Râ€“3R+",
+    "Ryzyko maks. 1â€“2%",
+    "ZarzÄ…dzam pozycjÄ… zgodnie z planem",
     "Nie przesuwam SL na stracie",
-    "Zamykam pozycję zgodnie z planem",
+    "Zamykam pozycjÄ™ zgodnie z planem",
   ];
 
   return (
@@ -144,11 +144,11 @@ export default function SwingTradingPage() {
               </span>
             </h1>
             <div className="mt-2 text-sm font-black uppercase tracking-[.14em] text-amber-300">
-              Trend • Struktura • Cierpliwość
+              Trend â€¢ Struktura â€¢ CierpliwoÅ›Ä‡
             </div>
             <p className="mt-4 max-w-xl text-sm leading-6 text-sky-100/70">
-              Strategia swing trading oparta na analizie trendu wyższych interwałów,
-              strukturze rynku i wejściu w najlepsze strefy.
+              Strategia swing trading oparta na analizie trendu wyÅ¼szych interwaÅ‚Ã³w,
+              strukturze rynku i wejÅ›ciu w najlepsze strefy.
             </p>
           </div>
         </section>
@@ -156,20 +156,20 @@ export default function SwingTradingPage() {
         {/* METRICS */}
         <section className="rounded-[20px] border border-cyan-400/15 bg-[#04111f] p-4">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-            <Metric icon="◷" label="Timeframe" value="D1 / H4" sub="Wejście: H4 / H1" />
-            <Metric icon="🌐" label="Sesje" value="London / New York" sub="Najlepsza płynność" />
-            <Metric icon="📈" label="Średni RR" value="2.5R+" sub="Cel 3R+" />
-            <Metric icon="⏱" label="Średni czas" value="3–10 dni" sub="Pozycje wielodniowe" />
-            <Metric icon="🎯" label="Częstotliwość" value="1–3 trade" sub="Tygodniowo" />
+            <Metric icon="â—·" label="Timeframe" value="D1 / H4" sub="WejÅ›cie: H4 / H1" />
+            <Metric icon="ðŸŒ" label="Sesje" value="London / New York" sub="Najlepsza pÅ‚ynnoÅ›Ä‡" />
+            <Metric icon="ðŸ“ˆ" label="Åšredni RR" value="2.5R+" sub="Cel 3R+" />
+            <Metric icon="â±" label="Åšredni czas" value="3â€“10 dni" sub="Pozycje wielodniowe" />
+            <Metric icon="ðŸŽ¯" label="CzÄ™stotliwoÅ›Ä‡" value="1â€“3 trade" sub="Tygodniowo" />
           </div>
         </section>
 
         {/* RULES */}
         <section className="rounded-[20px] border border-cyan-400/15 bg-[#04111f] p-4">
           <div className="mb-4 flex items-center gap-2">
-            <span className="text-xl">①</span>
+            <span className="text-xl">â‘ </span>
             <h2 className="text-[15px] font-black uppercase tracking-[.08em] text-cyan-300">
-              Zasady działania
+              Zasady dziaÅ‚ania
             </h2>
           </div>
 
@@ -179,35 +179,35 @@ export default function SwingTradingPage() {
               title="Analiza trendu D1"
               image="/strategie/swing-trading/rules/rule-1-trend.png"
             >
-              Określ kierunek trendu na D1 przez strukturę HH/HL lub LH/LL oraz EMA 50/200.
+              OkreÅ›l kierunek trendu na D1 przez strukturÄ™ HH/HL lub LH/LL oraz EMA 50/200.
             </RuleCard>
             <RuleCard
               n={2}
-              title="Znajdź strefę"
+              title="ZnajdÅº strefÄ™"
               image="/strategie/swing-trading/rules/rule-2-zone.png"
             >
-              Zidentyfikuj kluczowe wsparcie, opór, FVG lub Order Block zgodny z trendem.
+              Zidentyfikuj kluczowe wsparcie, opÃ³r, FVG lub Order Block zgodny z trendem.
             </RuleCard>
             <RuleCard
               n={3}
-              title="Wejście H4 / H1"
+              title="WejÅ›cie H4 / H1"
               image="/strategie/swing-trading/rules/rule-3-entry.png"
             >
-              Poczekaj na reakcję ceny i potwierdzenie na H4 lub H1 zgodne z kierunkiem D1.
+              Poczekaj na reakcjÄ™ ceny i potwierdzenie na H4 lub H1 zgodne z kierunkiem D1.
             </RuleCard>
             <RuleCard
               n={4}
-              title="Zarządzaj pozycją"
+              title="ZarzÄ…dzaj pozycjÄ…"
               image="/strategie/swing-trading/rules/rule-4-manage.png"
             >
-              SL za swingiem. TP 2R–3R+ lub prowadzenie pozycji po strukturze.
+              SL za swingiem. TP 2Râ€“3R+ lub prowadzenie pozycji po strukturze.
             </RuleCard>
             <RuleCard
               n={5}
-              title="Zarządzaj ryzykiem"
+              title="ZarzÄ…dzaj ryzykiem"
               image="/strategie/swing-trading/rules/rule-5-risk.png"
             >
-              Ryzykuj maksymalnie 1–2% kapitału na transakcję i nie zwiększaj ryzyka po stracie.
+              Ryzykuj maksymalnie 1â€“2% kapitaÅ‚u na transakcjÄ™ i nie zwiÄ™kszaj ryzyka po stracie.
             </RuleCard>
           </div>
         </section>
@@ -215,18 +215,18 @@ export default function SwingTradingPage() {
         {/* PREPARATION */}
         <section className="rounded-[20px] border border-cyan-400/15 bg-[#04111f] p-4">
           <div className="mb-4 flex items-center gap-2">
-            <span className="text-xl">②</span>
+            <span className="text-xl">â‘¡</span>
             <h2 className="text-[15px] font-black uppercase tracking-[.08em] text-cyan-300">
-              Mapa dnia – przygotowanie
+              Mapa dnia â€“ przygotowanie
             </h2>
           </div>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
             {[
-              ["📅", "Kalendarz ekonomiczny", "Unikaj najważniejszych danych HTF bez planu."],
-              ["📊", "Bias na D1", "Trend, struktura i najważniejsze poziomy."],
-              ["🔎", "Kluczowe strefy", "Wsparcie, opór, FVG i Order Block."],
-              ["🎯", "Setup zgodny z biasem", "D1 wyznacza kierunek, H4/H1 timing."],
-              ["☑", "1–3 okazje tygodniowo", "Jakość ponad ilość."],
+              ["ðŸ“…", "Kalendarz ekonomiczny", "Unikaj najwaÅ¼niejszych danych HTF bez planu."],
+              ["ðŸ“Š", "Bias na D1", "Trend, struktura i najwaÅ¼niejsze poziomy."],
+              ["ðŸ”Ž", "Kluczowe strefy", "Wsparcie, opÃ³r, FVG i Order Block."],
+              ["ðŸŽ¯", "Setup zgodny z biasem", "D1 wyznacza kierunek, H4/H1 timing."],
+              ["â˜‘", "1â€“3 okazje tygodniowo", "JakoÅ›Ä‡ ponad iloÅ›Ä‡."],
             ].map(([icon, title, desc]) => (
               <div key={title} className="rounded-xl border border-cyan-400/10 bg-[#071728] p-4">
                 <div className="text-2xl">{icon}</div>
@@ -240,9 +240,9 @@ export default function SwingTradingPage() {
         {/* SETUPS */}
         <section className="rounded-[20px] border border-cyan-400/15 bg-[#04111f] p-4">
           <div className="mb-4 flex items-center gap-2">
-            <span className="text-xl">③</span>
+            <span className="text-xl">â‘¢</span>
             <h2 className="text-[15px] font-black uppercase tracking-[.08em] text-cyan-300">
-              Przykłady setupów
+              PrzykÅ‚ady setupÃ³w
             </h2>
           </div>
 
@@ -279,13 +279,13 @@ export default function SwingTradingPage() {
           <Card className="border-cyan-400/15 bg-[#04111f]">
             <CardContent className="p-5">
               <h3 className="text-[14px] font-black uppercase text-cyan-300">
-                Zarządzanie pozycją
+                ZarzÄ…dzanie pozycjÄ…
               </h3>
               <div className="mt-4 space-y-3">
                 {[
-                  ["%", "Przenieś SL na BE", "Po osiągnięciu 1R i potwierdzeniu struktury."],
-                  ["⚖", "Trailing Stop", "Podążaj za trendem lub EMA 20/50."],
-                  ["◔", "Częściowa realizacja", "Zrealizuj część przy 2R, resztę zostaw na 3R+."],
+                  ["%", "PrzenieÅ› SL na BE", "Po osiÄ…gniÄ™ciu 1R i potwierdzeniu struktury."],
+                  ["âš–", "Trailing Stop", "PodÄ…Å¼aj za trendem lub EMA 20/50."],
+                  ["â—”", "CzÄ™Å›ciowa realizacja", "Zrealizuj czÄ™Å›Ä‡ przy 2R, resztÄ™ zostaw na 3R+."],
                 ].map(([icon, title, desc]) => (
                   <div key={title} className="flex gap-3 rounded-xl border border-cyan-400/10 bg-[#071728] p-3">
                     <div className="text-xl">{icon}</div>
@@ -304,9 +304,9 @@ export default function SwingTradingPage() {
               <h3 className="text-[14px] font-black uppercase text-cyan-300">Najlepsze sesje</h3>
               <div className="mt-4 space-y-3">
                 {[
-                  ["🇬🇧", "LONDYN", "08:00–12:00", "NAJLEPSZA"],
-                  ["🇺🇸", "NOWY JORK", "14:00–18:00", "BARDZO DOBRA"],
-                  ["🇬🇧🇺🇸", "NAKŁADANIE SESJI", "13:00–16:00", "IDEALNA"],
+                  ["ðŸ‡¬ðŸ‡§", "LONDYN", "08:00â€“12:00", "NAJLEPSZA"],
+                  ["ðŸ‡ºðŸ‡¸", "NOWY JORK", "14:00â€“18:00", "BARDZO DOBRA"],
+                  ["ðŸ‡¬ðŸ‡§ðŸ‡ºðŸ‡¸", "NAKÅADANIE SESJI", "13:00â€“16:00", "IDEALNA"],
                 ].map(([flag, name, time, rating]) => (
                   <div key={name} className="grid grid-cols-[48px_1fr_auto] items-center gap-3 rounded-xl border border-cyan-400/10 bg-[#071728] p-3">
                     <div className="text-2xl">{flag}</div>
@@ -327,16 +327,16 @@ export default function SwingTradingPage() {
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <div className="text-[18px] font-black uppercase tracking-[.08em] text-amber-300">
-                PLAN + CIERPLIWOŚĆ + DYSCYPLINA = SUKCES
+                PLAN + CIERPLIWOÅšÄ† + DYSCYPLINA = SUKCES
               </div>
               <div className="mt-1 text-[11px] text-sky-100/50">
-                Czekaj na najlepsze setupy zgodne z planem i zarządzaj ryzykiem.
+                Czekaj na najlepsze setupy zgodne z planem i zarzÄ…dzaj ryzykiem.
               </div>
             </div>
 
             <div className="flex gap-2">
               <Link href="/strategie">
-                <Button variant="outline">← Strategie</Button>
+                <Button variant="outline">â† Strategie</Button>
               </Link>
               {!paid ? (
                 <Link href="/paywall">
@@ -350,3 +350,4 @@ export default function SwingTradingPage() {
     </main>
   );
 }
+

@@ -1,10 +1,10 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2026-03-25.dahlia",
+  
 });
 
 export async function GET() {
@@ -58,7 +58,7 @@ export async function GET() {
     console.error("GET /api/stripe/connect/status error:", error);
 
     return NextResponse.json(
-      { error: "Nie udało się pobrać statusu Stripe Connect" },
+      { error: "Nie udaÅ‚o siÄ™ pobraÄ‡ statusu Stripe Connect" },
       { status: 500 }
     );
   }

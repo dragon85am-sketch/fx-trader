@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -100,18 +100,18 @@ export default function KursKoniecPage() {
       <div className="mx-auto max-w-5xl space-y-8">
         {/* TOP PANEL */}
         <div className="rounded-3xl border border-white/10 bg-white/5 p-8 text-center">
-          <div className="text-5xl mb-4">🎉</div>
+          <div className="text-5xl mb-4">ðŸŽ‰</div>
 
           <h1 className="text-3xl md:text-4xl font-bold text-white mb-3">
             Gratulacje!
           </h1>
 
           <p className="text-gray-300 mb-2">
-            Ukończyłeś kurs <span className="font-semibold text-white">FX Trade Academy</span>
+            UkoÅ„czyÅ‚eÅ› kurs <span className="font-semibold text-white">FX Trade Academy</span>
           </p>
 
           <p className="text-gray-400 mb-6">
-            Możesz teraz pobrać certyfikat ukończenia.
+            MoÅ¼esz teraz pobraÄ‡ certyfikat ukoÅ„czenia.
           </p>
 
           <div className="flex flex-wrap justify-center gap-4">
@@ -120,7 +120,7 @@ export default function KursKoniecPage() {
               href="/education/kurs"
               className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white"
             >
-              Wróć do kursu
+              WrÃ³Ä‡ do kursu
             </Link>
 
             <button
@@ -137,14 +137,14 @@ export default function KursKoniecPage() {
               onClick={handleResetProgress}
               className="px-5 py-2 rounded-lg bg-white/5 border border-white/10 text-white hover:bg-white/10"
             >
-              Powtórz kurs
+              PowtÃ³rz kurs
             </button>
 
           </div>
 
           {resetDone && (
             <div className="mt-4 text-green-400">
-              Progres kursu został zresetowany.
+              Progres kursu zostaÅ‚ zresetowany.
             </div>
           )}
         </div>
@@ -166,7 +166,7 @@ export default function KursKoniecPage() {
                 <div className="flex justify-between mb-6 text-sm text-gray-400">
                   <div>
                     <p className="tracking-widest text-[#d6b06a] uppercase">
-                      Certyfikat ukończenia
+                      Certyfikat ukoÅ„czenia
                     </p>
                     <p>FX Trade Academy</p>
                   </div>
@@ -192,17 +192,17 @@ export default function KursKoniecPage() {
                   </h2>
 
                   <p className="text-xl text-[#e8c679] tracking-widest">
-                    UKOŃCZENIA
+                    UKOÅƒCZENIA
                   </p>
 
                 </div>
 
-                {/* TREŚĆ */}
+                {/* TREÅšÄ† */}
 
                 <div className="text-center mb-6">
 
                   <p className="text-gray-300 mb-3">
-                    Niniejszym potwierdzamy, że
+                    Niniejszym potwierdzamy, Å¼e
                   </p>
 
                   <p className="text-4xl font-serif italic text-white mb-3">
@@ -210,8 +210,8 @@ export default function KursKoniecPage() {
                   </p>
 
                   <p className="text-gray-300 max-w-2xl mx-auto">
-                    ukończył pełny program edukacyjny FX Trade Academy obejmujący
-                    19 modułów szkoleniowych z zakresu tradingu, zarządzania
+                    ukoÅ„czyÅ‚ peÅ‚ny program edukacyjny FX Trade Academy obejmujÄ…cy
+                    19 moduÅ‚Ã³w szkoleniowych z zakresu tradingu, zarzÄ…dzania
                     ryzykiem, psychologii oraz budowy systemu transakcyjnego.
                   </p>
 
@@ -223,12 +223,12 @@ export default function KursKoniecPage() {
 
                   <div className="border border-[#c9a45c]/30 rounded-lg p-3">
                     <p className="text-xs text-gray-400">Status</p>
-                    <p className="text-white font-semibold">Ukończono</p>
+                    <p className="text-white font-semibold">UkoÅ„czono</p>
                   </div>
 
                   <div className="border border-[#c9a45c]/30 rounded-lg p-3">
                     <p className="text-xs text-gray-400">Program</p>
-                    <p className="text-white font-semibold">19 modułów</p>
+                    <p className="text-white font-semibold">19 moduÅ‚Ã³w</p>
                   </div>
 
                   <div className="border border-[#c9a45c]/30 rounded-lg p-3">
@@ -253,7 +253,7 @@ export default function KursKoniecPage() {
                     </div>
 
                     <div>
-                      <p className="text-xs text-gray-400">Pieczęć programu</p>
+                      <p className="text-xs text-gray-400">PieczÄ™Ä‡ programu</p>
                       <p className="text-white">FX Trade Academy</p>
                     </div>
                   </div>
@@ -270,7 +270,7 @@ export default function KursKoniecPage() {
                 </div>
 
                 <p className="text-center text-xs text-gray-400 mt-4">
-                  Niniejszy certyfikat stanowi potwierdzenie ukończenia programu
+                  Niniejszy certyfikat stanowi potwierdzenie ukoÅ„czenia programu
                   edukacyjnego FX Trade Academy i ma charakter szkoleniowy.
                 </p>
 

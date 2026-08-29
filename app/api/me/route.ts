@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 
@@ -37,7 +37,7 @@ export async function GET() {
     if (!user) {
       return NextResponse.json(
         {
-          error: "Nie znaleziono użytkownika",
+          error: "Nie znaleziono uÅ¼ytkownika",
         },
         {
           status: 404,
@@ -86,7 +86,7 @@ export async function GET() {
 
     return NextResponse.json(
       {
-        error: "Błąd serwera",
+        error: "BÅ‚Ä…d serwera",
       },
       {
         status: 500,

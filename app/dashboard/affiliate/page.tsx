@@ -1,4 +1,4 @@
-
+﻿
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -43,7 +43,7 @@ function getPayoutStatusLabel(status: PayoutStatus) {
     case "Approved":
       return "Zatwierdzona";
     case "Paid":
-      return "Opłacona";
+      return "OpÅ‚acona";
     case "Rejected":
       return "Odrzucona";
     case "Pending":
@@ -67,7 +67,7 @@ function getPayoutBadgeClass(status: PayoutStatus) {
 }
 
 function formatEuro(value: number) {
-  return `${value}€`;
+  return `${value}â‚¬`;
 }
 
 export default async function AffiliatePage() {
@@ -80,7 +80,7 @@ export default async function AffiliatePage() {
   const authUser = auth.user;
 
 
-  let userName = "Użytkownik";
+  let userName = "UÅ¼ytkownik";
   let affiliateLink = `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/ref/${authUser.userId}`;
   let availablePayout = 0;
   let pendingCommission = 0;
@@ -186,7 +186,7 @@ export default async function AffiliatePage() {
     console.log("AUTH USER:", authUser);
     console.log("DB USER:", user);
 
-    userName = user?.name || user?.email || "Użytkownik";
+    userName = user?.name || user?.email || "UÅ¼ytkownik";
     stripeConnected = Boolean(user?.stripeAccountId);
 
 stripePayoutsEnabled = Boolean(
@@ -261,15 +261,15 @@ stripeOnboardingDone = Boolean(
 
                 <p className="mt-1 max-w-2xl text-[11px] leading-5 text-sky-100/50">
                   Witaj, <span className="font-semibold text-white">{userName}</span>. Polecaj FX Trade Education
-                  i zarabiaj <span className="font-semibold text-sky-300">30–40€</span> za każdą sprzedaż.
+                  i zarabiaj <span className="font-semibold text-sky-300">30â€“40â‚¬</span> za kaÅ¼dÄ… sprzedaÅ¼.
                 </p>
               </div>
 
               <div className="grid grid-cols-3 gap-2">
                 {[
-                  ["Kliknięcia", String(clicks)],
-                  ["Sprzedaże", String(sales)],
-                  ["Zarobki", `${totalEarned}€`],
+                  ["KlikniÄ™cia", String(clicks)],
+                  ["SprzedaÅ¼e", String(sales)],
+                  ["Zarobki", `${totalEarned}â‚¬`],
                 ].map(([label, value]) => (
                   <div
                     key={label}
@@ -289,7 +289,7 @@ stripeOnboardingDone = Boolean(
               <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                 <div className="min-w-0 flex-1">
                   <div className="text-[9px] font-semibold uppercase tracking-[.14em] text-sky-100/45">
-                    Twój link partnerski
+                    TwÃ³j link partnerski
                   </div>
 
                   <div className="mt-2 flex min-w-0 items-center rounded-[9px] border border-sky-400/20 bg-[#072f59] px-3 py-3">
@@ -301,7 +301,7 @@ stripeOnboardingDone = Boolean(
                   <CopyAffiliateLinkButton affiliateLink={affiliateLink} />
 
                   <button className="rounded-[9px] border border-sky-400/30 bg-[#0a3b6d] shadow-[0_0_14px_rgba(14,165,233,.10)] px-4 py-2.5 text-[10px] font-semibold text-sky-100 transition hover:bg-[#0d4c87]">
-                    Utwórz kampanię
+                    UtwÃ³rz kampaniÄ™
                   </button>
                 </div>
               </div>
@@ -310,13 +310,13 @@ stripeOnboardingDone = Boolean(
             <div className="rounded-[14px] border border-sky-400/30 bg-[linear-gradient(145deg,#0b477f_0%,#083967_52%,#062d57_100%)] shadow-[0_0_22px_rgba(14,165,233,.13),inset_0_1px_0_rgba(255,255,255,.055)] p-4">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <div className="text-[9px] uppercase tracking-[.12em] text-sky-100/45">Twój poziom</div>
+                  <div className="text-[9px] uppercase tracking-[.12em] text-sky-100/45">TwÃ³j poziom</div>
                   <div className="mt-1 text-[20px] font-bold text-white">STARTER</div>
-                  <div className="mt-1 text-[10px] font-semibold text-sky-300">30€ / sprzedaż</div>
+                  <div className="mt-1 text-[10px] font-semibold text-sky-300">30â‚¬ / sprzedaÅ¼</div>
                 </div>
 
                 <span className="rounded-full border border-sky-400/25 bg-sky-500/10 px-2.5 py-1 text-[8px] font-semibold text-sky-300">
-                  {sales} / 30 sprzedaży
+                  {sales} / 30 sprzedaÅ¼y
                 </span>
               </div>
 
@@ -336,9 +336,9 @@ stripeOnboardingDone = Boolean(
 
               <div className="mt-4 grid grid-cols-3 gap-2">
                 {[
-                  ["STARTER", "30€", true],
-                  ["PRO", "35€", false],
-                  ["ELITE", "40€", false],
+                  ["STARTER", "30â‚¬", true],
+                  ["PRO", "35â‚¬", false],
+                  ["ELITE", "40â‚¬", false],
                 ].map(([label, value, active]) => (
                   <div
                     key={String(label)}
@@ -362,13 +362,13 @@ stripeOnboardingDone = Boolean(
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                   <div className="text-[11px] font-semibold text-amber-200">
-                    Masz aktywny wniosek o wypłatę
+                    Masz aktywny wniosek o wypÅ‚atÄ™
                   </div>
 
                   <div className="mt-1 text-[9px] text-amber-100/60">
                     Kwota: <span className="font-semibold text-white">{formatEuro(activePayout.amount)}</span>
-                    {" "}• Status: <span className="font-semibold text-white">{getPayoutStatusLabel(activePayout.status)}</span>
-                    {" "}• Data: {new Date(activePayout.createdAt).toLocaleDateString("pl-PL")}
+                    {" "}â€¢ Status: <span className="font-semibold text-white">{getPayoutStatusLabel(activePayout.status)}</span>
+                    {" "}â€¢ Data: {new Date(activePayout.createdAt).toLocaleDateString("pl-PL")}
                   </div>
                 </div>
 
@@ -376,7 +376,7 @@ stripeOnboardingDone = Boolean(
                   href="/dashboard/affiliate/payouts"
                   className="inline-flex w-fit rounded-[8px] border border-amber-300/25 bg-amber-300/10 px-3 py-2 text-[9px] font-semibold text-amber-100"
                 >
-                  Przejdź do historii
+                  PrzejdÅº do historii
                 </Link>
               </div>
             </section>
@@ -385,10 +385,10 @@ stripeOnboardingDone = Boolean(
           {/* KPI ROW */}
           <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             {[
-              ["Kliknięcia", String(clicks), "+12.4% vs 30 dni", "↗"],
-              ["Rejestracje", "132", "+8.1% vs 30 dni", "◎"],
-              ["Sprzedaże", String(sales), "+23% trend", "▣"],
-              ["Konwersja", `${conversion}%`, "realny performance", "◔"],
+              ["KlikniÄ™cia", String(clicks), "+12.4% vs 30 dni", "â†—"],
+              ["Rejestracje", "132", "+8.1% vs 30 dni", "â—Ž"],
+              ["SprzedaÅ¼e", String(sales), "+23% trend", "â–£"],
+              ["Konwersja", `${conversion}%`, "realny performance", "â—”"],
             ].map(([label, value, hint, icon]) => (
               <div
                 key={label}
@@ -415,7 +415,7 @@ stripeOnboardingDone = Boolean(
             <div className="rounded-[14px] border border-sky-400/30 bg-[linear-gradient(145deg,#0b477f_0%,#083967_52%,#062d57_100%)] shadow-[0_0_22px_rgba(14,165,233,.13),inset_0_1px_0_rgba(255,255,255,.055)] p-4">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
-                  <h2 className="text-[16px] font-semibold text-white">Ostatnie sprzedaże</h2>
+                  <h2 className="text-[16px] font-semibold text-white">Ostatnie sprzedaÅ¼e</h2>
                   <p className="mt-1 text-[9px] text-sky-100/45">
                     Historia ostatnich prowizji w Affiliate Hub
                   </p>
@@ -442,7 +442,7 @@ stripeOnboardingDone = Boolean(
                     {salesData.length === 0 ? (
                       <tr>
                         <td colSpan={5} className="bg-[#083866] px-3 py-7 text-center text-sky-100/35">
-                          Brak sprzedaży
+                          Brak sprzedaÅ¼y
                         </td>
                       </tr>
                     ) : (
@@ -451,7 +451,7 @@ stripeOnboardingDone = Boolean(
                           key={sale.id}
                           date={new Date(sale.createdAt).toLocaleDateString("pl-PL")}
                           user={sale.buyer}
-                          commission={`${sale.amount}€`}
+                          commission={`${sale.amount}â‚¬`}
                           status={sale.status as "Pending" | "Approved" | "Paid"}
                         />
                       ))
@@ -467,20 +467,20 @@ stripeOnboardingDone = Boolean(
                 <div className="mb-3 flex items-center justify-between">
                   <div>
                     <h3 className="text-[15px] font-semibold text-white">Saldo partnera</h3>
-                    <p className="mt-1 text-[8px] text-sky-100/40">Podsumowanie prowizji i wypłat</p>
+                    <p className="mt-1 text-[8px] text-sky-100/40">Podsumowanie prowizji i wypÅ‚at</p>
                   </div>
                   <div className="flex h-9 w-9 items-center justify-center rounded-[9px] border border-emerald-400/20 bg-emerald-500/10 text-emerald-300">
-                    €
+                    â‚¬
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   {[
-                    ["Dostępne do wypłaty", `${availablePayout}€`, "text-emerald-300"],
-                    ["Oczekujące prowizje", `${pendingCommission}€`, "text-white"],
-                    ["Łączny zarobek", `${totalEarned}€`, "text-emerald-300"],
-                    ["Łącznie wypłacono", `${totalPaid}€`, "text-emerald-300"],
-                    ["Ostatnia wypłata", latestPayout ? formatEuro(latestPayout.amount) : "Brak", "text-white"],
+                    ["DostÄ™pne do wypÅ‚aty", `${availablePayout}â‚¬`, "text-emerald-300"],
+                    ["OczekujÄ…ce prowizje", `${pendingCommission}â‚¬`, "text-white"],
+                    ["ÅÄ…czny zarobek", `${totalEarned}â‚¬`, "text-emerald-300"],
+                    ["ÅÄ…cznie wypÅ‚acono", `${totalPaid}â‚¬`, "text-emerald-300"],
+                    ["Ostatnia wypÅ‚ata", latestPayout ? formatEuro(latestPayout.amount) : "Brak", "text-white"],
                   ].map(([label, value, tone]) => (
                     <div
                       key={label}
@@ -501,7 +501,7 @@ stripeOnboardingDone = Boolean(
                     disabled
                     className="mt-3 w-full rounded-[8px] border border-white/10 bg-slate-500/15 px-3 py-2.5 text-[9px] font-semibold text-sky-100/35"
                   >
-                    Minimalna wypłata 50€
+                    Minimalna wypÅ‚ata 50â‚¬
                   </button>
                 )}
               </div>
@@ -510,8 +510,8 @@ stripeOnboardingDone = Boolean(
               <div className="rounded-[14px] border border-sky-400/30 bg-[linear-gradient(145deg,#0b477f_0%,#083967_52%,#062d57_100%)] shadow-[0_0_22px_rgba(14,165,233,.13),inset_0_1px_0_rgba(255,255,255,.055)] p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-[15px] font-semibold text-white">Ostatnie wypłaty</h3>
-                    <p className="mt-1 text-[8px] text-sky-100/40">Trzy ostatnie requesty payoutów</p>
+                    <h3 className="text-[15px] font-semibold text-white">Ostatnie wypÅ‚aty</h3>
+                    <p className="mt-1 text-[8px] text-sky-100/40">Trzy ostatnie requesty payoutÃ³w</p>
                   </div>
 
                   <Link
@@ -525,7 +525,7 @@ stripeOnboardingDone = Boolean(
                 <div className="mt-3 space-y-2">
                   {recentPayouts.length === 0 ? (
                     <div className="rounded-[9px] border border-dashed border-[#0a417b] bg-[#041b36] p-4 text-[9px] text-sky-100/35">
-                      Nie masz jeszcze historii wypłat.
+                      Nie masz jeszcze historii wypÅ‚at.
                     </div>
                   ) : (
                     recentPayouts.map((payout) => (
@@ -560,7 +560,7 @@ stripeOnboardingDone = Boolean(
               <div className="rounded-[14px] border border-sky-400/30 bg-[linear-gradient(145deg,#0b477f_0%,#083967_52%,#062d57_100%)] shadow-[0_0_22px_rgba(14,165,233,.13),inset_0_1px_0_rgba(255,255,255,.055)] p-4">
                 <h3 className="text-[15px] font-semibold text-white">Szybkie akcje</h3>
                 <p className="mt-1 text-[8px] text-sky-100/40">
-                  Najważniejsze sekcje związane z payoutami i prowizjami.
+                  NajwaÅ¼niejsze sekcje zwiÄ…zane z payoutami i prowizjami.
                 </p>
 
                 <div className="mt-3 rounded-[10px] border border-sky-400/20 bg-[#072f59] p-3">
@@ -568,18 +568,18 @@ stripeOnboardingDone = Boolean(
                     <div>
                       <div className="text-[10px] font-semibold text-white">Stripe Connect</div>
                       <div className="mt-1 max-w-sm text-[8px] leading-4 text-sky-100/40">
-                        Połącz konto payoutów Stripe, aby otrzymywać automatyczne wypłaty affiliate.
+                        PoÅ‚Ä…cz konto payoutÃ³w Stripe, aby otrzymywaÄ‡ automatyczne wypÅ‚aty affiliate.
                       </div>
 
                       <div className="mt-3 space-y-1 text-[8px]">
                         <div className={stripeConnected ? "text-emerald-300" : "text-rose-300"}>
-                          {stripeConnected ? "✓ Stripe connected" : "✕ Stripe not connected"}
+                          {stripeConnected ? "âœ“ Stripe connected" : "âœ• Stripe not connected"}
                         </div>
                         <div className={stripeOnboardingDone ? "text-emerald-300" : "text-amber-300"}>
-                          {stripeOnboardingDone ? "✓ Onboarding completed" : "⚠ Onboarding incomplete"}
+                          {stripeOnboardingDone ? "âœ“ Onboarding completed" : "âš  Onboarding incomplete"}
                         </div>
                         <div className={stripePayoutsEnabled ? "text-emerald-300" : "text-rose-300"}>
-                          {stripePayoutsEnabled ? "✓ Payouts enabled" : "✕ Payouts disabled"}
+                          {stripePayoutsEnabled ? "âœ“ Payouts enabled" : "âœ• Payouts disabled"}
                         </div>
                       </div>
                     </div>
@@ -587,7 +587,7 @@ stripeOnboardingDone = Boolean(
                     <div className="shrink-0">
                       {stripePayoutsEnabled ? (
                         <div className="rounded-[8px] border border-emerald-400/20 bg-emerald-500/10 px-3 py-2 text-[8px] font-semibold text-emerald-300">
-                          Stripe gotowy do wypłat
+                          Stripe gotowy do wypÅ‚at
                         </div>
                       ) : (
                         <ConnectStripeButton />
@@ -601,22 +601,22 @@ stripeOnboardingDone = Boolean(
                     href="/dashboard/affiliate/payouts"
                     className="block rounded-[8px] border border-sky-400/20 bg-[#072f59] px-3 py-2.5 text-[9px] font-semibold text-sky-100/70 hover:bg-[#0a416f]"
                   >
-                    Otwórz historię wypłat
+                    OtwÃ³rz historiÄ™ wypÅ‚at
                   </Link>
 
                   <Link
                     href="/dashboard/affiliate/commissions"
                     className="block rounded-[8px] border border-sky-400/20 bg-[#072f59] px-3 py-2.5 text-[9px] font-semibold text-sky-100/70 hover:bg-[#0a416f]"
                   >
-                    Sprawdź prowizje
+                    SprawdÅº prowizje
                   </Link>
 
                   <div className="rounded-[8px] border border-sky-400/20 bg-sky-500/[0.06] px-3 py-2.5">
-                    <div className="text-[9px] font-semibold text-white">Status payoutów</div>
+                    <div className="text-[9px] font-semibold text-white">Status payoutÃ³w</div>
                     <div className="mt-1 text-[8px] text-sky-100/45">
                       {activePayout
                         ? `Masz aktywny request: ${getPayoutStatusLabel(activePayout.status)}`
-                        : "Nie masz aktywnego requestu wypłaty"}
+                        : "Nie masz aktywnego requestu wypÅ‚aty"}
                     </div>
                   </div>
                 </div>

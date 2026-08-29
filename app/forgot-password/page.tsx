@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -42,17 +42,17 @@ export default function ForgotPasswordPage() {
       const data = (await res.json()) as ForgotPasswordResponse;
 
       if (!res.ok) {
-        setError(data.error || "Nie udało się wysłać linku resetującego.");
+        setError(data.error || "Nie udaÅ‚o siÄ™ wysÅ‚aÄ‡ linku resetujÄ…cego.");
         return;
       }
 
       setSent(true);
       setMessage(
         data.message ||
-          "Jeżeli konto z tym adresem istnieje, wysłaliśmy link do resetowania hasła."
+          "JeÅ¼eli konto z tym adresem istnieje, wysÅ‚aliÅ›my link do resetowania hasÅ‚a."
       );
     } catch {
-      setError("Problem z połączeniem z serwerem.");
+      setError("Problem z poÅ‚Ä…czeniem z serwerem.");
     } finally {
       setLoading(false);
     }
@@ -87,12 +87,12 @@ export default function ForgotPasswordPage() {
             </div>
 
             <h1 className="mt-5 text-3xl font-black tracking-tight">
-              Reset hasła
+              Reset hasÅ‚a
             </h1>
 
             <p className="mx-auto mt-3 max-w-[520px] text-sm leading-6 text-slate-400">
-              Podaj adres email przypisany do konta. Wyślemy Ci bezpieczny link
-              do ustawienia nowego hasła.
+              Podaj adres email przypisany do konta. WyÅ›lemy Ci bezpieczny link
+              do ustawienia nowego hasÅ‚a.
             </p>
           </div>
 
@@ -130,7 +130,7 @@ export default function ForgotPasswordPage() {
                 className="flex w-full items-center justify-center gap-3 rounded-2xl border border-cyan-300/25 bg-[linear-gradient(90deg,#0ea5e9,#2563eb_55%,#1d4ed8)] py-4 text-[16px] font-bold text-white shadow-[0_10px_35px_rgba(37,99,235,.30)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Send className="h-5 w-5" />
-                {loading ? "Wysyłanie..." : "Wyślij link resetujący"}
+                {loading ? "WysyÅ‚anie..." : "WyÅ›lij link resetujÄ…cy"}
               </button>
             </form>
           ) : (
@@ -142,13 +142,13 @@ export default function ForgotPasswordPage() {
 
                 <div>
                   <div className="font-bold text-emerald-300">
-                    Sprawdź swoją skrzynkę
+                    SprawdÅº swojÄ… skrzynkÄ™
                   </div>
                   <p className="mt-2 text-sm leading-6 text-slate-300">
                     {message}
                   </p>
                   <p className="mt-2 text-xs text-slate-500">
-                    Link resetujący jest ważny przez 30 minut.
+                    Link resetujÄ…cy jest waÅ¼ny przez 30 minut.
                   </p>
                 </div>
               </div>
@@ -162,10 +162,10 @@ export default function ForgotPasswordPage() {
 
             <div>
               <div className="text-sm font-medium text-slate-200">
-                Bezpieczny reset hasła
+                Bezpieczny reset hasÅ‚a
               </div>
               <div className="mt-1 text-sm leading-5 text-slate-400">
-                Dla bezpieczeństwa nie informujemy, czy podany adres email
+                Dla bezpieczeÅ„stwa nie informujemy, czy podany adres email
                 istnieje w systemie.
               </div>
             </div>
@@ -177,7 +177,7 @@ export default function ForgotPasswordPage() {
               className="inline-flex min-w-[220px] items-center justify-center gap-2 rounded-2xl border border-blue-500/40 bg-[#06172f]/70 px-6 py-3.5 text-[15px] font-semibold text-sky-300 transition hover:border-sky-400/70 hover:bg-[#0a2344] hover:text-sky-200"
             >
               <ArrowLeft className="h-5 w-5" />
-              Wróć do logowania
+              WrÃ³Ä‡ do logowania
             </Link>
           </div>
         </div>
@@ -185,3 +185,4 @@ export default function ForgotPasswordPage() {
     </main>
   );
 }
+
