@@ -1,0 +1,126 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  role      String   @default("user")
+
+  isPremium Boolean @default(false)
+
+  isBanned Boolean   @default(false)
+  bannedAt DateTime?
+
+  premiumSince DateTime?
+  premiumUntil DateTime?
+
+  cancelAtPeriodEnd Boolean @default(false)
+
+  theme    String?
+  language String?
+
+  tokenVersion Int @default(0)
+
+  referredByUserId String?
+
+  stripeCustomerId     String? @unique
+  stripeSubscriptionId String? @unique
+
+  stripeAccountId      String?
+  stripeOnboardingDone Boolean @default(false)
+  payoutsEnabled       Boolean @default(false)
+
+  password String?
+
+  affiliateSales AffiliateSale[]
+  affiliateStat  AffiliateStat?
+  dashboardStat  DashboardStat?
+  payoutRequests PayoutRequest[]
+
+  passwordResetTokens PasswordResetToken[]
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  userId    String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model AffiliateSale {
+  id              String   @id @default(cuid())
+  userId          String
+  buyer           String
+  amount          Float
+  status          String
+  createdAt       DateTime @default(now())
+  stripeSessionId String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AffiliateStat {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  availablePayout   Float    @default(0)
+  pendingCommission Float    @default(0)
+  totalEarned       Float    @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PayoutRequest {
+  id               String    @id @default(cuid())
+  userId           String
+  amount           Float
+  status           String
+  createdAt        DateTime  @default(now())
+  approvedAt       DateTime?
+  paidAt           DateTime?
+  rejectedAt       DateTime?
+  stripeTransferId String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model DashboardStat {
+  id     String @id @default(cuid())
+  userId String @unique
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  totalRevenue Float @default(0)
+  clicks       Int   @default(0)
+  sales        Int   @default(0)
+  conversion   Float @default(0)
+  monthlyPnl   Float @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  type      String
+  message   String
+  userId    String?
+  createdAt DateTime @default(now())
+}

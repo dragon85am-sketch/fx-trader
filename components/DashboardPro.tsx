@@ -76,13 +76,15 @@ export default function DashboardPro() {
     "overview" | "setupy" | "bledy" | "sesje" | "journal"
   >("overview");
 
+  const [journalTab, setJournalTab] = useState<
+    "overview" | "all" | "stats" | "mistakes" | "sessions"
+  >("overview");
+
   const [trades, _setTrades] = useState<Trade[]>(() => getTrades());
 
-  // ✅ FIX: trzymaj onboarding w state, żeby UI zawsze się odświeżał
   const [onboarding, setOnboardingState] = useState(() => getOnboarding());
   const isOnboarding = !onboarding.completed;
 
-  // filters (disabled during onboarding)
   const [fMarket, setFMarket] = useState("ALL");
   const [fTf, setFTf] = useState("ALL");
   const [fSetup, setFSetup] = useState("ALL");
@@ -97,7 +99,8 @@ export default function DashboardPro() {
   }, [trades]);
 
   const filtered = useMemo(() => {
-    if (isOnboarding) return trades; // onboarding ignores filters
+    if (isOnboarding) return trades;
+
     return trades.filter(
       (t) =>
         (fMarket === "ALL" || t.market === fMarket) &&
@@ -117,10 +120,14 @@ export default function DashboardPro() {
     let cum = 0;
     const curve = base
       .slice()
-      .sort((a, b) => a.date.localeCompare(b.date))
+      .sort((a, b) => (a.date ?? "").localeCompare(b.date ?? ""))
       .map((t) => {
-        cum += t.resultR;
-        return { name: t.date.slice(5), equityR: Number(cum.toFixed(2)) };
+        cum += t.resultR ?? 0;
+
+        return {
+          name: t.date?.slice(5) ?? "brak daty",
+          equityR: Number(cum.toFixed(2)),
+        };
       });
 
     let peak = -Infinity;
@@ -130,19 +137,19 @@ export default function DashboardPro() {
       maxDD = Math.min(maxDD, p.equityR - peak);
     }
 
-    // expectancy
     const avgWin = wins
       ? base.filter((t) => t.resultR > 0).reduce((a, t) => a + t.resultR, 0) /
         wins
       : 0;
+
     const losses = n - wins;
     const avgLoss = losses
       ? base.filter((t) => t.resultR <= 0).reduce((a, t) => a + t.resultR, 0) /
         losses
       : 0;
+
     const expectancy = n ? (wins / n) * avgWin + (losses / n) * avgLoss : 0;
 
-    // per setup
     const setupMap = new Map<string, { n: number; wins: number; sumR: number }>();
     for (const t of base) {
       const k = t.setup || "(brak)";
@@ -152,6 +159,7 @@ export default function DashboardPro() {
       v.sumR += t.resultR;
       setupMap.set(k, v);
     }
+
     const perSetup = Array.from(setupMap.entries())
       .map(([setup, v]) => ({
         setup,
@@ -161,7 +169,6 @@ export default function DashboardPro() {
       }))
       .sort((a, b) => b.avgR - a.avgR);
 
-    // per mistake
     const mistakeMap = new Map<string, { n: number; losses: number }>();
     for (const t of base) {
       const k = t.mistake || "Brak";
@@ -170,6 +177,7 @@ export default function DashboardPro() {
       v.losses += t.resultR <= 0 ? 1 : 0;
       mistakeMap.set(k, v);
     }
+
     const perMistake = Array.from(mistakeMap.entries())
       .map(([mistake, v]) => ({
         mistake,
@@ -178,7 +186,6 @@ export default function DashboardPro() {
       }))
       .sort((a, b) => b.lossRate - a.lossRate);
 
-    // per session
     const sessMap = new Map<string, { n: number; sumR: number }>();
     for (const t of base) {
       const k = t.session || "Brak";
@@ -187,6 +194,7 @@ export default function DashboardPro() {
       v.sumR += t.resultR;
       sessMap.set(k, v);
     }
+
     const perSession = Array.from(sessMap.entries())
       .map(([session, v]) => ({
         session,
@@ -195,14 +203,14 @@ export default function DashboardPro() {
       }))
       .sort((a, b) => b.avgR - a.avgR);
 
-    // onboarding insights (top 3 mistakes by losses)
     const lossCount = new Map<string, number>();
-    for (const t of base)
-      if (t.resultR < 0)
-        lossCount.set(
-          t.mistake || "Brak",
-          (lossCount.get(t.mistake || "Brak") || 0) + 1
-        );
+    for (const t of base) {
+      if (t.resultR < 0) {
+        const key = t.mistake || "Brak";
+        lossCount.set(key, (lossCount.get(key) || 0) + 1);
+      }
+    }
+
     const topMistakes = Array.from(lossCount.entries())
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3);
@@ -227,7 +235,6 @@ export default function DashboardPro() {
     setTrades(next);
   }
 
-  // CSV
   function exportCSV() {
     const header = "date,market,tf,side,setup,resultR,mistake,session,notes";
     const rows = filtered.map((t) =>
@@ -245,6 +252,7 @@ export default function DashboardPro() {
         .map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`)
         .join(",")
     );
+
     const blob = new Blob([[header, ...rows].join("\n")], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -256,17 +264,21 @@ export default function DashboardPro() {
 
   function importCSV(file: File) {
     const reader = new FileReader();
+
     reader.onload = () => {
       const text = String(reader.result || "");
       const lines = text.split(/\r?\n/).filter(Boolean);
       const dataLines = lines.slice(1);
+
       const imported: Trade[] = dataLines
         .map((l) => {
           const cols = l
-            .split(/,(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)/)
+            .split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/)
             .map((v) => v.replace(/^"|"$/g, ""));
+
           const [date, market, tf, side, setup, resultR, mistake, session, notes] =
             cols;
+
           return {
             id: crypto.randomUUID(),
             date,
@@ -284,14 +296,12 @@ export default function DashboardPro() {
 
       const nextTrades = [...imported, ...trades];
       updateTrades(nextTrades);
-
-      // ✅ odśwież onboarding state po imporcie (na wypadek)
       setOnboardingState(getOnboarding());
     };
+
     reader.readAsText(file);
   }
 
-  // Journal form
   const today = new Date().toISOString().slice(0, 10);
   const [date, setDate] = useState(today);
   const [market, setMarket] = useState("BTCUSDT");
@@ -303,7 +313,6 @@ export default function DashboardPro() {
   const [session, setSession] = useState("NY");
   const [notes, setNotes] = useState("");
 
-  // ✅ FIX: completed ustawiane na true po 10 trade + licznik liczony po trades.length
   function addTrade() {
     const r = Number(resultR);
     if (!Number.isFinite(r)) return;
@@ -335,14 +344,18 @@ export default function DashboardPro() {
       completed: done,
     });
 
-    // ✅ odśwież UI
     setOnboardingState(getOnboarding());
-
     setNotes("");
     setResultR("1");
   }
 
-  const TabsButton = ({ id, label }: { id: typeof tab; label: string }) => (
+  const TabsButton = ({
+    id,
+    label,
+  }: {
+    id: "overview" | "setupy" | "bledy" | "sesje" | "journal";
+    label: string;
+  }) => (
     <button
       className={cn(
         "rounded-xl px-3 py-2 text-sm font-semibold border border-zinc-800",
@@ -362,8 +375,28 @@ export default function DashboardPro() {
     </button>
   );
 
+  const JournalTabButton = ({
+    id,
+    label,
+  }: {
+    id: "overview" | "all" | "stats" | "mistakes" | "sessions";
+    label: string;
+  }) => (
+    <button
+      className={cn(
+        "rounded-xl px-3 py-2 text-sm font-semibold border border-zinc-800",
+        journalTab === id
+          ? "bg-zinc-100 text-zinc-950"
+          : "bg-zinc-950 text-zinc-200 hover:bg-zinc-900"
+      )}
+      onClick={() => setJournalTab(id)}
+    >
+      {label}
+    </button>
+  );
+
   return (
-    <div className="space-y-6">
+    <div className="w-full min-w-0 max-w-none space-y-6">
       <div className="flex flex-wrap gap-2 items-center justify-between">
         <div className="flex flex-wrap gap-2">
           <TabsButton id="overview" label="Overview" />
@@ -399,7 +432,6 @@ export default function DashboardPro() {
         </div>
       </div>
 
-      {/* Filters */}
       <Card className={cn(isOnboarding ? "opacity-60" : "")}>
         <CardContent className="p-4">
           <div className="flex flex-wrap gap-3 items-end">
@@ -490,8 +522,8 @@ export default function DashboardPro() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <Card className="lg:col-span-2">
-              <CardContent>
+            <Card className="lg:col-span-2 min-w-0">
+              <CardContent className="p-6">
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
                   <h3 className="text-lg font-semibold">Equity curve (R)</h3>
                   <p className="text-sm text-zinc-400">
@@ -509,8 +541,8 @@ export default function DashboardPro() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardContent>
+            <Card className="min-w-0">
+              <CardContent className="p-6">
                 <h3 className="text-lg font-semibold mb-2">Szybkie wnioski</h3>
                 {isOnboarding ? (
                   <>
@@ -521,8 +553,7 @@ export default function DashboardPro() {
                     <div className="mt-4 space-y-2">
                       {(stats.topMistakes.length
                         ? stats.topMistakes
-                        : [["—", 0]] as any
-                      ).map(([m, c]: any) => (
+                        : ([["—", 0]] as [string, number][])).map(([m, c]) => (
                         <div
                           key={m}
                           className="flex items-center justify-between text-sm"
@@ -563,7 +594,7 @@ export default function DashboardPro() {
 
       {tab === "setupy" && !isOnboarding && (
         <Card>
-          <CardContent>
+          <CardContent className="p-6">
             <h3 className="text-lg font-semibold mb-4">Statystyki per setup</h3>
             <Table
               headers={["Setup", "Trade", "Win%", "Avg R"]}
@@ -583,8 +614,10 @@ export default function DashboardPro() {
 
       {tab === "bledy" && !isOnboarding && (
         <Card>
-          <CardContent>
-            <h3 className="text-lg font-semibold mb-4">Błędy (dlaczego tracisz)</h3>
+          <CardContent className="p-6">
+            <h3 className="text-lg font-semibold mb-4">
+              Błędy (dlaczego tracisz)
+            </h3>
             <Table
               headers={["Błąd", "Trade", "Loss%"]}
               rows={stats.perMistake.map((m) => [
@@ -602,8 +635,10 @@ export default function DashboardPro() {
 
       {tab === "sesje" && !isOnboarding && (
         <Card>
-          <CardContent>
-            <h3 className="text-lg font-semibold mb-4">Sesje (gdzie masz edge)</h3>
+          <CardContent className="p-6">
+            <h3 className="text-lg font-semibold mb-4">
+              Sesje (gdzie masz edge)
+            </h3>
             <Table
               headers={["Sesja", "Trade", "Avg R"]}
               rows={stats.perSession.map((s) => [
@@ -613,241 +648,364 @@ export default function DashboardPro() {
               ])}
             />
             <p className="text-xs text-zinc-500 mt-3">
-              Jeśli jedna sesja ma wyraźnie lepszy Avg R, ogranicz trading poza nią.
+              Jeśli jedna sesja ma wyraźnie lepszy Avg R, ogranicz trading poza
+              nią.
             </p>
           </CardContent>
         </Card>
       )}
 
       {tab === "journal" && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Card className="lg:col-span-1">
-            <CardContent className="p-6">
-              <h3 className="text-lg font-semibold mb-4">Dodaj trade</h3>
+        <div className="space-y-6">
+          <div className="flex flex-wrap gap-2">
+            <JournalTabButton id="overview" label="Przegląd" />
+            <JournalTabButton id="all" label="Wszystkie trade" />
+            <JournalTabButton id="stats" label="Statystyki" />
+            <JournalTabButton id="mistakes" label="Błędy" />
+            <JournalTabButton id="sessions" label="Sesje" />
+          </div>
 
-              <div className="space-y-3">
-                <div>
-                  <Label>Data</Label>
-                  <Input
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    placeholder="YYYY-MM-DD"
-                  />
-                </div>
+          {journalTab === "overview" && (
+            <div className="grid grid-cols-1 xl:grid-cols-[420px_minmax(0,1fr)] gap-6">
+              <Card className="min-w-0">
+                <CardContent className="p-6">
+                  <h3 className="text-lg font-semibold mb-4">Dodaj trade</h3>
 
-                <div>
-                  <Label>Rynek</Label>
-                  <select
-                    value={market}
-                    onChange={(e) => setMarket(e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm"
-                  >
-                    {["BTCUSDT", "ETHUSDT", "XAUUSD", "EURUSD"].map((m) => (
-                      <option key={m} value={m}>
-                        {m}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label>TF</Label>
-                    <select
-                      value={tf}
-                      onChange={(e) => setTf(e.target.value)}
-                      className="mt-1 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm"
-                    >
-                      {["M1", "M5", "M15"].map((x) => (
-                        <option key={x} value={x}>
-                          {x}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <Label>Strona</Label>
-                    <select
-                      value={side}
-                      onChange={(e) => setSide(e.target.value as TradeSide)}
-                      className="mt-1 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm"
-                    >
-                      {["LONG", "SHORT"].map((x) => (
-                        <option key={x} value={x}>
-                          {x}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <Label>Setup</Label>
-                  <Input value={setup} onChange={(e) => setSetup(e.target.value)} />
-                </div>
-
-                <div>
-                  <Label>Wynik (R)</Label>
-                  <Input
-                    value={resultR}
-                    onChange={(e) => setResultR(e.target.value)}
-                    inputMode="decimal"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label>Błąd</Label>
-                    <select
-                      value={mistake}
-                      onChange={(e) => setMistake(e.target.value)}
-                      className="mt-1 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm"
-                    >
-                      {[
-                        "Brak",
-                        "FOMO",
-                        "Brak filtra M5",
-                        "Brak potwierdzenia",
-                        "Zły SL",
-                        "Revenge trade",
-                      ].map((x) => (
-                        <option key={x} value={x}>
-                          {x}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <Label>Sesja</Label>
-                    <select
-                      value={session}
-                      onChange={(e) => setSession(e.target.value)}
-                      className="mt-1 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm"
-                    >
-                      {["London", "NY", "Asia", "Brak"].map((x) => (
-                        <option key={x} value={x}>
-                          {x}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <Label>Notatki</Label>
-                  <Input
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="co było dobrze/źle"
-                  />
-                </div>
-
-                <Button onClick={addTrade} className="w-full">
-                  Dodaj trade
-                </Button>
-
-                {isOnboarding && (
-                  <div className="text-xs text-zinc-500">
-                    Po każdym trade: odpowiedz sobie, czy był zgodny z zasadami. Po
-                    10 trade odblokujesz PRO.
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="lg:col-span-2">
-            <CardContent>
-              <h3 className="text-lg font-semibold mb-4">Ostatnie trade</h3>
-
-              <div className="overflow-auto rounded-2xl border border-zinc-800">
-                <table className="min-w-full text-sm">
-                  <thead className="bg-zinc-950">
-                    <tr>
-                      {["Data", "Rynek", "TF", "Strona", "Setup", "Błąd", "Sesja", "Wynik"].map(
-                        (h) => (
-                          <th
-                            key={h}
-                            className="px-4 py-3 text-left font-semibold text-zinc-300 whitespace-nowrap"
-                          >
-                            {h}
-                          </th>
-                        )
-                      )}
-                      <th className="px-4 py-3" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {trades.map((t) => (
-                      <tr key={t.id} className="border-t border-zinc-800">
-                        <td className="px-4 py-3 whitespace-nowrap">{t.date}</td>
-                        <td className="px-4 py-3 whitespace-nowrap">{t.market}</td>
-                        <td className="px-4 py-3 whitespace-nowrap">{t.tf}</td>
-                        <td className="px-4 py-3 whitespace-nowrap">{t.side}</td>
-                        <td className="px-4 py-3 whitespace-nowrap">{t.setup}</td>
-                        <td className="px-4 py-3 whitespace-nowrap">{t.mistake}</td>
-                        <td className="px-4 py-3 whitespace-nowrap">{t.session}</td>
-                        <td className="px-4 py-3 whitespace-nowrap font-semibold">
-                          {t.resultR > 0
-                            ? `+${t.resultR.toFixed(2)}R`
-                            : `${t.resultR.toFixed(2)}R`}
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <Button
-                            variant="outline"
-                            onClick={() => updateTrades(trades.filter((x) => x.id !== t.id))}
-                          >
-                            Usuń
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* ✅ FIX: opieramy warunek o state onboarding */}
-              {isOnboarding && (onboarding.tradesCount ?? 0) >= 10 && (
-                <div className="mt-4 rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
-                  <h4 className="font-semibold mb-2">Onboarding: mini-analiza</h4>
-                  <p className="text-sm text-zinc-400">
-                    To nie są Twoje wyniki końcowe. To pierwsza próbka, która pokazuje proces.
-                  </p>
-
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Pill>Win rate: {stats.winRate.toFixed(0)}%</Pill>
-                    <Pill>Avg R: {stats.avgR.toFixed(2)}R</Pill>
-                    <Pill>Max DD: {stats.maxDD.toFixed(2)}R</Pill>
-                  </div>
-
-                  <div className="mt-3">
-                    <p className="text-sm text-zinc-300 font-semibold">TOP błędy (z strat):</p>
-                    <div className="mt-2 space-y-1 text-sm text-zinc-300">
-                      {(stats.topMistakes.length ? stats.topMistakes : [["Brak", 0]] as any).map(
-                        ([m, c]: any) => (
-                          <div key={m} className="flex justify-between">
-                            <span>{m}</span>
-                            <span className="text-zinc-500">{c}</span>
-                          </div>
-                        )
-                      )}
+                  <div className="space-y-3">
+                    <div>
+                      <Label>Data</Label>
+                      <Input
+                        value={date}
+                        onChange={(e) => setDate(e.target.value)}
+                        placeholder="YYYY-MM-DD"
+                      />
                     </div>
+
+                    <div>
+                      <Label>Rynek</Label>
+                      <select
+                        value={market}
+                        onChange={(e) => setMarket(e.target.value)}
+                        className="mt-1 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm"
+                      >
+                        {["BTCUSDT", "ETHUSDT", "XAUUSD", "EURUSD"].map((m) => (
+                          <option key={m} value={m}>
+                            {m}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label>TF</Label>
+                        <select
+                          value={tf}
+                          onChange={(e) => setTf(e.target.value)}
+                          className="mt-1 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm"
+                        >
+                          {["M1", "M5", "M15"].map((x) => (
+                            <option key={x} value={x}>
+                              {x}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <Label>Strona</Label>
+                        <select
+                          value={side}
+                          onChange={(e) => setSide(e.target.value as TradeSide)}
+                          className="mt-1 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm"
+                        >
+                          {["LONG", "SHORT"].map((x) => (
+                            <option key={x} value={x}>
+                              {x}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label>Setup</Label>
+                      <Input
+                        value={setup}
+                        onChange={(e) => setSetup(e.target.value)}
+                      />
+                    </div>
+
+                    <div>
+                      <Label>Wynik (R)</Label>
+                      <Input
+                        value={resultR}
+                        onChange={(e) => setResultR(e.target.value)}
+                        inputMode="decimal"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label>Błąd</Label>
+                        <select
+                          value={mistake}
+                          onChange={(e) => setMistake(e.target.value)}
+                          className="mt-1 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm"
+                        >
+                          {[
+                            "Brak",
+                            "FOMO",
+                            "Brak filtra M5",
+                            "Brak potwierdzenia",
+                            "Zły SL",
+                            "Revenge trade",
+                          ].map((x) => (
+                            <option key={x} value={x}>
+                              {x}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <Label>Sesja</Label>
+                        <select
+                          value={session}
+                          onChange={(e) => setSession(e.target.value)}
+                          className="mt-1 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm"
+                        >
+                          {["London", "NY", "Asia", "Brak"].map((x) => (
+                            <option key={x} value={x}>
+                              {x}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label>Notatki</Label>
+                      <Input
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        placeholder="co było dobrze/źle"
+                      />
+                    </div>
+
+                    <Button onClick={addTrade} className="w-full">
+                      Dodaj trade
+                    </Button>
+
+                    {isOnboarding && (
+                      <div className="text-xs text-zinc-500">
+                        Po każdym trade: odpowiedz sobie, czy był zgodny z
+                        zasadami. Po 10 trade odblokujesz PRO.
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="min-w-0">
+                <CardContent className="p-6">
+                  <h3 className="text-lg font-semibold mb-4">Ostatnie trade</h3>
+
+                  <div className="overflow-auto rounded-2xl border border-zinc-800">
+                    <table className="min-w-full text-sm">
+                      <thead className="bg-zinc-950">
+                        <tr>
+                          {[
+                            "Data",
+                            "Rynek",
+                            "TF",
+                            "Strona",
+                            "Setup",
+                            "Błąd",
+                            "Sesja",
+                            "Wynik",
+                          ].map((h) => (
+                            <th
+                              key={h}
+                              className="px-4 py-3 text-left font-semibold text-zinc-300 whitespace-nowrap"
+                            >
+                              {h}
+                            </th>
+                          ))}
+                          <th className="px-4 py-3" />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {trades.map((t) => (
+                          <tr key={t.id} className="border-t border-zinc-800">
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              {t.date}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              {t.market}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              {t.tf}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              {t.side}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              {t.setup}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              {t.mistake}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              {t.session}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap font-semibold">
+                              {t.resultR > 0
+                                ? `+${t.resultR.toFixed(2)}R`
+                                : `${t.resultR.toFixed(2)}R`}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <Button
+                                variant="outline"
+                                onClick={() =>
+                                  updateTrades(
+                                    trades.filter((x) => x.id !== t.id)
+                                  )
+                                }
+                              >
+                                Usuń
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
 
-                  <div className="mt-4 flex gap-2">
-                    <Button
-                      onClick={() => {
-                        setOnboarding({ ...getOnboarding(), completed: true, step: 999 });
-                        setOnboardingState(getOnboarding());
-                      }}
-                    >
-                      Odblokuj pełną wersję
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                  {isOnboarding && (onboarding.tradesCount ?? 0) >= 10 && (
+                    <div className="mt-4 rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
+                      <h4 className="font-semibold mb-2">
+                        Onboarding: mini-analiza
+                      </h4>
+                      <p className="text-sm text-zinc-400">
+                        To nie są Twoje wyniki końcowe. To pierwsza próbka,
+                        która pokazuje proces.
+                      </p>
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Pill>Win rate: {stats.winRate.toFixed(0)}%</Pill>
+                        <Pill>Avg R: {stats.avgR.toFixed(2)}R</Pill>
+                        <Pill>Max DD: {stats.maxDD.toFixed(2)}R</Pill>
+                      </div>
+
+                      <div className="mt-3">
+                        <p className="text-sm text-zinc-300 font-semibold">
+                          TOP błędy (z strat):
+                        </p>
+                        <div className="mt-2 space-y-1 text-sm text-zinc-300">
+                          {(stats.topMistakes.length
+                            ? stats.topMistakes
+                            : ([["Brak", 0]] as [string, number][])).map(
+                            ([m, c]) => (
+                              <div key={m} className="flex justify-between">
+                                <span>{m}</span>
+                                <span className="text-zinc-500">{c}</span>
+                              </div>
+                            )
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="mt-4 flex gap-2">
+                        <Button
+                          onClick={() => {
+                            setOnboarding({
+                              ...getOnboarding(),
+                              completed: true,
+                              step: 999,
+                            });
+                            setOnboardingState(getOnboarding());
+                          }}
+                        >
+                          Odblokuj pełną wersję
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {journalTab === "all" && (
+            <Card>
+              <CardContent className="p-6">
+                <h3 className="text-lg font-semibold mb-4">Wszystkie trade</h3>
+                <Table
+                  headers={[
+                    "Data",
+                    "Rynek",
+                    "TF",
+                    "Strona",
+                    "Setup",
+                    "Błąd",
+                    "Sesja",
+                    "Wynik",
+                  ]}
+                  rows={trades.map((t) => [
+                    t.date,
+                    t.market,
+                    t.tf,
+                    t.side,
+                    t.setup,
+                    t.mistake,
+                    t.session,
+                    t.resultR > 0
+                      ? `+${t.resultR.toFixed(2)}R`
+                      : `${t.resultR.toFixed(2)}R`,
+                  ])}
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {journalTab === "stats" && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <Metric title="Win rate" value={`${stats.winRate.toFixed(0)}%`} />
+              <Metric title="Średni wynik" value={`${stats.avgR.toFixed(2)}R`} />
+              <Metric title="Expectancy" value={`${stats.expectancy.toFixed(2)}R`} />
+            </div>
+          )}
+
+          {journalTab === "mistakes" && (
+            <Card>
+              <CardContent className="p-6">
+                <h3 className="text-lg font-semibold mb-4">Błędy</h3>
+                <Table
+                  headers={["Błąd", "Trade", "Loss%"]}
+                  rows={stats.perMistake.map((m) => [
+                    m.mistake,
+                    String(m.trades),
+                    `${m.lossRate.toFixed(0)}%`,
+                  ])}
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {journalTab === "sessions" && (
+            <Card>
+              <CardContent className="p-6">
+                <h3 className="text-lg font-semibold mb-4">Sesje</h3>
+                <Table
+                  headers={["Sesja", "Trade", "Avg R"]}
+                  rows={stats.perSession.map((s) => [
+                    s.session,
+                    String(s.trades),
+                    `${s.avgR.toFixed(2)}R`,
+                  ])}
+                />
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
     </div>

@@ -1,15 +1,788 @@
 @tailwind base;
+
 @tailwind components;
+
 @tailwind utilities;
 
-/* poprawne dla dark UI */
+/* =========================
+   FX TRADE BLUE PREMIUM THEME
+========================= */
+
 :root {
-  color-scheme: dark;
+  --bg: #0b4f87;
+  --text: #eaf6ff;
+
+  --primary: #159cff;
+  --primary-light: #3fc7ff;
+  --primary-dark: #0056d6;
+
+  --primary-gradient: linear-gradient(
+    135deg,
+    #0b73ff 0%,
+    #159cff 45%,
+    #35c8ff 100%
+  );
+
+  --primary-gradient-soft: linear-gradient(
+    135deg,
+    rgba(11, 115, 255, 0.95),
+    rgba(21, 156, 255, 0.85),
+    rgba(53, 200, 255, 0.75)
+  );
+
+  --sidebar: #0a3f72;
+  --panel: rgba(14, 78, 137, 0.94);
+  --panel-light: rgba(18, 100, 170, 0.9);
+  --card: rgba(16, 88, 150, 0.9);
+
+  --line-soft: rgba(87, 175, 255, 0.22);
+  --line-blue: rgba(53, 200, 255, 0.5);
+
+  --green: #16c784;
+  --red: #ef4444;
+  --yellow: #facc15;
 }
 
-/* twardy fallback – zawsze czytelne */
+/* =========================
+   BASE
+========================= */
+
 html,
 body {
-  background-color: #020617; /* slate-950 */
-  color: #e4e4e7; /* zinc-200 */
+  min-height: 100%;
+}
+
+html {
+  background: #0b4f87;
+}
+
+body {
+  background:
+    radial-gradient(circle at 50% -8%, rgba(79, 209, 255, 0.28), transparent 38%),
+    radial-gradient(circle at 8% 45%, rgba(0, 145, 255, 0.22), transparent 44%),
+    radial-gradient(circle at 92% 70%, rgba(0, 190, 255, 0.18), transparent 46%),
+    linear-gradient(
+      180deg,
+      #1269ac 0%,
+      #0e5b9b 25%,
+      #0b4f87 55%,
+      #094679 78%,
+      #083d6b 100%
+    );
+  background-attachment: fixed;
+  color: var(--text);
+  overflow-x: hidden;
+  font-feature-settings: "rlig" 1, "calt" 1;
+}
+
+/* =========================
+   GLOBAL BACKGROUND
+========================= */
+
+.fx-animated-bg {
+  position: relative;
+  isolation: isolate;
+}
+
+.fx-animated-bg::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+
+  background:
+    radial-gradient(900px 560px at 50% 0%, rgba(53, 200, 255, 0.34), transparent 60%),
+    radial-gradient(720px 450px at 10% 76%, rgba(53, 200, 255, 0.18), transparent 65%),
+    radial-gradient(780px 480px at 90% 72%, rgba(11, 115, 255, 0.2), transparent 65%);
+
+  filter: blur(18px);
+  opacity: 0.95;
+  animation: fxGlowMove 18s ease-in-out infinite;
+}
+
+.fx-animated-bg::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+
+  background:
+    linear-gradient(to right, rgba(255,255,255,0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,0.035) 1px, transparent 1px);
+
+  background-size: 72px 72px;
+  opacity: 0.16;
+  mask-image: radial-gradient(circle at center, black 40%, transparent 100%);
+}
+
+@keyframes fxGlowMove {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  50% {
+    transform: translate3d(0, 22px, 0) scale(1.025);
+  }
+
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+/* =========================
+   PAGE SHELL
+========================= */
+
+.fx-page-shell {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(53, 200, 255, 0.15), transparent 34%),
+    linear-gradient(
+      180deg,
+      rgba(18, 105, 172, 0.3),
+      rgba(11, 79, 135, 0.28)
+    );
+}
+
+/* =========================
+   CARDS / PANELS
+========================= */
+
+.fx-card {
+  background: linear-gradient(
+    180deg,
+    rgba(20, 104, 174, 0.94),
+    rgba(10, 68, 121, 0.96)
+  );
+
+  border: 1px solid rgba(94, 216, 255, 0.3);
+  border-radius: 22px;
+
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+
+  box-shadow:
+    0 12px 40px rgba(0, 28, 68, 0.28),
+    inset 0 1px 0 rgba(255,255,255,0.08),
+    0 0 22px rgba(21,156,255,0.14);
+}
+
+.fx-card-hover:hover {
+  border-color: rgba(94, 216, 255, 0.5);
+
+  box-shadow:
+    0 16px 48px rgba(0, 24, 60, 0.32),
+    0 0 34px rgba(21,156,255,0.26),
+    inset 0 1px 0 rgba(255,255,255,0.1);
+
+  transform: translateY(-1px);
+}
+
+.fx-glass {
+  background: rgba(16, 88, 150, 0.78);
+  border: 1px solid rgba(94, 216, 255, 0.24);
+
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.fx-border {
+  border: 1px solid rgba(94, 216, 255, 0.3);
+}
+
+.fx-glow {
+  border: 1px solid rgba(94, 216, 255, 0.46);
+
+  box-shadow:
+    0 0 16px rgba(21,156,255,0.26),
+    0 0 36px rgba(53,200,255,0.16),
+    inset 0 0 18px rgba(53,200,255,0.07);
+}
+
+/* =========================
+   HEADER / TOP BAR
+========================= */
+
+.fx-header {
+  background: var(--primary-gradient);
+  border-bottom: 1px solid rgba(255,255,255,0.14);
+
+  box-shadow:
+    0 8px 35px rgba(21,156,255,0.3),
+    inset 0 1px 0 rgba(255,255,255,0.2);
+}
+
+.fx-topbar {
+  background: linear-gradient(
+    90deg,
+    #0a4d8b 0%,
+    #0b73ff 35%,
+    #159cff 70%,
+    #35c8ff 100%
+  );
+
+  box-shadow: 0 8px 35px rgba(21,156,255,0.3);
+}
+
+/* =========================
+   BUTTONS / ACTIVE
+========================= */
+
+.fx-button,
+.fx-active {
+  background: var(--primary-gradient);
+  color: #ffffff;
+  border: 1px solid rgba(255,255,255,0.16);
+
+  box-shadow:
+    0 0 16px rgba(21,156,255,0.38),
+    0 0 34px rgba(53,200,255,0.2),
+    inset 0 1px 0 rgba(255,255,255,0.18);
+
+  transition: all 0.25s ease;
+}
+
+.fx-button:hover,
+.fx-active:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+
+  box-shadow:
+    0 0 22px rgba(21,156,255,0.52),
+    0 0 46px rgba(53,200,255,0.26);
+}
+
+.fx-button-soft {
+  background: rgba(21,156,255,0.18);
+  color: #e9f8ff;
+  border: 1px solid rgba(94,216,255,0.28);
+}
+
+.fx-button-soft:hover {
+  background: rgba(21,156,255,0.3);
+}
+
+/* =========================
+   SIDEBAR
+========================= */
+
+.fx-sidebar {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(11, 76, 134, 0.98),
+      rgba(7, 51, 95, 0.98)
+    );
+
+  border-right: 1px solid rgba(94,216,255,0.22);
+
+  box-shadow:
+    12px 0 40px rgba(0,24,60,0.26),
+    inset -1px 0 0 rgba(255,255,255,0.04);
+}
+
+.fx-sidebar-item {
+  color: rgba(234,246,255,0.86);
+  border-radius: 14px;
+  transition: all 0.22s ease;
+}
+
+.fx-sidebar-item:hover {
+  background: rgba(21,156,255,0.18);
+  color: #ffffff;
+}
+
+.fx-sidebar-item-active {
+  background: var(--primary-gradient);
+  color: #ffffff;
+
+  box-shadow:
+    0 0 18px rgba(21,156,255,0.42),
+    inset 0 1px 0 rgba(255,255,255,0.16);
+}
+
+/* =========================
+   CHART / TABLE
+========================= */
+
+.fx-chart {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(7, 36, 70, 0.98),
+      rgba(4, 25, 50, 0.99)
+    );
+
+  border: 1px solid rgba(53,200,255,0.18);
+  border-radius: 20px;
+
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,0.025),
+    0 0 24px rgba(0,120,255,0.08);
+}
+
+.fx-table {
+  background: rgba(13, 76, 133, 0.94);
+  border: 1px solid rgba(94,216,255,0.22);
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+.fx-table thead {
+  background: rgba(8, 56, 104, 0.9);
+}
+
+.fx-table tr {
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+
+.fx-table tr:hover {
+  background: rgba(21,156,255,0.12);
+}
+
+/* =========================
+   BADGES
+========================= */
+
+.fx-badge-buy {
+  background: rgba(22,199,132,0.18);
+  color: #6dffbf;
+  border: 1px solid rgba(22,199,132,0.35);
+}
+
+.fx-badge-sell {
+  background: rgba(239,68,68,0.18);
+  color: #ff9c9c;
+  border: 1px solid rgba(239,68,68,0.35);
+}
+
+.fx-badge-blue {
+  background: rgba(21,156,255,0.2);
+  color: #d4f3ff;
+  border: 1px solid rgba(94,216,255,0.38);
+}
+
+/* =========================
+   TEXT
+========================= */
+
+.fx-title-glow {
+  text-shadow:
+    0 0 16px rgba(53,200,255,0.3),
+    0 0 34px rgba(21,156,255,0.18);
+}
+
+.fx-muted {
+  color: rgba(234,246,255,0.66);
+}
+
+.fx-divider {
+  border-color: rgba(94,216,255,0.2);
+}
+
+/* =========================
+   SCROLLBAR
+========================= */
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255,255,255,0.04);
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #35c8ff, #0b73ff);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #6ee7ff, #159cff);
+}
+
+/* =========================
+   SELECTION
+========================= */
+
+::selection {
+  background: rgba(21,156,255,0.4);
+  color: #ffffff;
+}
+
+/* =========================
+   LIGHT MODE
+   Important: still blue, never white/black
+========================= */
+
+html.light {
+  --bg: #0b4f87;
+  --text: #eaf6ff;
+  --card: rgba(16, 88, 150, 0.9);
+  --line-soft: rgba(94, 216, 255, 0.24);
+  --line-blue: rgba(53, 200, 255, 0.5);
+}
+
+html.light body {
+  background:
+    radial-gradient(circle at 50% -8%, rgba(94,216,255,0.32), transparent 40%),
+    radial-gradient(circle at left, rgba(21,156,255,0.2), transparent 50%),
+    radial-gradient(circle at right, rgba(53,200,255,0.18), transparent 55%),
+    linear-gradient(180deg, #1269ac 0%, #0e5b9b 30%, #0b4f87 68%, #083f70 100%);
+  background-attachment: fixed;
+}
+
+/* =========================
+   DARK MODE
+   Changed from BLACK to BLUE
+========================= */
+
+html.dark {
+  --bg: #0a477d;
+  --text: #ffffff;
+  --card: rgba(15, 82, 143, 0.92);
+  --panel: rgba(13, 73, 128, 0.94);
+  --panel-light: rgba(18, 97, 166, 0.9);
+  --sidebar: #083d6e;
+  --line-soft: rgba(94,216,255,0.22);
+}
+
+html.dark body {
+  background:
+    radial-gradient(circle at 50% -8%, rgba(94,216,255,0.26), transparent 40%),
+    radial-gradient(circle at 12% 48%, rgba(11,115,255,0.2), transparent 45%),
+    radial-gradient(circle at 88% 72%, rgba(53,200,255,0.16), transparent 45%),
+    linear-gradient(
+      180deg,
+      #115f9f 0%,
+      #0d548f 28%,
+      #0a477d 58%,
+      #083e70 82%,
+      #073761 100%
+    );
+  background-attachment: fixed;
+}
+
+/* =========================
+   SYSTEM MODE
+   Also blue
+========================= */
+
+html.system {
+  --bg: #0a4b83;
+  --text: #eaf6ff;
+  --card: rgba(15, 84, 146, 0.9);
+  --panel: rgba(13, 75, 132, 0.94);
+  --sidebar: #083f72;
+}
+
+html.system body {
+  background:
+    radial-gradient(circle at top, rgba(94,216,255,0.26), transparent 44%),
+    radial-gradient(circle at 15% 70%, rgba(11,115,255,0.18), transparent 45%),
+    linear-gradient(
+      180deg,
+      #1165a8 0%,
+      #0e5794 35%,
+      #0a4b83 68%,
+      #083f70 100%
+    );
+  background-attachment: fixed;
+}
+
+
+/* =========================================================
+   FX TRADE — 3 REAL THEME MODES
+   Controlled by: html[data-fx-theme="light|bright|dark"]
+========================================================= */
+
+html,
+body {
+  min-height: 100%;
+  transition:
+    background 260ms ease,
+    background-color 260ms ease,
+    color 260ms ease;
+}
+
+/* 1. JASNY — nadal FX blue, ale wyraźnie jaśniejszy */
+html[data-fx-theme="light"] {
+  --bg: #197fc1;
+  --text: #ffffff;
+  --sidebar: #1267a6;
+  --panel: rgba(28, 126, 193, 0.94);
+  --panel-light: rgba(43, 151, 220, 0.92);
+  --card: rgba(31, 135, 204, 0.92);
+  --line-soft: rgba(157, 226, 255, 0.34);
+  --line-blue: rgba(112, 220, 255, 0.68);
+}
+
+html[data-fx-theme="light"],
+html[data-fx-theme="light"] body {
+  background-color: #197fc1;
+}
+
+html[data-fx-theme="light"] body {
+  background:
+    radial-gradient(circle at 50% -10%, rgba(146, 231, 255, 0.42), transparent 39%),
+    radial-gradient(circle at 7% 44%, rgba(68, 185, 255, 0.30), transparent 46%),
+    radial-gradient(circle at 93% 70%, rgba(66, 215, 255, 0.22), transparent 48%),
+    linear-gradient(180deg, #2495d8 0%, #1b83c5 28%, #1775b5 58%, #1269a5 80%, #105d94 100%);
+  background-attachment: fixed;
+}
+
+/* 2. JAŚNIEJSZY / BLUE — obecny wygląd aplikacji */
+html[data-fx-theme="bright"] {
+  --bg: #0b4f87;
+  --text: #eaf6ff;
+  --sidebar: #0a3f72;
+  --panel: rgba(14, 78, 137, 0.94);
+  --panel-light: rgba(18, 100, 170, 0.90);
+  --card: rgba(16, 88, 150, 0.90);
+  --line-soft: rgba(87, 175, 255, 0.22);
+  --line-blue: rgba(53, 200, 255, 0.50);
+}
+
+html[data-fx-theme="bright"],
+html[data-fx-theme="bright"] body {
+  background-color: #0b4f87;
+}
+
+html[data-fx-theme="bright"] body {
+  background:
+    radial-gradient(circle at 50% -10%, rgba(53, 200, 255, 0.22), transparent 38%),
+    radial-gradient(circle at 8% 45%, rgba(21, 156, 255, 0.14), transparent 46%),
+    radial-gradient(circle at 92% 72%, rgba(0, 180, 255, 0.10), transparent 46%),
+    linear-gradient(180deg, #1269ac 0%, #0e5b9b 28%, #0b4f87 58%, #094679 80%, #083d6b 100%);
+  background-attachment: fixed;
+}
+
+/* 3. CIEMNY — głęboki navy, bez czystej czerni */
+html[data-fx-theme="dark"] {
+  --bg: #03182d;
+  --text: #eaf6ff;
+  --sidebar: #041d36;
+  --panel: rgba(5, 34, 63, 0.97);
+  --panel-light: rgba(7, 48, 87, 0.94);
+  --card: rgba(6, 42, 76, 0.95);
+  --line-soft: rgba(58, 150, 220, 0.18);
+  --line-blue: rgba(31, 155, 235, 0.38);
+}
+
+html[data-fx-theme="dark"],
+html[data-fx-theme="dark"] body {
+  background-color: #03182d;
+}
+
+html[data-fx-theme="dark"] body {
+  background:
+    radial-gradient(circle at 50% -10%, rgba(20, 116, 184, 0.18), transparent 38%),
+    radial-gradient(circle at 8% 45%, rgba(10, 84, 145, 0.12), transparent 46%),
+    radial-gradient(circle at 92% 72%, rgba(0, 111, 180, 0.08), transparent 46%),
+    linear-gradient(180deg, #082d50 0%, #062541 28%, #051e36 58%, #041a30 80%, #031526 100%);
+  background-attachment: fixed;
+}
+
+/* Page shell pokazuje globalne tło */
+.fx-page-shell {
+  min-height: 100vh;
+  background: transparent;
+}
+
+.fx-page-shell > main {
+  background: transparent !important;
+}
+
+.fx-page-shell > main > main[class*="min-h-screen"],
+.fx-page-shell > main > div[class*="min-h-screen"],
+.fx-page-shell > main > section[class*="min-h-screen"] {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+/* Elementy korzystające z klas FX reagują na tryb */
+html[data-fx-theme="light"] .fx-sidebar,
+html[data-fx-theme="bright"] .fx-sidebar,
+html[data-fx-theme="dark"] .fx-sidebar {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--sidebar) 96%, white 4%),
+    var(--sidebar)
+  );
+}
+
+html[data-fx-theme="light"] .fx-card,
+html[data-fx-theme="bright"] .fx-card,
+html[data-fx-theme="dark"] .fx-card {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--card) 88%, white 12%),
+    color-mix(in srgb, var(--card) 92%, black 8%)
+  );
+}
+
+html[data-fx-theme="light"] .fx-glass,
+html[data-fx-theme="bright"] .fx-glass,
+html[data-fx-theme="dark"] .fx-glass {
+  background: var(--card);
+}
+
+/* Stare klasy pozostają kompatybilne */
+html.light,
+html.system,
+html.dark {
+  color: var(--text);
+}
+
+/* =========================================================
+   FX TRADE — LAYOUTSHELL THEME BRIDGE
+   These classes replace hard-coded Tailwind backgrounds
+   inside LayoutShell.tsx.
+========================================================= */
+
+.fx-app-background {
+  background: var(--fx-app-background);
+}
+
+.fx-app-ambient {
+  background: var(--fx-app-ambient);
+  transition: background 300ms ease, opacity 300ms ease;
+}
+
+.fx-app-grid {
+  opacity: var(--fx-grid-opacity);
+  background-image:
+    linear-gradient(rgba(125,211,252,.18) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(125,211,252,.18) 1px, transparent 1px);
+  background-size: 64px 64px;
+  transition: opacity 300ms ease;
+}
+
+.fx-layout-topbar {
+  background: var(--fx-layout-topbar);
+  border-color: var(--fx-layout-border);
+  box-shadow: var(--fx-layout-topbar-shadow);
+}
+
+.fx-layout-content {
+  background: var(--fx-layout-content);
+  border-color: var(--fx-layout-border);
+  box-shadow: var(--fx-layout-content-shadow);
+}
+
+.fx-language-button {
+  background: var(--fx-language-bg);
+  border-color: var(--fx-layout-border);
+}
+
+.fx-language-button:hover {
+  background: var(--fx-language-hover);
+  border-color: rgba(103,232,249,.42);
+}
+
+.fx-language-menu {
+  background: var(--fx-language-menu);
+  border-color: var(--fx-layout-border);
+}
+
+/* LIGHT */
+html[data-fx-theme="light"] {
+  --fx-app-background:
+    radial-gradient(circle at 50% 0%, rgba(180,239,255,.34), transparent 34%),
+    linear-gradient(180deg,#2b97d7 0%,#2388ca 30%,#1c78b8 62%,#176ca8 82%,#125f97 100%);
+
+  --fx-app-ambient:
+    radial-gradient(circle at 15% 20%, rgba(123,220,255,.22), transparent 28%),
+    radial-gradient(circle at 85% 70%, rgba(84,218,255,.17), transparent 34%);
+
+  --fx-grid-opacity: .15;
+
+  --fx-layout-topbar:
+    linear-gradient(180deg,rgba(44,145,211,.94),rgba(27,113,178,.94));
+
+  --fx-layout-content:
+    linear-gradient(180deg,rgba(42,143,211,.83),rgba(25,111,176,.88));
+
+  --fx-layout-border: rgba(165,232,255,.30);
+
+  --fx-layout-topbar-shadow:
+    0 10px 35px rgba(0,55,105,.18),
+    inset 0 1px 0 rgba(255,255,255,.12);
+
+  --fx-layout-content-shadow:
+    0 16px 45px rgba(0,45,90,.16),
+    inset 0 1px 0 rgba(255,255,255,.10);
+
+  --fx-language-bg: #1978b8;
+  --fx-language-hover: #238ccb;
+  --fx-language-menu: #176da8;
+}
+
+/* BRIGHT / CURRENT PREMIUM BLUE */
+html[data-fx-theme="bright"] {
+  --fx-app-background:
+    radial-gradient(circle at 50% 0%, rgba(94,216,255,.24), transparent 34%),
+    linear-gradient(180deg,#1269ac 0%,#0f5d9e 30%,#0b4f87 62%,#094777 82%,#083d6b 100%);
+
+  --fx-app-ambient:
+    radial-gradient(circle at 15% 20%, rgba(56,189,248,.14), transparent 28%),
+    radial-gradient(circle at 85% 70%, rgba(34,211,238,.12), transparent 34%);
+
+  --fx-grid-opacity: .10;
+
+  --fx-layout-topbar:
+    linear-gradient(180deg,rgba(18,104,174,.94),rgba(11,79,135,.94));
+
+  --fx-layout-content:
+    linear-gradient(180deg,rgba(19,105,176,.80),rgba(11,79,135,.84));
+
+  --fx-layout-border: rgba(103,232,249,.20);
+
+  --fx-layout-topbar-shadow:
+    0 10px 35px rgba(0,40,90,.20),
+    inset 0 1px 0 rgba(255,255,255,.06);
+
+  --fx-layout-content-shadow:
+    0 16px 45px rgba(0,35,80,.18),
+    inset 0 1px 0 rgba(255,255,255,.05);
+
+  --fx-language-bg: #0b4f87;
+  --fx-language-hover: #1269ac;
+  --fx-language-menu: #0a477d;
+}
+
+/* DARK */
+html[data-fx-theme="dark"] {
+  --fx-app-background:
+    radial-gradient(circle at 50% 0%, rgba(20,116,184,.15), transparent 34%),
+    linear-gradient(180deg,#082d50 0%,#062541 30%,#051e36 62%,#041a2f 82%,#031526 100%);
+
+  --fx-app-ambient:
+    radial-gradient(circle at 15% 20%, rgba(15,95,160,.10), transparent 28%),
+    radial-gradient(circle at 85% 70%, rgba(12,108,160,.08), transparent 34%);
+
+  --fx-grid-opacity: .055;
+
+  --fx-layout-topbar:
+    linear-gradient(180deg,rgba(8,49,86,.97),rgba(5,34,62,.97));
+
+  --fx-layout-content:
+    linear-gradient(180deg,rgba(7,45,80,.92),rgba(4,29,54,.95));
+
+  --fx-layout-border: rgba(56,189,248,.13);
+
+  --fx-layout-topbar-shadow:
+    0 10px 35px rgba(0,10,25,.32),
+    inset 0 1px 0 rgba(255,255,255,.035);
+
+  --fx-layout-content-shadow:
+    0 16px 45px rgba(0,8,20,.32),
+    inset 0 1px 0 rgba(255,255,255,.03);
+
+  --fx-language-bg: #082b4c;
+  --fx-language-hover: #0a3a65;
+  --fx-language-menu: #061f38;
 }
