@@ -44,12 +44,12 @@ export default function RegisterPage() {
     setMsg("");
 
     if (!name.trim()) {
-      setMsg("Wpisz swoje imiÄ™.");
+      setMsg("Wpisz swoje imię.");
       return;
     }
 
     if (!passwordValid) {
-      setMsg("HasÅ‚o musi mieÄ‡ minimum 8 znakÃ³w, cyfrÄ™ i znak specjalny.");
+      setMsg("Hasło musi mieć minimum 8 znaków, cyfrę i znak specjalny.");
       return;
     }
 
@@ -77,19 +77,19 @@ export default function RegisterPage() {
       }
 
       if (!res.ok) {
-        setMsg(data?.error || "BÅ‚Ä…d rejestracji");
+        setMsg(data?.error || "Błąd rejestracji");
         return;
       }
 
-      // Konto zostaÅ‚o utworzone.
-      // Przechodzimy do checkoutu zamiast wpuszczaÄ‡ uÅ¼ytkownika do dashboardu.
+      // Konto zostało utworzone.
+      // Przechodzimy do checkoutu zamiast wpuszczać użytkownika do dashboardu.
       // /api/stripe/checkout wymaga aktywnej sesji przez requireAuth(),
-      // wiÄ™c endpoint /api/register powinien po rejestracji ustawiÄ‡ cookie "token".
-      setMsg("Konto utworzone. Przekierowanie do pÅ‚atnoÅ›ci...");
+      // więc endpoint /api/register powinien po rejestracji ustawić cookie "token".
+      setMsg("Konto utworzone. Przekierowanie do płatności...");
 
       window.location.href = "/checkout";
     } catch {
-      setMsg("BÅ‚Ä…d serwera");
+      setMsg("Błąd serwera");
     } finally {
       setLoading(false);
     }
@@ -143,7 +143,7 @@ export default function RegisterPage() {
                 {/* LEFT COPY */}
                 <div>
                   <h1 className="whitespace-nowrap text-3xl font-black leading-tight md:text-4xl xl:text-[46px]">
-                    DoÅ‚Ä…cz do
+                    Dołącz do
                     <br />
                     <span className="bg-gradient-to-r from-sky-300 via-blue-500 to-blue-600 bg-clip-text text-transparent">
                       FX TRADE
@@ -153,20 +153,20 @@ export default function RegisterPage() {
                   <div className="mt-5 h-[3px] w-16 bg-sky-500" />
 
                   <p className="mt-6 max-w-xl text-base leading-7 text-slate-300/80 md:text-lg">
-                    Platforma edukacyjna dla traderÃ³w, ktÃ³rzy chcÄ… dziaÅ‚aÄ‡ Å›wiadomie
-                    i rozwijaÄ‡ swÃ³j proces krok po kroku.
+                    Platforma edukacyjna dla traderów, którzy chcą działać świadomie
+                    i rozwijać swój proces krok po kroku.
                   </p>
 
                   <div className="mt-8 space-y-4">
                     <Feature
                       icon={GraduationCap}
                       title="Kompletna edukacja"
-                      text="Kursy od podstaw do zaawansowanych zagadnieÅ„ tradingowych."
+                      text="Kursy od podstaw do zaawansowanych zagadnień tradingowych."
                     />
                     <Feature
                       icon={BarChart3}
-                      title="NarzÄ™dzia analityczne"
-                      text="Skanery rynku, wskaÅºniki i dashboard analityczny."
+                      title="Narzędzia analityczne"
+                      text="Skanery rynku, wskaźniki i dashboard analityczny."
                     />
                     <Feature
                       icon={Target}
@@ -176,7 +176,7 @@ export default function RegisterPage() {
                     <Feature
                       icon={Radio}
                       title="Live sesje codziennie"
-                      text="Scalping na Å¼ywo, analiza rynku oraz Q&A."
+                      text="Scalping na żywo, analiza rynku oraz Q&A."
                     />
                   </div>
                 </div>
@@ -200,10 +200,10 @@ export default function RegisterPage() {
                 </div>
                 <div>
                   <div className="text-sm font-black text-sky-300">
-                    Bezpieczne i profesjonalne Å›rodowisko
+                    Bezpieczne i profesjonalne środowisko
                   </div>
                   <div className="mt-1 text-xs text-slate-400">
-                    Twoje dane sÄ… chronione. Skup siÄ™ na nauce i rozwoju.
+                    Twoje dane są chronione. Skup się na nauce i rozwoju.
                   </div>
                 </div>
               </div>
@@ -220,7 +220,7 @@ export default function RegisterPage() {
 
                 <h2 className="mt-6 text-4xl font-black">Rejestracja</h2>
                 <p className="mx-auto mt-3 max-w-lg text-base leading-7 text-slate-400">
-                  UtwÃ³rz konto i zyskaj dostÄ™p do platformy{" "}
+                  Utwórz konto i zyskaj dostęp do platformy{" "}
                   <span className="font-semibold text-sky-400">
                     FX Trade Premium.
                   </span>
@@ -231,20 +231,20 @@ export default function RegisterPage() {
                 <div>
                   <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-300">
                     <UserRound className="h-4 w-4 text-sky-400" />
-                    ImiÄ™
+                    Imię
                   </label>
                   <div className="relative">
                     <UserRound className="pointer-events-none absolute left-5 top-1/2 h-6 w-6 -translate-y-1/2 text-slate-400" />
                     <input
                       type="text"
-                      placeholder="ImiÄ™"
+                      placeholder="Imię"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       className="w-full rounded-2xl border border-sky-300/25 bg-[#06294f]/90 px-14 py-4 text-base text-white outline-none transition placeholder:text-slate-500 focus:border-sky-500/70 focus:ring-2 focus:ring-sky-500/10"
                       required
                     />
                   </div>
-                  <p className="mt-2 text-xs text-slate-500">Wpisz swoje imiÄ™</p>
+                  <p className="mt-2 text-xs text-slate-500">Wpisz swoje imię</p>
                 </div>
 
                 <div>
@@ -263,19 +263,19 @@ export default function RegisterPage() {
                       required
                     />
                   </div>
-                  <p className="mt-2 text-xs text-slate-500">Wpisz swÃ³j adres email</p>
+                  <p className="mt-2 text-xs text-slate-500">Wpisz swój adres email</p>
                 </div>
 
                 <div>
                   <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-300">
                     <LockKeyhole className="h-4 w-4 text-sky-400" />
-                    HasÅ‚o
+                    Hasło
                   </label>
                   <div className="relative">
                     <LockKeyhole className="pointer-events-none absolute left-5 top-1/2 h-6 w-6 -translate-y-1/2 text-slate-400" />
                     <input
                       type={showPassword ? "text" : "password"}
-                      placeholder="HasÅ‚o"
+                      placeholder="Hasło"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       className="w-full rounded-2xl border border-sky-300/25 bg-[#06294f]/90 px-14 py-4 pr-16 text-base text-white outline-none transition placeholder:text-slate-500 focus:border-sky-500/70 focus:ring-2 focus:ring-sky-500/10"
@@ -285,18 +285,18 @@ export default function RegisterPage() {
                       type="button"
                       onClick={() => setShowPassword((v) => !v)}
                       className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-500 transition hover:text-sky-300"
-                      aria-label={showPassword ? "Ukryj hasÅ‚o" : "PokaÅ¼ hasÅ‚o"}
+                      aria-label={showPassword ? "Ukryj hasło" : "Pokaż hasło"}
                     >
                       {showPassword ? <EyeOff className="h-6 w-6" /> : <Eye className="h-6 w-6" />}
                     </button>
                   </div>
 
                   <p className="mt-2 text-xs text-slate-500">
-                    Minimum 8 znakÃ³w, w tym cyfra i znak specjalny
+                    Minimum 8 znaków, w tym cyfra i znak specjalny
                   </p>
 
                   <div className="mt-4 grid gap-2 sm:grid-cols-3">
-                    <PasswordRule ok={passwordRules.length}>Minimum 8 znakÃ³w</PasswordRule>
+                    <PasswordRule ok={passwordRules.length}>Minimum 8 znaków</PasswordRule>
                     <PasswordRule ok={passwordRules.number}>Jedna cyfra</PasswordRule>
                     <PasswordRule ok={passwordRules.special}>Znak specjalny</PasswordRule>
                   </div>
@@ -319,17 +319,17 @@ export default function RegisterPage() {
                   disabled={loading}
                   className="group flex w-full items-center justify-center gap-3 rounded-2xl border border-blue-400/20 bg-gradient-to-r from-sky-500 via-blue-600 to-blue-700 px-5 py-4 text-lg font-black shadow-[0_12px_38px_rgba(37,99,235,.28)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {loading ? "Tworzenie konta..." : "ZaÅ‚Ã³Å¼ konto"}
+                  {loading ? "Tworzenie konta..." : "Załóż konto"}
                   {!loading ? <ArrowRight className="h-5 w-5 transition group-hover:translate-x-1" /> : null}
                 </button>
 
                 <div className="pt-2 text-center text-base text-slate-400">
-                  Masz juÅ¼ konto?{" "}
+                  Masz już konto?{" "}
                   <Link
                     href="/login"
                     className="font-semibold text-sky-400 underline-offset-4 hover:underline"
                   >
-                    Zaloguj siÄ™
+                    Zaloguj się
                   </Link>
                 </div>
               </form>
@@ -345,19 +345,19 @@ export default function RegisterPage() {
                 <ShieldCheck className="h-6 w-6 text-blue-400" />
               </div>
               <p className="max-w-5xl text-xs leading-6 text-slate-400">
-                DostÄ™p do Platformy Edukacyjnej FX Trade Premium obejmuje kurs tradingu,
-                strategie rynkowe, dashboard analityczny oraz narzÄ™dzia wspierajÄ…ce proces
-                decyzyjny. Produkt ma charakter wyÅ‚Ä…cznie edukacyjny i informacyjny.
+                Dostęp do Platformy Edukacyjnej FX Trade Premium obejmuje kurs tradingu,
+                strategie rynkowe, dashboard analityczny oraz narzędzia wspierające proces
+                decyzyjny. Produkt ma charakter wyłącznie edukacyjny i informacyjny.
                 Nie stanowi porady inwestycyjnej ani rekomendacji finansowej.
-                Wyniki zaleÅ¼Ä… od indywidualnych decyzji uÅ¼ytkownika.
+                Wyniki zależą od indywidualnych decyzji użytkownika.
               </p>
             </div>
 
             <div className="grid flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <MiniBenefit icon={ShieldCheck} title="BezpieczeÅ„stwo" text="Twoje dane sÄ… chronione" />
-              <MiniBenefit icon={BookOpen} title="Edukacja" text="Na kaÅ¼dym poziomie" />
-              <MiniBenefit icon={BarChart3} title="NarzÄ™dzia" text="Dla Å›wiadomego tradera" />
-              <MiniBenefit icon={Users} title="SpoÅ‚ecznoÅ›Ä‡" text="Wsparcie i rozwÃ³j" />
+              <MiniBenefit icon={ShieldCheck} title="Bezpieczeństwo" text="Twoje dane są chronione" />
+              <MiniBenefit icon={BookOpen} title="Edukacja" text="Na każdym poziomie" />
+              <MiniBenefit icon={BarChart3} title="Narzędzia" text="Dla świadomego tradera" />
+              <MiniBenefit icon={Users} title="Społeczność" text="Wsparcie i rozwój" />
             </div>
           </div>
         </section>

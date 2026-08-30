@@ -1,12 +1,12 @@
 ﻿"use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import {
   ArrowLeft,
   ArrowRight,
   BarChart3,
   BookOpen,
-  CheckSquare,
   Clock3,
   Crown,
   Download,
@@ -23,8 +23,8 @@ const bonusCards = [
   {
     title: "Checklisty PDF",
     description:
-      "Gotowe checklisty do analizy rynku, wejÅ›Ä‡ i zarzÄ…dzania pozycjÄ….",
-    meta1: "6 plikÃ³w",
+      "Gotowe checklisty do analizy rynku, wejść i zarządzania pozycją.",
+    meta1: "6 plików",
     meta2: "1h 20m",
     tag: "CHECKLISTY",
     accent: "sky",
@@ -32,12 +32,12 @@ const bonusCards = [
     icon: FileText,
   },
   {
-    title: "PrzykÅ‚ady trade",
+    title: "Przykłady trade",
     description:
-      "Rzeczywiste przykÅ‚ady trade z opisem wejÅ›Ä‡, exita i zarzÄ…dzania.",
-    meta1: "8 materiaÅ‚Ã³w",
+      "Rzeczywiste przykłady trade z opisem wejść, exita i zarządzania.",
+    meta1: "8 materiałów",
     meta2: "3h 15m",
-    tag: "PRZYKÅADY",
+    tag: "PRZYKŁADY",
     accent: "emerald",
     image: "/bonus-przyklady-trade.png",
     icon: TrendingUp,
@@ -45,8 +45,8 @@ const bonusCards = [
   {
     title: "Case studies",
     description:
-      "SzczegÃ³Å‚owe analizy przypadkÃ³w i strategii w praktyce.",
-    meta1: "5 materiaÅ‚Ã³w",
+      "Szczegółowe analizy przypadków i strategii w praktyce.",
+    meta1: "5 materiałów",
     meta2: "2h 40m",
     tag: "CASE STUDIES",
     accent: "violet",
@@ -54,10 +54,10 @@ const bonusCards = [
     icon: BarChart3,
   },
   {
-    title: "Typowe bÅ‚Ä™dy traderÃ³w",
+    title: "Typowe błędy traderów",
     description:
-      "NajczÄ™stsze bÅ‚Ä™dy oraz sposoby jak ich unikaÄ‡ i poprawiaÄ‡ wyniki.",
-    meta1: "5 materiaÅ‚Ã³w",
+      "Najczęstsze błędy oraz sposoby jak ich unikać i poprawiać wyniki.",
+    meta1: "5 materiałów",
     meta2: "1h 30m",
     tag: "PORADNIK",
     accent: "rose",
@@ -67,9 +67,9 @@ const bonusCards = [
 ];
 
 const popular = [
-  ["Checklista: Plan Tradingowy", "PDF â€¢ 12 stron", "892"],
-  ["Checklista: ZarzÄ…dzanie Ryzykiem", "PDF â€¢ 8 stron", "756"],
-  ["PrzykÅ‚ad trade: EURUSD Scalping", "PDF â€¢ 15 stron", "645"],
+  ["Checklista: Plan Tradingowy", "PDF • 12 stron", "892"],
+  ["Checklista: Zarządzanie Ryzykiem", "PDF • 8 stron", "756"],
+  ["Przykład trade: EURUSD Scalping", "PDF • 15 stron", "645"],
 ];
 
 const premium = [
@@ -88,7 +88,7 @@ const premium = [
   {
     icon: Table2,
     title: "Szablony Excel",
-    desc: "Gotowe szablony do dziennika tradingowego, analizy i zarzÄ…dzania kapitaÅ‚em.",
+    desc: "Gotowe szablony do dziennika tradingowego, analizy i zarządzania kapitałem.",
     accent: "emerald",
   },
 ];
@@ -162,10 +162,10 @@ export default function BonusyPage() {
                   FX TRADE / EDUCATION / BONUS
                 </div>
                 <h1 className="mt-1 text-[28px] font-semibold tracking-tight">
-                  MateriaÅ‚y bonusowe
+                  Materiały bonusowe
                 </h1>
                 <p className="mt-1 max-w-[620px] text-[11px] leading-5 text-sky-100/50">
-                  Dodatkowe materiaÅ‚y, ktÃ³re pomogÄ… Ci staÄ‡ siÄ™ lepszym traderem.
+                  Dodatkowe materiały, które pomogą Ci stać się lepszym traderem.
                 </p>
               </div>
             </div>
@@ -183,10 +183,10 @@ export default function BonusyPage() {
         {/* STATS */}
         <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {[
-            [FileText, "24", "MateriaÅ‚y dostÄ™pne"],
-            [Clock3, "12h 45m", "ÅÄ…czny czas materiaÅ‚Ã³w"],
-            [Download, "1.8k", "PobraÅ„ Å‚Ä…cznie"],
-            [Star, "4.9 / 5", "Åšrednia ocena materiaÅ‚Ã³w"],
+            [FileText, "24", "Materiały dostępne"],
+            [Clock3, "12h 45m", "Łączny czas materiałów"],
+            [Download, "1.8k", "Pobrań łącznie"],
+            [Star, "4.9 / 5", "Średnia ocena materiałów"],
           ].map(([Icon, value, label], index) => {
             const StatIcon = Icon as typeof FileText;
             return (
@@ -237,12 +237,14 @@ export default function BonusyPage() {
 
                   {/* VISUAL */}
                   <div
-                    className={`mt-4 h-[150px] overflow-hidden rounded-[11px] border ${a.border} bg-[#06284d]`}
+                    className={`relative mt-4 h-[150px] overflow-hidden rounded-[11px] border ${a.border} bg-[#06284d]`}
                   >
-                    <img
+                    <Image
                       src={card.image}
                       alt={card.title}
-                      className="h-full w-full object-cover object-center transition duration-300 group-hover:scale-[1.025]"
+                      fill
+                      className="object-cover object-center transition duration-300 group-hover:scale-[1.025]"
+                      sizes="(min-width: 1536px) 25vw, (min-width: 768px) 50vw, 100vw"
                     />
                   </div>
 
@@ -267,7 +269,7 @@ export default function BonusyPage() {
                     type="button"
                     className={`mt-4 inline-flex w-full items-center justify-center gap-2 rounded-[9px] border ${a.border} bg-[#0a3f73] px-4 py-2.5 text-[10px] font-bold ${a.text} transition hover:bg-[#1263a5]`}
                   >
-                    OtwÃ³rz materiaÅ‚y
+                    Otwórz materiały
                     <ArrowRight className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -281,7 +283,7 @@ export default function BonusyPage() {
           <div className="rounded-[14px] border border-[#1784cf] bg-[linear-gradient(145deg,#105d9d_0%,#0b477e_55%,#073866_100%)] shadow-[0_0_24px_rgba(14,165,233,.12),inset_0_1px_0_rgba(255,255,255,.055)] p-5">
             <div className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-amber-300" />
-              <h2 className="text-[15px] font-semibold">NajczÄ™Å›ciej pobierane</h2>
+              <h2 className="text-[15px] font-semibold">Najczęściej pobierane</h2>
             </div>
 
             <div className="mt-4 divide-y divide-[#1573b5]">
@@ -314,7 +316,7 @@ export default function BonusyPage() {
           <div className="rounded-[14px] border border-[#1784cf] bg-[linear-gradient(145deg,#105d9d_0%,#0b477e_55%,#073866_100%)] shadow-[0_0_24px_rgba(14,165,233,.12),inset_0_1px_0_rgba(255,255,255,.055)] p-5">
             <div className="flex items-center gap-2">
               <Crown className="h-5 w-5 text-amber-300" />
-              <h2 className="text-[15px] font-semibold">MateriaÅ‚y premium</h2>
+              <h2 className="text-[15px] font-semibold">Materiały premium</h2>
             </div>
 
             <div className="mt-4 divide-y divide-[#1573b5]">
@@ -351,4 +353,3 @@ export default function BonusyPage() {
     </main>
   );
 }
-

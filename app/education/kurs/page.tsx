@@ -53,7 +53,7 @@ const modules: Module[] = [
   { id: 7, title: "Timing", icon: Clock3 },
   { id: 8, title: "Liquidity", icon: Droplets },
   { id: 9, title: "Risk management", icon: ShieldCheck },
-  { id: 10, title: "ZarzÄ…dzanie pozycjÄ…", icon: PieChart },
+  { id: 10, title: "Zarządzanie pozycją", icon: PieChart },
   { id: 11, title: "Psychologia tradingu", icon: Brain },
   { id: 12, title: "Rutyna tradera", icon: ClipboardCheck },
   { id: 13, title: "Trading journal", icon: NotebookPen },
@@ -61,13 +61,13 @@ const modules: Module[] = [
   { id: 15, title: "System tradingowy", icon: Settings },
   { id: 16, title: "Statystyka tradingowa", icon: BarChart3 },
   { id: 17, title: "Skalowanie konta", icon: Rocket },
-  { id: 18, title: "BÅ‚Ä™dy traderÃ³w", icon: TriangleAlert },
+  { id: 18, title: "Błędy traderów", icon: TriangleAlert },
 ];
 
 function getProgressBar(percent: number) {
   const total = 16;
   const filled = Math.round((percent / 100) * total);
-  return "â–ˆ".repeat(filled) + "â–‘".repeat(total - filled);
+  return "█".repeat(filled) + "░".repeat(total - filled);
 }
 
 const moduleAccents = [
@@ -189,8 +189,8 @@ export default function KursPage() {
 
                   <div className="mt-4 flex flex-wrap gap-2">
                     {[
-                      [BookOpen, `${modules.length} moduÅ‚Ã³w`],
-                      [BrainCircuit, `${modules.length} quizÃ³w`],
+                      [BookOpen, `${modules.length} modułów`],
+                      [BrainCircuit, `${modules.length} quizów`],
                       [Flame, `Streak: ${streak} dni`],
                     ].map(([Icon, label], index) => {
                       const StatIcon = Icon as typeof BookOpen;
@@ -211,10 +211,10 @@ export default function KursPage() {
               <div className="mt-5 rounded-[12px] border border-[#0a417b] bg-[#031a36] p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="text-[11px] font-semibold">
-                    PostÄ™p kursu: <span className="text-sky-300">{progress}%</span>
+                    Postęp kursu: <span className="text-sky-300">{progress}%</span>
                   </div>
                   <div className="text-[9px] text-sky-100/50">
-                    UkoÅ„czone moduÅ‚y:{" "}
+                    Ukończone moduły:{" "}
                     <span className="font-semibold text-emerald-300">
                       {passedCount}/{modules.length}
                     </span>
@@ -238,7 +238,7 @@ export default function KursPage() {
                     className="inline-flex items-center gap-2 rounded-[9px] border border-sky-300/25 bg-[linear-gradient(90deg,#075ECB,#0B8FE4)] px-4 py-2.5 text-[10px] font-bold text-white transition hover:brightness-110"
                   >
                     <Play className="h-3.5 w-3.5" />
-                    Kontynuuj naukÄ™
+                    Kontynuuj naukę
                   </Link>
 
                   <Link
@@ -246,7 +246,7 @@ export default function KursPage() {
                     className="inline-flex items-center gap-2 rounded-[9px] border border-[#0d579e] bg-[#052348] px-4 py-2.5 text-[10px] font-semibold text-sky-100/70 transition hover:bg-[#0a3264]"
                   >
                     <RotateCcw className="h-3.5 w-3.5" />
-                    PowtÃ³rz ostatni moduÅ‚
+                    Powtórz ostatni moduł
                   </Link>
                 </div>
               </div>
@@ -289,30 +289,30 @@ export default function KursPage() {
           {[
             {
               icon: BookOpen,
-              label: "ModuÅ‚y ukoÅ„czone",
+              label: "Moduły ukończone",
               value: `${passedCount} / ${modules.length}`,
               hint: `${progress}%`,
               tone: "sky",
             },
             {
               icon: TrendingUp,
-              label: "PostÄ™p kursu",
+              label: "Postęp kursu",
               value: `${progress}%`,
-              hint: progress >= 100 ? "Åšwietna robota! ðŸŽ‰" : "Kontynuuj naukÄ™",
+              hint: progress >= 100 ? "Świetna robota! 🎉" : "Kontynuuj naukę",
               tone: "emerald",
             },
             {
               icon: GraduationCap,
-              label: "Odblokowany moduÅ‚",
+              label: "Odblokowany moduł",
               value: `${unlockedModule + 1} / ${modules.length}`,
-              hint: unlockedModule + 1 >= modules.length ? "Wszystkie odblokowane" : "Ucz siÄ™ dalej",
+              hint: unlockedModule + 1 >= modules.length ? "Wszystkie odblokowane" : "Ucz się dalej",
               tone: "violet",
             },
             {
               icon: CalendarDays,
               label: "Streak nauki",
               value: `${streak} dni`,
-              hint: "Konsekwencja popÅ‚aca!",
+              hint: "Konsekwencja popłaca!",
               tone: "orange",
             },
           ].map((stat) => {
@@ -353,7 +353,7 @@ export default function KursPage() {
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-2">
               <BookOpen className="h-5 w-5 text-sky-300" />
-              <h2 className="text-[16px] font-semibold">ModuÅ‚y kursu</h2>
+              <h2 className="text-[16px] font-semibold">Moduły kursu</h2>
             </div>
 
             <div className="flex items-center gap-2">
@@ -364,7 +364,7 @@ export default function KursPage() {
                 <List className="h-4 w-4" />
               </button>
               <button className="rounded-[8px] border border-[#0d579e] bg-[#052348] px-3 py-2 text-[9px] text-sky-100/60">
-                Wszystkie moduÅ‚y
+                Wszystkie moduły
               </button>
             </div>
           </div>
@@ -397,7 +397,7 @@ export default function KursPage() {
                           {module.title}
                         </h3>
                         <p className="mt-1 text-[8px] text-sky-100/45">
-                          6 lekcji â€¢ 1 quiz
+                          6 lekcji • 1 quiz
                         </p>
 
                         <div
@@ -417,12 +417,12 @@ export default function KursPage() {
                           ) : completed ? (
                             <>
                               <CheckCircle2 className="h-3 w-3" />
-                              UkoÅ„czony
+                              Ukończony
                             </>
                           ) : (
                             <>
                               <Play className="h-3 w-3" />
-                              DostÄ™pny
+                              Dostępny
                             </>
                           )}
                         </div>

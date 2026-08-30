@@ -3,7 +3,6 @@
 import React from "react";
 import Link from "next/link";
 import {
-  ArrowRight,
   BarChart3,
   Bolt,
   Boxes,
@@ -52,10 +51,10 @@ const STRATEGIES: Strat[] = [
   {
     key: "scalping",
     title: "SCALPING",
-    desc: "Szybkie wejÅ›cia i wyjÅ›cia. Filtr M5 â†’ timing M1. Selekcja ponad iloÅ›Ä‡.",
+    desc: "Szybkie wejścia i wyjścia. Filtr M5 → timing M1. Selekcja ponad ilość.",
     badge: "FREE",
     href: "/strategie/scalping",
-    tags: ["M5 â†’ M1", "3â€“5 trade", "RR 1.5R+"],
+    tags: ["M5 → M1", "3–5 trade", "RR 1.5R+"],
     rating: "4.8",
     success: "85%",
     timeframe: "M1 - M5",
@@ -69,10 +68,10 @@ const STRATEGIES: Strat[] = [
   {
     key: "day-trading",
     title: "DAY TRADING",
-    desc: "Plan dnia i 1â€“3 najlepsze okazje. Mniej klikania, wiÄ™cej jakoÅ›ci.",
+    desc: "Plan dnia i 1–3 najlepsze okazje. Mniej klikania, więcej jakości.",
     badge: "PREMIUM",
     href: "/strategie/day-trading",
-    tags: ["London/NY", "1â€“3 trade", "RR 2R+"],
+    tags: ["London/NY", "1–3 trade", "RR 2R+"],
     rating: "4.9",
     success: "82%",
     timeframe: "M15 - H1",
@@ -86,16 +85,16 @@ const STRATEGIES: Strat[] = [
   {
     key: "swing-trading",
     title: "SWING TRADING",
-    desc: "Mniej wejÅ›Ä‡, wiÄ™ksze ruchy. HTF poziomy + cierpliwoÅ›Ä‡.",
+    desc: "Mniej wejść, większe ruchy. HTF poziomy + cierpliwość.",
     badge: "PREMIUM",
     href: "/strategie/swing-trading",
-    tags: ["H1/H4", "1â€“5 / tydz.", "RR 3R+"],
+    tags: ["H1/H4", "1–5 / tydz.", "RR 3R+"],
     rating: "4.7",
     success: "80%",
     timeframe: "H4 - D1",
     rr: "1.3 - 1.8",
     duration: "2 - 10 dni",
-    session: "CaÅ‚y tydzieÅ„",
+    session: "Cały tydzień",
     markets: ["EURUSD", "GBPUSD", "USOIL", "XAUUSD"],
     icon: BarChart3,
     accent: "sky",
@@ -103,13 +102,13 @@ const STRATEGIES: Strat[] = [
   {
     key: "renko",
     title: "RENKO STRATEGY",
-    desc: "Czysty wykres Renko filtrujÄ…cy szum i pokazujÄ…cy trend.",
+    desc: "Czysty wykres Renko filtrujący szum i pokazujący trend.",
     badge: "PREMIUM",
     href: "/strategie/renko",
     tags: ["Renko 10/20/30", "Trend", "RR 1.6R+"],
     rating: "4.8",
     success: "83%",
-    timeframe: "Renko 10 Â· 20 Â· 30",
+    timeframe: "Renko 10 · 20 · 30",
     rr: "1.2 - 1.6",
     duration: "30 min - kilka dni",
     session: "London / NY",
@@ -120,7 +119,7 @@ const STRATEGIES: Strat[] = [
   {
     key: "supertrend",
     title: "SUPERTREND STRATEGY",
-    desc: "PodÄ…Å¼aj za trendem z wykorzystaniem wskaÅºnika SuperTrend.",
+    desc: "Podążaj za trendem z wykorzystaniem wskaźnika SuperTrend.",
     badge: "PREMIUM",
     href: "/strategie/supertrend",
     tags: ["M15/H1/H4", "Trend", "RR 1.5R+"],
@@ -137,7 +136,7 @@ const STRATEGIES: Strat[] = [
   {
     key: "bollinger",
     title: "BOLLINGER BANDS",
-    desc: "Wykorzystaj zmiennoÅ›Ä‡ rynku, wybicia i powroty do pasm Bollingera.",
+    desc: "Wykorzystaj zmienność rynku, wybicia i powroty do pasm Bollingera.",
     badge: "PREMIUM",
     href: "/strategie/bollinger",
     tags: ["M5/M15/H1", "Volatility", "RR 1.4R+"],
@@ -154,7 +153,7 @@ const STRATEGIES: Strat[] = [
   {
     key: "price-action",
     title: "PRICE ACTION",
-    desc: "Klasyczne Price Action, struktura rynku i potwierdzenia Å›wiecowe.",
+    desc: "Klasyczne Price Action, struktura rynku i potwierdzenia świecowe.",
     badge: "FREE",
     href: "/strategie/price-action",
     tags: ["M5/H1/H4", "Structure", "RR 1.6R+"],
@@ -163,7 +162,7 @@ const STRATEGIES: Strat[] = [
     timeframe: "M5 - H1 - H4",
     rr: "1.2 - 1.6",
     duration: "1 - kilka dni",
-    session: "CaÅ‚y tydzieÅ„",
+    session: "Cały tydzień",
     markets: ["EURUSD", "GBPUSD", "US30", "XAUUSD"],
     icon: CandlestickChart,
     accent: "emerald",
@@ -237,7 +236,7 @@ function PremiumLock() {
       <div className="w-full max-w-[260px] rounded-[12px] border border-violet-400/25 bg-[linear-gradient(145deg,#123f72,#24245f)] p-4 shadow-[0_0_36px_rgba(139,92,246,.22)] shadow-[0_0_32px_rgba(139,92,246,.12)]">
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-[8px] uppercase tracking-[.12em] text-sky-100/45">DostÄ™p</div>
+            <div className="text-[8px] uppercase tracking-[.12em] text-sky-100/45">Dostęp</div>
             <div className="mt-1 text-[15px] font-bold">PREMIUM</div>
           </div>
 
@@ -247,7 +246,7 @@ function PremiumLock() {
         </div>
 
         <p className="mt-3 text-[9px] leading-4 text-sky-100/50">
-          Odblokuj premium, Å¼eby zobaczyÄ‡ peÅ‚ny plan, checklistÄ™ i szczegÃ³Å‚y strategii.
+          Odblokuj premium, żeby zobaczyć pełny plan, checklistę i szczegóły strategii.
         </p>
 
         <div className="mt-4 grid grid-cols-2 gap-2">
@@ -319,7 +318,7 @@ function StrategyCard({
         <div className="mt-4 grid grid-cols-2 gap-3 rounded-[10px] border border-[#0a417b] bg-[#07315a]/90 p-3 shadow-[inset_0_0_18px_rgba(14,165,233,.05)]">
           <div>
             <div className="flex items-center justify-between text-[8px] text-sky-100/45">
-              <span>SkutecznoÅ›Ä‡</span>
+              <span>Skuteczność</span>
               <span className="font-semibold text-white">{strategy.success}</span>
             </div>
             <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#061425]">
@@ -328,7 +327,7 @@ function StrategyCard({
           </div>
 
           <div>
-            <div className="text-[8px] text-sky-100/45">InterwaÅ‚y</div>
+            <div className="text-[8px] text-sky-100/45">Interwały</div>
             <div className="mt-1 text-[11px] font-semibold text-sky-300">{strategy.timeframe}</div>
           </div>
         </div>
@@ -349,7 +348,7 @@ function StrategyCard({
         </div>
 
         <div className="mt-3">
-          <div className="text-[8px] text-sky-100/45">Najlepiej dziaÅ‚a na:</div>
+          <div className="text-[8px] text-sky-100/45">Najlepiej działa na:</div>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {strategy.markets.map((market) => (
               <span
@@ -367,7 +366,7 @@ function StrategyCard({
             href={locked ? "/paywall" : strategy.href}
             className="rounded-[8px] border border-[#0d579e] bg-[#0a3a69] px-3 py-2.5 text-center text-[9px] font-semibold text-sky-100/70 hover:bg-[#0a3264]"
           >
-            SzczegÃ³Å‚y
+            Szczegóły
           </Link>
 
           <Link
@@ -378,7 +377,7 @@ function StrategyCard({
                 : "border-sky-300/25 bg-[linear-gradient(90deg,#075ECB,#0B8FE4)]"
             }`}
           >
-            OtwÃ³rz strategiÄ™
+            Otwórz strategię
           </Link>
         </div>
       </div>
@@ -387,7 +386,7 @@ function StrategyCard({
 }
 
 export default function StrategieDashboardPage() {
-  // Tymczasowo odblokowane wszystkie strategie podczas dodawania treÅ›ci.
+  // Tymczasowo odblokowane wszystkie strategie podczas dodawania treści.
   const paid = true;
 
   const freeCount = STRATEGIES.filter((s) => s.badge === "FREE").length;
@@ -423,12 +422,12 @@ export default function StrategieDashboardPage() {
               </h1>
 
               <p className="mt-1 max-w-[680px] text-[11px] leading-5 text-sky-100/50">
-                Wybierz strategiÄ™ dopasowanÄ… do rynku i swojego stylu handlu.
-                KaÅ¼da strategia ma plan, warunki wejÅ›cia i checklistÄ™.
+                Wybierz strategię dopasowaną do rynku i swojego stylu handlu.
+                Każda strategia ma plan, warunki wejścia i checklistę.
               </p>
 
               <div className="mt-4 flex flex-wrap gap-2">
-                {["FREE + PREMIUM", "SpÃ³jny proces", "Selekcja > iloÅ›Ä‡"].map((tag) => (
+                {["FREE + PREMIUM", "Spójny proces", "Selekcja > ilość"].map((tag) => (
                   <span
                     key={tag}
                     className="rounded-full border border-[#0d579e] bg-[#0a3a69] px-3 py-1.5 text-[8px] font-semibold text-sky-100/60"
@@ -441,9 +440,9 @@ export default function StrategieDashboardPage() {
 
             <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
               {[
-                [Gift, String(freeCount), "Free strategies", "DostÄ™pne"],
-                [Crown, String(premiumCount), "Premium strategies", paid ? "Odblokowane" : "PeÅ‚ny dostÄ™p"],
-                [TrendingUp, "83%", "Åšrednia skutecznoÅ›Ä‡", "7 strategii"],
+                [Gift, String(freeCount), "Free strategies", "Dostępne"],
+                [Crown, String(premiumCount), "Premium strategies", paid ? "Odblokowane" : "Pełny dostęp"],
+                [TrendingUp, "83%", "Średnia skuteczność", "7 strategii"],
                 [BookOpenCheck, "48+", "Checklisty", "Gotowe listy"],
               ].map(([Icon, value, label, sub], index) => {
                 const StatIcon = Icon as typeof Gift;
@@ -488,16 +487,16 @@ export default function StrategieDashboardPage() {
                 <div className="flex h-10 w-10 items-center justify-center rounded-[10px] border border-emerald-400/25 bg-emerald-500/10 text-emerald-300">
                   <Target className="h-5 w-5" />
                 </div>
-                <h2 className="text-[14px] font-semibold">Jak wybraÄ‡ strategiÄ™?</h2>
+                <h2 className="text-[14px] font-semibold">Jak wybrać strategię?</h2>
               </div>
 
               <div className="mt-5 space-y-3">
                 {[
-                  "Dopasuj interwaÅ‚ do swojego czasu.",
-                  "SprawdÅº najlepsze sesje.",
-                  "Upewnij siÄ™, Å¼e RR jest akceptowalne.",
-                  "Przetestuj strategiÄ™ na koncie demo.",
-                  "Stosuj checklistÄ™ za kaÅ¼dym razem.",
+                  "Dopasuj interwał do swojego czasu.",
+                  "Sprawdź najlepsze sesje.",
+                  "Upewnij się, że RR jest akceptowalne.",
+                  "Przetestuj strategię na koncie demo.",
+                  "Stosuj checklistę za każdym razem.",
                 ].map((item) => (
                   <div key={item} className="flex items-start gap-2 text-[9px] text-sky-100/65">
                     <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-300" />
@@ -512,7 +511,7 @@ export default function StrategieDashboardPage() {
                 <Crown className="h-6 w-6 text-amber-300" />
                 <h3 className="mt-3 text-[15px] font-semibold">Odblokuj Premium</h3>
                 <p className="mt-2 text-[9px] leading-4 text-sky-100/45">
-                  Uzyskaj dostÄ™p do Day Trading i Swing Trading oraz peÅ‚nych checklist.
+                  Uzyskaj dostęp do Day Trading i Swing Trading oraz pełnych checklist.
                 </p>
 
                 <Link
@@ -527,7 +526,7 @@ export default function StrategieDashboardPage() {
                 <ShieldCheck className="h-6 w-6 text-emerald-300" />
                 <h3 className="mt-3 text-[15px] font-semibold">Premium aktywne</h3>
                 <p className="mt-2 text-[9px] leading-4 text-sky-100/45">
-                  Wszystkie strategie premium sÄ… odblokowane.
+                  Wszystkie strategie premium są odblokowane.
                 </p>
               </div>
             )}
@@ -537,11 +536,11 @@ export default function StrategieDashboardPage() {
         {/* BOTTOM BENEFITS */}
         <section className="grid gap-3 rounded-[14px] border border-[#0d579e] bg-[linear-gradient(145deg,#0b477f,#07325d)] p-4 shadow-[0_0_28px_rgba(14,165,233,.13)] md:grid-cols-2 xl:grid-cols-5">
           {[
-            [BookOpenCheck, "Gotowe checklisty", "Do kaÅ¼dej strategii"],
-            [BarChart3, "PrzykÅ‚ady na wykresach", "Realne setupy"],
-            [ShieldCheck, "ZarzÄ…dzanie ryzykiem", "Ochrona kapitaÅ‚u"],
-            [TrendingUp, "Statystyki skutecznoÅ›ci", "Backtest + wyniki"],
-            [Clock3, "Aktualizacje strategii", "Na bieÅ¼Ä…co"],
+            [BookOpenCheck, "Gotowe checklisty", "Do każdej strategii"],
+            [BarChart3, "Przykłady na wykresach", "Realne setupy"],
+            [ShieldCheck, "Zarządzanie ryzykiem", "Ochrona kapitału"],
+            [TrendingUp, "Statystyki skuteczności", "Backtest + wyniki"],
+            [Clock3, "Aktualizacje strategii", "Na bieżąco"],
           ].map(([Icon, title, desc], index) => {
             const BenefitIcon = Icon as typeof BookOpenCheck;
 
@@ -575,4 +574,3 @@ export default function StrategieDashboardPage() {
     </main>
   );
 }
-

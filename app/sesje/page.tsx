@@ -36,7 +36,7 @@ type DayConfig = {
 
 const DAYS: DayConfig[] = [
   {
-    day: "PONIEDZIAÅEK",
+    day: "PONIEDZIAŁEK",
     date: "19 MAJ",
     city: "NEW YORK",
     image: "/sessions/sessions-new-york.png",
@@ -56,7 +56,7 @@ const DAYS: DayConfig[] = [
     ],
   },
   {
-    day: "ÅšRODA",
+    day: "ŚRODA",
     date: "21 MAJ",
     city: "FRANKFURT",
     image: "/sessions/sessions-frankfurt.png",
@@ -76,7 +76,7 @@ const DAYS: DayConfig[] = [
     ],
   },
   {
-    day: "PIÄ„TEK",
+    day: "PIĄTEK",
     date: "23 MAJ",
     city: "NEW YORK",
     image: "/sessions/sessions-new-york-2.png",
@@ -148,132 +148,7 @@ function SessionIcon({ kind }: { kind: SessionKind }) {
   );
 }
 
-function CityScene({
-  city,
-  variant,
-}: {
-  city: Exclude<DayConfig["city"], "CRYPTO">;
-  variant: number;
-}) {
-  const skylinePaths = [
-    "M0 96h12V72h8V56h7v40h11V67h10v29h13V43h8v53h12V61h9v35h17V32h8v64h15V58h10v38h14V48h10v48h14V66h11v30h22v25H0z",
-    "M0 98h14V74h10V49h8v49h13V66h9v32h15V39h8v59h13V56h10v42h14V27h7v71h15V63h10v35h17V44h9v54h18V70h12v28h23v23H0z",
-    "M0 98h10V80h11V58h8v40h14V69h10v29h16V47h9v51h13V62h11v36h15V36h8v62h14V55h10v43h15V29h8v69h18V65h12v33h20v23H0z",
-    "M0 98h12V78h9V54h10v44h13V71h10v27h15V41h8v57h14V60h10v38h17V30h8v68h13V49h10v49h18V64h12v34h17V45h9v53h24v23H0z",
-    "M0 98h15V70h9V51h8v47h14V75h11v23h16V42h9v56h14V58h10v40h17V33h8v65h13V54h11v44h16V68h11v30h16V47h9v51h22v23H0z",
-  ];
 
-  const label =
-    city === "NEW YORK"
-      ? "NEW YORK"
-      : city === "LONDON"
-        ? "LONDON"
-        : city === "FRANKFURT"
-          ? "FRANKFURT"
-          : "DUBAI";
-
-  return (
-    <div className="relative h-[132px] overflow-hidden border-b border-cyan-300/10 bg-[radial-gradient(circle_at_50%_0%,rgba(30,103,173,.55),transparent_50%),linear-gradient(180deg,#0c3764_0%,#0a2a50_45%,#061320_100%)]">
-      <div className="absolute inset-0 opacity-35 [background-image:radial-gradient(circle_at_20%_22%,rgba(255,255,255,.65)_0_1px,transparent_1.4px),radial-gradient(circle_at_75%_18%,rgba(255,255,255,.42)_0_1px,transparent_1.4px)] [background-size:84px_84px,116px_116px]" />
-
-      <div className="absolute left-3 top-3 z-10 rounded-full border border-cyan-300/20 bg-[#041426]/75 px-2 py-1 text-[7px] font-black tracking-[.18em] text-cyan-100/75">
-        {label}
-      </div>
-
-      <svg
-        className="absolute inset-x-0 bottom-0 h-[105px] w-full"
-        viewBox="0 0 220 122"
-        preserveAspectRatio="none"
-      >
-        <defs>
-          <linearGradient id={`bld-${variant}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#164e82" />
-            <stop offset=".55" stopColor="#0b2b4d" />
-            <stop offset="1" stopColor="#04121f" />
-          </linearGradient>
-        </defs>
-
-        <path
-          d={skylinePaths[variant % skylinePaths.length]}
-          fill={`url(#bld-${variant})`}
-        />
-
-        {Array.from({ length: 26 }).map((_, i) => {
-          const x = 5 + ((i * 17 + variant * 9) % 210);
-          const y = 52 + ((i * 13 + variant * 7) % 48);
-          return (
-            <rect
-              key={i}
-              x={x}
-              y={y}
-              width="1.5"
-              height="1.5"
-              fill={i % 3 === 0 ? "#fbbf24" : "#60a5fa"}
-              opacity={i % 3 === 0 ? ".65" : ".22"}
-            />
-          );
-        })}
-      </svg>
-
-      <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-[#04121f] to-transparent" />
-    </div>
-  );
-}
-
-function CryptoScene({ cyan = false }: { cyan?: boolean }) {
-  return (
-    <div
-      className={`relative h-[215px] overflow-hidden border-b ${
-        cyan ? "border-cyan-400/15" : "border-orange-400/15"
-      } ${
-        cyan
-          ? "bg-[radial-gradient(circle_at_50%_30%,rgba(34,211,238,.18),transparent_34%),linear-gradient(180deg,#071b30,#06111c)]"
-          : "bg-[radial-gradient(circle_at_50%_30%,rgba(249,115,22,.18),transparent_34%),linear-gradient(180deg,#161109,#06111c)]"
-      }`}
-    >
-      <div className="absolute inset-0 opacity-35 [background-image:radial-gradient(circle_at_25%_25%,rgba(255,255,255,.65)_0_1px,transparent_1.4px),radial-gradient(circle_at_76%_15%,rgba(255,255,255,.4)_0_1px,transparent_1.4px)] [background-size:78px_78px,118px_118px]" />
-
-      <div
-        className={`absolute left-1/2 top-7 grid h-72px w-72px -translate-x-1/2 place-items-center rounded-full border text-white ${
-          cyan
-            ? "border-cyan-200/60 bg-[radial-gradient(circle_at_35%_25%,#7dd3fc,#06b6d4_42%,#0e7490_72%,#083344)] shadow-[0_0_38px_rgba(34,211,238,.45)]"
-            : "border-orange-200/60 bg-[radial-gradient(circle_at_35%_25%,#ffd78a,#f59e0b_42%,#c75a00_72%,#4b1900)] shadow-[0_0_38px_rgba(249,115,22,.45)]"
-        }`}
-        style={{ width: 72, height: 72 }}
-      >
-        <Bitcoin className="h-10 w-10" />
-      </div>
-
-      <div className="absolute inset-x-0 top-[108px] text-center">
-        <div className="text-[17px] font-black text-white">BTC</div>
-        <div className="mt-1 text-[25px] font-black text-white">16:00</div>
-        <div
-          className={`mx-auto mt-2 inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[7px] font-black ${
-            cyan
-              ? "border-cyan-400/30 bg-cyan-500/10 text-cyan-300"
-              : "border-orange-400/30 bg-orange-500/10 text-orange-300"
-          }`}
-        >
-          <span className={`h-1.5 w-1.5 rounded-full ${cyan ? "bg-cyan-400" : "bg-orange-400"}`} />
-          SESSION LIVE
-        </div>
-      </div>
-
-      <svg
-        className={`absolute inset-x-0 bottom-0 h-12 w-full ${cyan ? "text-cyan-400" : "text-orange-400"}`}
-        viewBox="0 0 220 48"
-        preserveAspectRatio="none"
-      >
-        <path
-          d="M0 41 L14 39 L28 31 L42 34 L57 25 L73 29 L87 19 L104 23 L120 14 L137 18 L153 8 L171 13 L188 4 L203 9 L220 1"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-        />
-      </svg>
-    </div>
-  );
-}
 
 function LiveBadge({ scalping = false }: { scalping?: boolean }) {
   return (
@@ -327,7 +202,7 @@ function Donut78() {
         <div className="text-center">
           <div className="text-[28px] font-black text-white">78%</div>
           <div className="mt-1 text-[8px] font-bold uppercase tracking-[.10em] text-slate-400">
-            skutecznoÅ›Ä‡
+            skuteczność
           </div>
         </div>
       </div>
@@ -372,7 +247,7 @@ export default function SesjePage() {
         className="pointer-events-none hidden"
       />
 
-      {/* pÅ‚ynne przejÅ›cie tapet do Å›rodka */}
+      {/* płynne przejście tapet do środka */}
       <div
         aria-hidden="true"
         className="pointer-events-none hidden"
@@ -399,7 +274,7 @@ export default function SesjePage() {
                   </span>
                 </h1>
                 <p className="mt-0.5 text-[9px] font-semibold uppercase tracking-[.10em] text-slate-400">
-                  PLAN SESJI NA Å»YWO â€“ TRADING Z PROFESJONALISTAMI
+                  PLAN SESJI NA ŻYWO – TRADING Z PROFESJONALISTAMI
                 </p>
               </div>
             </div>
@@ -525,7 +400,7 @@ export default function SesjePage() {
                         : "text-cyan-300"
                     }`}
                   >
-                    NAJBLIÅ»SZA SESJA
+                    NAJBLIŻSZA SESJA
                   </div>
                   <div className="mt-2 flex items-center gap-2 text-[8px] text-slate-400">
                     <Clock3 className="h-3.5 w-3.5" />
@@ -563,7 +438,7 @@ export default function SesjePage() {
                   AKTUALNA SESJA
                 </div>
                 <span className="rounded-md border border-emerald-400/25 bg-emerald-500/10 px-2 py-1 text-[8px] font-black text-emerald-300">
-                  â— LIVE
+                  ● LIVE
                 </span>
               </div>
 
@@ -596,8 +471,8 @@ export default function SesjePage() {
 
               <div className="mt-3 grid grid-cols-3 gap-2">
                 {[
-                  ["LIKWIDNOÅšÄ†", "85%", "text-cyan-300"],
-                  ["ZMIENNOÅšÄ†", "ÅšREDNIA", "text-cyan-300"],
+                  ["LIKWIDNOŚĆ", "85%", "text-cyan-300"],
+                  ["ZMIENNOŚĆ", "ŚREDNIA", "text-cyan-300"],
                   ["TREND", "BULLISH", "text-emerald-300"],
                 ].map(([label, value, color]) => (
                   <div
@@ -615,7 +490,7 @@ export default function SesjePage() {
                 className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-[9px] border border-cyan-300/30 bg-[linear-gradient(90deg,#0798c6,#078fd8)] px-4 py-3 text-[11px] font-black text-white shadow-[0_0_20px_rgba(34,211,238,.16)] hover:brightness-110"
               >
                 <Radio className="h-4 w-4" />
-                DOÅÄ„CZ DO SESJI
+                DOŁĄCZ DO SESJI
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
@@ -624,9 +499,9 @@ export default function SesjePage() {
           {/* NEXT SESSIONS */}
           <div className="overflow-hidden rounded-[16px] border border-cyan-200/35 bg-[linear-gradient(180deg,#0d65a8,#08457a)]">
             <div className="flex items-center justify-between border-b border-cyan-300/10 px-4 py-3">
-              <div className="text-[11px] font-black">NAJBLIÅ»SZE SESJE</div>
+              <div className="text-[11px] font-black">NAJBLIŻSZE SESJE</div>
               <button className="text-[8px] font-black text-cyan-300">
-                ZOBACZ WSZYSTKIE â†’
+                ZOBACZ WSZYSTKIE →
               </button>
             </div>
 
@@ -690,7 +565,7 @@ export default function SesjePage() {
               <div className="space-y-3">
                 {[
                   [CalendarDays, "SESJE W TYGODNIU", "7", "text-cyan-300"],
-                  [TrendingUp, "ÅšREDNI RR", "2.45", "text-cyan-300"],
+                  [TrendingUp, "ŚREDNI RR", "2.45", "text-cyan-300"],
                   [Activity, "WYGRANE", "78%", "text-emerald-300"],
                   [ShieldCheck, "TRANSAKCJE", "152", "text-slate-300"],
                 ].map(([Icon, label, value, color]) => {
@@ -726,11 +601,11 @@ export default function SesjePage() {
         {/* BOTTOM STRIP */}
         <section className="mt-3 grid overflow-hidden rounded-[14px] border border-cyan-200/30 bg-[linear-gradient(180deg,#0b5795,#073b6b)] sm:grid-cols-2 xl:grid-cols-5">
           {[
-            [Radio, "SESSION LIVE", "Sesje z analizÄ… i transakcjami na Å¼ywo", "text-violet-300"],
-            [Zap, "SCALPING LIVE", "Szybkie setupy i scalping na Å¼ywo", "text-cyan-300"],
-            [CalendarDays, "7 DNI W TYGODNIU", "PeÅ‚ny harmonogram sesji live", "text-cyan-300"],
-            [Crown, "PRO QUALITY", "Profesjonalna edukacja i realne podejÅ›cie do rynku", "text-violet-300"],
-            [Bell, "POWIADOMIENIA", "Nie przegap Å¼adnej waÅ¼nej sesji", "text-amber-300"],
+            [Radio, "SESSION LIVE", "Sesje z analizą i transakcjami na żywo", "text-violet-300"],
+            [Zap, "SCALPING LIVE", "Szybkie setupy i scalping na żywo", "text-cyan-300"],
+            [CalendarDays, "7 DNI W TYGODNIU", "Pełny harmonogram sesji live", "text-cyan-300"],
+            [Crown, "PRO QUALITY", "Profesjonalna edukacja i realne podejście do rynku", "text-violet-300"],
+            [Bell, "POWIADOMIENIA", "Nie przegap żadnej ważnej sesji", "text-amber-300"],
           ].map(([Icon, title, text, color], index) => {
             const InfoIcon = Icon as typeof Radio;
             return (
@@ -757,11 +632,10 @@ export default function SesjePage() {
         <footer className="mt-3 flex items-center justify-center gap-4 py-2 text-[8px] font-semibold uppercase tracking-[.30em] text-cyan-100/55">
           <span className="h-px w-28 bg-cyan-500/20" />
           <ShieldCheck className="h-4 w-4 text-cyan-400" />
-          FX TRADE PROFESSIONAL â€“ TRADING Z PROFESJONALISTAMI
+          FX TRADE PROFESSIONAL – TRADING Z PROFESJONALISTAMI
           <span className="h-px w-28 bg-cyan-500/20" />
         </footer>
       </div>
     </main>
   );
 }
-

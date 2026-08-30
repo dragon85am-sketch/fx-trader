@@ -108,7 +108,7 @@ export default async function HomePage() {
               className="hidden items-center gap-2 rounded-lg border border-sky-400/42 bg-[#06335C] px-4 py-2.5 text-[12px] font-semibold transition hover:border-sky-400/46 sm:flex"
             >
               <User className="h-4 w-4 text-sky-400" />
-              Zaloguj siÄ™
+              Zaloguj się
             </Link>
 
             <Link
@@ -116,7 +116,7 @@ export default async function HomePage() {
               className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-sky-500 via-blue-600 to-blue-700 px-4 py-2.5 text-[12px] font-bold shadow-[0_0_26px_rgba(37,99,235,.26)] transition hover:brightness-110"
             >
               <Crown className="h-4 w-4" />
-              Kup dostÄ™p do platformy
+              Kup dostęp do platformy
             </Link>
           </div>
         </div>
@@ -126,7 +126,7 @@ export default async function HomePage() {
         {/* HERO */}
         <section className="grid items-center gap-7 py-6 lg:grid-cols-[0.86fr_1.14fr]">
           <div className="relative isolate">
-          {/* STATIC HERO CANDLES â€” anchored to hero, do not follow scroll */}
+          {/* STATIC HERO CANDLES — anchored to hero, do not follow scroll */}
           <div className="pointer-events-none absolute right-[-30px] top-[18px] z-0 hidden h-[360px] w-[310px] xl:block">
             {[
               [10, 238, 54, 18],
@@ -184,31 +184,31 @@ export default async function HomePage() {
             </h1>
 
             <p className="mt-6 max-w-[620px] text-[13px] leading-6 text-slate-400">
-              Zaawansowane narzÄ™dzia do analizy rynku, wyszukiwania
-              potencjalnych setupÃ³w oraz uporzÄ…dkowanej edukacji
-              tradingowej w jednym profesjonalnym Å›rodowisku.
+              Zaawansowane narzędzia do analizy rynku, wyszukiwania
+              potencjalnych setupów oraz uporządkowanej edukacji
+              tradingowej w jednym profesjonalnym środowisku.
             </p>
 
             <div id="funkcje" className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
               <MiniFeature
                 icon={<Target />}
-                title="ZnajdÅº najlepsze setupy"
+                title="Znajdź najlepsze setupy"
                 text="Skanery rynku w czasie rzeczywistym"
               />
               <MiniFeature
                 icon={<TrendingUp />}
                 title="Analizuj profesjonalnie"
-                text="WskaÅºniki, wykresy i dane"
+                text="Wskaźniki, wykresy i dane"
               />
               <MiniFeature
                 icon={<ShieldCheck />}
                 title="Handluj z planem"
-                text="Strategie i uporzÄ…dkowany proces"
+                text="Strategie i uporządkowany proces"
               />
               <MiniFeature
                 icon={<BookOpen />}
-                title="Rozwijaj wiedzÄ™"
-                text="Kursy, analizy i materiaÅ‚y"
+                title="Rozwijaj wiedzę"
+                text="Kursy, analizy i materiały"
               />
             </div>
 
@@ -218,7 +218,7 @@ export default async function HomePage() {
                 className="group flex min-w-[235px] items-center justify-center gap-3 rounded-lg bg-gradient-to-r from-sky-500 via-blue-600 to-blue-700 px-6 py-3.5 text-[12px] font-bold shadow-[0_0_34px_rgba(37,99,235,.24)] transition hover:brightness-110"
               >
                 <Crown className="h-4 w-4" />
-                Kup dostÄ™p do platformy
+                Kup dostęp do platformy
                 <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-1" />
               </Link>
 
@@ -227,7 +227,7 @@ export default async function HomePage() {
                 className="flex min-w-[190px] items-center justify-center gap-2 rounded-lg border border-sky-400/46 bg-[#073A6A] px-6 py-3.5 text-[12px] font-semibold text-sky-200 transition hover:bg-sky-500/[0.07]"
               >
                 <User className="h-4 w-4" />
-                Zarejestruj siÄ™
+                Zarejestruj się
               </Link>
             </div>
           </div>
@@ -275,10 +275,10 @@ export default async function HomePage() {
 
         {/* STATS */}
         <section className="grid overflow-hidden rounded-[14px] border border-sky-300/45 bg-[#06335C]/92 sm:grid-cols-2 xl:grid-cols-4">
-          <BigStat icon={<Radar />} value="5" text="SkanerÃ³w dostÄ™pnych" />
-          <BigStat icon={<TrendingUp />} value="10+" text="RynkÃ³w obsÅ‚ugiwanych" />
-          <BigStat icon={<Zap />} value="24/7" text="DostÄ™p do platformy" />
-          <BigStat icon={<BrainCircuit />} value="AI" text="NarzÄ™dzia analityczne" />
+          <BigStat icon={<Radar />} value="5" text="Skanerów dostępnych" />
+          <BigStat icon={<TrendingUp />} value="10+" text="Rynków obsługiwanych" />
+          <BigStat icon={<Zap />} value="24/7" text="Dostęp do platformy" />
+          <BigStat icon={<BrainCircuit />} value="AI" text="Narzędzia analityczne" />
         </section>
 
         {/* 4 MAIN CARDS */}
@@ -287,18 +287,18 @@ export default async function HomePage() {
             id="scanner"
             icon={<Radar />}
             title="Skaner Rynku"
-            description="Skanuj wiele instrumentÃ³w w czasie rzeczywistym i filtruj potencjalne okazje."
+            description="Skanuj wiele instrumentów w czasie rzeczywistym i filtruj potencjalne okazje."
             image="/home/market-scanner.png"
             href="/skaner"
-            button="OtwÃ³rz skaner"
+            button="Otwórz skaner"
           />
           <FeatureCard
             icon={<BarChart3 />}
             title="Wykresy Premium"
-            description="Zaawansowane wykresy i narzÄ™dzia analizy technicznej."
+            description="Zaawansowane wykresy i narzędzia analizy technicznej."
             image="/home/premium-chart.png"
             href="/dashboard"
-            button="OtwÃ³rz wykresy"
+            button="Otwórz wykresy"
           />
           <FeatureCard
             id="strategie"
@@ -313,10 +313,10 @@ export default async function HomePage() {
             id="edukacja"
             icon={<GraduationCap />}
             title="Edukacja"
-            description="Rozwijaj umiejÄ™tnoÅ›ci dziÄ™ki kursom, webinarom i analizom."
+            description="Rozwijaj umiejętności dzięki kursom, webinarom i analizom."
             image="/home/education.png"
             href="/edukacja"
-            button="OtwÃ³rz edukacjÄ™"
+            button="Otwórz edukację"
           />
         </section>
 
@@ -324,23 +324,23 @@ export default async function HomePage() {
         <section className="grid overflow-hidden rounded-[14px] border border-sky-300/45 bg-[#06335C]/92 sm:grid-cols-2 xl:grid-cols-4">
           <Benefit
             icon={<LockKeyhole />}
-            title="BezpieczeÅ„stwo"
-            text="Bezpieczny dostÄ™p do platformy i Twoich danych."
+            title="Bezpieczeństwo"
+            text="Bezpieczny dostęp do platformy i Twoich danych."
           />
           <Benefit
             icon={<Zap />}
-            title="SzybkoÅ›Ä‡"
-            text="DostÄ™p do narzÄ™dzi i danych w jednym miejscu."
+            title="Szybkość"
+            text="Dostęp do narzędzi i danych w jednym miejscu."
           />
           <Benefit
             icon={<ShieldCheck />}
-            title="NiezawodnoÅ›Ä‡"
-            text="Stabilne Å›rodowisko stworzone dla traderÃ³w."
+            title="Niezawodność"
+            text="Stabilne środowisko stworzone dla traderów."
           />
           <Benefit
             icon={<Headphones />}
             title="Wsparcie 24/7"
-            text="JesteÅ›my tu dla Ciebie przez caÅ‚Ä… dobÄ™."
+            text="Jesteśmy tu dla Ciebie przez całą dobę."
           />
         </section>
 
@@ -349,24 +349,24 @@ export default async function HomePage() {
           className="mt-3 rounded-[12px] border border-sky-200/25 bg-sky-300/[0.035] px-4 py-3"
         >
           <p className="text-[9px] leading-5 text-slate-400">
-            DostÄ™p do Platformy Edukacyjnej FX Trade Professional Trading
+            Dostęp do Platformy Edukacyjnej FX Trade Professional Trading
             obejmuje kurs tradingu, strategie rynkowe, dashboard analityczny
-            oraz narzÄ™dzia wspierajÄ…ce proces analizy i podejmowania
-            samodzielnych decyzji tradingowych. Produkt ma charakter wyÅ‚Ä…cznie
+            oraz narzędzia wspierające proces analizy i podejmowania
+            samodzielnych decyzji tradingowych. Produkt ma charakter wyłącznie
             edukacyjny i informacyjny. Nie stanowi porady inwestycyjnej ani
-            rekomendacji finansowej. Trading na rynkach finansowych wiÄ…Å¼e siÄ™
-            z ryzykiem utraty kapitaÅ‚u.
+            rekomendacji finansowej. Trading na rynkach finansowych wiąże się
+            z ryzykiem utraty kapitału.
           </p>
         </section>
 
         <footer className="flex flex-col items-center justify-between gap-4 py-4 text-[8px] text-slate-500 sm:flex-row">
-          <span>Â© 2026 FX Trade Professional Trading.</span>
+          <span>© 2026 FX Trade Professional Trading.</span>
           <div className="flex gap-5">
             <Link href="/regulamin" className="hover:text-slate-400">
               Regulamin
             </Link>
             <Link href="/polityka-prywatnosci" className="hover:text-slate-400">
-              Polityka prywatnoÅ›ci
+              Polityka prywatności
             </Link>
             <Link href="/kontakt" className="hover:text-slate-400">
               Kontakt

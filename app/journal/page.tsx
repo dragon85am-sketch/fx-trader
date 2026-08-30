@@ -6,8 +6,6 @@ import {
   Brain,
   CalendarDays,
   CheckCircle2,
-  CircleDollarSign,
-  Gauge,
   Gem,
   LineChart,
   Pencil,
@@ -79,7 +77,7 @@ function parseCsvLine(line: string): string[] {
 }
 
 export default function FxTradeJournalProPage() {
-  const [activeJournalTab, setActiveJournalTab] = useState("PrzeglÄ…d");
+  const [activeJournalTab, setActiveJournalTab] = useState("Przegląd");
   const [showAddTradeModal, setShowAddTradeModal] = useState(false);
   const [editingTradeId, setEditingTradeId] = useState<string | null>(null);
 
@@ -92,8 +90,8 @@ export default function FxTradeJournalProPage() {
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // WAÅ»NE: pierwszy render serwera i klienta musi byÄ‡ identyczny.
-  // Nie czytamy localStorage bezpoÅ›rednio w useState, bo powoduje hydration mismatch.
+  // WAŻNE: pierwszy render serwera i klienta musi być identyczny.
+  // Nie czytamy localStorage bezpośrednio w useState, bo powoduje hydration mismatch.
   const [trades, setTrades] = useState<JournalTrade[]>([]);
   const [storageReady, setStorageReady] = useState(false);
 
@@ -183,7 +181,7 @@ export default function FxTradeJournalProPage() {
         ]);
       }
     } catch (err) {
-      console.error("BÅ‚Ä…d odczytu localStorage:", err);
+      console.error("Błąd odczytu localStorage:", err);
     }
 
     try {
@@ -192,9 +190,9 @@ export default function FxTradeJournalProPage() {
         setTradingPlan(JSON.parse(savedPlan));
       }
     } catch (err) {
-      console.error("BÅ‚Ä…d odczytu trading plan:", err);
+      console.error("Błąd odczytu trading plan:", err);
     } finally {
-      // Dopiero od tej chwili wolno zapisywaÄ‡ stan z powrotem do localStorage.
+      // Dopiero od tej chwili wolno zapisywać stan z powrotem do localStorage.
       setStorageReady(true);
     }
   }, []);
@@ -205,13 +203,13 @@ export default function FxTradeJournalProPage() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(trades));
     } catch (err) {
-      console.error("BÅ‚Ä…d zapisu do localStorage:", err);
-      alert("Nie udaÅ‚o siÄ™ zapisaÄ‡ trade. Screenshot jest prawdopodobnie za duÅ¼y.");
+      console.error("Błąd zapisu do localStorage:", err);
+      alert("Nie udało się zapisać trade. Screenshot jest prawdopodobnie za duży.");
     }
   }, [trades, storageReady]);
 
  const journalTabs = [
-  "PrzeglÄ…d",
+  "Przegląd",
   "Wszystkie trade'y",
   "Statystyki",
   "Strategie",
@@ -416,14 +414,14 @@ const equityCurve = useMemo(() => {
   }, [trades]);
 
   const aiInsight = useMemo(() => {
-    if (!trades.length) return "Dodaj kilka tradeâ€™Ã³w, a pojawi siÄ™ analiza.";
+    if (!trades.length) return "Dodaj kilka trade’ów, a pojawi się analiza.";
 
     const bestPair = pairStats.bestPair;
     const worstPair = pairStats.worstPair;
 
-    if (!bestPair || !worstPair) return "Za maÅ‚o danych do peÅ‚nej analizy.";
+    if (!bestPair || !worstPair) return "Za mało danych do pełnej analizy.";
 
-    return `Najlepsza para: ${bestPair[0]} (${bestPair[1].toFixed(2)}R). NajsÅ‚absza para: ${worstPair[0]} (${worstPair[1].toFixed(2)}R). Win rate: ${performance.winRate.toFixed(0)}%. Expectancy: ${performance.expectancy.toFixed(2)}R. Ogranicz sÅ‚absze pary i skup siÄ™ na setupach z najwyÅ¼szym expectancy.`;
+    return `Najlepsza para: ${bestPair[0]} (${bestPair[1].toFixed(2)}R). Najsłabsza para: ${worstPair[0]} (${worstPair[1].toFixed(2)}R). Win rate: ${performance.winRate.toFixed(0)}%. Expectancy: ${performance.expectancy.toFixed(2)}R. Ogranicz słabsze pary i skup się na setupach z najwyższym expectancy.`;
   }, [trades, pairStats, performance.winRate, performance.expectancy]);
 
   const topStats = [
@@ -572,7 +570,7 @@ const equityCurve = useMemo(() => {
         setTrades((prev) => [...imported, ...prev]);
       } catch (err) {
         console.error(err);
-        alert("Nie udaÅ‚o siÄ™ zaimportowaÄ‡ CSV.");
+        alert("Nie udało się zaimportować CSV.");
       } finally {
         e.target.value = "";
       }
@@ -582,16 +580,8 @@ const equityCurve = useMemo(() => {
   };
 
   const handleSaveTrade = () => {
-    const saveTradesToStorage = (nextTrades: JournalTrade[]) => {
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify(nextTrades)
-  );
-
-  setTrades(nextTrades);
-};
     if (!form.pair || !form.entry || !form.rr || !form.date) {
-      alert("UzupeÅ‚nij wymagane pola: data, para, entry, RR.");
+      alert("Uzupełnij wymagane pola: data, para, entry, RR.");
       return;
     }
 
@@ -608,7 +598,7 @@ const equityCurve = useMemo(() => {
       setActiveJournalTab("Wszystkie trade'y");
     } catch (err) {
       console.error(err);
-      alert("Nie udaÅ‚o siÄ™ zapisaÄ‡ trade.");
+      alert("Nie udało się zapisać trade.");
     }
   };
 
@@ -648,7 +638,7 @@ const equityCurve = useMemo(() => {
   };
 
   const weekdayPerformance = useMemo(() => {
-    const names = ["Niedz", "Pon", "Wt", "Åšr", "Czw", "Pt", "Sob"];
+    const names = ["Niedz", "Pon", "Wt", "Śr", "Czw", "Pt", "Sob"];
     const sums = Array.from({ length: 7 }, () => 0);
 
     for (const trade of trades) {
@@ -672,18 +662,6 @@ const equityCurve = useMemo(() => {
   const avgDurationLabel = "2h 35m";
   const maxProfitR = trades.length ? Math.max(...trades.map((t) => t.resultR)) : 0;
   const maxLossR = trades.length ? Math.min(...trades.map((t) => t.resultR)) : 0;
-
-  const maxEquity = Math.max(...equityCurve.map((p) => p.value), 1);
-  const minEquity = Math.min(...equityCurve.map((p) => p.value), 0);
-  const range = Math.max(maxEquity - minEquity, 1);
-
-  const points = equityCurve
-    .map((point, i) => {
-      const x = 40 + (i * 760) / Math.max(equityCurve.length - 1, 1);
-      const y = 280 - ((point.value - minEquity) / range) * 220;
-      return `${x},${y}`;
-    })
-    .join(" ");
 
   return (
     <div className="relative isolate overflow-hidden min-h-screen w-full text-white" style={{ backgroundColor: "#020817" }}>
@@ -909,7 +887,7 @@ const equityCurve = useMemo(() => {
             </div>
           </section>
 
-          {(activeJournalTab === "PrzeglÄ…d" || activeJournalTab === "Wszystkie trade'y") && (
+          {(activeJournalTab === "Przegląd" || activeJournalTab === "Wszystkie trade'y") && (
             <section className="mt-3 overflow-hidden rounded-[12px] border border-sky-400/30 bg-[linear-gradient(180deg,rgba(9,67,126,.96)_0%,rgba(5,35,73,.98)_100%)] shadow-[0_12px_34px_rgba(0,0,0,.16),0_0_22px_rgba(14,165,233,.06),inset_0_1px_0_rgba(255,255,255,.045)] p-3">
               <div className="mb-4 flex flex-wrap gap-3">
                 <input placeholder="Pair (np. XAUUSD)" value={filterPair} onChange={(e) => setFilterPair(e.target.value)} className="rounded-[8px] border border-sky-300/35 bg-[linear-gradient(145deg,#06294f,#041b36)] px-3 py-2 text-[11px] outline-none placeholder:text-sky-100/35" />
@@ -933,7 +911,7 @@ const equityCurve = useMemo(() => {
             </section>
           )}
 
-          {activeJournalTab === "PrzeglÄ…d" && (
+          {activeJournalTab === "Przegląd" && (
             <>
               <div className="mt-3 grid gap-3 xl:grid-cols-3">
                 <section className="rounded-[12px] border border-sky-400/30 bg-[radial-gradient(circle_at_15%_10%,rgba(125,211,252,.18),transparent_30%),linear-gradient(145deg,rgba(24,90,145,.98),rgba(9,54,94,.98))] shadow-[0_12px_32px_rgba(0,0,0,.16),0_0_20px_rgba(14,165,233,.055),inset_0_1px_0_rgba(255,255,255,.04)] p-4">
@@ -948,7 +926,7 @@ const equityCurve = useMemo(() => {
                           <span className={`h-3 w-3 rounded-full ${item.color}`} />
                           <div>
                             <p className="text-[12px] font-medium">{item.name}</p>
-                            <p className="text-[9px] text-sky-100/45">{item.pct}% udziaÅ‚u</p>
+                            <p className="text-[9px] text-sky-100/45">{item.pct}% udziału</p>
                           </div>
                         </div>
 
@@ -977,7 +955,7 @@ const equityCurve = useMemo(() => {
                         {aiInsight}
                       </div>
                       <p className="mt-3 text-[10px] leading-4 text-sky-100/45">
-                        Analiza aktualizuje siÄ™ automatycznie na podstawie Twoich zapisanych transakcji.
+                        Analiza aktualizuje się automatycznie na podstawie Twoich zapisanych transakcji.
                       </p>
                     </div>
                   </div>
@@ -1014,12 +992,12 @@ const equityCurve = useMemo(() => {
 
               <div className="mt-3 grid gap-3 xl:grid-cols-[2.1fr_.85fr]">
                 <section className="rounded-[12px] border border-sky-400/30 bg-[radial-gradient(circle_at_15%_10%,rgba(125,211,252,.18),transparent_30%),linear-gradient(145deg,rgba(24,90,145,.98),rgba(9,54,94,.98))] shadow-[0_12px_32px_rgba(0,0,0,.16),0_0_20px_rgba(14,165,233,.055),inset_0_1px_0_rgba(255,255,255,.04)] p-4">
-                  <h2 className="mb-3 text-[16px] font-semibold">Twoje statystyki w skrÃ³cie</h2>
+                  <h2 className="mb-3 text-[16px] font-semibold">Twoje statystyki w skrócie</h2>
 
                   <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
                     {[
-                      ["Åšredni RR", performance.avgRR.toFixed(2), "text-white"],
-                      ["Åšredni czas trwania", avgDurationLabel, "text-white"],
+                      ["Średni RR", performance.avgRR.toFixed(2), "text-white"],
+                      ["Średni czas trwania", avgDurationLabel, "text-white"],
                       ["Maksymalny profit", `${maxProfitR >= 0 ? "+" : ""}${maxProfitR.toFixed(2)}R`, "text-emerald-300"],
                       ["Maksymalna strata", `${maxLossR.toFixed(2)}R`, "text-rose-300"],
                       ["Profit Factor", performance.profitFactor.toFixed(2), "text-white"],
@@ -1035,11 +1013,11 @@ const equityCurve = useMemo(() => {
 
                 <section className="flex min-h-[120px] items-center rounded-[12px] border border-sky-400/30 bg-[radial-gradient(circle_at_15%_10%,rgba(125,211,252,.18),transparent_30%),linear-gradient(145deg,rgba(24,90,145,.98),rgba(9,54,94,.98))] shadow-[0_12px_32px_rgba(0,0,0,.16),0_0_20px_rgba(14,165,233,.055),inset_0_1px_0_rgba(255,255,255,.04)] p-5">
                   <div>
-                    <div className="text-[36px] leading-none text-[#20a8ff]">â€œ</div>
+                    <div className="text-[36px] leading-none text-[#20a8ff]">“</div>
                     <p className="text-[13px] italic leading-6 text-sky-50/80">
-                      Dyscyplina w planie, konsekwencja w dziaÅ‚aniu, wolnoÅ›Ä‡ w Å¼yciu.
+                      Dyscyplina w planie, konsekwencja w działaniu, wolność w życiu.
                     </p>
-                    <p className="mt-2 text-[10px] text-sky-100/45">â€“ FX Trade Premium</p>
+                    <p className="mt-2 text-[10px] text-sky-100/45">– FX Trade Premium</p>
                   </div>
                 </section>
               </div>
@@ -1075,7 +1053,7 @@ const equityCurve = useMemo(() => {
                       </div>
 
                       <p className="mt-1 text-[12px] text-sky-100/50">
-                        Oblicz dzienny target, ryzyko i plan na miesiÄ…c.
+                        Oblicz dzienny target, ryzyko i plan na miesiąc.
                       </p>
                     </div>
                   </div>
@@ -1104,7 +1082,7 @@ const equityCurve = useMemo(() => {
                         <div>
                           <h3 className="text-[18px] font-bold">Plan Parameters</h3>
                           <p className="mt-1 text-[10px] text-sky-100/40">
-                            Ustaw parametry planu przed aktywacjÄ….
+                            Ustaw parametry planu przed aktywacją.
                           </p>
                         </div>
                         <span className="rounded-lg border border-sky-400/20 bg-sky-500/10 px-3 py-2 text-[10px] text-sky-300">
@@ -1182,7 +1160,7 @@ const equityCurve = useMemo(() => {
                       </div>
 
                       <div className="mt-5 rounded-xl border border-amber-400/15 bg-amber-500/[0.06] px-4 py-3 text-[10px] text-amber-200/80">
-                        ðŸ’¡ Zasada: maÅ‚e ryzyko, konsekwencja, dÅ‚ugoterminowy zysk.
+                        💡 Zasada: małe ryzyko, konsekwencja, długoterminowy zysk.
                       </div>
                     </div>
 
@@ -1375,7 +1353,7 @@ const equityCurve = useMemo(() => {
                         </div>
                         <div>
                           <p className="text-[12px] font-black">
-                            Handluj wedÅ‚ug planu â€“ emocje zostaw poza rynkiem.
+                            Handluj według planu – emocje zostaw poza rynkiem.
                           </p>
                           <p className="mt-1 text-[10px] text-sky-100/40">
                             Konsekwencja tworzy wyniki.
@@ -1387,7 +1365,7 @@ const equityCurve = useMemo(() => {
                         { icon: ShieldCheck, title: "Dyscyplina", desc: "Klucz do sukcesu" },
                         { icon: BarChart3, title: "Konsekwencja", desc: "Codzienna przewaga" },
                         { icon: Brain, title: "Psychologia", desc: "Kontrola emocji" },
-                        { icon: Gem, title: "DÅ‚ugoterminowy zysk", desc: "TwÃ³j cel" },
+                        { icon: Gem, title: "Długoterminowy zysk", desc: "Twój cel" },
                       ].map(({ icon: Icon, title, desc }) => (
                         <div
                           key={title}
@@ -1444,7 +1422,7 @@ const equityCurve = useMemo(() => {
                         <span className={`h-4 w-4 rounded-full ${item.color}`} />
                         <div>
                           <p className="font-medium">{item.name}</p>
-                          <p className="text-sm text-sky-100/45">{item.pct}% udziaÅ‚u</p>
+                          <p className="text-sm text-sky-100/45">{item.pct}% udziału</p>
                         </div>
                       </div>
                       <p className={`text-xl font-semibold ${item.value.startsWith("-") ? "text-rose-400" : "text-emerald-400"}`}>{item.value}</p>
@@ -1459,7 +1437,7 @@ const equityCurve = useMemo(() => {
                   {strategySummary.map((item) => (
                     <div key={item.name} className="rounded-[10px] border border-sky-400/20 bg-[linear-gradient(145deg,#06284d,#041b36)] shadow-[inset_0_1px_0_rgba(255,255,255,.025)] p-4">
                       <p className="text-lg font-medium">{item.name}</p>
-                      <p className="mt-2 text-sky-100/45">Strategia {item.name} dziaÅ‚a najlepiej przy wysokiej pÅ‚ynnoÅ›ci i potwierdzeniu kierunku.</p>
+                      <p className="mt-2 text-sky-100/45">Strategia {item.name} działa najlepiej przy wysokiej płynności i potwierdzeniu kierunku.</p>
                     </div>
                   ))}
                 </div>
@@ -1496,8 +1474,8 @@ const equityCurve = useMemo(() => {
           {activeJournalTab === "Ustawienia" && (
             <section className="mt-6 grid gap-6 md:grid-cols-2">
               <div className="rounded-[12px] border border-sky-400/30 bg-[radial-gradient(circle_at_15%_10%,rgba(125,211,252,.18),transparent_30%),linear-gradient(145deg,rgba(24,90,145,.98),rgba(9,54,94,.98))] shadow-[0_12px_32px_rgba(0,0,0,.16),0_0_20px_rgba(14,165,233,.055),inset_0_1px_0_rgba(255,255,255,.04)] p-6 backdrop-blur">
-                <p className="text-lg font-semibold">DomyÅ›lny widok</p>
-                <p className="mt-2 text-sky-100/45">PrzeglÄ…d</p>
+                <p className="text-lg font-semibold">Domyślny widok</p>
+                <p className="mt-2 text-sky-100/45">Przegląd</p>
               </div>
               <div className="rounded-[12px] border border-sky-400/30 bg-[radial-gradient(circle_at_15%_10%,rgba(125,211,252,.18),transparent_30%),linear-gradient(145deg,rgba(24,90,145,.98),rgba(9,54,94,.98))] shadow-[0_12px_32px_rgba(0,0,0,.16),0_0_20px_rgba(14,165,233,.055),inset_0_1px_0_rgba(255,255,255,.04)] p-6 backdrop-blur">
                 <p className="text-lg font-semibold">Import brokera</p>
@@ -1514,7 +1492,7 @@ const equityCurve = useMemo(() => {
             <div className="mb-5 flex items-center justify-between">
               <h3 className="text-2xl font-semibold">{editingTradeId ? "Edytuj trade" : "Add Trade"}</h3>
               <button onClick={() => { setShowAddTradeModal(false); resetForm(); }} className="rounded-xl border border-sky-300/30 px-3 py-2 text-sky-100/70 hover:bg-white/10">
-                âœ•
+                ✕
               </button>
             </div>
 
@@ -1554,12 +1532,12 @@ const equityCurve = useMemo(() => {
 
               <div className="md:col-span-2">
                 <label className="mb-2 block text-sm text-sky-100/70">Notes</label>
-                <textarea value={form.notes} onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))} placeholder="opis trade'a, dlaczego wejÅ›cie, co byÅ‚o dobrze/Åºle" rows={5} className="w-full rounded-[9px] border border-sky-300/35 bg-[linear-gradient(145deg,#06294f,#041b36)] px-4 py-3 outline-none" />
+                <textarea value={form.notes} onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))} placeholder="opis trade'a, dlaczego wejście, co było dobrze/źle" rows={5} className="w-full rounded-[9px] border border-sky-300/35 bg-[linear-gradient(145deg,#06294f,#041b36)] px-4 py-3 outline-none" />
               </div>
 
               {form.screenshot && (
                 <div className="md:col-span-2">
-                  <p className="mb-2 text-sm text-sky-100/70">PodglÄ…d screena</p>
+                  <p className="mb-2 text-sm text-sky-100/70">Podgląd screena</p>
                   <img src={form.screenshot} alt="preview" className="h-52 w-full rounded-xl border border-sky-300/30 object-cover" />
                 </div>
               )}
@@ -1581,16 +1559,16 @@ const equityCurve = useMemo(() => {
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 p-4" onClick={() => setPreviewImage(null)}>
           <div className="relative max-h-[95vh] max-w-[95vw]" onClick={(e) => e.stopPropagation()}>
             <button onClick={() => setPreviewImage(null)} className="absolute -right-2 -top-2 z-10 rounded-full border border-white/20 bg-[#041b36] px-3 py-2 text-sm text-white hover:bg-white/10">
-              âœ•
+              ✕
             </button>
 
             {screenshotTrades.length > 1 && (
               <>
                 <button onClick={showPrevImage} className="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full border border-white/20 bg-[#041b36]/90 px-4 py-3 text-white hover:bg-white/10">
-                  â—€
+                  ◀
                 </button>
                 <button onClick={showNextImage} className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full border border-white/20 bg-[#041b36]/90 px-4 py-3 text-white hover:bg-white/10">
-                  â–¶
+                  ▶
                 </button>
               </>
             )}
@@ -1655,7 +1633,7 @@ function TradeTable({
               <td className="px-3 py-3">
                 <div className="flex gap-2">
                   <button onClick={() => onEdit(trade)} className="rounded-xl bg-yellow-500/20 px-3 py-2 text-sm text-yellow-300">Edytuj</button>
-                  <button onClick={() => onDelete(trade.id)} className="rounded-xl border border-rose-400/20 bg-rose-500/10 px-3 py-2 text-sm text-rose-300 hover:bg-rose-500/20">UsuÅ„</button>
+                  <button onClick={() => onDelete(trade.id)} className="rounded-xl border border-rose-400/20 bg-rose-500/10 px-3 py-2 text-sm text-rose-300 hover:bg-rose-500/20">Usuń</button>
                 </div>
               </td>
             </tr>
@@ -1696,8 +1674,8 @@ function TradingPlanCalendar({
   onNext: () => void;
 }) {
   const monthNames = [
-    "StyczeÅ„", "Luty", "Marzec", "KwiecieÅ„", "Maj", "Czerwiec",
-    "Lipiec", "SierpieÅ„", "WrzesieÅ„", "PaÅºdziernik", "Listopad", "GrudzieÅ„",
+    "Styczeń", "Luty", "Marzec", "Kwiecień", "Maj", "Czerwiec",
+    "Lipiec", "Sierpień", "Wrzesień", "Październik", "Listopad", "Grudzień",
   ];
 
   const statusClass = (status: string) => {
@@ -1729,7 +1707,7 @@ function TradingPlanCalendar({
             onClick={onPrev}
             className="flex h-9 w-9 items-center justify-center rounded-lg border border-cyan-300/45 bg-[#062a4a] text-cyan-100 shadow-[0_0_14px_rgba(34,211,238,.14)] transition hover:border-cyan-200/70 hover:bg-[#0a3a64]"
           >
-            â€¹
+            ‹
           </button>
           <span className="min-w-[125px] text-center text-[11px] font-bold">
             {monthNames[data.month - 1]} {data.year}
@@ -1739,13 +1717,13 @@ function TradingPlanCalendar({
             onClick={onNext}
             className="flex h-9 w-9 items-center justify-center rounded-lg border border-cyan-300/45 bg-[#062a4a] text-cyan-100 shadow-[0_0_14px_rgba(34,211,238,.14)] transition hover:border-cyan-200/70 hover:bg-[#0a3a64]"
           >
-            â€º
+            ›
           </button>
         </div>
       </div>
 
       <div className="mt-4 grid grid-cols-7 gap-1 text-center text-[9px] font-bold text-sky-100/40">
-        {["Pon", "Wt", "Åšr", "Czw", "Pt", "Sob", "Ndz"].map((d) => (
+        {["Pon", "Wt", "Śr", "Czw", "Pt", "Sob", "Ndz"].map((d) => (
           <div key={d} className="py-1">{d}</div>
         ))}
       </div>
@@ -1755,7 +1733,7 @@ function TradingPlanCalendar({
           cell ? (
             <div
               key={cell.date}
-              title={`${cell.date} â€¢ ${cell.trades} trade â€¢ ${cell.pnl >= 0 ? "+" : ""}${cell.pnl.toFixed(2)} USD`}
+              title={`${cell.date} • ${cell.trades} trade • ${cell.pnl >= 0 ? "+" : ""}${cell.pnl.toFixed(2)} USD`}
               className={`min-h-[72px] rounded-xl border p-2.5 ${statusClass(cell.status)}`}
             >
               <div className="text-[11px] font-bold text-white/80">{cell.day}</div>
@@ -1764,7 +1742,7 @@ function TradingPlanCalendar({
                   {cell.pnl >= 0 ? "+" : ""}{cell.pnl.toFixed(2)}
                 </div>
               ) : (
-                <div className="mt-3 text-[10px]">â€”</div>
+                <div className="mt-3 text-[10px]">—</div>
               )}
             </div>
           ) : (
@@ -1774,10 +1752,10 @@ function TradingPlanCalendar({
       </div>
 
       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-[9px] text-sky-100/55">
-        <span><b className="text-emerald-300">â—</b> TARGET</span>
-        <span><b className="text-amber-300">â—</b> PARTIAL</span>
-        <span><b className="text-rose-300">â—</b> LOSS</span>
-        <span><b className="text-sky-100/30">â—</b> NO TRADE</span>
+        <span><b className="text-emerald-300">●</b> TARGET</span>
+        <span><b className="text-amber-300">●</b> PARTIAL</span>
+        <span><b className="text-rose-300">●</b> LOSS</span>
+        <span><b className="text-sky-100/30">●</b> NO TRADE</span>
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
@@ -1946,7 +1924,7 @@ function MiniPlanBox({ label, value }: { label: string; value: string }) {
 function Checklist({ text, failed }: { text: string; failed?: boolean }) {
   return (
     <div className="mb-2.5 flex items-center gap-2 text-[11px]">
-      <span className={`flex h-5 w-5 items-center justify-center rounded-full border ${failed ? "border-rose-400/40 bg-rose-500/15 text-rose-300" : "border-emerald-400/35 bg-emerald-500/15 text-emerald-300"}`}>{failed ? "Ã—" : "âœ“"}</span>
+      <span className={`flex h-5 w-5 items-center justify-center rounded-full border ${failed ? "border-rose-400/40 bg-rose-500/15 text-rose-300" : "border-emerald-400/35 bg-emerald-500/15 text-emerald-300"}`}>{failed ? "×" : "✓"}</span>
       <span className="text-sky-50/80">{text}</span>
     </div>
   );
@@ -1985,4 +1963,3 @@ function FormInput({
 
   );
 }
-
