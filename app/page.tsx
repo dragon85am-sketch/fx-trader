@@ -1,7 +1,8 @@
-﻿import { cookies } from "next/headers";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 import {
   ArrowRight,
@@ -103,6 +104,8 @@ export default async function HomePage() {
           </nav>
 
           <div className="flex items-center gap-2.5">
+            <LanguageSwitcher />
+
             <Link
               href="/login"
               className="hidden items-center gap-2 rounded-lg border border-sky-400/42 bg-[#06335C] px-4 py-2.5 text-[12px] font-semibold transition hover:border-sky-400/46 sm:flex"

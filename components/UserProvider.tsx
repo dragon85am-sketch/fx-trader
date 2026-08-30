@@ -14,7 +14,7 @@ type User = {
   name: string | null;
   role: "admin" | "user";
   theme?: "dark" | "light" | "system";
-  language?: "pl" | "en";
+  language?: "pl" | "en" | "de" | "nl" | "es";
 };
 
 type UserContextType = {

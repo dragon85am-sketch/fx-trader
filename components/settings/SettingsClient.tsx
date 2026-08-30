@@ -4,6 +4,10 @@ import React from "react";
 import { toast } from "sonner";
 import DeleteAccountModal from "@/components/settings/DeleteAccountModal";
 import { useLanguage } from "@/components/LanguageProvider";
+import {
+  normalizeLanguage,
+  type AppLanguage,
+} from "@/lib/i18n/catalog";
 
 type MeResponse = {
   user?: {
@@ -28,7 +32,7 @@ type MeResponse = {
 };
 
 export default function SettingsClient() {
-  const { t, setLang } = useLanguage();
+  const { t, lang, setLang, locale } = useLanguage();
 
   // =====================================================
   // PROFILE
@@ -63,7 +67,7 @@ export default function SettingsClient() {
     React.useState("dark");
 
   const [language, setLanguage] =
-    React.useState<"pl" | "en">("pl");
+    React.useState<AppLanguage>(lang);
 
   // =====================================================
   // SECURITY
@@ -163,18 +167,9 @@ export default function SettingsClient() {
           user.theme || "dark"
         );
 
-        const dbLanguage =
-          user.language === "en"
-            ? "en"
-            : "pl";
-
-        setLanguage(dbLanguage);
-        setLang(dbLanguage);
-
-        localStorage.setItem(
-          "lang",
-          dbLanguage
-        );
+        // Nie nadpisuj języka wybranego w górnym przełączniku.
+        // Wejście w /settings ma zachować aktualny język aplikacji.
+        setLanguage(lang);
 
         localStorage.setItem(
           "theme",
@@ -205,7 +200,7 @@ export default function SettingsClient() {
     }
 
     load();
-  }, [setLang]);
+  }, [lang]);
 
   // =====================================================
   // FORMAT DATE
@@ -225,7 +220,7 @@ export default function SettingsClient() {
     }
 
     return new Intl.DateTimeFormat(
-      "pl-PL",
+      locale,
       {
         day: "2-digit",
         month: "2-digit",
@@ -303,9 +298,8 @@ export default function SettingsClient() {
         t("savedSettings")
       );
 
-      setTimeout(() => {
-        window.location.reload();
-      }, 200);
+      // Język aktualizuje się od razu przez LanguageProvider.
+      // Nie przeładowujemy całej strony, więc ekran nie miga.
     } catch (err) {
       console.error(
         "SAVE PROFILE ERROR:",
@@ -1018,9 +1012,7 @@ export default function SettingsClient() {
                     value={language}
                     onChange={(e) => {
                       const newLang =
-                        e.target.value as
-                          | "pl"
-                          | "en";
+                        e.target.value as AppLanguage;
 
                       setLanguage(
                         newLang
@@ -1041,9 +1033,10 @@ export default function SettingsClient() {
                       Polski
                     </option>
 
-                    <option value="en">
-                      English
-                    </option>
+                    <option value="en">English</option>
+                    <option value="de">Deutsch</option>
+                    <option value="nl">Nederlands</option>
+                    <option value="es">Español</option>
                   </select>
 
                 </div>
