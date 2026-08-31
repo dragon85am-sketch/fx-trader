@@ -66,9 +66,9 @@ export default async function HomePage() {
       </div>
 
       {/* NAVBAR */}
-      <header className="relative z-50 border-b border-sky-200/25 bg-[#031A31]/95 backdrop-blur-xl">
-        <div className="mx-auto flex min-h-[64px] w-full max-w-[1380px] items-center justify-between gap-2 px-2 py-2 sm:px-4 md:px-6">
-          <Link href="/" className="relative h-[42px] w-[132px] shrink-0 sm:h-[52px] sm:w-[205px]">
+      <header className="sticky top-0 z-50 border-b border-sky-200/25 bg-[#031A31]/95 backdrop-blur-xl">
+        <div className="mx-auto flex min-h-[60px] w-full max-w-[1380px] items-center justify-between gap-2 px-2 py-2 sm:min-h-[64px] sm:px-4 md:px-6">
+          <Link href="/" className="relative h-[38px] w-[112px] shrink-0 min-[390px]:w-[126px] sm:h-[52px] sm:w-[205px]">
             <Image
               src="/home/logo-fxtrade.png"
               alt="FX Trade Professional Trading"
@@ -103,12 +103,12 @@ export default async function HomePage() {
             </a>
           </nav>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex min-w-0 items-center gap-1.5 sm:gap-2.5">
             <LanguageSwitcher />
 
             <Link
               href="/login"
-              className="hidden items-center gap-2 rounded-lg border border-sky-400/42 bg-[#06335C] px-4 py-2.5 text-[12px] font-semibold transition hover:border-sky-400/46 sm:flex"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-sky-400/42 bg-[#06335C] text-[0px] font-semibold transition hover:border-sky-400/60 sm:h-auto sm:w-auto sm:gap-2 sm:px-4 sm:py-2.5 sm:text-[12px]"
             >
               <User className="h-4 w-4 text-sky-400" />
               Zaloguj się
@@ -116,19 +116,30 @@ export default async function HomePage() {
 
             <Link
               href="/checkout"
-              className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-sky-500 via-blue-600 to-blue-700 px-4 py-2.5 text-[12px] font-bold shadow-[0_0_26px_rgba(37,99,235,.26)] transition hover:brightness-110"
+              className="flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-gradient-to-r from-sky-500 via-blue-600 to-blue-700 px-2.5 text-[10px] font-bold shadow-[0_0_26px_rgba(37,99,235,.26)] transition hover:brightness-110 min-[430px]:px-3 sm:h-auto sm:gap-2 sm:px-4 sm:py-2.5 sm:text-[12px]"
             >
               <Crown className="h-4 w-4" />
-              Kup dostęp do platformy
+              <span className="hidden min-[430px]:inline">Kup dostęp do platformy</span>
+              <span className="min-[430px]:hidden">Kup dostęp</span>
             </Link>
           </div>
         </div>
+
+        <nav className="mx-auto flex w-full max-w-[1380px] gap-1.5 overflow-x-auto px-2 pb-2 text-[10px] font-semibold text-slate-300 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:hidden sm:px-4">
+          <a href="#funkcje" className="shrink-0 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2">Funkcje</a>
+          <a href="#scanner" className="shrink-0 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2">Skaner</a>
+          <a href="#strategie" className="shrink-0 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2">Strategie</a>
+          <a href="#edukacja" className="shrink-0 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2">Edukacja</a>
+          <Link href="/trading-room" className="shrink-0 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2">Trading Room</Link>
+          <Link href="/cennik" className="shrink-0 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2">Cennik</Link>
+          <a href="#onas" className="shrink-0 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2">O nas</a>
+        </nav>
       </header>
 
       <div className="relative z-10 mx-auto w-full min-w-0 max-w-[1380px] px-2 pb-6 sm:px-4 md:px-6">
         {/* HERO */}
         <section className="grid min-w-0 grid-cols-1 items-center gap-5 py-4 sm:gap-7 sm:py-6 lg:grid-cols-[minmax(0,.86fr)_minmax(0,1.14fr)]">
-          <div className="relative isolate">
+          <div className="relative isolate min-w-0">
           {/* STATIC HERO CANDLES — anchored to hero, do not follow scroll */}
           <div className="pointer-events-none absolute right-[-30px] top-[18px] z-0 hidden h-[360px] w-[310px] xl:block">
             {[
@@ -167,7 +178,7 @@ export default async function HomePage() {
             <div className="absolute bottom-[45px] left-[5px] h-[120px] w-[285px] rounded-[50%] border-b border-sky-400/15" />
           </div>
 
-            <div className="mb-5 inline-flex items-center rounded-full border border-sky-400/38 bg-sky-500/[0.06] px-4 py-2 text-[9px] font-bold uppercase tracking-[0.19em] text-sky-400">
+            <div className="mb-4 inline-flex max-w-full items-center rounded-full border border-sky-400/38 bg-sky-500/[0.06] px-3 py-2 text-[8px] font-bold uppercase tracking-[0.10em] text-sky-400 sm:mb-5 sm:px-4 sm:text-[9px] sm:tracking-[0.19em]">
               Profesjonalna platforma tradingowa
             </div>
 
@@ -186,7 +197,7 @@ export default async function HomePage() {
               </span>
             </h1>
 
-            <p className="mt-6 max-w-[620px] text-[13px] leading-6 text-slate-400">
+            <p className="mt-5 max-w-[620px] text-[12px] leading-5 text-slate-400 sm:mt-6 sm:text-[13px] sm:leading-6">
               Zaawansowane narzędzia do analizy rynku, wyszukiwania
               potencjalnych setupów oraz uporządkowanej edukacji
               tradingowej w jednym profesjonalnym środowisku.
@@ -236,10 +247,10 @@ export default async function HomePage() {
           </div>
 
           {/* HERO CHART */}
-          <div className="relative">
+          <div className="relative min-w-0">
             <div className="absolute inset-0 bg-blue-400/[0.12] blur-[90px]" />
 
-            <div className="relative overflow-hidden rounded-[18px] border border-sky-400/38 bg-gradient-to-br from-[#073A6A] to-[#061C33] p-4 shadow-[0_24px_70px_rgba(2,12,27,.32)]">
+            <div className="relative w-full min-w-0 overflow-hidden rounded-[14px] border border-sky-400/38 bg-gradient-to-br from-[#073A6A] to-[#061C33] p-2.5 shadow-[0_24px_70px_rgba(2,12,27,.32)] sm:rounded-[18px] sm:p-4">
               <div className="mb-3 flex items-center justify-between">
                 <div className="flex gap-2">
                   <span className="rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 text-[10px] font-bold">
@@ -266,7 +277,7 @@ export default async function HomePage() {
                 />
               </div>
 
-              <div className="mt-2.5 grid grid-cols-2 sm:grid-cols-4 sm:divide-x divide-white/[0.06] rounded-lg border border-sky-200/22 bg-sky-300/[0.035]">
+              <div className="mt-2.5 grid grid-cols-2 overflow-hidden rounded-lg border border-sky-200/22 bg-sky-300/[0.035] sm:grid-cols-4 sm:divide-x sm:divide-white/[0.06]">
                 <ChartStat label="BID" value="1.08738" />
                 <ChartStat label="ASK" value="1.08746" />
                 <ChartStat label="SPREAD" value="0.8" />
@@ -277,7 +288,7 @@ export default async function HomePage() {
         </section>
 
         {/* STATS */}
-        <section className="grid grid-cols-2 overflow-hidden rounded-[14px] border border-sky-300/45 bg-[#06335C]/92 xl:grid-cols-4">
+        <section className="grid grid-cols-1 overflow-hidden rounded-[14px] border border-sky-300/45 bg-[#06335C]/92 min-[390px]:grid-cols-2 xl:grid-cols-4">
           <BigStat icon={<Radar />} value="5" text="Skanerów dostępnych" />
           <BigStat icon={<TrendingUp />} value="10+" text="Rynków obsługiwanych" />
           <BigStat icon={<Zap />} value="24/7" text="Dostęp do platformy" />
@@ -324,7 +335,7 @@ export default async function HomePage() {
         </section>
 
         {/* BENEFITS */}
-        <section className="grid grid-cols-2 overflow-hidden rounded-[14px] border border-sky-300/45 bg-[#06335C]/92 xl:grid-cols-4">
+        <section className="grid grid-cols-1 overflow-hidden rounded-[14px] border border-sky-300/45 bg-[#06335C]/92 min-[390px]:grid-cols-2 xl:grid-cols-4">
           <Benefit
             icon={<LockKeyhole />}
             title="Bezpieczeństwo"
@@ -362,9 +373,9 @@ export default async function HomePage() {
           </p>
         </section>
 
-        <footer className="flex flex-col items-center justify-between gap-4 py-4 text-[8px] text-slate-500 sm:flex-row">
+        <footer className="flex flex-col items-center justify-between gap-3 py-4 text-center text-[8px] text-slate-500 sm:flex-row sm:text-left">
           <span>© 2026 FX Trade Professional Trading.</span>
-          <div className="flex gap-5">
+          <div className="flex flex-wrap justify-center gap-x-5 gap-y-2 sm:justify-end">
             <Link href="/regulamin" className="hover:text-slate-400">
               Regulamin
             </Link>
@@ -393,8 +404,8 @@ function MiniFeature({
   return (
     <div>
       <div className="mb-2.5 text-sky-400 [&_svg]:h-6 [&_svg]:w-6">{icon}</div>
-      <div className="text-[10px] font-bold text-white">{title}</div>
-      <div className="mt-1 text-[8px] leading-4 text-slate-400">{text}</div>
+      <div className="break-words text-[10px] font-bold text-white">{title}</div>
+      <div className="mt-1 break-words text-[8px] leading-4 text-slate-400">{text}</div>
     </div>
   );
 }
@@ -418,7 +429,7 @@ function BigStat({
   text: string;
 }) {
   return (
-    <div className="flex items-center justify-center gap-4 border-b border-sky-200/22 px-4 py-3.5 sm:border-r xl:border-b-0">
+    <div className="flex min-w-0 items-center justify-start gap-3 border-b border-sky-200/22 px-3 py-3.5 min-[390px]:border-r sm:px-4 xl:border-b-0">
       <div className="text-sky-400 [&_svg]:h-7 [&_svg]:w-7">{icon}</div>
       <div>
         <div className="text-[16px] font-black">{value}</div>
@@ -495,11 +506,11 @@ function Benefit({
   text: string;
 }) {
   return (
-    <div className="flex items-center gap-4 border-b border-sky-200/22 px-4 py-3.5 sm:border-r xl:border-b-0">
+    <div className="flex min-w-0 items-center gap-3 border-b border-sky-200/22 px-3 py-3.5 min-[390px]:border-r sm:px-4 xl:border-b-0">
       <div className="shrink-0 text-blue-500 [&_svg]:h-7 [&_svg]:w-7">{icon}</div>
       <div>
         <div className="text-[11px] font-bold">{title}</div>
-        <div className="mt-1 text-[8px] leading-4 text-slate-400">{text}</div>
+        <div className="mt-1 break-words text-[8px] leading-4 text-slate-400">{text}</div>
       </div>
     </div>
   );
