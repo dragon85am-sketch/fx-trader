@@ -1,4 +1,4 @@
-import { cookies } from "next/headers";
+﻿import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -30,7 +30,7 @@ export default async function HomePage() {
   }
 
   return (
-    <main className="min-h-screen overflow-hidden bg-[#031A31] text-white">
+    <main className="min-h-[100dvh] w-full max-w-full overflow-x-hidden bg-[#031A31] text-white">
       {/* BACKGROUND - STATIC, NO ANIMATION */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute inset-0 bg-[linear-gradient(180deg,#03152B_0%,#06284A_48%,#03182F_100%)]" />
@@ -67,8 +67,8 @@ export default async function HomePage() {
 
       {/* NAVBAR */}
       <header className="relative z-50 border-b border-sky-200/25 bg-[#031A31]/95 backdrop-blur-xl">
-        <div className="mx-auto flex h-[64px] w-full max-w-[1380px] items-center justify-between px-4 md:px-6">
-          <Link href="/" className="relative h-[52px] w-[205px] shrink-0">
+        <div className="mx-auto flex min-h-[64px] w-full max-w-[1380px] items-center justify-between gap-2 px-2 py-2 sm:px-4 md:px-6">
+          <Link href="/" className="relative h-[42px] w-[132px] shrink-0 sm:h-[52px] sm:w-[205px]">
             <Image
               src="/home/logo-fxtrade.png"
               alt="FX Trade Professional Trading"
@@ -125,9 +125,9 @@ export default async function HomePage() {
         </div>
       </header>
 
-      <div className="relative z-10 mx-auto w-full max-w-[1380px] px-4 pb-6 md:px-6">
+      <div className="relative z-10 mx-auto w-full min-w-0 max-w-[1380px] px-2 pb-6 sm:px-4 md:px-6">
         {/* HERO */}
-        <section className="grid items-center gap-7 py-6 lg:grid-cols-[0.86fr_1.14fr]">
+        <section className="grid min-w-0 grid-cols-1 items-center gap-5 py-4 sm:gap-7 sm:py-6 lg:grid-cols-[minmax(0,.86fr)_minmax(0,1.14fr)]">
           <div className="relative isolate">
           {/* STATIC HERO CANDLES — anchored to hero, do not follow scroll */}
           <div className="pointer-events-none absolute right-[-30px] top-[18px] z-0 hidden h-[360px] w-[310px] xl:block">
@@ -172,14 +172,14 @@ export default async function HomePage() {
             </div>
 
             <h1 className="leading-none">
-              <span className="block text-[54px] font-black tracking-[-0.055em] sm:text-[64px] xl:text-[70px]">
+              <span className="block text-[42px] font-black tracking-[-0.055em] min-[390px]:text-[48px] sm:text-[64px] xl:text-[70px]">
                 FX{" "}
                 <span className="bg-gradient-to-r from-sky-400 via-blue-500 to-blue-700 bg-clip-text text-transparent">
                   TRADE
                 </span>
               </span>
 
-              <span className="mt-3 flex items-center gap-3 text-[12px] font-semibold tracking-[0.5em] text-sky-300 sm:text-[15px]">
+              <span className="mt-3 flex min-w-0 items-center gap-2 text-[9px] font-semibold tracking-[0.22em] text-sky-300 min-[390px]:text-[10px] sm:gap-3 sm:text-[15px] sm:tracking-[0.5em]">
                 <span className="h-px w-8 bg-sky-500" />
                 PROFESSIONAL TRADING
                 <span className="h-px flex-1 bg-gradient-to-r from-sky-500 to-transparent" />
@@ -192,7 +192,7 @@ export default async function HomePage() {
               tradingowej w jednym profesjonalnym środowisku.
             </p>
 
-            <div id="funkcje" className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <div id="funkcje" className="mt-5 grid grid-cols-2 gap-3 sm:mt-6 sm:grid-cols-4 sm:gap-4">
               <MiniFeature
                 icon={<Target />}
                 title="Znajdź najlepsze setupy"
@@ -215,10 +215,10 @@ export default async function HomePage() {
               />
             </div>
 
-            <div className="mt-6 flex flex-wrap gap-3">
+            <div className="mt-6 flex w-full flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:gap-3">
               <Link
                 href="/checkout"
-                className="group flex min-w-[235px] items-center justify-center gap-3 rounded-lg bg-gradient-to-r from-sky-500 via-blue-600 to-blue-700 px-6 py-3.5 text-[12px] font-bold shadow-[0_0_34px_rgba(37,99,235,.24)] transition hover:brightness-110"
+                className="group flex w-full min-w-0 items-center justify-center gap-3 sm:w-auto sm:min-w-[235px] rounded-lg bg-gradient-to-r from-sky-500 via-blue-600 to-blue-700 px-6 py-3.5 text-[12px] font-bold shadow-[0_0_34px_rgba(37,99,235,.24)] transition hover:brightness-110"
               >
                 <Crown className="h-4 w-4" />
                 Kup dostęp do platformy
@@ -227,7 +227,7 @@ export default async function HomePage() {
 
               <Link
                 href="/register"
-                className="flex min-w-[190px] items-center justify-center gap-2 rounded-lg border border-sky-400/46 bg-[#073A6A] px-6 py-3.5 text-[12px] font-semibold text-sky-200 transition hover:bg-sky-500/[0.07]"
+                className="flex w-full min-w-0 items-center justify-center gap-2 sm:w-auto sm:min-w-[190px] rounded-lg border border-sky-400/46 bg-[#073A6A] px-6 py-3.5 text-[12px] font-semibold text-sky-200 transition hover:bg-sky-500/[0.07]"
               >
                 <User className="h-4 w-4" />
                 Zarejestruj się
@@ -255,7 +255,7 @@ export default async function HomePage() {
                 </span>
               </div>
 
-              <div className="relative h-[315px] overflow-hidden rounded-lg border border-sky-200/22 bg-[#042845]">
+              <div className="relative h-[205px] overflow-hidden rounded-lg min-[390px]:h-[230px] sm:h-[315px] border border-sky-200/22 bg-[#042845]">
                 <Image
                   src="/home/hero-chart.png"
                   alt="FX Trade EURUSD chart"
@@ -266,7 +266,7 @@ export default async function HomePage() {
                 />
               </div>
 
-              <div className="mt-2.5 grid grid-cols-4 divide-x divide-white/[0.06] rounded-lg border border-sky-200/22 bg-sky-300/[0.035]">
+              <div className="mt-2.5 grid grid-cols-2 sm:grid-cols-4 sm:divide-x divide-white/[0.06] rounded-lg border border-sky-200/22 bg-sky-300/[0.035]">
                 <ChartStat label="BID" value="1.08738" />
                 <ChartStat label="ASK" value="1.08746" />
                 <ChartStat label="SPREAD" value="0.8" />
@@ -277,7 +277,7 @@ export default async function HomePage() {
         </section>
 
         {/* STATS */}
-        <section className="grid overflow-hidden rounded-[14px] border border-sky-300/45 bg-[#06335C]/92 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="grid grid-cols-2 overflow-hidden rounded-[14px] border border-sky-300/45 bg-[#06335C]/92 xl:grid-cols-4">
           <BigStat icon={<Radar />} value="5" text="Skanerów dostępnych" />
           <BigStat icon={<TrendingUp />} value="10+" text="Rynków obsługiwanych" />
           <BigStat icon={<Zap />} value="24/7" text="Dostęp do platformy" />
@@ -285,7 +285,7 @@ export default async function HomePage() {
         </section>
 
         {/* 4 MAIN CARDS */}
-        <section className="grid items-stretch gap-2.5 py-3 md:grid-cols-2 xl:grid-cols-4">
+        <section className="grid min-w-0 grid-cols-1 items-stretch gap-2.5 py-3 sm:grid-cols-2 xl:grid-cols-4">
           <FeatureCard
             id="scanner"
             icon={<Radar />}
@@ -324,7 +324,7 @@ export default async function HomePage() {
         </section>
 
         {/* BENEFITS */}
-        <section className="grid overflow-hidden rounded-[14px] border border-sky-300/45 bg-[#06335C]/92 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="grid grid-cols-2 overflow-hidden rounded-[14px] border border-sky-300/45 bg-[#06335C]/92 xl:grid-cols-4">
           <Benefit
             icon={<LockKeyhole />}
             title="Bezpieczeństwo"
@@ -448,7 +448,7 @@ function FeatureCard({
   return (
     <article
       id={id}
-      className="group flex h-[350px] flex-col rounded-[14px] border border-sky-400/38 bg-gradient-to-b from-[#073A6A] to-[#042845] p-3 transition duration-300 hover:border-sky-400/38"
+      className="group flex min-w-0 min-h-[320px] flex-col rounded-[14px] sm:h-[350px] border border-sky-400/38 bg-gradient-to-b from-[#073A6A] to-[#042845] p-3 transition duration-300 hover:border-sky-400/38"
     >
       <div className="flex min-h-[54px] gap-2.5">
         <div className="shrink-0 text-sky-400 [&_svg]:h-5 [&_svg]:w-5">
@@ -462,7 +462,7 @@ function FeatureCard({
         </div>
       </div>
 
-      <div className="relative mt-3 h-[198px] w-full overflow-hidden rounded-lg border border-sky-200/25 bg-[#032138] p-2">
+      <div className="relative mt-3 h-[180px] w-full min-w-0 overflow-hidden sm:h-[198px] rounded-lg border border-sky-200/25 bg-[#032138] p-2">
         <div className="relative h-full w-full overflow-hidden rounded-md">
           <Image
             src={image}
