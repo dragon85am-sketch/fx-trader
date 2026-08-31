@@ -1377,7 +1377,7 @@ function PocMiniScanner({
   const resultLabel = state.loading ? "LOADING" : summary.label;
 
   return (
-    <div className="w-[860px] max-w-full self-start overflow-hidden rounded-[22px] border border-sky-300/35 bg-[linear-gradient(180deg,#174f86_0%,#123f6d_48%,#0d335a_100%)] shadow-[0_14px_35px_rgba(0,0,0,.22),0_0_28px_rgba(14,165,233,.08),inset_0_1px_0_rgba(255,255,255,.08)]">
+    <div className="w-[860px] min-w-[720px] max-w-none self-start overflow-hidden rounded-[18px] sm:rounded-[22px] border border-sky-300/35 bg-[linear-gradient(180deg,#174f86_0%,#123f6d_48%,#0d335a_100%)] shadow-[0_14px_35px_rgba(0,0,0,.22),0_0_28px_rgba(14,165,233,.08),inset_0_1px_0_rgba(255,255,255,.08)]">
       {/* HEADER */}
       <div className="flex items-center justify-between gap-4 border-b border-sky-200/10 bg-[#123d68]/70 px-4 py-3">
         <div className="flex min-w-0 items-center gap-3">
@@ -1439,7 +1439,7 @@ function PocMiniScanner({
       </div>
 
       {/* TIMEFRAMES */}
-      <div className="grid grid-cols-7 gap-2 px-3.5 py-3">
+      <div className="grid grid-cols-7 gap-1.5 px-2.5 py-2.5 sm:gap-2 sm:px-3.5 sm:py-3">
         {POC_TIMEFRAMES.map((pocTf) => {
           const cell = state.cells.find((item) => item.tf === pocTf);
 
@@ -2090,13 +2090,25 @@ React.useEffect(() => {
     const BOTTOM_PAD = 24;
 
     const compute = () => {
+      const width = window.innerWidth;
+
+      // MOBILE: mały panel instrumentów + duży wykres.
+      if (width < 640) {
+        setPanelH(330);
+        setChartHeight(Math.max(420, Math.min(560, window.innerHeight - 250)));
+        return;
+      }
+
+      // TABLET: panel nadal kompaktowy, wykres zajmuje większość ekranu.
+      if (width < 1280) {
+        setPanelH(390);
+        setChartHeight(Math.max(520, Math.min(680, window.innerHeight - 220)));
+        return;
+      }
+
+      // DESKTOP: zachowujemy dotychczasowy układ.
       const h = Math.max(620, window.innerHeight - HEADER_OFFSET - BOTTOM_PAD);
-
-      // Lewa lista może dalej dopasowywać się do wysokości ekranu.
       setPanelH(h);
-
-      // Wykres rośnie tylko w kontrolowanym zakresie.
-      // Closed Trades ma osobną stałą wysokość i zawsze zostaje POD wykresem.
       setChartHeight(
         Math.max(560, Math.min(780, window.innerHeight - 360))
       );
@@ -2784,11 +2796,11 @@ if (closedNow.length) {
   
 
   return (
-    <main className="min-h-screen w-full space-y-4 bg-[radial-gradient(circle_at_top,#0d3d72_0%,#082b52_34%,#061a33_70%,#041325_100%)] px-4 py-4 text-sky-50">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <main className="min-h-[100dvh] w-full max-w-full space-y-3 overflow-x-hidden bg-[radial-gradient(circle_at_top,#0d3d72_0%,#082b52_34%,#061a33_70%,#041325_100%)] px-2 py-2 text-sky-50 sm:space-y-4 sm:px-3 sm:py-3 xl:px-4 xl:py-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
         <div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-white drop-shadow-[0_0_16px_rgba(56,189,248,.20)] md:text-3xl">Skaner rynku</h1>
-          <p className="mt-2 text-sky-100/70">
+          <h1 className="text-xl font-extrabold tracking-tight text-white drop-shadow-[0_0_16px_rgba(56,189,248,.20)] sm:text-2xl md:text-3xl">Skaner rynku</h1>
+          <p className="mt-1 max-w-[760px] text-[10px] leading-4 text-sky-100/60 sm:mt-2 sm:text-sm">
             Live: <span className="font-semibold">{source}</span> • 3 potwierdzenia: Liquidity + Price Action + 2 Confirmation Candles
           </p>
         </div>
@@ -2811,13 +2823,13 @@ if (closedNow.length) {
         </div>
       </div>
 
-      <div className="flex w-full gap-4">
-        <Card className="w-[420px] shrink-0 overflow-hidden border-sky-300/20 bg-[linear-gradient(180deg,rgba(20,74,128,.96)_0%,rgba(12,54,101,.96)_52%,rgba(8,40,78,.98)_100%)] shadow-[0_18px_45px_rgba(0,10,35,.34),0_0_28px_rgba(14,165,233,.10),inset_0_1px_0_rgba(255,255,255,.06)]" style={{ height: panelH }}>
-          <CardContent className="flex h-full flex-col gap-3 p-5">
+      <div className="flex w-full min-w-0 flex-col gap-3 xl:flex-row xl:gap-4">
+        <Card className="w-full min-w-0 shrink-0 overflow-hidden border-sky-300/20 xl:w-[380px] bg-[linear-gradient(180deg,rgba(20,74,128,.96)_0%,rgba(12,54,101,.96)_52%,rgba(8,40,78,.98)_100%)] shadow-[0_18px_45px_rgba(0,10,35,.34),0_0_28px_rgba(14,165,233,.10),inset_0_1px_0_rgba(255,255,255,.06)]" style={{ height: panelH }}>
+          <CardContent className="flex h-full flex-col gap-2 p-3 sm:gap-3 sm:p-4 xl:p-5">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-lg font-bold text-white">Lista instrumentów</p>
-                <p className="text-sm text-sky-100/60">Search • Sort Liquidity • Filter READY</p>
+                <p className="text-sm font-bold text-white sm:text-base xl:text-lg">Lista instrumentów</p>
+                <p className="hidden text-xs text-sky-100/50 sm:block xl:text-sm">Search • Sort Liquidity • Filter READY</p>
               </div>
 
               <div className="text-right text-xs text-sky-100/55">
@@ -2829,7 +2841,7 @@ if (closedNow.length) {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Szukaj… (np. EURUSD / BTCUSDT)"
-              className="w-full rounded-2xl border border-sky-300/20 bg-[#061c37]/80 px-4 py-2.5 text-sm text-white shadow-[inset_0_1px_8px_rgba(0,0,0,.16)] outline-none placeholder:text-sky-100/35 focus:border-cyan-300/45 focus:ring-2 focus:ring-cyan-400/10"
+              className="w-full rounded-xl border border-sky-300/20 bg-[#061c37]/80 px-3 py-2 text-xs sm:rounded-2xl sm:px-4 sm:py-2.5 sm:text-sm text-white shadow-[inset_0_1px_8px_rgba(0,0,0,.16)] outline-none placeholder:text-sky-100/35 focus:border-cyan-300/45 focus:ring-2 focus:ring-cyan-400/10"
             />
 
             <div className="flex flex-wrap gap-2">
@@ -2893,7 +2905,7 @@ if (closedNow.length) {
                     }}
                     onClick={() => setSelectedSymbol(r.symbol)}
                     className={cn(
-                      "relative cursor-pointer overflow-hidden rounded-2xl border p-4 transition-all duration-200",
+                      "relative cursor-pointer overflow-hidden rounded-xl border p-2.5 transition-all duration-200 sm:rounded-2xl sm:p-3 xl:p-4",
                       active ? "border-cyan-300/45 bg-[linear-gradient(135deg,rgba(13,107,184,.88),rgba(10,67,125,.88))] shadow-[0_0_24px_rgba(34,211,238,.16),inset_0_1px_0_rgba(255,255,255,.06)]" : "border-sky-300/14 bg-[linear-gradient(180deg,rgba(11,49,92,.78),rgba(7,37,72,.84))] hover:border-sky-300/28 hover:bg-[#10477e]",
                       isFlashing ? "ring-2 ring-emerald-400/60 shadow-[0_0_24px_rgba(52,211,153,0.25)]" : ""
                     )}
@@ -2943,20 +2955,22 @@ if (closedNow.length) {
           </CardContent>
         </Card>
 
-        <div ref={rightPanelRef} className="min-w-0 flex-1">
+        <div ref={rightPanelRef} className="w-full min-w-0 flex-1">
           <Card className="overflow-visible border-sky-300/18 bg-[linear-gradient(180deg,rgba(17,66,117,.94)_0%,rgba(10,48,91,.97)_45%,rgba(7,35,69,.98)_100%)] shadow-[0_18px_50px_rgba(0,10,35,.34),0_0_30px_rgba(14,165,233,.08),inset_0_1px_0_rgba(255,255,255,.05)]">
-            <CardContent className="flex flex-col gap-4 p-5">
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div className="flex flex-wrap items-center gap-3">
-                  <h2 className="text-xl font-extrabold tracking-tight text-white">{selected.symbol}</h2>
+            <CardContent className="flex min-w-0 flex-col gap-3 p-2.5 sm:p-3 md:p-4 xl:gap-4 xl:p-5">
+              <div className="flex min-w-0 flex-col gap-2 sm:gap-3 xl:flex-row xl:items-center xl:justify-between">
+                <div className="min-w-0">
+                  <div className="mb-2 flex items-center justify-between gap-2 xl:mb-0 xl:inline-flex">
+                    <h2 className="text-lg font-extrabold tracking-tight text-white sm:text-xl">{selected.symbol}</h2>
+                  </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex w-full min-w-0 items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-2">
                     {TIMEFRAMES.map((t) => (
                       <button
                         key={t}
                         onClick={() => setTf(t)}
                         className={cn(
-                          "rounded-full border px-3 py-1 text-sm font-semibold transition",
+                          "shrink-0 rounded-full border px-2.5 py-1.5 text-[11px] font-semibold transition sm:px-3 sm:py-1 sm:text-sm",
                           tf === t
                             ? "border-cyan-300/45 bg-[linear-gradient(135deg,#0ea5e9_0%,#2563eb_100%)] text-white shadow-[0_0_18px_rgba(14,165,233,.22)]"
                             : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/75 hover:border-sky-300/30 hover:bg-[#12477f] hover:text-white"
@@ -2971,7 +2985,7 @@ if (closedNow.length) {
                       type="button"
                       onClick={() => setToolsPanelOpen((v) => !v)}
                       className={cn(
-                        "ml-1 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm font-semibold transition",
+                        "shrink-0 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[10px] font-semibold transition sm:ml-1 sm:gap-2 sm:px-3 sm:py-1 sm:text-sm",
                         toolsPanelOpen
                           ? "border-cyan-300/45 bg-[linear-gradient(135deg,#0ea5e9_0%,#2563eb_100%)] text-white shadow-[0_0_18px_rgba(14,165,233,.22)]"
                           : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/75 hover:border-sky-300/30 hover:bg-[#12477f] hover:text-white"
@@ -2993,7 +3007,7 @@ if (closedNow.length) {
   });
 }}
                       className={cn(
-                        "ml-1 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm font-semibold transition",
+                        "shrink-0 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[10px] font-semibold transition sm:ml-1 sm:gap-2 sm:px-3 sm:py-1 sm:text-sm",
                         emaState.some((cfg) => cfg.enabled)
                           ? "border-sky-400/30 bg-sky-500/15 text-sky-100"
                           : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/75 hover:border-sky-300/30 hover:bg-[#12477f] hover:text-white"
@@ -3174,7 +3188,7 @@ if (closedNow.length) {
     type="button"
     onClick={() => setBbState((p) => ({ ...p, enabled: !p.enabled }))}
     className={cn(
-      "ml-1 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm font-semibold transition",
+      "shrink-0 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[10px] font-semibold transition sm:ml-1 sm:gap-2 sm:px-3 sm:py-1 sm:text-sm",
       bbState.enabled
         ? "border-fuchsia-400/30 bg-fuchsia-500/15 text-fuchsia-100"
         : "border-white/10 bg-white/5 text-zinc-200/70 hover:bg-white/10 hover:text-white"
@@ -3398,7 +3412,7 @@ if (closedNow.length) {
                         });
                       }}
                       className={cn(
-                        "ml-1 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm font-semibold transition",
+                        "shrink-0 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[10px] font-semibold transition sm:ml-1 sm:gap-2 sm:px-3 sm:py-1 sm:text-sm",
                         heikinAshi
                           ? "border-amber-400/30 bg-amber-500/15 text-amber-100"
                           : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/75 hover:border-sky-300/30 hover:bg-[#12477f] hover:text-white"
@@ -3417,7 +3431,7 @@ if (closedNow.length) {
                         });
                       }}
                       className={cn(
-                        "ml-1 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm font-semibold transition",
+                        "shrink-0 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[10px] font-semibold transition sm:ml-1 sm:gap-2 sm:px-3 sm:py-1 sm:text-sm",
                         renko
                           ? "border-emerald-400/30 bg-emerald-500/15 text-emerald-100"
                           : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/75 hover:border-sky-300/30 hover:bg-[#12477f] hover:text-white"
@@ -3450,7 +3464,7 @@ if (closedNow.length) {
                       onClick={() => setPatternsEnabled((v) => !v)}
                       title={patternsEnabled ? "Formacje świecowe aktywne — kliknij, aby wyłączyć" : "Pokaż formacje świecowe"}
                       className={cn(
-                        "ml-1 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm font-semibold transition",
+                        "shrink-0 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[10px] font-semibold transition sm:ml-1 sm:gap-2 sm:px-3 sm:py-1 sm:text-sm",
                         patternsEnabled
                           ? "border-yellow-300/55 bg-yellow-400/15 text-yellow-100 shadow-[0_0_16px_rgba(250,204,21,.20)]"
                           : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/75 hover:border-yellow-300/35 hover:bg-yellow-400/10 hover:text-yellow-100"
@@ -3468,7 +3482,7 @@ if (closedNow.length) {
                           : "Włącz SuperTrend"
                       }
                       className={cn(
-                        "ml-1 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm font-semibold transition",
+                        "shrink-0 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[10px] font-semibold transition sm:ml-1 sm:gap-2 sm:px-3 sm:py-1 sm:text-sm",
                         supertrendEnabled
                           ? "border-emerald-300/45 bg-emerald-500/15 text-emerald-100 shadow-[0_0_16px_rgba(34,197,94,.18)]"
                           : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/75 hover:border-sky-300/30 hover:bg-[#12477f] hover:text-white"
@@ -3497,24 +3511,26 @@ if (closedNow.length) {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 self-start overflow-hidden sm:gap-3 xl:self-auto">
                   <LiquidityBar value={selected.liquidity} />
                   <SignalDot s={selected.signal} />
                   <ConfirmationBadge count={selected.confirmationCount ?? 0} side={selected.confirmationSide ?? null} />
                 </div>
               </div>
 
-              <div className="flex justify-start"><PocMiniScanner state={pocScanner} /></div>
+              <div className="w-full overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <div className="flex justify-start"><PocMiniScanner state={pocScanner} /></div>
+              </div>
 
               <div className="min-w-0">
 
-<div className="mb-3 flex flex-wrap gap-2">
+<div className="mb-2 flex w-full min-w-0 items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mb-3 sm:gap-2">
   <button
     type="button"
     onClick={toggleFullscreen}
     title={isFullscreen ? "Wyjdź z pełnego ekranu" : "Pełny ekran"}
     className={cn(
-      "grid h-10 w-10 place-items-center rounded-xl border text-lg font-black transition",
+      "grid h-9 w-9 shrink-0 place-items-center rounded-lg border text-base font-black transition sm:h-10 sm:w-10 sm:rounded-xl sm:text-lg",
       isFullscreen
         ? "border-cyan-300/50 bg-[linear-gradient(135deg,#0ea5e9,#2563eb)] text-white shadow-[0_0_16px_rgba(14,165,233,.18)]"
         : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/75 hover:border-sky-300/30 hover:bg-[#12477f] hover:text-white"
@@ -3529,7 +3545,7 @@ if (closedNow.length) {
       type="button"
       title={title}
       onClick={() => setActiveDrawTool(tool)}
-      className={`grid h-10 w-10 place-items-center rounded-xl border transition ${
+      className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg border transition sm:h-10 sm:w-10 sm:rounded-xl ${
         activeDrawTool === tool
           ? "border-cyan-300/50 bg-[linear-gradient(135deg,#0ea5e9,#2563eb)] text-white shadow-[0_0_16px_rgba(14,165,233,.18)]"
           : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/75 hover:border-sky-300/30 hover:bg-[#12477f] hover:text-white"
@@ -3575,8 +3591,8 @@ if (closedNow.length) {
                   <div className="text-sm font-semibold text-white">Closed Trades</div>
                 </div>
 
-                <div className="h-[250px] overflow-auto rounded-b-2xl">
-                  <table className="w-full text-sm">
+                <div className="h-[220px] overflow-auto rounded-b-2xl sm:h-[250px]">
+                  <table className="min-w-[760px] w-full text-xs sm:text-sm">
                     <thead className="sticky top-0 bg-[#082749] text-sky-100/80">
                       <tr className="border-b border-sky-300/12">
                         <th className="px-3 py-2 text-left">Data</th>
@@ -3683,8 +3699,8 @@ closedTrades.map((t) => (
       <div className="hidden">{flashKey}</div>
     
       {renkoPanelOpen ? (
-        <div className="fixed inset-0 z-[119] flex items-start justify-end bg-black/25 p-4 pt-20 backdrop-blur-[2px]">
-          <div className="w-full max-w-[620px] overflow-hidden rounded-[22px] border border-emerald-300/35 bg-[#07182c] text-white shadow-[0_30px_90px_rgba(0,0,0,.55),0_0_35px_rgba(34,197,94,.10)]">
+        <div className="fixed inset-0 z-[119] flex items-start justify-center overflow-y-auto bg-black/25 p-2 pt-16 backdrop-blur-[2px] sm:justify-end sm:p-4 sm:pt-20">
+          <div className="w-full max-w-[620px] overflow-hidden rounded-[18px] sm:rounded-[22px] border border-emerald-300/35 bg-[#07182c] text-white shadow-[0_30px_90px_rgba(0,0,0,.55),0_0_35px_rgba(34,197,94,.10)]">
             <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
               <div>
                 <div className="text-lg font-black">Renko</div>
