@@ -66,7 +66,7 @@ export default async function HomePage() {
       </div>
 
       {/* NAVBAR */}
-      <header className="sticky top-0 z-50 border-b border-sky-200/25 bg-[#031A31]/95 backdrop-blur-xl">
+      <header className="sticky top-0 z-50 overflow-visible border-b border-sky-200/25 bg-[#031A31]/95 backdrop-blur-xl">
         <div className="mx-auto flex min-h-[58px] w-full max-w-[1380px] items-center gap-1.5 px-2 py-2 sm:min-h-[64px] sm:gap-2.5 sm:px-4 md:px-6">
           <Link href="/" className="relative h-[36px] w-[96px] shrink-0 min-[390px]:w-[104px] sm:h-[52px] sm:w-[205px]">
             <Image
@@ -104,7 +104,7 @@ export default async function HomePage() {
           </nav>
 
           <div className="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-2.5">
-            <div className="w-[104px] shrink-0 overflow-hidden min-[390px]:w-[112px] sm:w-auto
+            <div className="relative z-[100] w-[104px] shrink-0 overflow-visible min-[390px]:w-[112px] sm:w-auto
               [&_button]:!h-9 [&_button]:!min-w-0 [&_button]:!w-[104px] [&_button]:!px-2
               min-[390px]:[&_button]:!w-[112px]
               sm:[&_button]:!h-auto sm:[&_button]:!w-auto sm:[&_button]:!px-4">
