@@ -1379,7 +1379,7 @@ function PocMiniScanner({
   return (
     <div className="w-[860px] min-w-[720px] max-w-none self-start overflow-hidden rounded-[18px] sm:rounded-[22px] border border-sky-300/35 bg-[linear-gradient(180deg,#174f86_0%,#123f6d_48%,#0d335a_100%)] shadow-[0_14px_35px_rgba(0,0,0,.22),0_0_28px_rgba(14,165,233,.08),inset_0_1px_0_rgba(255,255,255,.08)]">
       {/* HEADER */}
-      <div className="flex items-center justify-between gap-4 border-b border-sky-200/10 bg-[#123d68]/70 px-4 py-3">
+      <div className="flex items-center justify-between gap-2 border-b border-sky-200/10 bg-[#123d68]/70 px-2.5 py-2 sm:px-3 sm:py-2.5 xl:px-4 xl:py-3">
         <div className="flex min-w-0 items-center gap-3">
           <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-fuchsia-300/20 bg-fuchsia-400/10 shadow-[0_0_16px_rgba(217,70,239,.10)]">
             <ChartNoAxesCombined className="h-4 w-4 text-fuchsia-300" />
@@ -1439,7 +1439,7 @@ function PocMiniScanner({
       </div>
 
       {/* TIMEFRAMES */}
-      <div className="grid grid-cols-7 gap-1.5 px-2.5 py-2.5 sm:gap-2 sm:px-3.5 sm:py-3">
+      <div className="flex gap-1.5 overflow-x-auto px-2 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-2 sm:px-3 xl:grid xl:grid-cols-7 xl:overflow-visible xl:px-3.5 xl:py-3">
         {POC_TIMEFRAMES.map((pocTf) => {
           const cell = state.cells.find((item) => item.tf === pocTf);
 
@@ -1478,7 +1478,7 @@ function PocMiniScanner({
             <div
               key={pocTf}
               className={cn(
-                "group rounded-[14px] border px-2 py-2.5 text-center transition",
+                "group min-w-[92px] shrink-0 rounded-[10px] border px-2 py-2 text-center transition sm:min-w-[105px] sm:rounded-[12px] xl:min-w-0 xl:rounded-[14px] xl:py-2.5",
                 isBuy
                   ? "border-emerald-300/15 bg-[linear-gradient(180deg,#104b69_0%,#0d3f61_100%)]"
                   : isSell
@@ -2094,15 +2094,16 @@ React.useEffect(() => {
 
       // MOBILE: mały panel instrumentów + duży wykres.
       if (width < 640) {
-        setPanelH(330);
-        setChartHeight(Math.max(420, Math.min(560, window.innerHeight - 250)));
+        // Telefon: panel instrumentów mały, wykres wygodny ale nie za wysoki.
+        setPanelH(250);
+        setChartHeight(Math.max(330, Math.min(420, window.innerHeight - 320)));
         return;
       }
 
-      // TABLET: panel nadal kompaktowy, wykres zajmuje większość ekranu.
+      // Tablet: trochę większy wykres, nadal kompaktowe panele.
       if (width < 1280) {
-        setPanelH(390);
-        setChartHeight(Math.max(520, Math.min(680, window.innerHeight - 220)));
+        setPanelH(300);
+        setChartHeight(Math.max(400, Math.min(500, window.innerHeight - 280)));
         return;
       }
 
@@ -2797,10 +2798,10 @@ if (closedNow.length) {
 
   return (
     <main className="min-h-[100dvh] w-full max-w-full space-y-3 overflow-x-hidden bg-[radial-gradient(circle_at_top,#0d3d72_0%,#082b52_34%,#061a33_70%,#041325_100%)] px-2 py-2 text-sky-50 sm:space-y-4 sm:px-3 sm:py-3 xl:px-4 xl:py-4">
-      <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-1.5 sm:gap-2">
         <div>
-          <h1 className="text-xl font-extrabold tracking-tight text-white drop-shadow-[0_0_16px_rgba(56,189,248,.20)] sm:text-2xl md:text-3xl">Skaner rynku</h1>
-          <p className="mt-1 max-w-[760px] text-[10px] leading-4 text-sky-100/60 sm:mt-2 sm:text-sm">
+          <h1 className="text-lg font-extrabold tracking-tight text-white drop-shadow-[0_0_16px_rgba(56,189,248,.20)] sm:text-xl md:text-2xl xl:text-3xl">Skaner rynku</h1>
+          <p className="mt-0.5 max-w-[760px] text-[9px] leading-3.5 text-sky-100/55 sm:mt-1 sm:text-xs xl:mt-2 xl:text-sm">
             Live: <span className="font-semibold">{source}</span> • 3 potwierdzenia: Liquidity + Price Action + 2 Confirmation Candles
           </p>
         </div>
@@ -2811,7 +2812,7 @@ if (closedNow.length) {
           <button
             onClick={() => setScannerEnabled((v) => !v)}
             className={cn(
-              "rounded-2xl border px-3 py-2 text-sm font-semibold transition",
+              "rounded-xl border px-2.5 py-1.5 text-[10px] font-semibold transition sm:px-3 sm:py-2 sm:text-xs xl:rounded-2xl xl:text-sm",
               scannerEnabled
                 ? "border-emerald-300/30 bg-emerald-500/20 text-emerald-100 shadow-[0_0_16px_rgba(16,185,129,.16)]"
                 : "border-red-300/30 bg-red-500/20 text-red-100"
@@ -2825,10 +2826,10 @@ if (closedNow.length) {
 
       <div className="flex w-full min-w-0 flex-col gap-3 xl:flex-row xl:gap-4">
         <Card className="w-full min-w-0 shrink-0 overflow-hidden border-sky-300/20 xl:w-[380px] bg-[linear-gradient(180deg,rgba(20,74,128,.96)_0%,rgba(12,54,101,.96)_52%,rgba(8,40,78,.98)_100%)] shadow-[0_18px_45px_rgba(0,10,35,.34),0_0_28px_rgba(14,165,233,.10),inset_0_1px_0_rgba(255,255,255,.06)]" style={{ height: panelH }}>
-          <CardContent className="flex h-full flex-col gap-2 p-3 sm:gap-3 sm:p-4 xl:p-5">
+          <CardContent className="flex h-full flex-col gap-1.5 p-2.5 sm:gap-2 sm:p-3 xl:gap-3 xl:p-5">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-sm font-bold text-white sm:text-base xl:text-lg">Lista instrumentów</p>
+                <p className="text-xs font-bold text-white sm:text-sm xl:text-lg">Lista instrumentów</p>
                 <p className="hidden text-xs text-sky-100/50 sm:block xl:text-sm">Search • Sort Liquidity • Filter READY</p>
               </div>
 
@@ -2841,13 +2842,13 @@ if (closedNow.length) {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Szukaj… (np. EURUSD / BTCUSDT)"
-              className="w-full rounded-xl border border-sky-300/20 bg-[#061c37]/80 px-3 py-2 text-xs sm:rounded-2xl sm:px-4 sm:py-2.5 sm:text-sm text-white shadow-[inset_0_1px_8px_rgba(0,0,0,.16)] outline-none placeholder:text-sky-100/35 focus:border-cyan-300/45 focus:ring-2 focus:ring-cyan-400/10"
+              className="w-full rounded-lg border border-sky-300/20 bg-[#061c37]/80 px-2.5 py-1.5 text-[10px] sm:rounded-xl sm:px-3 sm:py-2 sm:text-xs xl:rounded-2xl xl:px-4 xl:py-2.5 xl:text-sm text-white shadow-[inset_0_1px_8px_rgba(0,0,0,.16)] outline-none placeholder:text-sky-100/35 focus:border-cyan-300/45 focus:ring-2 focus:ring-cyan-400/10"
             />
 
             <div className="flex flex-wrap gap-2">
               <button
                 className={cn(
-                  "rounded-2xl border px-3 py-2 text-sm font-semibold transition",
+                  "rounded-lg border px-2.5 py-1.5 text-[10px] font-semibold transition sm:rounded-xl sm:text-xs xl:rounded-2xl xl:px-3 xl:py-2 xl:text-sm",
                   sortKey === "LIQ_DESC"
                     ? "border-cyan-300/45 bg-[linear-gradient(135deg,#0ea5e9_0%,#2563eb_100%)] text-white shadow-[0_0_18px_rgba(14,165,233,.22)]"
                     : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/75 hover:border-sky-300/30 hover:bg-[#12477f] hover:text-white"
@@ -2860,7 +2861,7 @@ if (closedNow.length) {
 
               <button
                 className={cn(
-                  "rounded-2xl border px-3 py-2 text-sm font-semibold transition",
+                  "rounded-lg border px-2.5 py-1.5 text-[10px] font-semibold transition sm:rounded-xl sm:text-xs xl:rounded-2xl xl:px-3 xl:py-2 xl:text-sm",
                   sortKey === "LIQ_ASC"
                     ? "border-cyan-300/45 bg-[linear-gradient(135deg,#0ea5e9_0%,#2563eb_100%)] text-white shadow-[0_0_18px_rgba(14,165,233,.22)]"
                     : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/75 hover:border-sky-300/30 hover:bg-[#12477f] hover:text-white"
@@ -2873,7 +2874,7 @@ if (closedNow.length) {
 
               <button
                 className={cn(
-                  "rounded-2xl border px-3 py-2 text-sm font-semibold transition",
+                  "rounded-lg border px-2.5 py-1.5 text-[10px] font-semibold transition sm:rounded-xl sm:text-xs xl:rounded-2xl xl:px-3 xl:py-2 xl:text-sm",
                   onlyReady
                     ? "border-emerald-300/30 bg-emerald-500/20 text-emerald-100 shadow-[0_0_16px_rgba(16,185,129,.16)]"
                     : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/75 hover:border-sky-300/30 hover:bg-[#12477f] hover:text-white"
@@ -2905,7 +2906,7 @@ if (closedNow.length) {
                     }}
                     onClick={() => setSelectedSymbol(r.symbol)}
                     className={cn(
-                      "relative cursor-pointer overflow-hidden rounded-xl border p-2.5 transition-all duration-200 sm:rounded-2xl sm:p-3 xl:p-4",
+                      "relative cursor-pointer overflow-hidden rounded-lg border p-2 transition-all duration-200 sm:rounded-xl sm:p-2.5 xl:rounded-2xl xl:p-4",
                       active ? "border-cyan-300/45 bg-[linear-gradient(135deg,rgba(13,107,184,.88),rgba(10,67,125,.88))] shadow-[0_0_24px_rgba(34,211,238,.16),inset_0_1px_0_rgba(255,255,255,.06)]" : "border-sky-300/14 bg-[linear-gradient(180deg,rgba(11,49,92,.78),rgba(7,37,72,.84))] hover:border-sky-300/28 hover:bg-[#10477e]",
                       isFlashing ? "ring-2 ring-emerald-400/60 shadow-[0_0_24px_rgba(52,211,153,0.25)]" : ""
                     )}
@@ -2957,11 +2958,11 @@ if (closedNow.length) {
 
         <div ref={rightPanelRef} className="w-full min-w-0 flex-1">
           <Card className="overflow-visible border-sky-300/18 bg-[linear-gradient(180deg,rgba(17,66,117,.94)_0%,rgba(10,48,91,.97)_45%,rgba(7,35,69,.98)_100%)] shadow-[0_18px_50px_rgba(0,10,35,.34),0_0_30px_rgba(14,165,233,.08),inset_0_1px_0_rgba(255,255,255,.05)]">
-            <CardContent className="flex min-w-0 flex-col gap-3 p-2.5 sm:p-3 md:p-4 xl:gap-4 xl:p-5">
+            <CardContent className="flex min-w-0 flex-col gap-2 p-2 sm:p-2.5 md:p-3 xl:gap-4 xl:p-5">
               <div className="flex min-w-0 flex-col gap-2 sm:gap-3 xl:flex-row xl:items-center xl:justify-between">
                 <div className="min-w-0">
                   <div className="mb-2 flex items-center justify-between gap-2 xl:mb-0 xl:inline-flex">
-                    <h2 className="text-lg font-extrabold tracking-tight text-white sm:text-xl">{selected.symbol}</h2>
+                    <h2 className="text-base font-extrabold tracking-tight text-white sm:text-lg xl:text-xl">{selected.symbol}</h2>
                   </div>
 
                   <div className="flex w-full min-w-0 items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-2">
@@ -2970,7 +2971,7 @@ if (closedNow.length) {
                         key={t}
                         onClick={() => setTf(t)}
                         className={cn(
-                          "shrink-0 rounded-full border px-2.5 py-1.5 text-[11px] font-semibold transition sm:px-3 sm:py-1 sm:text-sm",
+                          "shrink-0 rounded-full border px-2 py-1 text-[10px] font-semibold transition sm:px-2.5 sm:text-xs xl:px-3 xl:text-sm",
                           tf === t
                             ? "border-cyan-300/45 bg-[linear-gradient(135deg,#0ea5e9_0%,#2563eb_100%)] text-white shadow-[0_0_18px_rgba(14,165,233,.22)]"
                             : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/75 hover:border-sky-300/30 hover:bg-[#12477f] hover:text-white"
@@ -3518,8 +3519,8 @@ if (closedNow.length) {
                 </div>
               </div>
 
-              <div className="w-full overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                <div className="flex justify-start"><PocMiniScanner state={pocScanner} /></div>
+              <div className="w-full min-w-0">
+                <PocMiniScanner state={pocScanner} />
               </div>
 
               <div className="min-w-0">
@@ -3530,7 +3531,7 @@ if (closedNow.length) {
     onClick={toggleFullscreen}
     title={isFullscreen ? "Wyjdź z pełnego ekranu" : "Pełny ekran"}
     className={cn(
-      "grid h-9 w-9 shrink-0 place-items-center rounded-lg border text-base font-black transition sm:h-10 sm:w-10 sm:rounded-xl sm:text-lg",
+      "grid h-8 w-8 shrink-0 place-items-center rounded-lg border text-sm font-black transition sm:h-9 sm:w-9 xl:h-10 xl:w-10 xl:rounded-xl xl:text-lg",
       isFullscreen
         ? "border-cyan-300/50 bg-[linear-gradient(135deg,#0ea5e9,#2563eb)] text-white shadow-[0_0_16px_rgba(14,165,233,.18)]"
         : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/75 hover:border-sky-300/30 hover:bg-[#12477f] hover:text-white"
@@ -3545,7 +3546,7 @@ if (closedNow.length) {
       type="button"
       title={title}
       onClick={() => setActiveDrawTool(tool)}
-      className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg border transition sm:h-10 sm:w-10 sm:rounded-xl ${
+      className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg border transition sm:h-9 sm:w-9 xl:h-10 xl:w-10 xl:rounded-xl ${
         activeDrawTool === tool
           ? "border-cyan-300/50 bg-[linear-gradient(135deg,#0ea5e9,#2563eb)] text-white shadow-[0_0_16px_rgba(14,165,233,.18)]"
           : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/75 hover:border-sky-300/30 hover:bg-[#12477f] hover:text-white"

@@ -620,19 +620,20 @@ type CandlePattern = {
 
 function detectCandlePatterns(candles: CandlestickData[]): CandlePattern[] {
   const out: CandlePattern[] = [];
-  if (candles.length < 30) return out;
+  if (candles.length < 35) return out;
 
   const n = (v: any) => toNum(v);
   const body = (c: any) => Math.abs(n(c.close) - n(c.open));
   const range = (c: any) => Math.max(1e-12, n(c.high) - n(c.low));
   const bull = (c: any) => n(c.close) > n(c.open);
   const bear = (c: any) => n(c.close) < n(c.open);
+  const top = (c: any) => Math.max(n(c.open), n(c.close));
+  const bottom = (c: any) => Math.min(n(c.open), n(c.close));
+  const upper = (c: any) => n(c.high) - top(c);
+  const lower = (c: any) => bottom(c) - n(c.low);
+  const mid = (c: any) => (n(c.open) + n(c.close)) / 2;
 
-  const push = (
-    c: any,
-    label: string,
-    side: "BUY" | "SELL"
-  ) => {
+  const push = (c: any, label: string, side: "BUY" | "SELL") => {
     out.push({
       time: c.time as UTCTimestamp,
       label,
@@ -642,33 +643,30 @@ function detectCandlePatterns(candles: CandlestickData[]): CandlePattern[] {
   };
 
   // ============================================================
-  // HH + HL + BREAKOUT
+  // FX TRADE PRO HYBRID
   //
   // BUY:
-  // 1. wykrywamy swing low
-  // 2. potem swing high = HH
-  // 3. kolejny swing low musi być wyżej = HL
-  // 4. poziom wejścia = poprzedni HH
-  // 5. BUY dopiero gdy zamknięta zielona świeca wybije HH
+  // TREND PASS
+  // + HH/HL STRUCTURE PASS
+  // + LIQUIDITY SWEEP HL PASS
+  // + PRICE ACTION PASS
+  // + MOMENTUM/POTWIERDZENIE PASS
+  // + BREAKOUT HH PASS
+  // = BUY
   //
-  // SELL:
-  // 1. swing high
-  // 2. potem swing low = LL
-  // 3. kolejny swing high niżej = LH
-  // 4. poziom wejścia = poprzedni LL
-  // 5. SELL po zamknięciu czerwonej świecy poniżej LL
+  // SELL = dokładne odbicie lustrzane:
+  // DOWN + LL/LH + sweep LH + bearish PA + momentum + breakout LL.
   // ============================================================
 
   const SWING = 3;
-  const MIN_BODY_RATIO = 0.45;
+  const MIN_MOMENTUM_BODY = 0.55;
+  const SWEEP_LOOKBACK = 8;
 
   const isSwingHigh = (idx: number) => {
     if (idx < SWING || idx >= candles.length - SWING) return false;
     const h = n((candles[idx] as any).high);
-
     for (let j = idx - SWING; j <= idx + SWING; j++) {
-      if (j === idx) continue;
-      if (n((candles[j] as any).high) >= h) return false;
+      if (j !== idx && n((candles[j] as any).high) >= h) return false;
     }
     return true;
   };
@@ -676,10 +674,8 @@ function detectCandlePatterns(candles: CandlestickData[]): CandlePattern[] {
   const isSwingLow = (idx: number) => {
     if (idx < SWING || idx >= candles.length - SWING) return false;
     const l = n((candles[idx] as any).low);
-
     for (let j = idx - SWING; j <= idx + SWING; j++) {
-      if (j === idx) continue;
-      if (n((candles[j] as any).low) <= l) return false;
+      if (j !== idx && n((candles[j] as any).low) <= l) return false;
     }
     return true;
   };
@@ -692,111 +688,310 @@ function detectCandlePatterns(candles: CandlestickData[]): CandlePattern[] {
     if (isSwingLow(i)) lows.push(i);
   }
 
-  // ========================= BUY =========================
-  // Szukamy sekwencji:
-  // LOW -> HH -> HL -> breakout HH
-  for (let h = 0; h < highs.length; h++) {
+  // PRICE ACTION na końcu korekty.
+  const bullishPAAt = (i: number) => {
+    if (i < 0) return null;
+    const c: any = candles[i];
+
+    // Hammer
+    if (
+      lower(c) >= Math.max(body(c) * 2, range(c) * 0.42) &&
+      upper(c) <= Math.max(body(c) * 0.8, range(c) * 0.18)
+    ) {
+      return { start: i, end: i, label: "HAMMER" };
+    }
+
+    // Bullish Engulfing
+    if (i >= 1) {
+      const p: any = candles[i - 1];
+      if (
+        bear(p) &&
+        bull(c) &&
+        bottom(c) <= bottom(p) &&
+        top(c) >= top(p) &&
+        body(c) >= body(p) * 0.9
+      ) {
+        return { start: i - 1, end: i, label: "BULL ENGULF" };
+      }
+    }
+
+    // Morning Star
+    if (i >= 2) {
+      const a: any = candles[i - 2];
+      const b: any = candles[i - 1];
+      if (
+        bear(a) &&
+        body(a) / range(a) >= 0.50 &&
+        body(b) / range(b) <= 0.38 &&
+        bull(c) &&
+        body(c) / range(c) >= 0.50 &&
+        n(c.close) > mid(a)
+      ) {
+        return { start: i - 2, end: i, label: "MORNING STAR" };
+      }
+    }
+
+    // Bullish Harami
+    if (i >= 1) {
+      const p: any = candles[i - 1];
+      if (
+        bear(p) &&
+        bull(c) &&
+        body(c) < body(p) * 0.65 &&
+        top(c) <= top(p) &&
+        bottom(c) >= bottom(p)
+      ) {
+        return { start: i - 1, end: i, label: "BULL HARAMI" };
+      }
+    }
+
+    return null;
+  };
+
+  const bearishPAAt = (i: number) => {
+    if (i < 0) return null;
+    const c: any = candles[i];
+
+    // Shooting Star
+    if (
+      upper(c) >= Math.max(body(c) * 2, range(c) * 0.42) &&
+      lower(c) <= Math.max(body(c) * 0.8, range(c) * 0.18)
+    ) {
+      return { start: i, end: i, label: "SHOOTING STAR" };
+    }
+
+    // Bearish Engulfing
+    if (i >= 1) {
+      const p: any = candles[i - 1];
+      if (
+        bull(p) &&
+        bear(c) &&
+        bottom(c) <= bottom(p) &&
+        top(c) >= top(p) &&
+        body(c) >= body(p) * 0.9
+      ) {
+        return { start: i - 1, end: i, label: "BEAR ENGULF" };
+      }
+    }
+
+    // Evening Star
+    if (i >= 2) {
+      const a: any = candles[i - 2];
+      const b: any = candles[i - 1];
+      if (
+        bull(a) &&
+        body(a) / range(a) >= 0.50 &&
+        body(b) / range(b) <= 0.38 &&
+        bear(c) &&
+        body(c) / range(c) >= 0.50 &&
+        n(c.close) < mid(a)
+      ) {
+        return { start: i - 2, end: i, label: "EVENING STAR" };
+      }
+    }
+
+    // Bearish Harami
+    if (i >= 1) {
+      const p: any = candles[i - 1];
+      if (
+        bull(p) &&
+        bear(c) &&
+        body(c) < body(p) * 0.65 &&
+        top(c) <= top(p) &&
+        bottom(c) >= bottom(p)
+      ) {
+        return { start: i - 1, end: i, label: "BEAR HARAMI" };
+      }
+    }
+
+    return null;
+  };
+
+  // Liquidity sweep BUY:
+  // knot schodzi poniżej wcześniejszego lokalnego minimum,
+  // ale świeca zamyka się ponownie NAD tym poziomem.
+  const bullishSweepAt = (idx: number) => {
+    if (idx < 2) return false;
+    const c: any = candles[idx];
+    const from = Math.max(0, idx - SWEEP_LOOKBACK);
+    const prev = candles.slice(from, idx) as any[];
+    if (!prev.length) return false;
+
+    const liquidityLow = Math.min(...prev.map((x) => n(x.low)));
+    return n(c.low) < liquidityLow && n(c.close) > liquidityLow;
+  };
+
+  // Liquidity sweep SELL:
+  // knot wybija wcześniejszy lokalny szczyt,
+  // ale świeca zamyka się z powrotem POD nim.
+  const bearishSweepAt = (idx: number) => {
+    if (idx < 2) return false;
+    const c: any = candles[idx];
+    const from = Math.max(0, idx - SWEEP_LOOKBACK);
+    const prev = candles.slice(from, idx) as any[];
+    if (!prev.length) return false;
+
+    const liquidityHigh = Math.max(...prev.map((x) => n(x.high)));
+    return n(c.high) > liquidityHigh && n(c.close) < liquidityHigh;
+  };
+
+  // ============================================================
+  // BUY: HH -> HL -> sweep -> PA -> momentum -> breakout HH
+  // ============================================================
+  for (let h = 1; h < highs.length; h++) {
     const hhIdx = highs[h];
+    const previousHighIdx = highs[h - 1];
 
-    const prevLowIdx = [...lows]
-      .filter((i) => i < hhIdx)
-      .pop();
-
-    const hlIdx = lows.find((i) => i > hhIdx);
-
-    if (prevLowIdx == null || hlIdx == null) continue;
-
-    const prevLow = n((candles[prevLowIdx] as any).low);
     const hh = n((candles[hhIdx] as any).high);
+    const previousHigh = n((candles[previousHighIdx] as any).high);
+
+    // STRUCTURE/TREND PASS: Higher High.
+    if (hh <= previousHigh) continue;
+
+    const previousLowIdx = [...lows].filter((i) => i < hhIdx).pop();
+    const hlIdx = lows.find((i) => i > hhIdx);
+    if (previousLowIdx == null || hlIdx == null) continue;
+
+    const previousLow = n((candles[previousLowIdx] as any).low);
     const hl = n((candles[hlIdx] as any).low);
 
-    // HL musi być wyżej niż poprzedni swing low.
-    if (!(hl > prevLow)) continue;
+    // STRUCTURE/TREND PASS: Higher Low.
+    if (hl <= previousLow) continue;
 
-    // HH powinien być wyżej niż wcześniejszy swing high.
-    const previousHighIdx = [...highs]
-      .filter((i) => i < hhIdx)
-      .pop();
+    // Szukamy PA w strefie HL: od 2 świec przed HL do 4 po HL.
+    const paFrom = Math.max(hhIdx + 1, hlIdx - 2);
+    const paTo = Math.min(candles.length - 2, hlIdx + 4);
 
-    if (previousHighIdx != null) {
-      const previousHigh = n((candles[previousHighIdx] as any).high);
-      if (!(hh > previousHigh)) continue;
-    }
+    for (let paIdx = paFrom; paIdx <= paTo; paIdx++) {
+      const pa = bullishPAAt(paIdx);
+      if (!pa) continue;
 
-    // Po HL szukamy wybicia HH świecą zamkniętą.
-    for (let i = hlIdx + 1; i < candles.length; i++) {
-      const c: any = candles[i];
-
-      // Jeśli przed wybiciem cena zaneguje HL, setup anulowany.
-      if (n(c.low) < hl) break;
-
-      const bodyRatio = body(c) / range(c);
-
-      const breakout =
-        bull(c) &&
-        bodyRatio >= MIN_BODY_RATIO &&
-        n(c.close) > hh;
-
-      if (breakout) {
-        push(c, "BUY", "BUY");
-        break;
+      // LIQUIDITY PASS:
+      // sweep może być na jednej ze świec samej formacji lub bezpośrednio przed nią.
+      let sweepPass = false;
+      for (let s = Math.max(hhIdx + 1, pa.start - 1); s <= pa.end; s++) {
+        if (bullishSweepAt(s)) {
+          sweepPass = true;
+          break;
+        }
       }
+      if (!sweepPass) continue;
+
+      const formation = candles.slice(pa.start, pa.end + 1) as any[];
+      const formationHigh = Math.max(...formation.map((c) => n(c.high)));
+
+      // Następna świeca = POTWIERDZENIE/MOMENTUM.
+      const confirmIdx = pa.end + 1;
+      if (confirmIdx >= candles.length) continue;
+      const confirm: any = candles[confirmIdx];
+
+      const momentumPass =
+        bull(confirm) &&
+        body(confirm) / range(confirm) >= MIN_MOMENTUM_BODY &&
+        n(confirm.close) > formationHigh;
+
+      if (!momentumPass) continue;
+
+      // BREAKOUT HH może nastąpić na świecy momentum albo kilka świec później.
+      for (let i = confirmIdx; i < candles.length; i++) {
+        const c: any = candles[i];
+
+        // Setup zanegowany przed breakoutem.
+        if (n(c.close) < hl) break;
+
+        const breakoutPass =
+          bull(c) &&
+          body(c) / range(c) >= 0.45 &&
+          n(c.close) > hh;
+
+        if (breakoutPass) {
+          push(c, "BUY", "BUY");
+          break;
+        }
+
+        // Nie czekamy bez końca na stare setupy.
+        if (i - confirmIdx >= 8) break;
+      }
+
+      break;
     }
   }
 
-  // ========================= SELL =========================
-  // Szukamy sekwencji:
-  // HIGH -> LL -> LH -> breakout LL
-  for (let l = 0; l < lows.length; l++) {
+  // ============================================================
+  // SELL: LL -> LH -> sweep -> PA -> momentum -> breakout LL
+  // ============================================================
+  for (let l = 1; l < lows.length; l++) {
     const llIdx = lows[l];
+    const previousLowIdx = lows[l - 1];
 
-    const prevHighIdx = [...highs]
-      .filter((i) => i < llIdx)
-      .pop();
-
-    const lhIdx = highs.find((i) => i > llIdx);
-
-    if (prevHighIdx == null || lhIdx == null) continue;
-
-    const prevHigh = n((candles[prevHighIdx] as any).high);
     const ll = n((candles[llIdx] as any).low);
+    const previousLow = n((candles[previousLowIdx] as any).low);
+
+    // STRUCTURE/TREND PASS: Lower Low.
+    if (ll >= previousLow) continue;
+
+    const previousHighIdx = [...highs].filter((i) => i < llIdx).pop();
+    const lhIdx = highs.find((i) => i > llIdx);
+    if (previousHighIdx == null || lhIdx == null) continue;
+
+    const previousHigh = n((candles[previousHighIdx] as any).high);
     const lh = n((candles[lhIdx] as any).high);
 
-    // LH musi być niżej niż poprzedni swing high.
-    if (!(lh < prevHigh)) continue;
+    // STRUCTURE/TREND PASS: Lower High.
+    if (lh >= previousHigh) continue;
 
-    // LL powinien być niżej niż wcześniejszy swing low.
-    const previousLowIdx = [...lows]
-      .filter((i) => i < llIdx)
-      .pop();
+    const paFrom = Math.max(llIdx + 1, lhIdx - 2);
+    const paTo = Math.min(candles.length - 2, lhIdx + 4);
 
-    if (previousLowIdx != null) {
-      const previousLow = n((candles[previousLowIdx] as any).low);
-      if (!(ll < previousLow)) continue;
-    }
+    for (let paIdx = paFrom; paIdx <= paTo; paIdx++) {
+      const pa = bearishPAAt(paIdx);
+      if (!pa) continue;
 
-    // Po LH szukamy wybicia LL świecą zamkniętą.
-    for (let i = lhIdx + 1; i < candles.length; i++) {
-      const c: any = candles[i];
-
-      // Jeśli przed wybiciem cena zaneguje LH, setup anulowany.
-      if (n(c.high) > lh) break;
-
-      const bodyRatio = body(c) / range(c);
-
-      const breakout =
-        bear(c) &&
-        bodyRatio >= MIN_BODY_RATIO &&
-        n(c.close) < ll;
-
-      if (breakout) {
-        push(c, "SELL", "SELL");
-        break;
+      let sweepPass = false;
+      for (let s = Math.max(llIdx + 1, pa.start - 1); s <= pa.end; s++) {
+        if (bearishSweepAt(s)) {
+          sweepPass = true;
+          break;
+        }
       }
+      if (!sweepPass) continue;
+
+      const formation = candles.slice(pa.start, pa.end + 1) as any[];
+      const formationLow = Math.min(...formation.map((c) => n(c.low)));
+
+      const confirmIdx = pa.end + 1;
+      if (confirmIdx >= candles.length) continue;
+      const confirm: any = candles[confirmIdx];
+
+      const momentumPass =
+        bear(confirm) &&
+        body(confirm) / range(confirm) >= MIN_MOMENTUM_BODY &&
+        n(confirm.close) < formationLow;
+
+      if (!momentumPass) continue;
+
+      for (let i = confirmIdx; i < candles.length; i++) {
+        const c: any = candles[i];
+
+        if (n(c.close) > lh) break;
+
+        const breakoutPass =
+          bear(c) &&
+          body(c) / range(c) >= 0.45 &&
+          n(c.close) < ll;
+
+        if (breakoutPass) {
+          push(c, "SELL", "SELL");
+          break;
+        }
+
+        if (i - confirmIdx >= 8) break;
+      }
+
+      break;
     }
   }
 
-  // Bez duplikatów, maksymalnie 40 najnowszych sygnałów.
   const unique = Array.from(
     new Map(
       out.map((p) => [
@@ -1937,14 +2132,18 @@ patternsEnabled = false,
         horzLines: { color: "rgba(255,255,255,0.05)" },
       },
       rightPriceScale: {
-  borderVisible: false,
-  scaleMargins: {
-    top: 0.08,
-    bottom: 0.12,
-  },
-},
+        visible: true,
+        borderVisible: true,
+        borderColor: "rgba(148,163,184,0.32)",
+        entireTextOnly: false,
+        scaleMargins: {
+          top: 0.08,
+          bottom: 0.12,
+        },
+      },
       timeScale: {
-        borderVisible: false,
+        borderVisible: true,
+        borderColor: "rgba(148,163,184,0.32)",
         rightOffset,
         barSpacing: 10,
         minBarSpacing: 2,
@@ -2566,7 +2765,7 @@ kineticScroll: {
       }
     >
       <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-[#0B1220]">
-        <div className="pointer-events-auto absolute left-3 top-3 z-[30] flex items-center gap-2">
+        <div className="pointer-events-auto absolute left-2 top-2 z-[30] flex items-center gap-1.5 sm:left-3 sm:top-3 sm:gap-2">
           <button
             type="button"
             onClick={() => {
@@ -2576,7 +2775,7 @@ kineticScroll: {
                 chartRef.current?.timeScale().scrollToRealTime();
               } catch {}
             }}
-            className={`rounded-2xl border px-3 py-2 text-xs font-bold transition ${
+            className={`rounded-lg border px-2 py-1.5 text-[10px] font-bold transition sm:rounded-xl sm:px-2.5 sm:text-xs xl:rounded-2xl xl:px-3 xl:py-2 ${
               followOnTick && !detached
                 ? "border-sky-400/35 bg-sky-500/15 text-sky-100"
                 : "border-white/10 bg-white/5 text-zinc-200/70 hover:bg-white/10 hover:text-white"
@@ -2603,7 +2802,7 @@ kineticScroll: {
                 return next;
               });
             }}
-            className={`rounded-2xl border px-3 py-2 text-xs font-bold transition ${
+            className={`rounded-lg border px-2 py-1.5 text-[10px] font-bold transition sm:rounded-xl sm:px-2.5 sm:text-xs xl:rounded-2xl xl:px-3 xl:py-2 ${
               rightPadOn
                 ? "border-fuchsia-400/35 bg-fuchsia-500/15 text-fuchsia-100"
                 : "border-white/10 bg-white/5 text-zinc-200/70 hover:bg-white/10 hover:text-white"
@@ -2614,7 +2813,7 @@ kineticScroll: {
           </button>
         </div>
 
-        <div className="pointer-events-none absolute left-3 top-16 z-[31] rounded-2xl border border-white/10 bg-black/50 px-3 py-2 text-[11px] text-white/80 backdrop-blur">
+        <div className="pointer-events-none absolute left-2 top-12 z-[31] hidden rounded-xl border border-white/10 bg-black/45 px-2 py-1.5 text-[9px] text-white/70 backdrop-blur min-[420px]:block sm:left-3 sm:top-14 sm:text-[10px] xl:top-16 xl:rounded-2xl xl:px-3 xl:py-2 xl:text-[11px]">
           <div>
             <span className="text-slate-400">FREEZE:</span> {freezeDebug.frozen ? "YES" : "NO"}
           </div>
@@ -2759,7 +2958,11 @@ kineticScroll: {
             so drag left/right + wheel zoom + axis scaling work normally.
             Drawing tools re-enable the drawing overlay.
           */}
-          <div className="absolute inset-0 z-[20] pointer-events-auto">
+          <div
+            className={`absolute inset-0 z-[20] ${
+              activeDrawTool === "SELECT" ? "pointer-events-none" : "pointer-events-auto"
+            }`}
+          >
             <DrawingsLayer
               wrapRef={containerRef}
               chartRef={chartRef}
