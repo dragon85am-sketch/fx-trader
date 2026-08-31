@@ -67,8 +67,8 @@ export default async function HomePage() {
 
       {/* NAVBAR */}
       <header className="sticky top-0 z-50 border-b border-sky-200/25 bg-[#031A31]/95 backdrop-blur-xl">
-        <div className="mx-auto flex min-h-[60px] w-full max-w-[1380px] items-center justify-between gap-2 px-2 py-2 sm:min-h-[64px] sm:px-4 md:px-6">
-          <Link href="/" className="relative h-[38px] w-[112px] shrink-0 min-[390px]:w-[126px] sm:h-[52px] sm:w-[205px]">
+        <div className="mx-auto flex min-h-[58px] w-full max-w-[1380px] items-center gap-1.5 px-2 py-2 sm:min-h-[64px] sm:gap-2.5 sm:px-4 md:px-6">
+          <Link href="/" className="relative h-[36px] w-[96px] shrink-0 min-[390px]:w-[104px] sm:h-[52px] sm:w-[205px]">
             <Image
               src="/home/logo-fxtrade.png"
               alt="FX Trade Professional Trading"
@@ -103,8 +103,13 @@ export default async function HomePage() {
             </a>
           </nav>
 
-          <div className="flex min-w-0 items-center gap-1.5 sm:gap-2.5">
-            <LanguageSwitcher />
+          <div className="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-2.5">
+            <div className="w-[104px] shrink-0 overflow-hidden min-[390px]:w-[112px] sm:w-auto
+              [&_button]:!h-9 [&_button]:!min-w-0 [&_button]:!w-[104px] [&_button]:!px-2
+              min-[390px]:[&_button]:!w-[112px]
+              sm:[&_button]:!h-auto sm:[&_button]:!w-auto sm:[&_button]:!px-4">
+              <LanguageSwitcher />
+            </div>
 
             <Link
               href="/login"
@@ -116,23 +121,24 @@ export default async function HomePage() {
 
             <Link
               href="/checkout"
-              className="flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-gradient-to-r from-sky-500 via-blue-600 to-blue-700 px-2.5 text-[10px] font-bold shadow-[0_0_26px_rgba(37,99,235,.26)] transition hover:brightness-110 min-[430px]:px-3 sm:h-auto sm:gap-2 sm:px-4 sm:py-2.5 sm:text-[12px]"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-r from-sky-500 via-blue-600 to-blue-700 text-[10px] font-bold shadow-[0_0_26px_rgba(37,99,235,.26)] transition hover:brightness-110 min-[430px]:w-auto min-[430px]:gap-1.5 min-[430px]:px-3 sm:h-auto sm:gap-2 sm:px-4 sm:py-2.5 sm:text-[12px]"
+              aria-label="Kup dostęp do platformy"
             >
-              <Crown className="h-4 w-4" />
-              <span className="hidden min-[430px]:inline">Kup dostęp do platformy</span>
-              <span className="min-[430px]:hidden">Kup dostęp</span>
+              <Crown className="h-4 w-4 shrink-0" />
+              <span className="hidden min-[430px]:inline">Kup dostęp</span>
+              <span className="hidden sm:inline"> do platformy</span>
             </Link>
           </div>
         </div>
 
-        <nav className="mx-auto flex w-full max-w-[1380px] gap-1.5 overflow-x-auto px-2 pb-2 text-[10px] font-semibold text-slate-300 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:hidden sm:px-4">
-          <a href="#funkcje" className="shrink-0 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2">Funkcje</a>
-          <a href="#scanner" className="shrink-0 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2">Skaner</a>
-          <a href="#strategie" className="shrink-0 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2">Strategie</a>
-          <a href="#edukacja" className="shrink-0 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2">Edukacja</a>
-          <Link href="/trading-room" className="shrink-0 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2">Trading Room</Link>
-          <Link href="/cennik" className="shrink-0 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2">Cennik</Link>
-          <a href="#onas" className="shrink-0 rounded-md border border-white/10 bg-white/[0.03] px-3 py-2">O nas</a>
+        <nav className="mx-auto flex w-full max-w-[1380px] gap-1 overflow-x-auto px-2 pb-2 text-[9px] font-semibold text-slate-300 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden min-[390px]:gap-1.5 min-[390px]:text-[10px] lg:hidden sm:px-4">
+          <a href="#funkcje" className="shrink-0 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-2 min-[390px]:px-3">Funkcje</a>
+          <a href="#scanner" className="shrink-0 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-2 min-[390px]:px-3">Skaner</a>
+          <a href="#strategie" className="shrink-0 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-2 min-[390px]:px-3">Strategie</a>
+          <a href="#edukacja" className="shrink-0 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-2 min-[390px]:px-3">Edukacja</a>
+          <Link href="/trading-room" className="shrink-0 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-2 min-[390px]:px-3">Trading Room</Link>
+          <Link href="/cennik" className="shrink-0 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-2 min-[390px]:px-3">Cennik</Link>
+          <a href="#onas" className="shrink-0 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-2 min-[390px]:px-3">O nas</a>
         </nav>
       </header>
 
