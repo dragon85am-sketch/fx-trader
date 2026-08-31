@@ -1010,7 +1010,7 @@ useEffect(() => {
   const categories = ["Forex", "Surowce", "Kryptowaluty"];
 
   return (
-    <div className="relative isolate min-h-screen overflow-hidden bg-[#020817] px-4 pb-6 pt-5 text-white">
+    <div className="relative isolate min-h-[100dvh] w-full max-w-full overflow-x-hidden bg-[#020817] px-2 pb-5 pt-3 text-white sm:px-4 sm:pb-6 sm:pt-5">
       <div
         aria-hidden="true"
         className="pointer-events-none fixed inset-0 z-0 bg-cover bg-center bg-no-repeat"
@@ -1023,14 +1023,14 @@ useEffect(() => {
         aria-hidden="true"
         className="pointer-events-none fixed inset-0 z-[1] bg-[radial-gradient(circle_at_50%_15%,rgba(14,165,233,.06),transparent_45%)]"
       />
-      <section className="relative z-10 mx-auto max-w-[1600px]">
+      <section className="relative z-10 mx-auto w-full min-w-0 max-w-[1600px] [&_*]:max-w-full">
         <div className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <div className="text-[10px] font-semibold uppercase tracking-[.20em] text-cyan-300/70">
               FX Trade
             </div>
             <div className="mt-1 flex flex-wrap items-center gap-3">
-              <h1 className="text-3xl font-black tracking-tight">TRADING ROOM</h1>
+              <h1 className="text-[22px] font-black tracking-tight sm:text-3xl">TRADING ROOM</h1>
               <span className="inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-500/10 px-3 py-1 text-[10px] font-bold text-emerald-300">
                 <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,.8)]" />
                 RYNEK OTWARTY
@@ -1054,7 +1054,7 @@ useEffect(() => {
         </div>
 
         {activeRoomTab !== "Trading Room" ? (
-          <div className="mb-4 flex flex-wrap gap-2">
+          <div className="mb-4 flex max-w-full gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible">
             <button
               onClick={() => setActiveRoomTab("Trading Room")}
               className="rounded-xl border border-cyan-300/20 bg-[#0d3b63] px-4 py-2 text-[11px] font-semibold text-white transition hover:bg-[#12517f]"
@@ -1086,13 +1086,13 @@ useEffect(() => {
 
         {activeRoomTab === "Trading Room" ? (
           <>
-            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <section className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-3">
               <button
                 type="button"
                 onClick={() => setActiveRoomTab("Economic Calendar")}
                 className="group overflow-hidden rounded-[18px] border border-cyan-400/25 bg-[#07192b] text-left shadow-[0_10px_28px_rgba(0,0,0,.18)] transition hover:-translate-y-0.5 hover:border-cyan-300/55 hover:shadow-[0_0_30px_rgba(34,211,238,.12)]"
               >
-                <div className="relative h-[190px] overflow-hidden">
+                <div className="relative h-[150px] overflow-hidden sm:h-[190px]">
                   <img
                     src="/trading-room/economic-calendar-trading.png"
                     alt="Economic Calendar"
@@ -1120,7 +1120,7 @@ useEffect(() => {
                 onClick={() => setActiveRoomTab("Profit Calendar")}
                 className="group overflow-hidden rounded-[18px] border border-emerald-400/25 bg-[#071b19] text-left shadow-[0_10px_28px_rgba(0,0,0,.18)] transition hover:-translate-y-0.5 hover:border-emerald-300/55 hover:shadow-[0_0_30px_rgba(16,185,129,.12)]"
               >
-                <div className="relative h-[190px] overflow-hidden">
+                <div className="relative h-[150px] overflow-hidden sm:h-[190px]">
                   <img
                     src="/trading-room/calendar-profit-bull.png"
                     alt="Calendar Profit"
@@ -1164,7 +1164,7 @@ useEffect(() => {
                 onClick={() => router.push("/journal")}
                 className="group overflow-hidden rounded-[18px] border border-violet-400/25 bg-[#15102a] text-left shadow-[0_10px_28px_rgba(0,0,0,.18)] transition hover:-translate-y-0.5 hover:border-violet-300/55 hover:shadow-[0_0_30px_rgba(139,92,246,.14)]"
               >
-                <div className="relative h-[190px] overflow-hidden">
+                <div className="relative h-[150px] overflow-hidden sm:h-[190px]">
                   <img
                     src="/trading-room/journal-trading.png"
                     alt="Journal"
@@ -1210,7 +1210,7 @@ useEffect(() => {
                     Economic Calendar, Calendar Profit i Journal w jednym miejscu.
                   </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <span className="rounded-full border border-cyan-300/15 bg-cyan-400/5 px-3 py-1.5 text-[9px] text-cyan-200">
                     Economic
                   </span>
@@ -1229,13 +1229,13 @@ useEffect(() => {
     {/* =========================================================
         FX TRADE PREMIUM — ECONOMIC CALENDAR
        ========================================================= */}
-    <section className="overflow-hidden rounded-[16px] border border-cyan-300/30 bg-[linear-gradient(145deg,#1d82c3_0%,#1466a3_58%,#0d4f84_100%)] shadow-[0_12px_32px_rgba(1,20,45,.18),0_0_28px_rgba(34,211,238,.13),inset_0_1px_0_rgba(255,255,255,.12)]">
-      <div className="flex flex-col gap-5 px-5 py-5 xl:flex-row xl:items-center xl:justify-between">
+    <section className="overflow-x-auto rounded-[16px] border border-cyan-300/30 bg-[linear-gradient(145deg,#1d82c3_0%,#1466a3_58%,#0d4f84_100%)] shadow-[0_12px_32px_rgba(1,20,45,.18),0_0_28px_rgba(34,211,238,.13),inset_0_1px_0_rgba(255,255,255,.12)]">
+      <div className="flex flex-col gap-4 px-3 py-4 sm:px-5 sm:py-5 xl:flex-row xl:items-center xl:justify-between">
         <div>
           <div className="text-[9px] font-semibold uppercase tracking-[.18em] text-sky-300/65">
             Trading Room
           </div>
-          <h2 className="mt-1 text-[26px] font-semibold tracking-tight text-white">
+          <h2 className="mt-1 text-[21px] font-semibold tracking-tight text-white sm:text-[26px]">
             Economic Calendar
           </h2>
           <p className="mt-1 text-[11px] text-sky-100/50">
@@ -1254,7 +1254,7 @@ useEffect(() => {
         </div>
       </div>
 
-      <div className="border-t border-[#0a417b] px-5 py-3">
+      <div className="border-t border-[#0a417b] px-3 py-3 sm:px-5">
         <div className="flex flex-wrap gap-2">
           {roomTabs.map((tab) => (
             <button
@@ -1278,7 +1278,7 @@ useEffect(() => {
       <div className="rounded-[14px] border border-cyan-300/30 bg-[linear-gradient(145deg,#1a79b9_0%,#135f9b_52%,#0d4e82_100%)] p-4 shadow-[0_10px_28px_rgba(1,20,45,.16),0_0_24px_rgba(34,211,238,.11),inset_0_1px_0_rgba(255,255,255,.10)]">
         <h3 className="text-[14px] font-semibold text-white">Nadchodzące wydarzenia</h3>
 
-        <div className="mt-3 grid grid-cols-4 gap-2">
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
           {[
             ["HIGH", highImpactCount, "border-rose-500/25 bg-rose-500/10 text-rose-300"],
             ["MEDIUM", mediumImpactCount, "border-amber-400/25 bg-amber-400/10 text-amber-300"],
@@ -1743,7 +1743,7 @@ useEffect(() => {
                       previous: event.previous ?? "-",
                     });
                   }}
-                  className="w-full rounded-[9px] border border-[#0a417b] bg-[#0c4b7d] p-3 text-left transition hover:border-sky-400/50 hover:bg-[#115f99]"
+                  className="min-w-0 w-full rounded-[9px] border border-[#0a417b] bg-[#0c4b7d] p-3 text-left transition hover:border-sky-400/50 hover:bg-[#115f99]"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex gap-3">
@@ -1836,7 +1836,7 @@ useEffect(() => {
         {!showMacroFilters && (
           <button
             onClick={() => setShowMacroFilters(true)}
-            className="w-full rounded-[10px] border border-[#0d579e] bg-[#0f5b96] px-4 py-3 text-[10px] font-semibold text-sky-300 hover:bg-[#1674b5]"
+            className="min-w-0 w-full rounded-[10px] border border-[#0d579e] bg-[#0f5b96] px-4 py-3 text-[10px] font-semibold text-sky-300 hover:bg-[#1674b5]"
           >
             Pokaż Event Filters
           </button>
@@ -2022,7 +2022,7 @@ useEffect(() => {
     </div>
   </div>
 )}
-<div className="overflow-hidden rounded-2xl border border-white/10">
+<div className="overflow-x-auto rounded-2xl border border-white/10">
   <div className="grid grid-cols-6 bg-white/5 px-4 py-3 text-xs uppercase tracking-wider text-white/45">
     <div>Date</div>
     <div>Time</div>
@@ -2115,7 +2115,7 @@ useEffect(() => {
         </select>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-white/10">
+      <div className="overflow-x-auto rounded-xl border border-white/10">
         <div className="grid grid-cols-6 bg-white/5 px-4 py-3 text-xs uppercase tracking-wider text-white/45">
           <div>Date</div>
           <div>Time</div>
@@ -2152,7 +2152,7 @@ useEffect(() => {
           {/* =========================================================
               FX TRADE PREMIUM — PROFIT CALENDAR
              ========================================================= */}
-          <section className="overflow-hidden rounded-[16px] border border-cyan-300/30 bg-[linear-gradient(145deg,#1d82c3_0%,#1466a3_58%,#0d4f84_100%)] shadow-[0_12px_32px_rgba(1,20,45,.18),0_0_28px_rgba(34,211,238,.13),inset_0_1px_0_rgba(255,255,255,.12)]">
+          <section className="overflow-x-auto rounded-[16px] border border-cyan-300/30 bg-[linear-gradient(145deg,#1d82c3_0%,#1466a3_58%,#0d4f84_100%)] shadow-[0_12px_32px_rgba(1,20,45,.18),0_0_28px_rgba(34,211,238,.13),inset_0_1px_0_rgba(255,255,255,.12)]">
             <div className="flex flex-col gap-4 px-5 py-5 xl:flex-row xl:items-center xl:justify-between">
               <div>
                 <div className="text-[9px] font-semibold uppercase tracking-[.18em] text-sky-300/65">
@@ -2396,7 +2396,7 @@ useEffect(() => {
                 <select
                   value={newTrade.pair}
                   onChange={(e) => setNewTrade({ ...newTrade, pair: e.target.value })}
-                  className="w-full rounded-[8px] border border-[#0d579e] bg-[#0c4b7d] px-3 py-2.5 text-[10px] text-white outline-none"
+                  className="min-w-0 w-full rounded-[8px] border border-[#0d579e] bg-[#0c4b7d] px-3 py-2.5 text-[10px] text-white outline-none"
                 >
                   {Object.values(instrumentOptions).flat().map((symbol) => (
                     <option key={symbol} value={symbol}>{symbol}</option>
@@ -2445,7 +2445,7 @@ useEffect(() => {
                             [key]: e.target.value,
                           })
                         }
-                        className="w-full rounded-[8px] border border-[#0d579e] bg-[#0c4b7d] px-2.5 py-2.5 text-[10px] text-white outline-none"
+                        className="min-w-0 w-full rounded-[8px] border border-[#0d579e] bg-[#0c4b7d] px-2.5 py-2.5 text-[10px] text-white outline-none"
                       />
                     </label>
                   ))}
@@ -2457,7 +2457,7 @@ useEffect(() => {
                     <input
                       value={newTrade.size}
                       onChange={(e) => setNewTrade({ ...newTrade, size: e.target.value })}
-                      className="w-full rounded-[8px] border border-[#0d579e] bg-[#0c4b7d] px-3 py-2.5 text-[10px] text-white outline-none"
+                      className="min-w-0 w-full rounded-[8px] border border-[#0d579e] bg-[#0c4b7d] px-3 py-2.5 text-[10px] text-white outline-none"
                     />
                   </label>
 
@@ -2467,7 +2467,7 @@ useEffect(() => {
                       type="number"
                       value={newTrade.result}
                       onChange={(e) => setNewTrade({ ...newTrade, result: e.target.value })}
-                      className="w-full rounded-[8px] border border-[#0d579e] bg-[#0c4b7d] px-3 py-2.5 text-[10px] text-emerald-300 outline-none"
+                      className="min-w-0 w-full rounded-[8px] border border-[#0d579e] bg-[#0c4b7d] px-3 py-2.5 text-[10px] text-emerald-300 outline-none"
                     />
                   </label>
                 </div>
@@ -2478,7 +2478,7 @@ useEffect(() => {
                     type="date"
                     value={newTrade.date}
                     onChange={(e) => setNewTrade({ ...newTrade, date: e.target.value })}
-                    className="w-full rounded-[8px] border border-[#0d579e] bg-[#0c4b7d] px-3 py-2.5 text-[10px] text-white outline-none"
+                    className="min-w-0 w-full rounded-[8px] border border-[#0d579e] bg-[#0c4b7d] px-3 py-2.5 text-[10px] text-white outline-none"
                   />
                 </label>
 
@@ -2488,7 +2488,7 @@ useEffect(() => {
                     value={newTrade.setup}
                     onChange={(e) => setNewTrade({ ...newTrade, setup: e.target.value })}
                     placeholder="np. London Breakout"
-                    className="w-full rounded-[8px] border border-[#0d579e] bg-[#0c4b7d] px-3 py-2.5 text-[10px] text-white outline-none placeholder:text-sky-100/25"
+                    className="min-w-0 w-full rounded-[8px] border border-[#0d579e] bg-[#0c4b7d] px-3 py-2.5 text-[10px] text-white outline-none placeholder:text-sky-100/25"
                   />
                 </label>
 
@@ -2497,7 +2497,7 @@ useEffect(() => {
                   <select
                     value={newTrade.session}
                     onChange={(e) => setNewTrade({ ...newTrade, session: e.target.value })}
-                    className="w-full rounded-[8px] border border-[#0d579e] bg-[#0c4b7d] px-3 py-2.5 text-[10px] text-white outline-none"
+                    className="min-w-0 w-full rounded-[8px] border border-[#0d579e] bg-[#0c4b7d] px-3 py-2.5 text-[10px] text-white outline-none"
                   >
                     <option value="Asia">Asia</option>
                     <option value="London">London</option>
@@ -2519,7 +2519,7 @@ useEffect(() => {
 
                 <button
                   onClick={editingTradeId ? handleUpdateTrade : handleAddTrade}
-                  className="w-full rounded-[9px] border border-sky-300/30 bg-[linear-gradient(90deg,#0b9ee8,#1269e8)] px-4 py-3 text-[10px] font-bold text-white shadow-[0_0_18px_rgba(14,165,233,.18)] transition hover:brightness-110"
+                  className="min-w-0 w-full rounded-[9px] border border-sky-300/30 bg-[linear-gradient(90deg,#0b9ee8,#1269e8)] px-4 py-3 text-[10px] font-bold text-white shadow-[0_0_18px_rgba(14,165,233,.18)] transition hover:brightness-110"
                 >
                   {editingTradeId ? "✓ Zapisz zmiany" : "＋ Add Trade to Calendar"}
                 </button>

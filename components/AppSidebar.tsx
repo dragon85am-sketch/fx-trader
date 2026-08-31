@@ -473,8 +473,8 @@ export default function AppSidebar() {
   }
 
   return (
-    <aside className="hidden w-[304px] shrink-0 md:block">
-      <div className="h-screen p-3 pr-0 xl:p-4 xl:pr-0">
+    <aside className="h-full w-full shrink-0">
+      <div className="h-full p-3 lg:h-screen lg:pr-0 xl:p-4 xl:pr-0">
         <div className={cn(
             "sticky top-3 flex max-h-[calc(100vh-1.5rem)] flex-col overflow-hidden rounded-[30px] border border-sky-300/25 text-sky-50 shadow-[0_22px_70px_rgba(0,20,55,.42),0_0_30px_rgba(56,189,248,.12),inset_0_1px_0_rgba(255,255,255,.08)] backdrop-blur-2xl transition-colors duration-300 xl:top-4 xl:max-h-[calc(100vh-2rem)]",
             themeMode === "light"

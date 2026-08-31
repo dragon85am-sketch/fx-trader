@@ -1203,7 +1203,7 @@ function calcVolumePoc(candles: Candle[], bins = 28): number | null {
     const index = Math.max(0, Math.min(bins - 1, rawIndex));
 
     // Forex z Twelve Data czasem nie ma realnego wolumenu.
-    // Wtedy każda świeca dostaje wagę 1, żeby POC nadal działał.
+    // Wtedy kaÅ¼da Å›wieca dostaje wagÄ™ 1, Å¼eby POC nadal dziaÅ‚aÅ‚.
     const weight =
       Number.isFinite(candle.volume) && (candle.volume ?? 0) > 0
         ? Number(candle.volume)
@@ -1414,7 +1414,7 @@ function PocMiniScanner({
             {resultLabel}
           </span>
 
-          <div className="flex items-end gap-1" title="Siła całego sygnału">
+          <div className="flex items-end gap-1" title="SiÅ‚a caÅ‚ego sygnaÅ‚u">
             {Array.from({ length: 6 }).map((_, index) => {
               const heights = ["h-2", "h-2.5", "h-3", "h-3.5", "h-4", "h-4.5"];
               return (
@@ -1450,7 +1450,7 @@ function PocMiniScanner({
 
           const relationText =
             !cell
-              ? "—"
+              ? "â€”"
               : cell.relation === "ABOVE"
                 ? "Above"
                 : cell.relation === "BELOW"
@@ -1459,11 +1459,11 @@ function PocMiniScanner({
 
           const trendText =
             !cell
-              ? "—"
+              ? "â€”"
               : cell.trend === "UP"
-                ? "↑ Up"
+                ? "â†‘ Up"
                 : cell.trend === "DOWN"
-                  ? "↓ Down"
+                  ? "â†“ Down"
                   : "Flat";
 
           const activeSegments = isBuy
@@ -1552,7 +1552,7 @@ function PocMiniScanner({
               {`${POC_TIMEFRAMES.length - state.cells.length} TF bez danych`}
             </span>
           ) : (
-            <span>Wszystkie interwały aktywne</span>
+            <span>Wszystkie interwaÅ‚y aktywne</span>
           )}
         </div>
 
@@ -1709,7 +1709,7 @@ function formatSyncUTC(ts: number) {
   try {
     return new Date(ts).toISOString().slice(11, 19) + " UTC";
   } catch {
-    return "—";
+    return "â€”";
   }
 }
 
@@ -2002,13 +2002,13 @@ React.useEffect(() => {
     const onDown = (e: MouseEvent) => {
   const t = e.target as Node;
 
-  // ❌ EMA NIE ZAMYKA SIĘ NA KLIK
+  // âŒ EMA NIE ZAMYKA SIÄ˜ NA KLIK
   if (false) {}
 
-  // ❌ BB NIE ZAMYKA SIĘ NA KLIK
+  // âŒ BB NIE ZAMYKA SIÄ˜ NA KLIK
   if (false) {}
 
-  // ✅ tylko TOOLS się zamyka
+  // âœ… tylko TOOLS siÄ™ zamyka
   if (toolsPanelOpen && toolsPanelRef.current && !toolsPanelRef.current.contains(t)) {
     setToolsPanelOpen(false);
   }
@@ -2069,11 +2069,11 @@ React.useEffect(() => {
     const compute = () => {
       const h = Math.max(620, window.innerHeight - HEADER_OFFSET - BOTTOM_PAD);
 
-      // Lewa lista może dalej dopasowywać się do wysokości ekranu.
+      // Lewa lista moÅ¼e dalej dopasowywaÄ‡ siÄ™ do wysokoÅ›ci ekranu.
       setPanelH(h);
 
-      // Wykres rośnie tylko w kontrolowanym zakresie.
-      // Closed Trades ma osobną stałą wysokość i zawsze zostaje POD wykresem.
+      // Wykres roÅ›nie tylko w kontrolowanym zakresie.
+      // Closed Trades ma osobnÄ… staÅ‚Ä… wysokoÅ›Ä‡ i zawsze zostaje POD wykresem.
       setChartHeight(
         Math.max(560, Math.min(780, window.innerHeight - 360))
       );
@@ -2547,7 +2547,7 @@ if (closedNow.length) {
 });
       } catch (e: any) {
         if (!alive) return;
-        setError(e?.message ?? "Błąd pobierania danych");
+        setError(e?.message ?? "BÅ‚Ä…d pobierania danych");
       } finally {
         if (!alive) return;
         setLoading(false);
@@ -2667,8 +2667,8 @@ if (closedNow.length) {
     [selected.symbol, lastSync]
   );
 
-  // RENKO ma własne źródło danych niezależne od głównego interwału wykresu.
-  // Domyślnie: M1. CURRENT = aktualny TF. AUTO = M1.
+  // RENKO ma wÅ‚asne ÅºrÃ³dÅ‚o danych niezaleÅ¼ne od gÅ‚Ã³wnego interwaÅ‚u wykresu.
+  // DomyÅ›lnie: M1. CURRENT = aktualny TF. AUTO = M1.
   React.useEffect(() => {
     let alive = true;
 
@@ -2685,7 +2685,7 @@ if (closedNow.length) {
             ? tf
             : "M1";
 
-      // Jeżeli Renko ma korzystać dokładnie z aktualnego TF,
+      // JeÅ¼eli Renko ma korzystaÄ‡ dokÅ‚adnie z aktualnego TF,
       // nie robimy drugiego requestu.
       if (renkoTf === tf) {
         if (alive) setRenkoCandles(selectedCandles);
@@ -2707,7 +2707,7 @@ if (closedNow.length) {
 
     void refreshRenkoCandles();
 
-    // Odświeżenie razem ze skanerem.
+    // OdÅ›wieÅ¼enie razem ze skanerem.
     const id = window.setInterval(() => {
       void refreshRenkoCandles();
     }, REFRESH_MS);
@@ -2737,7 +2737,7 @@ if (closedNow.length) {
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight text-white drop-shadow-[0_0_16px_rgba(56,189,248,.20)] md:text-3xl">Skaner rynku</h1>
           <p className="mt-2 text-sky-100/70">
-            Live: <span className="font-semibold">{source}</span> • 3 potwierdzenia: Liquidity + Price Action + 2 Confirmation Candles
+            Live: <span className="font-semibold">{source}</span> â€¢ 3 potwierdzenia: Liquidity + Price Action + 2 Confirmation Candles
           </p>
         </div>
 
@@ -2764,19 +2764,19 @@ if (closedNow.length) {
           <CardContent className="flex h-full flex-col gap-3 p-5">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-lg font-bold text-white">Lista instrumentów</p>
-                <p className="text-sm text-sky-100/60">Search • Sort Liquidity • Filter READY</p>
+                <p className="text-lg font-bold text-white">Lista instrumentÃ³w</p>
+                <p className="text-sm text-sky-100/60">Search â€¢ Sort Liquidity â€¢ Filter READY</p>
               </div>
 
               <div className="text-right text-xs text-sky-100/55">
-                {loading ? "Sync…" : lastSync ? `Sync: ${formatSyncUTC(lastSync)}` : "—"}
+                {loading ? "Syncâ€¦" : lastSync ? `Sync: ${formatSyncUTC(lastSync)}` : "â€”"}
               </div>
             </div>
 
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Szukaj… (np. EURUSD / BTCUSDT)"
+              placeholder="Szukajâ€¦ (np. EURUSD / BTCUSDT)"
               className="w-full rounded-2xl border border-sky-300/20 bg-[#061c37]/80 px-4 py-2.5 text-sm text-white shadow-[inset_0_1px_8px_rgba(0,0,0,.16)] outline-none placeholder:text-sky-100/35 focus:border-cyan-300/45 focus:ring-2 focus:ring-cyan-400/10"
             />
 
@@ -2791,7 +2791,7 @@ if (closedNow.length) {
                 onClick={() => setSortKey("LIQ_DESC")}
                 type="button"
               >
-                Liquidity ↓
+                Liquidity â†“
               </button>
 
               <button
@@ -2804,7 +2804,7 @@ if (closedNow.length) {
                 onClick={() => setSortKey("LIQ_ASC")}
                 type="button"
               >
-                Liquidity ↑
+                Liquidity â†‘
               </button>
 
               <button
@@ -2878,11 +2878,11 @@ if (closedNow.length) {
 
                     {r.tradeActive && r.side ? (
                       <div className="mt-2 text-xs text-amber-200/90">
-                        ✅ <span className="font-extrabold">FX TRADE • {r.side}</span> • RR {r.levels?.rr?.toFixed?.(2) ?? "—"}
-                        {r.signalPattern && r.signalPattern !== "NONE" ? <span className="ml-2 text-yellow-200">• {r.signalPattern}</span> : null}
+                        âœ… <span className="font-extrabold">FX TRADE â€¢ {r.side}</span> â€¢ RR {r.levels?.rr?.toFixed?.(2) ?? "â€”"}
+                        {r.signalPattern && r.signalPattern !== "NONE" ? <span className="ml-2 text-yellow-200">â€¢ {r.signalPattern}</span> : null}
                       </div>
                     ) : (
-                      <div className="mt-2 text-xs text-sky-100/30">—</div>
+                      <div className="mt-2 text-xs text-sky-100/30">â€”</div>
                     )}
                   </div>
                 );
@@ -2977,7 +2977,7 @@ if (closedNow.length) {
         onClick={() => setEmaPanelOpen(false)}
         className="rounded-full border border-sky-300/15 bg-[#0b315c]/75 px-2 py-1 text-xs text-sky-100/75 hover:border-sky-300/30 hover:bg-[#12477f] hover:text-white"
       >
-        ✕
+        âœ•
       </button>
     </div>
 
@@ -3109,7 +3109,7 @@ if (closedNow.length) {
           </div>
 
           <div className="mt-1 pl-7 text-[9px] text-sky-100/25">
-            Slot {index + 1} • zakres 1–500
+            Slot {index + 1} â€¢ zakres 1â€“500
           </div>
         </div>
       ))}
@@ -3156,7 +3156,7 @@ if (closedNow.length) {
         onClick={() => setBbPanelOpen(false)}
         className="text-4xl font-bold leading-none text-slate-300 hover:text-white"
       >
-        ×
+        Ã—
       </button>
     </div>
 
@@ -3180,7 +3180,7 @@ if (closedNow.length) {
       </label>
 
       <label className="flex items-center justify-between text-lg font-semibold text-white">
-        <span>Odstępstwo</span>
+        <span>OdstÄ™pstwo</span>
         <input
           type="number"
           step="0.1"
@@ -3276,7 +3276,7 @@ if (closedNow.length) {
               }))
             }
             className="h-10 w-12 rounded-lg border border-white/15 bg-transparent"
-            title="Kolor tła Bollinger Bands"
+            title="Kolor tÅ‚a Bollinger Bands"
           />
         </div>
 
@@ -3314,7 +3314,7 @@ if (closedNow.length) {
         onClick={() => setBbState(DEFAULT_BB)}
         className="rounded-xl border border-sky-300/20 bg-[#0b315c]/80 px-6 py-3 text-lg font-bold text-white hover:bg-[#12477f]"
       >
-        Usuń
+        UsuÅ„
       </button>
 
       <button
@@ -3398,8 +3398,8 @@ if (closedNow.length) {
                       onClick={() => setSupertrendEnabled((v) => !v)}
                       title={
                         supertrendEnabled
-                          ? "SuperTrend aktywny — kliknij, aby wyłączyć"
-                          : "Włącz SuperTrend"
+                          ? "SuperTrend aktywny â€” kliknij, aby wyÅ‚Ä…czyÄ‡"
+                          : "WÅ‚Ä…cz SuperTrend"
                       }
                       className={cn(
                         "ml-1 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm font-semibold transition",
@@ -3446,7 +3446,7 @@ if (closedNow.length) {
   <button
     type="button"
     onClick={toggleFullscreen}
-    title={isFullscreen ? "Wyjdź z pełnego ekranu" : "Pełny ekran"}
+    title={isFullscreen ? "WyjdÅº z peÅ‚nego ekranu" : "PeÅ‚ny ekran"}
     className={cn(
       "grid h-10 w-10 place-items-center rounded-xl border text-lg font-black transition",
       isFullscreen
@@ -3454,7 +3454,7 @@ if (closedNow.length) {
         : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/75 hover:border-sky-300/30 hover:bg-[#12477f] hover:text-white"
     )}
   >
-    ⛶
+    â›¶
   </button>
 
   {DRAW_TOOL_BUTTONS.map(({ tool, icon: Icon, title }) => (
@@ -3515,7 +3515,7 @@ if (closedNow.length) {
                         <th className="px-3 py-2 text-left">Data</th>
                         <th className="px-3 py-2 text-left">Instrument</th>
                         <th className="px-3 py-2 text-left">Kierunek</th>
-                        <th className="px-3 py-2 text-left">Wejście</th>
+                        <th className="px-3 py-2 text-left">WejÅ›cie</th>
                         <th className="px-3 py-2 text-left">TP1</th>
                         <th className="px-3 py-2 text-left">TP2</th>
                         <th className="px-3 py-2 text-left">SL</th>
@@ -3533,7 +3533,7 @@ closedTrades.map((t) => (
 
     <td className="px-3 py-2">{t.instrument}</td>
 
-    {/* 🔥 KIERUNEK */}
+    {/* ðŸ”¥ KIERUNEK */}
     <td className="px-3 py-2">
       <span
         className={cn(
@@ -3548,11 +3548,11 @@ closedTrades.map((t) => (
     </td>
 
     <td className="px-3 py-2">{t.entry}</td>
-    <td className="px-3 py-2">{t.tp1 ?? "—"}</td>
-    <td className="px-3 py-2">{t.tp2 ?? "—"}</td>
+    <td className="px-3 py-2">{t.tp1 ?? "â€”"}</td>
+    <td className="px-3 py-2">{t.tp2 ?? "â€”"}</td>
     <td className="px-3 py-2">{t.sl}</td>
 
-    {/* 🔥 STATUS */}
+    {/* ðŸ”¥ STATUS */}
     <td className="px-3 py-2">
       {(() => {
         const safeStatus =
@@ -3575,7 +3575,7 @@ closedTrades.map((t) => (
     : "bg-red-500/20 text-red-300"
 )}
           >
-            {safeStatus || "—"}
+            {safeStatus || "â€”"}
           </span>
         );
       })()}
@@ -3585,7 +3585,7 @@ closedTrades.map((t) => (
                       ) : (
                         <tr>
                           <td colSpan={8} className="px-3 py-6 text-center text-sky-100/45">
-                            Brak zamkniętych trade’ów
+                            Brak zamkniÄ™tych tradeâ€™Ã³w
                           </td>
                         </tr>
                       )}
@@ -3622,7 +3622,7 @@ closedTrades.map((t) => (
               <div>
                 <div className="text-lg font-black">Renko</div>
                 <div className="mt-0.5 text-[11px] text-sky-100/45">
-                  Ustawienia wielkości cegły Renko
+                  Ustawienia wielkoÅ›ci cegÅ‚y Renko
                 </div>
               </div>
 
@@ -3631,7 +3631,7 @@ closedTrades.map((t) => (
                 onClick={() => setRenkoPanelOpen(false)}
                 className="grid h-9 w-9 place-items-center rounded-xl border border-white/10 bg-white/[0.03] text-xl text-sky-100/70 transition hover:bg-white/[0.08] hover:text-white"
               >
-                ×
+                Ã—
               </button>
             </div>
 
@@ -3654,7 +3654,7 @@ closedTrades.map((t) => (
                   >
                     <div className="text-sm font-black">AUTO ATR</div>
                     <div className="mt-1 text-[10px] leading-4 opacity-60">
-                      ATR(14) × 0.8, minimum 0.1% ceny — jak w dotychczasowym RENKO AUTO.
+                      ATR(14) Ã— 0.8, minimum 0.1% ceny â€” jak w dotychczasowym RENKO AUTO.
                     </div>
                   </button>
 
@@ -3670,14 +3670,14 @@ closedTrades.map((t) => (
                   >
                     <div className="text-sm font-black">MANUAL</div>
                     <div className="mt-1 text-[10px] leading-4 opacity-60">
-                      Sam ustawiasz stałą wielkość każdej cegły Renko.
+                      Sam ustawiasz staÅ‚Ä… wielkoÅ›Ä‡ kaÅ¼dej cegÅ‚y Renko.
                     </div>
                   </button>
                 </div>
               </div>
 
               <div className="mb-4 rounded-2xl border border-white/10 bg-white/[0.025] p-4">
-                <div className="mb-3 text-sm font-black">Źródło danych Renko</div>
+                <div className="mb-3 text-sm font-black">Å¹rÃ³dÅ‚o danych Renko</div>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   {([
                     ["M1", "M1"],
@@ -3701,7 +3701,7 @@ closedTrades.map((t) => (
                   ))}
                 </div>
                 <div className="mt-3 text-[10px] leading-4 text-sky-100/40">
-                  Domyślnie M1 — np. wykres M15 może wyświetlać Renko budowane z danych M1.
+                  DomyÅ›lnie M1 â€” np. wykres M15 moÅ¼e wyÅ›wietlaÄ‡ Renko budowane z danych M1.
                 </div>
               </div>
 
@@ -3711,8 +3711,8 @@ closedTrades.map((t) => (
                     <div className="text-sm font-black">Box Size</div>
                     <div className="mt-1 text-[10px] text-sky-100/40">
                       {renkoDraftMode === "AUTO"
-                        ? "AUTO — wartość wyliczana z ATR."
-                        : "Wpisz ręczną wielkość cegły dla aktualnego instrumentu."}
+                        ? "AUTO â€” wartoÅ›Ä‡ wyliczana z ATR."
+                        : "Wpisz rÄ™cznÄ… wielkoÅ›Ä‡ cegÅ‚y dla aktualnego instrumentu."}
                     </div>
                   </div>
 
@@ -3733,8 +3733,8 @@ closedTrades.map((t) => (
               </div>
 
               <div className="mt-4 rounded-xl border border-emerald-300/15 bg-emerald-500/[0.045] px-3 py-2.5 text-[10px] leading-4 text-sky-100/50">
-                AUTO ATR jest najlepszy, gdy przełączasz instrumenty i interwały.
-                Manual przydaje się, gdy chcesz zawsze identyczny Box Size.
+                AUTO ATR jest najlepszy, gdy przeÅ‚Ä…czasz instrumenty i interwaÅ‚y.
+                Manual przydaje siÄ™, gdy chcesz zawsze identyczny Box Size.
               </div>
             </div>
 
@@ -3748,7 +3748,7 @@ closedTrades.map((t) => (
                 }}
                 className="rounded-xl border border-white/10 bg-white/[0.035] px-4 py-2 text-sm font-bold text-sky-100/75 transition hover:bg-white/[0.07] hover:text-white"
               >
-                Domyślne
+                DomyÅ›lne
               </button>
 
               <div className="flex gap-2">
@@ -3791,7 +3791,7 @@ closedTrades.map((t) => (
               <div>
                 <div className="text-lg font-black">SuperTrend</div>
                 <div className="mt-0.5 text-[11px] text-sky-100/45">
-                  Parametry i styl wskaźnika
+                  Parametry i styl wskaÅºnika
                 </div>
               </div>
 
@@ -3800,7 +3800,7 @@ closedTrades.map((t) => (
                 onClick={() => setSupertrendPanelOpen(false)}
                 className="grid h-9 w-9 place-items-center rounded-xl border border-white/10 bg-white/[0.03] text-xl text-sky-100/70 transition hover:bg-white/[0.08] hover:text-white"
               >
-                ×
+                Ã—
               </button>
             </div>
 
@@ -3813,7 +3813,7 @@ closedTrades.map((t) => (
 
                 <div className="space-y-4">
                   <label className="flex items-center justify-between gap-4">
-                    <span className="text-sm text-sky-100/80">Długość ATR</span>
+                    <span className="text-sm text-sky-100/80">DÅ‚ugoÅ›Ä‡ ATR</span>
                     <input
                       type="number"
                       min={2}
@@ -3830,7 +3830,7 @@ closedTrades.map((t) => (
                   </label>
 
                   <label className="flex items-center justify-between gap-4">
-                    <span className="text-sm text-sky-100/80">Współczynnik</span>
+                    <span className="text-sm text-sky-100/80">WspÃ³Å‚czynnik</span>
                     <input
                       type="number"
                       min={0.1}
@@ -3866,10 +3866,10 @@ closedTrades.map((t) => (
                       />
                       <span>
                         <span className="block text-sm font-bold">
-                          Poczekaj na zamknięcie świecy
+                          Poczekaj na zamkniÄ™cie Å›wiecy
                         </span>
                         <span className="mt-1 block text-[10px] leading-4 text-sky-100/40">
-                          Sygnał SuperTrend jest liczony z ostatniej zamkniętej świecy.
+                          SygnaÅ‚ SuperTrend jest liczony z ostatniej zamkniÄ™tej Å›wiecy.
                         </span>
                       </span>
                     </label>
@@ -3977,8 +3977,8 @@ closedTrades.map((t) => (
                 </div>
 
                 <div className="mt-5 rounded-xl border border-emerald-300/15 bg-emerald-500/[0.045] px-3 py-2.5 text-[10px] leading-4 text-sky-100/50">
-                  Zielona linia jest rysowana pod świecami w trendzie wzrostowym,
-                  a czerwona nad świecami w trendzie spadkowym.
+                  Zielona linia jest rysowana pod Å›wiecami w trendzie wzrostowym,
+                  a czerwona nad Å›wiecami w trendzie spadkowym.
                 </div>
               </section>
             </div>
@@ -3991,7 +3991,7 @@ closedTrades.map((t) => (
                 }
                 className="rounded-xl border border-white/10 bg-white/[0.035] px-4 py-2 text-sm font-bold text-sky-100/75 transition hover:bg-white/[0.07] hover:text-white"
               >
-                Domyślne
+                DomyÅ›lne
               </button>
 
               <div className="flex gap-2">

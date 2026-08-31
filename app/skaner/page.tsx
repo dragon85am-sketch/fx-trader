@@ -160,7 +160,7 @@ function Badge({ badge }: { badge: ScannerCard["badge"] }) {
 
 export default function SkanerPage() {
   return (
-    <main className="relative isolate min-h-screen overflow-hidden bg-[#020817] text-white">
+    <main className="relative isolate min-h-[100dvh] w-full max-w-full overflow-x-hidden bg-[#020817] text-white">
       <div
         aria-hidden="true"
         className="pointer-events-none fixed inset-0 z-0 bg-cover bg-center bg-no-repeat"
@@ -173,22 +173,22 @@ export default function SkanerPage() {
         aria-hidden="true"
         className="pointer-events-none fixed inset-0 z-[1] bg-[radial-gradient(circle_at_50%_8%,rgba(34,211,238,.16),transparent_46%)]"
       />
-      <div className="relative z-10 mx-auto w-full max-w-[1900px] space-y-4 px-4 py-5 md:px-6 xl:px-8">
+      <div className="relative z-10 mx-auto w-full min-w-0 max-w-[1900px] space-y-3 px-2 py-3 sm:space-y-4 sm:px-4 sm:py-5 md:px-6 xl:px-8">
         {/* HEADER */}
-        <section className="relative overflow-hidden rounded-[16px] border border-cyan-300/45 bg-[linear-gradient(120deg,rgba(18,105,181,.96)_0%,rgba(13,82,151,.96)_52%,rgba(8,58,116,.97)_100%)] p-5 shadow-[0_0_28px_rgba(34,211,238,.18),inset_0_1px_0_rgba(255,255,255,.10)]">
+        <section className="relative overflow-hidden rounded-[14px] border border-cyan-300/45 bg-[linear-gradient(120deg,rgba(18,105,181,.96)_0%,rgba(13,82,151,.96)_52%,rgba(8,58,116,.97)_100%)] p-3 shadow-[0_0_28px_rgba(34,211,238,.18),inset_0_1px_0_rgba(255,255,255,.10)] sm:rounded-[16px] sm:p-5">
           <div className="pointer-events-none absolute right-[8%] top-0 h-full w-[34%] opacity-[.12] [background-image:radial-gradient(circle,#38bdf8_1px,transparent_1px)] [background-size:7px_7px] [mask-image:radial-gradient(ellipse_at_center,black_0%,transparent_72%)]" />
 
-          <div className="relative z-10 flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex h-14 w-14 items-center justify-center rounded-[14px] border border-sky-400/30 bg-sky-500/10 text-sky-300 shadow-[0_0_22px_rgba(14,165,233,.13)]">
-                <Radar className="h-7 w-7" />
+          <div className="relative z-10 flex min-w-0 flex-col gap-4 sm:gap-5 xl:flex-row xl:items-end xl:justify-between">
+            <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] border border-sky-400/30 bg-sky-500/10 text-sky-300 shadow-[0_0_22px_rgba(14,165,233,.13)] sm:h-14 sm:w-14 sm:rounded-[14px]">
+                <Radar className="h-5 w-5 sm:h-7 sm:w-7" />
               </div>
 
               <div>
                 <div className="text-[9px] font-semibold uppercase tracking-[.18em] text-sky-200/55">
                   FX TRADE / SKANER RYNKU
                 </div>
-                <h1 className="mt-1 text-[30px] font-semibold tracking-tight">
+                <h1 className="mt-1 text-[22px] font-semibold tracking-tight sm:text-[30px]">
                   Skaner rynku
                 </h1>
                 <p className="mt-1 text-[11px] text-sky-100/50">
@@ -197,7 +197,7 @@ export default function SkanerPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+            <div className="grid w-full grid-cols-2 gap-2 md:grid-cols-4 xl:w-auto">
               {[
                 [ScanSearch, "5", "Skanery dostępne"],
                 [TrendingUp, "10+", "Rynki obsługiwane"],
@@ -209,7 +209,7 @@ export default function SkanerPage() {
                 return (
                   <div
                     key={index}
-                    className="min-w-[145px] rounded-[11px] border border-cyan-300/30 bg-[linear-gradient(145deg,rgba(17,91,166,.95),rgba(8,65,132,.96))] px-4 py-3 shadow-[0_0_18px_rgba(34,211,238,.10),inset_0_1px_0_rgba(255,255,255,.07)]"
+                    className="min-w-0 rounded-[11px] border border-cyan-300/30 bg-[linear-gradient(145deg,rgba(17,91,166,.95),rgba(8,65,132,.96))] px-2.5 py-2.5 shadow-[0_0_18px_rgba(34,211,238,.10),inset_0_1px_0_rgba(255,255,255,.07)] sm:px-4 sm:py-3"
                   >
                     <div className="flex items-center gap-3">
                       <StatIcon className="h-5 w-5 text-sky-300" />
@@ -226,14 +226,14 @@ export default function SkanerPage() {
         </section>
 
         {/* SCANNERS */}
-        <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
+        <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
           {scanners.map((scanner) => {
             const a = accentClasses(scanner.accent);
 
             return (
               <article
                 key={scanner.title}
-                className={`group relative overflow-hidden rounded-[14px] border ${a.border} bg-[linear-gradient(145deg,rgba(15,91,168,.98)_0%,rgba(8,64,132,.98)_55%,rgba(5,48,104,.99)_100%)] p-4 shadow-[0_10px_28px_rgba(0,25,70,.20),0_0_20px_rgba(34,211,238,.10),inset_0_1px_0_rgba(255,255,255,.08)] transition duration-300 hover:-translate-y-[3px] hover:brightness-[1.08] hover:shadow-[0_14px_34px_rgba(0,25,70,.24),0_0_32px_rgba(34,211,238,.24),inset_0_1px_0_rgba(255,255,255,.12)]`}
+                className={`group relative min-w-0 overflow-hidden rounded-[14px] border ${a.border} bg-[linear-gradient(145deg,rgba(15,91,168,.98)_0%,rgba(8,64,132,.98)_55%,rgba(5,48,104,.99)_100%)] p-4 shadow-[0_10px_28px_rgba(0,25,70,.20),0_0_20px_rgba(34,211,238,.10),inset_0_1px_0_rgba(255,255,255,.08)] transition duration-300 hover:-translate-y-[3px] hover:brightness-[1.08] hover:shadow-[0_14px_34px_rgba(0,25,70,.24),0_0_32px_rgba(34,211,238,.24),inset_0_1px_0_rgba(255,255,255,.12)]`}
               >
                 <div className="flex items-center justify-between gap-3">
                   <Badge badge={scanner.badge} />
@@ -250,7 +250,7 @@ export default function SkanerPage() {
                 </div>
 
                 {/* IMAGE */}
-                <div className={`mt-4 h-[220px] overflow-hidden rounded-[11px] border ${a.border} bg-[linear-gradient(145deg,#062d5d,#031c3c)] shadow-[0_0_18px_rgba(34,211,238,.10),inset_0_0_18px_rgba(2,15,34,.45)]`}>
+                <div className={`mt-4 h-[180px] overflow-hidden rounded-[11px] border ${a.border} sm:h-[220px] bg-[linear-gradient(145deg,#062d5d,#031c3c)] shadow-[0_0_18px_rgba(34,211,238,.10),inset_0_0_18px_rgba(2,15,34,.45)]`}>
                   <img
                     src={scanner.image}
                     alt={scanner.title}
@@ -259,7 +259,7 @@ export default function SkanerPage() {
                 </div>
 
                 <div className="mt-4">
-                  <h2 className="text-[18px] font-semibold">{scanner.title}</h2>
+                  <h2 className="break-words text-[17px] font-semibold sm:text-[18px]">{scanner.title}</h2>
                   <p className={`mt-1 text-[10px] font-medium ${a.text}`}>
                     {scanner.description}
                   </p>
@@ -290,7 +290,7 @@ export default function SkanerPage() {
         </section>
 
         {/* INFO */}
-        <section className="rounded-[14px] border border-cyan-300/35 bg-[linear-gradient(145deg,rgba(16,99,177,.97),rgba(7,61,126,.98))] p-4 shadow-[0_0_26px_rgba(34,211,238,.14),inset_0_1px_0_rgba(255,255,255,.08)]">
+        <section className="rounded-[14px] border border-cyan-300/35 bg-[linear-gradient(145deg,rgba(16,99,177,.97),rgba(7,61,126,.98))] p-3 shadow-[0_0_26px_rgba(34,211,238,.14),inset_0_1px_0_rgba(255,255,255,.08)] sm:p-4">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex items-start gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] border border-sky-400/25 bg-sky-500/10 text-sky-300">
@@ -306,7 +306,7 @@ export default function SkanerPage() {
               </div>
             </div>
 
-            <button className="inline-flex items-center justify-center gap-2 rounded-[9px] border border-cyan-300/35 bg-[linear-gradient(90deg,#0b67c2,#089bd8)] px-4 py-2.5 text-[9px] font-semibold text-white shadow-[0_0_18px_rgba(34,211,238,.16)] transition hover:brightness-110 hover:shadow-[0_0_26px_rgba(34,211,238,.28)]">
+            <button className="inline-flex w-full items-center justify-center gap-2 rounded-[9px] border border-cyan-300/35 sm:w-auto bg-[linear-gradient(90deg,#0b67c2,#089bd8)] px-4 py-2.5 text-[9px] font-semibold text-white shadow-[0_0_18px_rgba(34,211,238,.16)] transition hover:brightness-110 hover:shadow-[0_0_26px_rgba(34,211,238,.28)]">
               Jak używać skanerów?
               <ArrowRight className="h-3.5 w-3.5" />
             </button>

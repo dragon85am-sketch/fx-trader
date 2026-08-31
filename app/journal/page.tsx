@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import ExcelJS from "exceljs";
 import {
   BarChart3,
   Brain,
@@ -70,11 +71,6 @@ function rrToNumber(rr: string): number {
   return right / left;
 }
 
-function parseCsvLine(line: string): string[] {
-  return line
-    .split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/)
-    .map((v) => v.replace(/^"|"$/g, "").trim());
-}
 
 export default function FxTradeJournalProPage() {
   const [activeJournalTab, setActiveJournalTab] = useState("Przegląd");
@@ -507,7 +503,7 @@ const equityCurve = useMemo(() => {
     setPreviewImage(screenshotTrades[nextIndex].screenshot || null);
   };
 
-  const handleTopAction = (action: string) => {
+  const handleTopAction = async (action: string) => {
     if (action === "Add Trade") {
       setShowAddTradeModal(true);
       return;
@@ -518,65 +514,728 @@ const equityCurve = useMemo(() => {
       return;
     }
 
-    if (action === "Export CSV") {
-      const header = "date,pair,side,entry,sl,tp,rr,outcome,resultR,pnl,notes";
-      const rows = trades.map((t) =>
-        [t.date, t.pair, t.side, t.entry, t.sl, t.tp, t.rr, t.outcome, t.resultR, t.pnl, t.notes]
-          .map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`)
-          .join(",")
+    if (action === "Export XLSX") {
+      const workbook = new ExcelJS.Workbook();
+
+      workbook.creator = "FX Trade";
+      workbook.lastModifiedBy = "FX Trade";
+      workbook.created = new Date();
+      workbook.modified = new Date();
+      workbook.title = "FX Trade Journal PRO";
+      workbook.subject = "Trading Journal Report";
+      workbook.company = "FX Trade";
+
+      const ws = workbook.addWorksheet("Journal", {
+        views: [
+          {
+            state: "frozen",
+            ySplit: 14,
+            showGridLines: false,
+          },
+        ],
+        pageSetup: {
+          orientation: "landscape",
+          fitToPage: true,
+          fitToWidth: 1,
+          fitToHeight: 0,
+          paperSize: 9,
+          margins: {
+            left: 0.2,
+            right: 0.2,
+            top: 0.25,
+            bottom: 0.25,
+            header: 0.1,
+            footer: 0.1,
+          },
+        },
+      });
+
+      const exportTrades = [...trades].sort((a, b) =>
+        b.date.localeCompare(a.date)
       );
 
-      const blob = new Blob([[header, ...rows].join("\n")], { type: "text/csv" });
+      const wins = exportTrades.filter((t) => t.outcome === "WIN").length;
+      const losses = exportTrades.filter((t) => t.outcome === "LOSS").length;
+      const breakEven = exportTrades.filter((t) => t.outcome === "BE").length;
+      const totalR = exportTrades.reduce(
+        (sum, t) => sum + Number(t.resultR || 0),
+        0
+      );
+      const totalPnl = exportTrades.reduce(
+        (sum, t) => sum + Number(t.pnl || 0),
+        0
+      );
+      const winRate = exportTrades.length ? wins / exportTrades.length : 0;
+
+      const reportDate = new Intl.DateTimeFormat("pl-PL", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      }).format(new Date());
+
+      // ===== PALETA =====
+      const NAVY = "FF031A36";
+      const NAVY_DARK = "FF021224";
+      const NAVY_MID = "FF082A52";
+      const BLUE = "FF0B5FB3";
+      const CYAN = "FF1EA7FF";
+      const CYAN_LIGHT = "FF72D8FF";
+      const WHITE = "FFFFFFFF";
+      const TEXT = "FF102B45";
+      const MUTED = "FF6B8297";
+      const BORDER = "FFC9D9E6";
+      const ROW_A = "FFFFFFFF";
+      const ROW_B = "FFF4F8FB";
+      const GREEN = "FF0C8C4A";
+      const GREEN_FILL = "FFE2F7EA";
+      const RED = "FFE53935";
+      const RED_FILL = "FFFFE7E5";
+      const GOLD = "FFE3A008";
+      const GOLD_FILL = "FFFFF4D6";
+      const KPI_BLUE = "FFEAF5FF";
+
+      // ===== KOLUMNY =====
+      ws.columns = [
+        { key: "lp", width: 7 },
+        { key: "date", width: 15 },
+        { key: "pair", width: 16 },
+        { key: "type", width: 12 },
+        { key: "entry", width: 15 },
+        { key: "sl", width: 15 },
+        { key: "tp", width: 15 },
+        { key: "rr", width: 11 },
+        { key: "outcome", width: 14 },
+        { key: "resultR", width: 14 },
+        { key: "pnl", width: 15 },
+        { key: "notes", width: 34 },
+      ];
+
+      // ==========================================
+      // 1) PREMIUM HEADER
+      // ==========================================
+      ws.mergeCells("A1:C4");
+      ws.mergeCells("D1:J2");
+      ws.mergeCells("D3:J4");
+      ws.mergeCells("K1:L4");
+
+      for (let r = 1; r <= 4; r += 1) {
+        ws.getRow(r).height = r === 1 ? 30 : 24;
+
+        for (let c = 1; c <= 12; c += 1) {
+          const cell = ws.getRow(r).getCell(c);
+          cell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: NAVY_DARK },
+          };
+          cell.font = { color: { argb: WHITE } };
+          cell.alignment = { vertical: "middle" };
+          cell.border = {
+            bottom: {
+              style: r === 4 ? "medium" : "thin",
+              color: { argb: r === 4 ? CYAN : NAVY_DARK },
+            },
+          };
+        }
+      }
+
+      // logo obrazek
+      try {
+        const res = await fetch("/fx-trade-logo.png");
+
+        if (res.ok) {
+          const buffer = await res.arrayBuffer();
+
+          const logoId = workbook.addImage({
+            buffer,
+            extension: "png",
+          });
+
+          ws.addImage(logoId, {
+            tl: { col: 0.52, row: 0.32 },
+            ext: { width: 170, height: 86 },
+            editAs: "oneCell",
+          });
+        } else {
+          ws.getCell("A1").value = "FX TRADE";
+          ws.getCell("A1").font = {
+            bold: true,
+            size: 24,
+            color: { argb: CYAN },
+          };
+          ws.getCell("A1").alignment = {
+            horizontal: "center",
+            vertical: "middle",
+            wrapText: true,
+          };
+        }
+      } catch {
+        ws.getCell("A1").value = "FX TRADE";
+        ws.getCell("A1").font = {
+          bold: true,
+          size: 24,
+          color: { argb: CYAN },
+        };
+        ws.getCell("A1").alignment = {
+          horizontal: "center",
+          vertical: "middle",
+        };
+      }
+
+      ws.getCell("D1").value = "FX TRADE JOURNAL PRO — RAPORT";
+      ws.getCell("D1").font = {
+        bold: true,
+        size: 22,
+        color: { argb: WHITE },
+      };
+      ws.getCell("D1").alignment = {
+        horizontal: "center",
+        vertical: "middle",
+      };
+
+      ws.getCell("D3").value =
+        "Analiza transakcji  •  Statystyki  •  Rozwój  •  Profesjonalny Trading";
+      ws.getCell("D3").font = {
+        size: 10,
+        color: { argb: "FFB6D9F2" },
+      };
+      ws.getCell("D3").alignment = {
+        horizontal: "center",
+        vertical: "middle",
+      };
+
+      ws.getCell("K1").value = `Wygenerowano:\n${reportDate}`;
+      ws.getCell("K1").font = {
+        bold: true,
+        size: 11,
+        color: { argb: CYAN_LIGHT },
+      };
+      ws.getCell("K1").alignment = {
+        horizontal: "center",
+        vertical: "middle",
+        wrapText: true,
+      };
+
+      // ==========================================
+      // 2) PODSUMOWANIE
+      // ==========================================
+      ws.mergeCells("A6:L6");
+      ws.getRow(6).height = 28;
+
+      ws.getCell("A6").value = "PODSUMOWANIE";
+      ws.getCell("A6").fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: NAVY },
+      };
+      ws.getCell("A6").font = {
+        bold: true,
+        size: 13,
+        color: { argb: WHITE },
+      };
+      ws.getCell("A6").alignment = {
+        horizontal: "left",
+        vertical: "middle",
+      };
+      ws.getCell("A6").border = {
+        top: { style: "medium", color: { argb: CYAN } },
+        bottom: { style: "medium", color: { argb: CYAN } },
+      };
+
+      const kpis = [
+        {
+          label: "WSZYSTKIE TRADE'Y",
+          value: exportTrades.length,
+          c1: 1,
+          c2: 2,
+          fill: KPI_BLUE,
+          color: BLUE,
+        },
+        {
+          label: "WYGRANE",
+          value: wins,
+          c1: 3,
+          c2: 4,
+          fill: GREEN_FILL,
+          color: GREEN,
+        },
+        {
+          label: "PRZEGRANE",
+          value: losses,
+          c1: 5,
+          c2: 6,
+          fill: RED_FILL,
+          color: RED,
+        },
+        {
+          label: "BREAK EVEN",
+          value: breakEven,
+          c1: 7,
+          c2: 8,
+          fill: GOLD_FILL,
+          color: GOLD,
+        },
+        {
+          label: "WIN RATE",
+          value: winRate,
+          c1: 9,
+          c2: 10,
+          fill: GREEN_FILL,
+          color: GREEN,
+          numFmt: "0.0%",
+        },
+        {
+          label: "ŁĄCZNY WYNIK R",
+          value: totalR,
+          c1: 11,
+          c2: 12,
+          fill: KPI_BLUE,
+          color: BLUE,
+          numFmt: '0.00"R"',
+        },
+      ];
+
+      ws.getRow(7).height = 38;
+      ws.getRow(8).height = 34;
+
+      for (const kpi of kpis) {
+        const label = ws.getRow(7).getCell(kpi.c1);
+        const value = ws.getRow(7).getCell(kpi.c2);
+
+        label.value = kpi.label;
+        value.value = kpi.value;
+
+        label.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: kpi.fill },
+        };
+        value.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: kpi.fill },
+        };
+
+        label.font = {
+          bold: true,
+          size: 9,
+          color: { argb: BLUE },
+        };
+
+        value.font = {
+          bold: true,
+          size: 18,
+          color: { argb: kpi.color },
+        };
+
+        label.alignment = {
+          horizontal: "center",
+          vertical: "middle",
+          wrapText: true,
+        };
+
+        value.alignment = {
+          horizontal: "center",
+          vertical: "middle",
+        };
+
+        label.border = {
+          top: { style: "thin", color: { argb: BORDER } },
+          bottom: { style: "thin", color: { argb: BORDER } },
+          left: { style: "thin", color: { argb: BORDER } },
+        };
+
+        value.border = {
+          top: { style: "thin", color: { argb: BORDER } },
+          bottom: { style: "thin", color: { argb: BORDER } },
+          right: { style: "thin", color: { argb: BORDER } },
+        };
+
+        if (kpi.numFmt) value.numFmt = kpi.numFmt;
+      }
+
+      // osobny KPI PNL
+      ws.mergeCells("K8:K8");
+      ws.getCell("K8").value = "ŁĄCZNY PNL";
+      ws.getCell("L8").value = totalPnl;
+
+      for (const addr of ["K8", "L8"]) {
+        const cell = ws.getCell(addr);
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: GREEN_FILL },
+        };
+        cell.border = {
+          top: { style: "thin", color: { argb: BORDER } },
+          bottom: { style: "thin", color: { argb: BORDER } },
+          left: { style: "thin", color: { argb: BORDER } },
+          right: { style: "thin", color: { argb: BORDER } },
+        };
+        cell.alignment = {
+          horizontal: "center",
+          vertical: "middle",
+        };
+      }
+
+      ws.getCell("K8").font = {
+        bold: true,
+        size: 9,
+        color: { argb: GREEN },
+      };
+      ws.getCell("L8").font = {
+        bold: true,
+        size: 18,
+        color: { argb: GREEN },
+      };
+      ws.getCell("L8").numFmt = '$#,##0.00;[Red]-$#,##0.00';
+
+      // ==========================================
+      // 3) DZIENNIK TRANSAKCJI
+      // ==========================================
+      ws.mergeCells("A10:J10");
+      ws.getCell("A10").value = "DZIENNIK TRANSAKCJI";
+      ws.getCell("K10").value = "DATA RAPORTU:";
+      ws.getCell("L10").value = reportDate;
+      ws.getRow(10).height = 30;
+
+      for (let c = 1; c <= 12; c += 1) {
+        const cell = ws.getRow(10).getCell(c);
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: NAVY },
+        };
+        cell.font = {
+          bold: true,
+          size: 11,
+          color: { argb: c === 12 ? CYAN : WHITE },
+        };
+        cell.alignment = {
+          horizontal: c >= 11 ? "center" : "left",
+          vertical: "middle",
+        };
+        cell.border = {
+          top: { style: "medium", color: { argb: CYAN } },
+          bottom: { style: "thin", color: { argb: CYAN } },
+        };
+      }
+
+      const headers = [
+        "LP",
+        "DATA",
+        "PARA",
+        "TYPE",
+        "WEJŚCIE",
+        "SL",
+        "TP",
+        "RR",
+        "WYNIK",
+        "RESULT R",
+        "PNL",
+        "NOTATKI",
+      ];
+
+      const headerRow = ws.getRow(11);
+      headerRow.values = headers;
+      headerRow.height = 28;
+
+      headerRow.eachCell((cell) => {
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: NAVY_MID },
+        };
+        cell.font = {
+          bold: true,
+          size: 9,
+          color: { argb: WHITE },
+        };
+        cell.alignment = {
+          horizontal: "center",
+          vertical: "middle",
+        };
+        cell.border = {
+          top: { style: "thin", color: { argb: CYAN } },
+          bottom: { style: "medium", color: { argb: CYAN } },
+          left: { style: "thin", color: { argb: "FF21486B" } },
+          right: { style: "thin", color: { argb: "FF21486B" } },
+        };
+      });
+
+      // ==========================================
+      // 4) DANE TRADE
+      // ==========================================
+      exportTrades.forEach((trade, index) => {
+        const rowNo = 12 + index;
+        const row = ws.getRow(rowNo);
+
+        row.values = [
+          index + 1,
+          trade.date,
+          trade.pair.toUpperCase(),
+          trade.side,
+          trade.entry,
+          trade.sl,
+          trade.tp,
+          trade.rr,
+          trade.outcome,
+          Number(trade.resultR || 0),
+          Number(trade.pnl || 0),
+          trade.notes || "",
+        ];
+
+        row.height = 27;
+
+        row.eachCell((cell, col) => {
+          cell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: index % 2 === 0 ? ROW_A : ROW_B },
+          };
+          cell.font = {
+            size: 10,
+            color: { argb: TEXT },
+            bold: [3, 4, 9, 10, 11].includes(col),
+          };
+          cell.alignment = {
+            horizontal: "center",
+            vertical: "middle",
+            wrapText: col === 12,
+          };
+          cell.border = {
+            bottom: { style: "thin", color: { argb: BORDER } },
+            left: { style: "thin", color: { argb: BORDER } },
+            right: { style: "thin", color: { argb: BORDER } },
+          };
+        });
+
+        row.getCell(2).font = {
+          bold: true,
+          color: { argb: BLUE },
+        };
+
+        row.getCell(3).font = {
+          bold: true,
+          color: { argb: NAVY_MID },
+        };
+
+        const sideCell = row.getCell(4);
+        sideCell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: trade.side === "BUY" ? GREEN_FILL : RED_FILL },
+        };
+        sideCell.font = {
+          bold: true,
+          color: { argb: trade.side === "BUY" ? GREEN : RED },
+        };
+
+        row.getCell(6).font = {
+          bold: true,
+          color: { argb: RED },
+        };
+
+        row.getCell(7).font = {
+          bold: true,
+          color: { argb: GREEN },
+        };
+
+        const outcomeCell = row.getCell(9);
+        const isWin = trade.outcome === "WIN";
+        const isLoss = trade.outcome === "LOSS";
+
+        outcomeCell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: {
+            argb: isWin ? GREEN_FILL : isLoss ? RED_FILL : GOLD_FILL,
+          },
+        };
+        outcomeCell.font = {
+          bold: true,
+          color: {
+            argb: isWin ? GREEN : isLoss ? RED : GOLD,
+          },
+        };
+
+        const resultCell = row.getCell(10);
+        resultCell.numFmt = '0.00"R"';
+        resultCell.font = {
+          bold: true,
+          color: {
+            argb:
+              trade.resultR > 0
+                ? GREEN
+                : trade.resultR < 0
+                  ? RED
+                  : MUTED,
+          },
+        };
+
+        const pnlCell = row.getCell(11);
+        pnlCell.numFmt = '$#,##0.00;[Red]-$#,##0.00';
+        pnlCell.font = {
+          bold: true,
+          color: {
+            argb:
+              trade.pnl > 0
+                ? GREEN
+                : trade.pnl < 0
+                  ? RED
+                  : MUTED,
+          },
+        };
+      });
+
+      const lastTradeRow = Math.max(12, 11 + exportTrades.length);
+
+      ws.autoFilter = {
+        from: "A11",
+        to: `L${lastTradeRow}`,
+      };
+
+      // ==========================================
+      // 5) PREMIUM FOOTER
+      // ==========================================
+      const footerRowNo = lastTradeRow + 3;
+      ws.getRow(footerRowNo).height = 40;
+
+      ws.mergeCells(`A${footerRowNo}:D${footerRowNo}`);
+      ws.mergeCells(`E${footerRowNo}:H${footerRowNo}`);
+      ws.mergeCells(`I${footerRowNo}:J${footerRowNo}`);
+      ws.mergeCells(`K${footerRowNo}:L${footerRowNo}`);
+
+      ws.getCell(`A${footerRowNo}`).value =
+        "DYSCYPLINA\nTrzymaj się planu, zarządzaj ryzykiem i bądź konsekwentny.";
+      ws.getCell(`E${footerRowNo}`).value =
+        "ANALIZA\nAnalizuj swoje transakcje i wyciągaj wnioski.";
+      ws.getCell(`I${footerRowNo}`).value =
+        "STRATEGIA\nDobra strategia + realizacja = sukces.";
+      ws.getCell(`K${footerRowNo}`).value =
+        "FX TRADE\nTRADE LIKE A PRO";
+
+      for (let c = 1; c <= 12; c += 1) {
+        const cell = ws.getRow(footerRowNo).getCell(c);
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: NAVY_DARK },
+        };
+        cell.font = {
+          bold: true,
+          size: 10,
+          color: { argb: c >= 11 ? CYAN : WHITE },
+        };
+        cell.alignment = {
+          horizontal: "center",
+          vertical: "middle",
+          wrapText: true,
+        };
+        cell.border = {
+          top: { style: "medium", color: { argb: CYAN } },
+        };
+      }
+
+      ws.pageSetup.printArea = `A1:L${footerRowNo}`;
+
+      // ==========================================
+      // 6) DOWNLOAD
+      // ==========================================
+      const buffer = await workbook.xlsx.writeBuffer();
+
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
+      const dateStamp = new Date().toISOString().slice(0, 10);
+
       a.href = url;
-      a.download = "fxtrade-journal.csv";
+      a.download = `fxtrade-journal-pro-${dateStamp}.xlsx`;
+
+      document.body.appendChild(a);
       a.click();
+      a.remove();
+
       URL.revokeObjectURL(url);
+
+      return;
     }
   };
 
-  const handleImportCsv = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportXlsx = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = () => {
+
+    reader.onload = async () => {
       try {
-        const text = String(reader.result || "");
-        const lines = text.split(/\r?\n/).filter(Boolean);
-        if (lines.length < 2) return;
+        const data = reader.result;
+        if (!(data instanceof ArrayBuffer)) return;
 
-        const imported = lines.slice(1).map((line) => {
-          const [date, pair, side, entry, sl, tp, rr, outcome, resultR, pnl, notes] = parseCsvLine(line);
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(data);
 
-          return {
+        const ws = workbook.getWorksheet("Journal") || workbook.worksheets[0];
+        if (!ws) {
+          alert("Nie znaleziono arkusza Journal.");
+          return;
+        }
+
+        const imported: JournalTrade[] = [];
+        const textOf = (row: ExcelJS.Row, col: number) => {
+          const value = row.getCell(col).value;
+          if (value == null) return "";
+          if (typeof value === "object" && "text" in (value as any)) {
+            return String((value as any).text ?? "");
+          }
+          return String(value);
+        };
+
+        for (let rowNo = 13; rowNo <= ws.actualRowCount; rowNo++) {
+          const row = ws.getRow(rowNo);
+          const date = textOf(row, 2);
+          const pair = textOf(row, 3);
+          if (!date || !pair) continue;
+
+          const side = textOf(row, 4).toUpperCase();
+          const outcome = textOf(row, 9).toUpperCase();
+
+          imported.push({
             id: crypto.randomUUID(),
-            date: date || new Date().toISOString().slice(0, 10),
-            pair: pair || "EURUSD",
-            side: (side === "SELL" ? "SELL" : "BUY") as "BUY" | "SELL",
-            entry: entry || "",
-            sl: sl || "",
-            tp: tp || "",
-            rr: rr || "1:1",
+            date,
+            pair,
+            side: side === "SELL" ? "SELL" : "BUY",
+            entry: textOf(row, 5),
+            sl: textOf(row, 6),
+            tp: textOf(row, 7),
+            rr: textOf(row, 8) || "1:1",
             outcome: outcome === "LOSS" ? "LOSS" : outcome === "BE" ? "BE" : "WIN",
-            resultR: Number(resultR || 0),
-            pnl: Number(pnl || 0),
-            notes: notes || "",
+            resultR: Number(row.getCell(10).value ?? 0),
+            pnl: Number(row.getCell(11).value ?? 0),
+            notes: textOf(row, 12),
             screenshot: "",
-          } satisfies JournalTrade;
-        });
+          });
+        }
+
+        if (!imported.length) {
+          alert("Nie znaleziono pozycji do importu.");
+          return;
+        }
 
         setTrades((prev) => [...imported, ...prev]);
       } catch (err) {
         console.error(err);
-        alert("Nie udało się zaimportować CSV.");
+        alert("Nie udało się zaimportować pliku XLSX.");
       } finally {
         e.target.value = "";
       }
     };
 
-    reader.readAsText(file);
+    reader.readAsArrayBuffer(file);
   };
 
   const handleSaveTrade = () => {
@@ -680,7 +1339,7 @@ const equityCurve = useMemo(() => {
       <div className="relative z-10">
       <main className="relative px-4 py-5 md:px-6 xl:px-8 before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-[420px] before:bg-[radial-gradient(circle_at_50%_0%,rgba(56,189,248,.10),transparent_62%)]">
         <div className="mx-auto w-full max-w-[1920px]">
-          <input ref={fileInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleImportCsv} />
+          <input ref={fileInputRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" className="hidden" onChange={handleImportXlsx} />
 
           <div className="mb-4 flex flex-col gap-4 border-b border-[#0a417b] pb-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
@@ -706,10 +1365,10 @@ const equityCurve = useMemo(() => {
                 Import Broker
               </button>
               <button
-                onClick={() => handleTopAction("Export CSV")}
+                onClick={() => handleTopAction("Export XLSX")}
                 className="rounded-[10px] border border-sky-400/30 bg-[linear-gradient(180deg,#083866,#06254b)] px-4 py-2.5 text-[12px] font-semibold text-sky-50 transition hover:bg-[#0a3264]"
               >
-                Eksport CSV
+                Eksport XLSX
               </button>
             </div>
           </div>

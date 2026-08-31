@@ -91,6 +91,7 @@ type Props = {
   supertrendDownBackground?: boolean;
   supertrendUpColor?: string;
   supertrendDownColor?: string;
+  patternsEnabled?: boolean;
 };
 
 /* =========================
@@ -608,6 +609,206 @@ function buildSupertrendLines(
 }
 
 /* =========================
+   CANDLE PATTERNS
+========================= */
+type CandlePattern = {
+  time: UTCTimestamp;
+  label: string;
+  side: "BUY" | "SELL" | "NEUTRAL";
+  price: number;
+};
+
+function detectCandlePatterns(candles: CandlestickData[]): CandlePattern[] {
+  const out: CandlePattern[] = [];
+  if (candles.length < 30) return out;
+
+  const n = (v: any) => toNum(v);
+  const body = (c: any) => Math.abs(n(c.close) - n(c.open));
+  const range = (c: any) => Math.max(1e-12, n(c.high) - n(c.low));
+  const bull = (c: any) => n(c.close) > n(c.open);
+  const bear = (c: any) => n(c.close) < n(c.open);
+
+  const push = (
+    c: any,
+    label: string,
+    side: "BUY" | "SELL"
+  ) => {
+    out.push({
+      time: c.time as UTCTimestamp,
+      label,
+      side,
+      price: side === "BUY" ? n(c.low) : n(c.high),
+    });
+  };
+
+  // ============================================================
+  // HH + HL + BREAKOUT
+  //
+  // BUY:
+  // 1. wykrywamy swing low
+  // 2. potem swing high = HH
+  // 3. kolejny swing low musi być wyżej = HL
+  // 4. poziom wejścia = poprzedni HH
+  // 5. BUY dopiero gdy zamknięta zielona świeca wybije HH
+  //
+  // SELL:
+  // 1. swing high
+  // 2. potem swing low = LL
+  // 3. kolejny swing high niżej = LH
+  // 4. poziom wejścia = poprzedni LL
+  // 5. SELL po zamknięciu czerwonej świecy poniżej LL
+  // ============================================================
+
+  const SWING = 3;
+  const MIN_BODY_RATIO = 0.45;
+
+  const isSwingHigh = (idx: number) => {
+    if (idx < SWING || idx >= candles.length - SWING) return false;
+    const h = n((candles[idx] as any).high);
+
+    for (let j = idx - SWING; j <= idx + SWING; j++) {
+      if (j === idx) continue;
+      if (n((candles[j] as any).high) >= h) return false;
+    }
+    return true;
+  };
+
+  const isSwingLow = (idx: number) => {
+    if (idx < SWING || idx >= candles.length - SWING) return false;
+    const l = n((candles[idx] as any).low);
+
+    for (let j = idx - SWING; j <= idx + SWING; j++) {
+      if (j === idx) continue;
+      if (n((candles[j] as any).low) <= l) return false;
+    }
+    return true;
+  };
+
+  const highs: number[] = [];
+  const lows: number[] = [];
+
+  for (let i = SWING; i < candles.length - SWING; i++) {
+    if (isSwingHigh(i)) highs.push(i);
+    if (isSwingLow(i)) lows.push(i);
+  }
+
+  // ========================= BUY =========================
+  // Szukamy sekwencji:
+  // LOW -> HH -> HL -> breakout HH
+  for (let h = 0; h < highs.length; h++) {
+    const hhIdx = highs[h];
+
+    const prevLowIdx = [...lows]
+      .filter((i) => i < hhIdx)
+      .pop();
+
+    const hlIdx = lows.find((i) => i > hhIdx);
+
+    if (prevLowIdx == null || hlIdx == null) continue;
+
+    const prevLow = n((candles[prevLowIdx] as any).low);
+    const hh = n((candles[hhIdx] as any).high);
+    const hl = n((candles[hlIdx] as any).low);
+
+    // HL musi być wyżej niż poprzedni swing low.
+    if (!(hl > prevLow)) continue;
+
+    // HH powinien być wyżej niż wcześniejszy swing high.
+    const previousHighIdx = [...highs]
+      .filter((i) => i < hhIdx)
+      .pop();
+
+    if (previousHighIdx != null) {
+      const previousHigh = n((candles[previousHighIdx] as any).high);
+      if (!(hh > previousHigh)) continue;
+    }
+
+    // Po HL szukamy wybicia HH świecą zamkniętą.
+    for (let i = hlIdx + 1; i < candles.length; i++) {
+      const c: any = candles[i];
+
+      // Jeśli przed wybiciem cena zaneguje HL, setup anulowany.
+      if (n(c.low) < hl) break;
+
+      const bodyRatio = body(c) / range(c);
+
+      const breakout =
+        bull(c) &&
+        bodyRatio >= MIN_BODY_RATIO &&
+        n(c.close) > hh;
+
+      if (breakout) {
+        push(c, "BUY", "BUY");
+        break;
+      }
+    }
+  }
+
+  // ========================= SELL =========================
+  // Szukamy sekwencji:
+  // HIGH -> LL -> LH -> breakout LL
+  for (let l = 0; l < lows.length; l++) {
+    const llIdx = lows[l];
+
+    const prevHighIdx = [...highs]
+      .filter((i) => i < llIdx)
+      .pop();
+
+    const lhIdx = highs.find((i) => i > llIdx);
+
+    if (prevHighIdx == null || lhIdx == null) continue;
+
+    const prevHigh = n((candles[prevHighIdx] as any).high);
+    const ll = n((candles[llIdx] as any).low);
+    const lh = n((candles[lhIdx] as any).high);
+
+    // LH musi być niżej niż poprzedni swing high.
+    if (!(lh < prevHigh)) continue;
+
+    // LL powinien być niżej niż wcześniejszy swing low.
+    const previousLowIdx = [...lows]
+      .filter((i) => i < llIdx)
+      .pop();
+
+    if (previousLowIdx != null) {
+      const previousLow = n((candles[previousLowIdx] as any).low);
+      if (!(ll < previousLow)) continue;
+    }
+
+    // Po LH szukamy wybicia LL świecą zamkniętą.
+    for (let i = lhIdx + 1; i < candles.length; i++) {
+      const c: any = candles[i];
+
+      // Jeśli przed wybiciem cena zaneguje LH, setup anulowany.
+      if (n(c.high) > lh) break;
+
+      const bodyRatio = body(c) / range(c);
+
+      const breakout =
+        bear(c) &&
+        bodyRatio >= MIN_BODY_RATIO &&
+        n(c.close) < ll;
+
+      if (breakout) {
+        push(c, "SELL", "SELL");
+        break;
+      }
+    }
+  }
+
+  // Bez duplikatów, maksymalnie 40 najnowszych sygnałów.
+  const unique = Array.from(
+    new Map(
+      out.map((p) => [
+        `${Number(p.time)}-${p.label}-${p.side}`,
+        p,
+      ])
+    ).values()
+  ).sort((a, b) => Number(a.time) - Number(b.time));
+
+  return unique.slice(-40);
+}
+/* =========================
    TRADE HELPERS
 ========================= */
 function calcRR(entry: number, sl: number, tp: number) {
@@ -708,6 +909,7 @@ supertrendUpBackground = true,
 supertrendDownBackground = true,
 supertrendUpColor = "#22c55e",
 supertrendDownColor = "#ef4444",
+patternsEnabled = false,
 }: Props) {
   const containerRef = React.useRef<HTMLDivElement | null>(null);
   const chartRef = React.useRef<IChartApi | null>(null);
@@ -771,6 +973,159 @@ supertrendDownColor = "#ef4444",
   const [detached, setDetached] = React.useState<boolean>(false);
   const [overlayTick, setOverlayTick] = React.useState(0);
   const rightOffset = rightPadOn ? 28 : 8;
+
+  const patternLabels = React.useMemo(() => {
+    if (!patternsEnabled || renko) return [] as Array<{
+      key: string;
+      x: number;
+      y: number;
+      label: string;
+      side: "BUY" | "SELL" | "NEUTRAL";
+    }>;
+
+    const chart = chartRef.current;
+    const candleSeries = candleSeriesRef.current;
+    const safe = displayCacheRef.current;
+    if (!chart || !candleSeries || !safe?.length) return [];
+
+    try {
+      return detectCandlePatterns(safe).flatMap((p, idx) => {
+        const x = chart.timeScale().timeToCoordinate(p.time);
+        const y0 = candleSeries.priceToCoordinate(p.price);
+        if (x == null || y0 == null) return [];
+        const y = Number(y0) + (p.side === "SELL" ? -26 : 14);
+        return [{
+          key: `${Number(p.time)}-${p.label}-${idx}`,
+          x: Number(x),
+          y,
+          label: p.label,
+          side: p.side,
+        }];
+      });
+    } catch {
+      return [];
+    }
+  }, [patternsEnabled, overlayTick, candles, liveCandle, heikinAshi, renko]);
+
+  // ============================================================
+  // AUTO STREFY DLA NOWEJ LOGIKI HH/HL / LL/LH
+  //
+  // Jeżeli główny skaner nie przekazał aktywnych `levels`,
+  // a FORMATIONS wykryje świeży BUY/SELL, MarketChart sam wyznaczy:
+  // ENTRY, SL, TP1 = 1R, TP2 = 2R, TP3 = 3R.
+  //
+  // BUY: SL pod ostatnim lokalnym HL / dołkiem przed wybiciem.
+  // SELL: SL nad ostatnim lokalnym LH / szczytem przed wybiciem.
+  // ============================================================
+  const patternTradeLevels = React.useMemo<Levels | undefined>(() => {
+    if (!patternsEnabled || renko) return undefined;
+
+    const safe = displayCacheRef.current;
+    if (!safe?.length) return undefined;
+
+    const signals = detectCandlePatterns(safe);
+    const latest = signals[signals.length - 1];
+    if (!latest) return undefined;
+
+    const signalIdx = safe.findIndex(
+      (c) => Number(c.time) === Number(latest.time)
+    );
+    if (signalIdx < 0) return undefined;
+
+    // Nie pokazujemy starych, historycznych stref jako aktywnego setupu.
+    // Sygnał musi należeć do 4 najnowszych świec.
+    if (signalIdx < safe.length - 4) return undefined;
+
+    const signal = safe[signalIdx] as any;
+    const entry = toNum(signal.close);
+    if (!Number.isFinite(entry) || entry <= 0) return undefined;
+
+    const lookbackFrom = Math.max(0, signalIdx - 12);
+    const beforeSignal = safe.slice(lookbackFrom, signalIdx + 1) as any[];
+    if (!beforeSignal.length) return undefined;
+
+    const atr = calcATR14Simple(safe.slice(Math.max(0, signalIdx - 30), signalIdx + 1));
+    const fallbackBuffer = Math.max(entry * 0.0005, atr * 0.12);
+
+    if (latest.side === "BUY") {
+      // HL / najniższy lokalny dołek korekty przed breakoutem.
+      const structureLow = Math.min(
+        ...beforeSignal
+          .slice(0, -1)
+          .map((c) => toNum(c.low))
+          .filter(Number.isFinite)
+      );
+
+      if (!Number.isFinite(structureLow)) return undefined;
+
+      const sl = structureLow - fallbackBuffer;
+      const risk = entry - sl;
+      if (!Number.isFinite(risk) || risk <= 0) return undefined;
+
+      const tp1 = entry + risk;
+      const tp2 = entry + risk * 2;
+      const tp3 = entry + risk * 3;
+      const entryPad = Math.max(risk * 0.05, atr * 0.05, entry * 0.00008);
+
+      return {
+        side: "BUY",
+        entry,
+        sl,
+        tps: [tp1, tp2, tp3],
+        rr: 3,
+        zones: [
+          { label: "ENTRY", from: entry - entryPad, to: entry + entryPad },
+          { label: "SL", from: sl - entryPad, to: sl + entryPad },
+          { label: "TP1", from: tp1 - entryPad, to: tp1 + entryPad },
+          { label: "TP2", from: tp2 - entryPad, to: tp2 + entryPad },
+          { label: "TP3", from: tp3 - entryPad, to: tp3 + entryPad },
+        ],
+      };
+    }
+
+    if (latest.side === "SELL") {
+      // LH / najwyższy lokalny szczyt korekty przed breakoutem.
+      const structureHigh = Math.max(
+        ...beforeSignal
+          .slice(0, -1)
+          .map((c) => toNum(c.high))
+          .filter(Number.isFinite)
+      );
+
+      if (!Number.isFinite(structureHigh)) return undefined;
+
+      const sl = structureHigh + fallbackBuffer;
+      const risk = sl - entry;
+      if (!Number.isFinite(risk) || risk <= 0) return undefined;
+
+      const tp1 = entry - risk;
+      const tp2 = entry - risk * 2;
+      const tp3 = entry - risk * 3;
+      const entryPad = Math.max(risk * 0.05, atr * 0.05, entry * 0.00008);
+
+      return {
+        side: "SELL",
+        entry,
+        sl,
+        tps: [tp1, tp2, tp3],
+        rr: 3,
+        zones: [
+          { label: "ENTRY", from: entry - entryPad, to: entry + entryPad },
+          { label: "SL", from: sl - entryPad, to: sl + entryPad },
+          { label: "TP1", from: tp1 - entryPad, to: tp1 + entryPad },
+          { label: "TP2", from: tp2 - entryPad, to: tp2 + entryPad },
+          { label: "TP3", from: tp3 - entryPad, to: tp3 + entryPad },
+        ],
+      };
+    }
+
+    return undefined;
+  }, [patternsEnabled, overlayTick, candles, liveCandle, heikinAshi, renko]);
+
+  // Priorytet ma setup przesłany z głównego skanera.
+  // Jeśli go nie ma, używamy stref z HH/HL / LL/LH breakout.
+  const activeLevels = showTradeLines && levels ? levels : patternTradeLevels;
+  const activeShowTradeLines = !!activeLevels;
 
   const bbFillOverlay = React.useMemo(() => {
     const chart = chartRef.current;
@@ -1496,27 +1851,32 @@ supertrendDownColor = "#ef4444",
     }>
   >([]);
 
-  const applyTradeLines = React.useCallback(
-    (safeForChart: CandlestickData[], prec: number, startT: UTCTimestamp) => {
+  const applyTradeLinesWithLevels = React.useCallback(
+    (
+      safeForChart: CandlestickData[],
+      prec: number,
+      startT: UTCTimestamp,
+      drawLevels: Levels
+    ) => {
       const chart = chartRef.current;
       const candleSeries = candleSeriesRef.current;
-      if (!chart || !candleSeries || !levels || !safeForChart.length) return;
+      if (!chart || !candleSeries || !drawLevels || !safeForChart.length) return;
 
       clearTradeLineSeries();
 
       const tps = (
-        levels.tps?.length ? levels.tps : levels.tp !== undefined ? [levels.tp] : []
+        drawLevels.tps?.length ? drawLevels.tps : drawLevels.tp !== undefined ? [drawLevels.tp] : []
       )
         .filter((x) => Number.isFinite(x))
         .slice(0, 3) as number[];
 
       const rr =
-        levels.rr ??
-        (tps.length ? calcRR(levels.entry, levels.sl, tps[tps.length - 1]) : undefined);
+        drawLevels.rr ??
+        (tps.length ? calcRR(drawLevels.entry, drawLevels.sl, tps[tps.length - 1]) : undefined);
       const rrText = rr !== undefined ? `RR ${rr.toFixed(2)}` : "";
 
       const side: "BUY" | "SELL" =
-        levels.side ?? (tps[0] !== undefined && tps[0] < levels.entry ? "SELL" : "BUY");
+        drawLevels.side ?? (tps[0] !== undefined && tps[0] < drawLevels.entry ? "SELL" : "BUY");
 
       const markers: SeriesMarker<UTCTimestamp>[] = [];
 
@@ -1550,7 +1910,7 @@ supertrendDownColor = "#ef4444",
 
       candleSeries.setMarkers(sortedMarkers);
     },
-    [levels, showEntryTimeMarker, highlightTime, clearTradeLineSeries]
+    [showEntryTimeMarker, highlightTime, clearTradeLineSeries]
   );
 
   React.useEffect(() => {
@@ -1794,20 +2154,20 @@ kineticScroll: {
     // Odśwież także wypełnienie pomiędzy górnym i dolnym pasmem BB.
     requestAnimationFrame(() => setOverlayTick((v) => v + 1));
 
-    const anchorKey = makeTradeAnchorKey(symbol, tf, levels);
+    const anchorKey = makeTradeAnchorKey(symbol, tf, activeLevels);
 
     if (frozenAnchorKeyRef.current !== anchorKey) {
       frozenAnchorKeyRef.current = anchorKey;
       frozenAnchorTimeRef.current = null;
       setFreezeDebug({
         frozen: false,
-        entry: levels?.entry ?? null,
+        entry: activeLevels?.entry ?? null,
         anchorTime: null,
         crossedIdx: null,
       });
     }
 
-    if (frozenAnchorTimeRef.current == null && showTradeLines && levels && safeForChart.length) {
+    if (frozenAnchorTimeRef.current == null && activeShowTradeLines && activeLevels && safeForChart.length) {
   const signalIdx =
     highlightTime != null ? findNearestIndexByTime(safeForChart, highlightTime) : 0;
 
@@ -1818,15 +2178,15 @@ kineticScroll: {
 
   setFreezeDebug({
     frozen: true,
-    entry: levels.entry,
+    entry: activeLevels.entry,
     anchorTime: Number(anchorTime),
     crossedIdx: anchorIdx,
   });
 }
     const anchorTime = frozenAnchorTimeRef.current;
 
-    if (showTradeLines && levels && safeForChart.length && anchorTime != null) {
-      applyTradeLines(safeForChart, prec, anchorTime);
+    if (activeShowTradeLines && activeLevels && safeForChart.length && anchorTime != null) {
+      applyTradeLinesWithLevels(safeForChart, prec, anchorTime, activeLevels);
 
       const containerW = containerRef.current?.clientWidth ?? 0;
       const RIGHT_MARGIN_PX = rightUiReservePx(rightPadOn);
@@ -1847,7 +2207,7 @@ kineticScroll: {
       const zoneW = Math.max(1, endX - startX);
 
       const tps = (
-        levels.tps?.length ? levels.tps : levels.tp !== undefined ? [levels.tp] : []
+        activeLevels.tps?.length ? activeLevels.tps : activeLevels.tp !== undefined ? [activeLevels.tp] : []
       )
         .filter((x) => Number.isFinite(x))
         .slice(0, 3) as number[];
@@ -1857,7 +2217,7 @@ kineticScroll: {
       const tp3 = tps[2];
 
       const side: "BUY" | "SELL" =
-        levels.side ?? (tp1 !== undefined && tp1 < levels.entry ? "SELL" : "BUY");
+        activeLevels.side ?? (tp1 !== undefined && tp1 < activeLevels.entry ? "SELL" : "BUY");
 
       const zr: Array<{
         key: string;
@@ -1931,24 +2291,24 @@ kineticScroll: {
         lbls.push({ key: `${text}-${price}`, y, text, kind, price });
       };
 
-      const entryZone = levels.zones?.find((z) => z.label === "ENTRY");
+      const entryZone = activeLevels.zones?.find((z) => z.label === "ENTRY");
       if (entryZone && Number.isFinite(entryZone.from) && Number.isFinite(entryZone.to)) {
         addBand(entryZone.from, entryZone.to, "ENTRY", "ENTRY");
       } else {
-        const pad = Math.max(1, Math.abs(levels.entry - levels.sl) * 0.06);
-        addBand(levels.entry - pad, levels.entry + pad, "ENTRY", "ENTRY-FB");
+        const pad = Math.max(1, Math.abs(activeLevels.entry - activeLevels.sl) * 0.06);
+        addBand(activeLevels.entry - pad, activeLevels.entry + pad, "ENTRY", "ENTRY-FB");
       }
 
-      if (Number.isFinite(levels.sl) && Number.isFinite(levels.entry)) {
-        addBand(levels.sl, levels.entry, "SL", "SL");
+      if (Number.isFinite(activeLevels.sl) && Number.isFinite(activeLevels.entry)) {
+        addBand(activeLevels.sl, activeLevels.entry, "SL", "SL");
       }
 
       if (side === "BUY") {
-        if (tp1 !== undefined) addBand(levels.entry, tp1, "TP1", "TP1");
+        if (tp1 !== undefined) addBand(activeLevels.entry, tp1, "TP1", "TP1");
         if (tp2 !== undefined && tp1 !== undefined) addBand(tp1, tp2, "TP2", "TP2");
         if (tp3 !== undefined && tp2 !== undefined) addBand(tp2, tp3, "TP3", "TP3");
       } else {
-        if (tp1 !== undefined) addBand(tp1, levels.entry, "TP1", "TP1");
+        if (tp1 !== undefined) addBand(tp1, activeLevels.entry, "TP1", "TP1");
         if (tp2 !== undefined && tp1 !== undefined) addBand(tp2, tp1, "TP2", "TP2");
         if (tp3 !== undefined && tp2 !== undefined) addBand(tp3, tp2, "TP3", "TP3");
       }
@@ -1956,14 +2316,14 @@ kineticScroll: {
       const entryLineColor =
         side === "BUY" ? "rgba(16,185,129,0.95)" : "rgba(239,68,68,0.95)";
 
-      addOL(levels.entry, `OL-ENTRY-${levels.entry}`, entryLineColor, 3);
-      addOL(levels.sl, `OL-SL-${levels.sl}`, "rgba(239,68,68,0.95)", 3);
+      addOL(activeLevels.entry, `OL-ENTRY-${activeLevels.entry}`, entryLineColor, 3);
+      addOL(activeLevels.sl, `OL-SL-${activeLevels.sl}`, "rgba(239,68,68,0.95)", 3);
       if (tp1 !== undefined) addOL(tp1, `OL-TP1-${tp1}`, "rgba(16,185,129,0.92)", 2);
       if (tp2 !== undefined) addOL(tp2, `OL-TP2-${tp2}`, "rgba(16,185,129,0.85)", 2);
       if (tp3 !== undefined) addOL(tp3, `OL-TP3-${tp3}`, "rgba(16,185,129,0.78)", 2);
 
-      addLabelAtPrice(levels.entry, "ENTRY", "ENTRY");
-      addLabelAtPrice(levels.sl, "SL", "SL");
+      addLabelAtPrice(activeLevels.entry, "ENTRY", "ENTRY");
+      addLabelAtPrice(activeLevels.sl, "SL", "SL");
       if (tp1 !== undefined) addLabelAtPrice(tp1, "TP1", "TP1");
       if (tp2 !== undefined) addLabelAtPrice(tp2, "TP2", "TP2");
       if (tp3 !== undefined) addLabelAtPrice(tp3, "TP3", "TP3");
@@ -1971,7 +2331,7 @@ kineticScroll: {
       setZoneRects(zr);
       setOverlayLines(ol);
       setZoneLabels(lbls);
-    } else if (!showTradeLines) {
+    } else if (!activeShowTradeLines) {
       try {
         candleSeries.setMarkers([]);
       } catch {}
@@ -1999,9 +2359,9 @@ kineticScroll: {
     renkoCandles,
     renkoBoxSize,
     currentRenkoBox,
-    showTradeLines,
-    levels,
-    applyTradeLines,
+    activeShowTradeLines,
+    activeLevels,
+    applyTradeLinesWithLevels,
     height,
     pricePrecision,
     highlightTime,
@@ -2143,7 +2503,7 @@ kineticScroll: {
         strokeWidth: 0.95,
       };
 
-    const sideForBand: "BUY" | "SELL" = levels?.side ?? "BUY";
+    const sideForBand: "BUY" | "SELL" = activeLevels?.side ?? "BUY";
     return sideForBand === "BUY"
       ? {
           fill: "url(#entryGradBuy)",
@@ -2160,7 +2520,7 @@ kineticScroll: {
   const pillClasses = (kind: "TP1" | "TP2" | "TP3" | "SL" | "ENTRY") => {
     if (kind === "SL") return "bg-red-600/85 border-red-200/30 text-white";
     if (kind === "ENTRY") {
-      const sideForEntry: "BUY" | "SELL" = levels?.side ?? "BUY";
+      const sideForEntry: "BUY" | "SELL" = activeLevels?.side ?? "BUY";
       return sideForEntry === "BUY"
         ? "bg-emerald-500/90 border-emerald-200/30 text-white"
         : "bg-red-500/90 border-red-200/30 text-white";
@@ -2177,17 +2537,21 @@ kineticScroll: {
   const priceDelta = lastClose - prevClose;
 
   const tps = (
-    levels?.tps?.length ? levels.tps : levels?.tp !== undefined ? [levels.tp] : []
+    activeLevels?.tps?.length
+      ? activeLevels.tps
+      : activeLevels?.tp !== undefined
+        ? [activeLevels.tp]
+        : []
   )
     .filter((x) => Number.isFinite(x))
     .slice(0, 3) as number[];
 
   const side: "BUY" | "SELL" =
-    levels?.side ?? (tps[0] !== undefined && tps[0] < (levels?.entry ?? 0) ? "SELL" : "BUY");
+    activeLevels?.side ?? (tps[0] !== undefined && tps[0] < (activeLevels?.entry ?? 0) ? "SELL" : "BUY");
 
   const rrValue =
-    levels?.rr ??
-    (levels && tps.length ? calcRR(levels.entry, levels.sl, tps[tps.length - 1]) : undefined);
+    activeLevels?.rr ??
+    (activeLevels && tps.length ? calcRR(activeLevels.entry, activeLevels.sl, tps[tps.length - 1]) : undefined);
 
   const trendScore = Math.max(40, Math.min(96, Math.round(Math.abs(priceDelta) > 0 ? 74 : 68)));
   const qualityLabel =
@@ -2313,6 +2677,20 @@ kineticScroll: {
               touchAction: "none",
             }}
           />
+
+          {patternsEnabled && patternLabels.length ? (
+            <div className="pointer-events-none absolute inset-0 z-[18] overflow-hidden">
+              {patternLabels.map((p) => (
+                <div
+                  key={p.key}
+                  className="absolute -translate-x-1/2 whitespace-nowrap rounded-md border border-yellow-300/70 bg-yellow-400/95 px-1.5 py-0.5 text-[9px] font-black tracking-[0.03em] text-slate-950 shadow-[0_0_10px_rgba(250,204,21,.35)]"
+                  style={{ left: p.x, top: p.y }}
+                >
+                  {p.label}
+                </div>
+              ))}
+            </div>
+          ) : null}
 
           {supertrendFillPolygons.length ? (
             <svg className="pointer-events-none absolute inset-0 z-[3] h-full w-full">
@@ -2586,8 +2964,8 @@ kineticScroll: {
           </div>
 
           <div className="space-y-3 border-t border-white/10 pb-4 pt-4">
-            <Row label="Entry" value={levels ? formatPrice(levels.entry, pricePrecision ?? 2) : "—"} />
-            <Row label="SL" value={levels ? formatPrice(levels.sl, pricePrecision ?? 2) : "—"} />
+            <Row label="Entry" value={activeLevels ? formatPrice(activeLevels.entry, pricePrecision ?? 2) : "—"} />
+            <Row label="SL" value={activeLevels ? formatPrice(activeLevels.sl, pricePrecision ?? 2) : "—"} />
             <Row label="TP1" value={tps[0] ? formatPrice(tps[0], pricePrecision ?? 2) : "—"} />
             <Row label="TP2" value={tps[1] ? formatPrice(tps[1], pricePrecision ?? 2) : "—"} />
             <Row label="TP3" value={tps[2] ? formatPrice(tps[2], pricePrecision ?? 2) : "—"} />

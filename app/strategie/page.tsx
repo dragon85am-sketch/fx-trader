@@ -249,7 +249,7 @@ function PremiumLock() {
           Odblokuj premium, żeby zobaczyć pełny plan, checklistę i szczegóły strategii.
         </p>
 
-        <div className="mt-4 grid grid-cols-2 gap-2">
+        <div className="mt-4 grid grid-cols-1 gap-2 min-[390px]:grid-cols-2">
           <Link
             href="/paywall"
             className="rounded-[8px] border border-violet-400/30 bg-[linear-gradient(90deg,#4c1d95,#6d28d9)] px-3 py-2.5 text-center text-[9px] font-bold text-white"
@@ -281,19 +281,19 @@ function StrategyCard({
 
   return (
     <article
-      className={`group relative overflow-hidden rounded-[14px] border border-[#0d579e] bg-[linear-gradient(145deg,#0b477f_0%,#083866_55%,#062d55_100%)] p-4 transition hover:border-sky-300/60 hover:shadow-[0_0_34px_rgba(56,189,248,.22)] ${a.glow}`}
+      className={`group relative min-w-0 overflow-hidden rounded-[14px] border border-[#0d579e] bg-[linear-gradient(145deg,#0b477f_0%,#083866_55%,#062d55_100%)] p-4 transition hover:border-sky-300/60 hover:shadow-[0_0_34px_rgba(56,189,248,.22)] ${a.glow}`}
     >
       {locked ? <PremiumLock /> : null}
 
       <div className={locked ? "opacity-35" : ""}>
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-3">
+        <div className="flex min-w-0 items-start justify-between gap-2 sm:gap-3">
+          <div className="flex min-w-0 items-start gap-2.5 sm:gap-3">
             <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-[11px] border ${a.icon}`}>
               <Icon className="h-5 w-5" />
             </div>
 
             <div>
-              <h2 className="text-[15px] font-semibold text-white">{strategy.title}</h2>
+              <h2 className="break-words text-[14px] font-semibold text-white sm:text-[15px]">{strategy.title}</h2>
               <div className="mt-1">
                 <Stars rating={strategy.rating} />
               </div>
@@ -315,7 +315,7 @@ function StrategyCard({
           {strategy.desc}
         </p>
 
-        <div className="mt-4 grid grid-cols-2 gap-3 rounded-[10px] border border-[#0a417b] bg-[#07315a]/90 p-3 shadow-[inset_0_0_18px_rgba(14,165,233,.05)]">
+        <div className="mt-4 grid grid-cols-1 gap-2 rounded-[10px] border border-[#0a417b] sm:grid-cols-2 sm:gap-3 bg-[#07315a]/90 p-3 shadow-[inset_0_0_18px_rgba(14,165,233,.05)]">
           <div>
             <div className="flex items-center justify-between text-[8px] text-sky-100/45">
               <span>Skuteczność</span>
@@ -332,7 +332,7 @@ function StrategyCard({
           </div>
         </div>
 
-        <div className="mt-3 grid grid-cols-3 gap-2 border-b border-[#0a417b] pb-3">
+        <div className="mt-3 grid grid-cols-2 gap-2 border-b border-[#0a417b] pb-3 sm:grid-cols-3">
           <div>
             <div className="text-[7px] text-sky-100/40">RR</div>
             <div className="mt-1 text-[9px] font-semibold">{strategy.rr}</div>
@@ -361,7 +361,7 @@ function StrategyCard({
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-2">
+        <div className="mt-4 grid grid-cols-1 gap-2 min-[390px]:grid-cols-2">
           <Link
             href={locked ? "/paywall" : strategy.href}
             className="rounded-[8px] border border-[#0d579e] bg-[#0a3a69] px-3 py-2.5 text-center text-[9px] font-semibold text-sky-100/70 hover:bg-[#0a3264]"
@@ -393,7 +393,7 @@ export default function StrategieDashboardPage() {
   const premiumCount = STRATEGIES.filter((s) => s.badge === "PREMIUM").length;
 
   return (
-    <main className="relative isolate min-h-screen overflow-hidden bg-[#020817] text-white">
+    <main className="relative isolate min-h-[100dvh] w-full max-w-full overflow-x-hidden bg-[#020817] text-white">
       <div
         aria-hidden="true"
         className="pointer-events-none fixed inset-0 z-0 bg-cover bg-center bg-no-repeat"
@@ -406,18 +406,18 @@ export default function StrategieDashboardPage() {
         aria-hidden="true"
         className="pointer-events-none fixed inset-0 z-[1] bg-[radial-gradient(circle_at_50%_8%,rgba(34,211,238,.18),transparent_46%)]"
       />
-      <div className="relative z-10 mx-auto w-full max-w-[1900px] space-y-4 px-4 py-5 md:px-6 xl:px-8">
+      <div className="relative z-10 mx-auto w-full min-w-0 max-w-[1900px] space-y-3 px-2 py-3 sm:space-y-4 sm:px-4 sm:py-5 md:px-6 xl:px-8">
         {/* HEADER */}
-        <section className="relative overflow-hidden rounded-[16px] border border-[#0d579e] bg-[linear-gradient(120deg,#0d4f8f_0%,#0a3f78_52%,#072f5f_100%)] p-5 shadow-[0_0_35px_rgba(14,165,233,.18),inset_0_1px_0_rgba(125,211,252,.10)]">
+        <section className="relative overflow-hidden rounded-[14px] border border-[#0d579e] bg-[linear-gradient(120deg,#0d4f8f_0%,#0a3f78_52%,#072f5f_100%)] p-3 shadow-[0_0_35px_rgba(14,165,233,.18),inset_0_1px_0_rgba(125,211,252,.10)] sm:rounded-[16px] sm:p-5">
           <div className="pointer-events-none absolute right-[8%] top-0 h-full w-[34%] opacity-[.12] [background-image:radial-gradient(circle,#38bdf8_1px,transparent_1px)] [background-size:7px_7px] [mask-image:radial-gradient(ellipse_at_center,black_0%,transparent_72%)]" />
 
-          <div className="relative z-10 flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+          <div className="relative z-10 flex min-w-0 flex-col gap-4 sm:gap-5 xl:flex-row xl:items-end xl:justify-between">
             <div>
               <div className="text-[9px] font-semibold uppercase tracking-[.18em] text-sky-200/55">
                 FX TRADE / STRATEGIE
               </div>
 
-              <h1 className="mt-1 text-[30px] font-semibold tracking-tight">
+              <h1 className="mt-1 text-[22px] font-semibold tracking-tight sm:text-[30px]">
                 Trading Strategies
               </h1>
 
@@ -438,7 +438,7 @@ export default function StrategieDashboardPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+            <div className="grid w-full grid-cols-2 gap-2 md:grid-cols-4 xl:w-auto">
               {[
                 [Gift, String(freeCount), "Free strategies", "Dostępne"],
                 [Crown, String(premiumCount), "Premium strategies", paid ? "Odblokowane" : "Pełny dostęp"],
@@ -450,9 +450,9 @@ export default function StrategieDashboardPage() {
                 return (
                   <div
                     key={index}
-                    className="min-w-[145px] rounded-[11px] border border-[#0d579e] bg-[#0a3f73] px-4 py-3 shadow-[0_0_20px_rgba(14,165,233,.08)]"
+                    className="min-w-0 rounded-[11px] border border-[#0d579e] bg-[#0a3f73] px-2.5 py-2.5 shadow-[0_0_20px_rgba(14,165,233,.08)] sm:px-4 sm:py-3"
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
                       <StatIcon className="h-5 w-5 text-sky-300" />
                       <div>
                         <div className="text-[8px] uppercase tracking-[.08em] text-sky-100/40">
@@ -470,8 +470,8 @@ export default function StrategieDashboardPage() {
         </section>
 
         {/* STRATEGIES + GUIDE */}
-        <section className="grid gap-3 xl:grid-cols-[1fr_300px]">
-          <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
+        <section className="grid min-w-0 grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_300px]">
+          <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 2xl:grid-cols-4">
             {STRATEGIES.map((strategy) => (
               <StrategyCard
                 key={strategy.key}
@@ -481,9 +481,9 @@ export default function StrategieDashboardPage() {
             ))}
           </div>
 
-          <aside className="space-y-3">
-            <div className="rounded-[14px] border border-[#0d579e] bg-[linear-gradient(145deg,#0b477f,#07325d)] p-5 shadow-[0_0_28px_rgba(14,165,233,.13)]">
-              <div className="flex items-center gap-3">
+          <aside className="min-w-0 space-y-3">
+            <div className="min-w-0 rounded-[14px] border border-[#0d579e] bg-[linear-gradient(145deg,#0b477f,#07325d)] p-4 sm:p-5 shadow-[0_0_28px_rgba(14,165,233,.13)]">
+              <div className="flex min-w-0 items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-[10px] border border-emerald-400/25 bg-emerald-500/10 text-emerald-300">
                   <Target className="h-5 w-5" />
                 </div>
@@ -534,7 +534,7 @@ export default function StrategieDashboardPage() {
         </section>
 
         {/* BOTTOM BENEFITS */}
-        <section className="grid gap-3 rounded-[14px] border border-[#0d579e] bg-[linear-gradient(145deg,#0b477f,#07325d)] p-4 shadow-[0_0_28px_rgba(14,165,233,.13)] md:grid-cols-2 xl:grid-cols-5">
+        <section className="grid grid-cols-1 gap-3 rounded-[14px] border border-[#0d579e] bg-[linear-gradient(145deg,#0b477f,#07325d)] p-3 shadow-[0_0_28px_rgba(14,165,233,.13)] sm:grid-cols-2 sm:p-4 xl:grid-cols-5">
           {[
             [BookOpenCheck, "Gotowe checklisty", "Do każdej strategii"],
             [BarChart3, "Przykłady na wykresach", "Realne setupy"],
@@ -545,7 +545,7 @@ export default function StrategieDashboardPage() {
             const BenefitIcon = Icon as typeof BookOpenCheck;
 
             return (
-              <div key={index} className="flex items-center gap-3">
+              <div key={index} className="flex min-w-0 items-center gap-3">
                 <div className="flex h-9 w-9 items-center justify-center rounded-[9px] border border-sky-400/20 bg-sky-500/10 text-sky-300">
                   <BenefitIcon className="h-4 w-4" />
                 </div>

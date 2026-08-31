@@ -176,7 +176,7 @@ function KpiCard({
   positive?: boolean;
 }) {
   return (
-    <div className="relative h-[74px] overflow-hidden rounded-[12px] border border-[#0d579e] bg-[linear-gradient(145deg,#228dce_0%,#1875b3_52%,#115f98_100%)] px-5 py-4 shadow-[0_8px_24px_rgba(2,18,38,.18),0_0_20px_rgba(34,211,238,.16),inset_0_1px_0_rgba(255,255,255,.12)]">
+    <div className="relative min-h-[74px] overflow-hidden rounded-[12px] border border-[#0d579e] bg-[linear-gradient(145deg,#228dce_0%,#1875b3_52%,#115f98_100%)] px-3 py-3 shadow-[0_8px_24px_rgba(2,18,38,.18),0_0_20px_rgba(34,211,238,.16),inset_0_1px_0_rgba(255,255,255,.12)] sm:px-5 sm:py-4">
       <div className="text-[9px] font-semibold uppercase tracking-[.12em] text-sky-100/45">
         {label}
       </div>
@@ -208,7 +208,7 @@ function ModuleCard({
   return (
     <Link
       href={href}
-      className="group relative flex min-h-[154px] flex-col overflow-hidden rounded-[14px] border border-[#0d579e] bg-[linear-gradient(145deg,#2491d1_0%,#1979b8_55%,#105b93_100%)] p-[18px] shadow-[0_14px_34px_rgba(2,18,38,.22),0_0_18px_rgba(34,211,238,.22),0_0_38px_rgba(14,165,233,.13),inset_0_1px_0_rgba(255,255,255,.16)] transition-all duration-200 hover:border-cyan-300/75 hover:shadow-[0_16px_38px_rgba(2,18,38,.24),0_0_28px_rgba(34,211,238,.34),0_0_52px_rgba(14,165,233,.20),inset_0_1px_0_rgba(255,255,255,.20)]"
+      className="group relative flex min-h-[148px] flex-col overflow-hidden rounded-[14px] border border-[#0d579e] bg-[linear-gradient(145deg,#2491d1_0%,#1979b8_55%,#105b93_100%)] p-4 shadow-[0_14px_34px_rgba(2,18,38,.22),0_0_18px_rgba(34,211,238,.22),0_0_38px_rgba(14,165,233,.13),inset_0_1px_0_rgba(255,255,255,.16)] transition-all duration-200 hover:border-cyan-300/75 hover:shadow-[0_16px_38px_rgba(2,18,38,.24),0_0_28px_rgba(34,211,238,.34),0_0_52px_rgba(14,165,233,.20),inset_0_1px_0_rgba(255,255,255,.20)] sm:min-h-[154px] sm:p-[18px]"
     >
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_0%_0%,rgba(56,189,248,.06),transparent_38%)]" />
 
@@ -315,7 +315,7 @@ export default async function DashboardPage() {
   const roleLabel = userRole === "admin" ? "Administrator" : "Premium Member";
 
   return (
-    <section className="relative isolate min-h-screen overflow-hidden bg-[#020817] text-white">
+    <section className="relative isolate min-h-[100dvh] w-full max-w-full overflow-x-hidden bg-[#020817] text-white">
       <div
         aria-hidden="true"
         className="pointer-events-none fixed inset-0 z-0 bg-cover bg-center bg-no-repeat"
@@ -330,8 +330,8 @@ export default async function DashboardPage() {
       />
       <div className="relative z-10">
       {/* TOPBAR 1:1 */}
-      <div className="border-b border-[#0a417b] bg-[#115d91] px-4 py-4 xl:px-5">
-        <div className="flex items-center justify-between gap-5">
+      <div className="border-b border-[#0a417b] bg-[#115d91] px-3 py-3 sm:px-4 sm:py-4 xl:px-5">
+        <div className="flex min-w-0 items-center justify-between gap-2 sm:gap-5">
           <div>
             <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[.16em] text-sky-100/65">
               <span>FX TRADE</span>
@@ -339,8 +339,8 @@ export default async function DashboardPage() {
               <span>DASHBOARD</span>
             </div>
 
-            <div className="mt-1 flex items-center gap-3">
-              <h1 className="text-[22px] font-semibold tracking-tight text-white">
+            <div className="mt-1 flex min-w-0 items-center gap-2 sm:gap-3">
+              <h1 className="truncate text-[18px] font-semibold tracking-tight text-white sm:text-[22px]">
                 Premium Panel
               </h1>
 
@@ -350,29 +350,37 @@ export default async function DashboardPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <TopIcon>
-              <Search className="h-5 w-5" />
-            </TopIcon>
+          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+            <div className="hidden lg:block">
+              <TopIcon>
+                <Search className="h-5 w-5" />
+              </TopIcon>
+            </div>
 
-            <TopIcon>
-              <Camera className="h-5 w-5" />
-            </TopIcon>
+            <div className="hidden xl:block">
+              <TopIcon>
+                <Camera className="h-5 w-5" />
+              </TopIcon>
+            </div>
 
-            <TopIcon>
-              <PanelsTopLeft className="h-5 w-5" />
-            </TopIcon>
+            <div className="hidden xl:block">
+              <TopIcon>
+                <PanelsTopLeft className="h-5 w-5" />
+              </TopIcon>
+            </div>
 
             <TopIcon badge="12">
               <Bell className="h-5 w-5" />
             </TopIcon>
 
-            <TopIcon>
-              <Settings className="h-5 w-5" />
-            </TopIcon>
+            <div className="hidden sm:block">
+              <TopIcon>
+                <Settings className="h-5 w-5" />
+              </TopIcon>
+            </div>
 
-            <div className="ml-2 flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-full border border-sky-400/50 bg-[#075ecb] text-sm font-semibold text-white">
+            <div className="ml-1 flex items-center gap-1 sm:ml-2 sm:gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full border border-sky-400/50 bg-[#075ecb] text-xs font-semibold text-white sm:h-11 sm:w-11 sm:text-sm">
                 {userInitials}
               </div>
 
@@ -391,10 +399,10 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      <div className="space-y-3 px-4 pb-5 pt-3 xl:px-5">
+      <div className="space-y-3 px-2 pb-4 pt-2 sm:px-4 sm:pb-5 sm:pt-3 xl:px-5">
         {/* STATUS */}
-        <div className="grid gap-3 2xl:grid-cols-[1.65fr_repeat(4,.72fr)_1.15fr]">
-          <div className="flex h-[60px] items-center justify-between rounded-[12px] border border-[#0d579e] bg-[linear-gradient(145deg,#2087c8_0%,#176fae_52%,#105b93_100%)] px-5">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 2xl:grid-cols-[1.65fr_repeat(4,.72fr)_1.15fr]">
+          <div className="col-span-2 flex h-[60px] min-w-0 items-center justify-between rounded-[12px] border border-[#0d579e] bg-[linear-gradient(145deg,#2087c8_0%,#176fae_52%,#105b93_100%)] px-3 sm:px-5 md:col-span-1">
             <div>
               <div className="text-[10px] text-sky-100/55">
                 Zalogowany użytkownik
@@ -412,7 +420,7 @@ export default async function DashboardPage() {
           <StatusCard label="SALDO" value="4,280€" accent icon={WalletCards} />
           <StatusCard label="ALERTY" value="12" icon={Bell} />
 
-          <div className="flex h-[60px] items-center justify-between rounded-[12px] border border-[#0d579e] bg-[linear-gradient(145deg,#2087c8_0%,#176fae_52%,#105b93_100%)] px-4">
+          <div className="col-span-2 flex h-[60px] min-w-0 items-center justify-between rounded-[12px] border border-[#0d579e] bg-[linear-gradient(145deg,#2087c8_0%,#176fae_52%,#105b93_100%)] px-3 sm:px-4 md:col-span-1">
             <div className="flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-full border border-sky-500/30 bg-[#1b82c4] text-xs font-semibold text-sky-100">
                 {userInitials}
@@ -433,10 +441,10 @@ export default async function DashboardPage() {
         </div>
 
         {/* HERO */}
-        <div className="relative min-h-[176px] overflow-hidden rounded-[14px] border border-[#0c78c6] bg-[linear-gradient(118deg,#2695d5_0%,#1a7dbb_52%,#115f98_100%)] px-5 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,.035)]">
+        <div className="relative min-h-[176px] overflow-hidden rounded-[14px] border border-[#0c78c6] bg-[linear-gradient(118deg,#2695d5_0%,#1a7dbb_52%,#115f98_100%)] px-3 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,.035)] sm:px-5 sm:py-5">
           <div className="pointer-events-none absolute left-[40%] top-0 h-full w-[38%] opacity-[.16] [background-image:radial-gradient(circle,#38bdf8_1px,transparent_1px)] [background-size:7px_7px] [mask-image:radial-gradient(ellipse_at_center,black_0%,transparent_73%)]" />
 
-          <div className="relative z-10 flex h-full flex-col justify-between gap-5 xl:flex-row xl:items-start">
+          <div className="relative z-10 flex h-full min-w-0 flex-col justify-between gap-5 xl:flex-row xl:items-start">
             <div>
               <div className="flex items-center gap-3">
                 <div className="flex h-11 w-11 items-center justify-center rounded-[11px] border border-[#0f66b7] bg-[#2089ca] font-bold text-white">
@@ -465,7 +473,7 @@ export default async function DashboardPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="grid w-full grid-cols-2 gap-2 sm:gap-3 sm:grid-cols-4 xl:w-auto">
               <StatusCard label="ACCOUNT" value="Premium" />
               <StatusCard label="SIGNALS" value="3 Active" accent />
               <StatusCard
@@ -483,7 +491,7 @@ export default async function DashboardPage() {
         </div>
 
         {/* KPI */}
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-2 xl:grid-cols-4">
           <KpiCard label="KLIKNIĘCIA" value={String(clicks)} icon={TrendingUp} />
           <KpiCard label="SPRZEDAŻE" value={String(sales)} icon={ShoppingCart} />
           <KpiCard label="KONWERSJA" value={`${conversion}%`} icon={PieChart} />
@@ -496,7 +504,7 @@ export default async function DashboardPage() {
         </div>
 
         {/* MODULES 3x3 */}
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {cards.map((card) => (
             <ModuleCard key={card.title} {...card} />
           ))}

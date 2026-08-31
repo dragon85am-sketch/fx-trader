@@ -90,9 +90,9 @@ export default function Journal() {
   };
 
   return (
-    <div className="space-y-6 text-white">
+    <div className="w-full min-w-0 max-w-full space-y-4 overflow-x-hidden text-white sm:space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">
+        <h1 className="text-[22px] font-bold sm:text-3xl">
           FX Trade Journal <span className="text-cyan-400">PRO</span>
         </h1>
         <p className="text-sm text-white/50">
@@ -100,10 +100,10 @@ export default function Journal() {
         </p>
       </div>
 
-      <section className="rounded-[26px] border border-white/10 bg-[#0b1423] p-6">
-        <div className="mb-6 flex items-center justify-between">
+      <section className="min-w-0 rounded-[18px] border border-white/10 bg-[#0b1423] p-3 sm:rounded-[26px] sm:p-6">
+        <div className="mb-5 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-2xl font-semibold">Trading Plan</h2>
+            <h2 className="text-xl font-semibold sm:text-2xl">Trading Plan</h2>
             <p className="text-sm text-white/45">
               Ustaw cele i aktywuj plan tradingowy
             </p>
@@ -112,14 +112,14 @@ export default function Journal() {
           {activeTab === "active" && (
             <button
               onClick={restartPlan}
-              className="rounded-xl bg-red-500/20 px-5 py-3 text-red-300"
+              className="w-full rounded-xl bg-red-500/20 px-4 py-2.5 text-red-300 sm:w-auto sm:px-5 sm:py-3"
             >
               Restart Plan
             </button>
           )}
         </div>
 
-        <div className="mb-6 flex gap-6 border-b border-white/10">
+        <div className="mb-6 flex max-w-full gap-5 overflow-x-auto border-b border-white/10 sm:gap-6">
           <button
             onClick={() => setActiveTab("config")}
             className={`pb-3 ${
@@ -144,7 +144,7 @@ export default function Journal() {
         </div>
 
         {activeTab === "config" ? (
-          <div className="grid gap-5 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:gap-5 lg:grid-cols-2">
             <PlanInput
               label="Account Balance"
               value={plan.accountBalance}
@@ -219,9 +219,9 @@ export default function Journal() {
             </button>
           </div>
         ) : (
-          <div className="grid gap-5 xl:grid-cols-[1fr_320px]">
+          <div className="grid min-w-0 grid-cols-1 gap-4 sm:gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
             <div className="space-y-5">
-              <div className="grid gap-4 md:grid-cols-5">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-5">
                 <StatCard
                   label="Monthly Goal"
                   value={`${plan.monthlyGoalPercent}%`}
@@ -239,7 +239,7 @@ export default function Journal() {
                 <StatCard label="Consistency" value="0%" sub="Start tracking" />
               </div>
 
-              <div className="grid gap-5 lg:grid-cols-3">
+              <div className="grid grid-cols-1 gap-4 sm:gap-5 lg:grid-cols-3">
                 <Panel title="Plan Parameters">
                   <Row label="Account Balance" value={`${plan.accountBalance.toFixed(2)} USD`} />
                   <Row
@@ -271,7 +271,7 @@ export default function Journal() {
                 </Panel>
 
                 <Panel title="Daily Progress">
-                  <div className="grid grid-cols-3 gap-3 text-sm">
+                  <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
                     <div>
                       <div className="text-white/45">Daily Goal</div>
                       <div className="mt-1 text-emerald-300">
@@ -308,7 +308,7 @@ export default function Journal() {
               </div>
             </div>
 
-            <aside className="space-y-4 rounded-[22px] border border-white/10 bg-[#091424] p-5">
+            <aside className="min-w-0 space-y-4 rounded-[18px] border border-white/10 bg-[#091424] p-4 sm:rounded-[22px] sm:p-5">
               <div className="text-center">
                 <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-400 to-blue-500 text-2xl">
                   ✓
@@ -337,7 +337,7 @@ export default function Journal() {
         )}
       </section>
 
-      <section className="rounded-[26px] border border-white/10 bg-[#0b1423] p-6">
+      <section className="min-w-0 rounded-[18px] border border-white/10 bg-[#0b1423] p-3 sm:rounded-[26px] sm:p-6">
         <h2 className="mb-4 text-xl font-semibold">Trade Journal</h2>
 
         <div className="grid gap-3">
@@ -346,7 +346,7 @@ export default function Journal() {
               key={trade.id}
               className="rounded-xl border border-white/10 bg-[#091424] p-4"
             >
-              <div className="flex justify-between">
+              <div className="flex min-w-0 items-start justify-between gap-3">
                 <div className="font-medium">{trade.pair}</div>
                 <div
                   className={
@@ -388,14 +388,14 @@ function PlanInput({
   return (
     <div>
       <label className="mb-2 block text-sm text-white/50">{label}</label>
-      <div className="flex rounded-xl border border-white/10 bg-[#091424]">
+      <div className="flex min-w-0 rounded-xl border border-white/10 bg-[#091424]">
         <input
           type="number"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full bg-transparent px-4 py-3 outline-none"
+          className="min-w-0 w-full bg-transparent px-3 py-3 outline-none sm:px-4"
         />
-        <div className="px-4 py-3 text-white/35">{suffix}</div>
+        <div className="shrink-0 px-3 py-3 text-white/35 sm:px-4">{suffix}</div>
       </div>
     </div>
   );
@@ -415,10 +415,10 @@ function StatCard({
   blue?: boolean;
 }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-[#091424] p-4 text-center">
+    <div className="min-w-0 rounded-xl border border-white/10 bg-[#091424] p-3 text-center sm:p-4">
       <div className="text-sm text-white/50">{label}</div>
       <div
-        className={`mt-3 text-3xl font-bold ${
+        className={`mt-2 break-words text-xl font-bold sm:mt-3 sm:text-3xl ${
           green ? "text-emerald-300" : blue ? "text-blue-400" : "text-white"
         }`}
       >
@@ -437,7 +437,7 @@ function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-[#091424] p-5">
+    <div className="min-w-0 rounded-xl border border-white/10 bg-[#091424] p-4 sm:p-5">
       <h3 className="mb-4 text-lg font-semibold">{title}</h3>
       {children}
     </div>
@@ -458,10 +458,10 @@ function Row({
   blue?: boolean;
 }) {
   return (
-    <div className="flex justify-between border-b border-white/5 py-2 text-sm">
+    <div className="flex min-w-0 flex-col gap-1 border-b border-white/5 py-2 text-sm sm:flex-row sm:items-start sm:justify-between sm:gap-4">
       <span className="text-white/50">{label}</span>
       <span
-        className={
+        className={`${
           green
             ? "text-emerald-300"
             : red
@@ -469,7 +469,7 @@ function Row({
             : blue
             ? "text-blue-400"
             : "text-white"
-        }
+        } break-words sm:text-right`}
       >
         {value}
       </span>

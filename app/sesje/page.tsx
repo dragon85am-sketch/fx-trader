@@ -128,7 +128,7 @@ function SessionIcon({ kind }: { kind: SessionKind }) {
   if (kind === "BTC") {
     return (
       <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full border border-orange-300/45 bg-[radial-gradient(circle_at_35%_28%,#ffc86a_0%,#f59e0b_38%,#c05b00_72%,#4b1900_100%)] text-white shadow-[0_0_24px_rgba(249,115,22,.32)]">
-        <Bitcoin className="h-7 w-7" strokeWidth={2.4} />
+        <Bitcoin className="h-5 w-5 sm:h-7 sm:w-7" strokeWidth={2.4} />
       </div>
     );
   }
@@ -136,14 +136,14 @@ function SessionIcon({ kind }: { kind: SessionKind }) {
   if (kind === "SCALPING") {
     return (
       <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-emerald-400/30 bg-emerald-500/10 text-emerald-300 shadow-[0_0_18px_rgba(16,185,129,.12)]">
-        <Activity className="h-7 w-7" />
+        <Activity className="h-5 w-5 sm:h-7 sm:w-7" />
       </div>
     );
   }
 
   return (
     <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-cyan-400/30 bg-cyan-500/10 text-cyan-300 shadow-[0_0_18px_rgba(34,211,238,.12)]">
-      <TrendingUp className="h-7 w-7" />
+      <TrendingUp className="h-5 w-5 sm:h-7 sm:w-7" />
     </div>
   );
 }
@@ -197,10 +197,10 @@ function TradingMiniChart() {
 
 function Donut78() {
   return (
-    <div className="relative grid h-[142px] w-[142px] place-items-center rounded-full bg-[conic-gradient(#22d3ee_0deg,#22d3ee_280deg,#0b2b49_280deg,#0b2b49_360deg)] shadow-[0_0_32px_rgba(34,211,238,.20)]">
-      <div className="grid h-[108px] w-[108px] place-items-center rounded-full border border-cyan-300/10 bg-[#061426]">
+    <div className="relative grid h-[124px] w-[124px] place-items-center rounded-full sm:h-[142px] sm:w-[142px] bg-[conic-gradient(#22d3ee_0deg,#22d3ee_280deg,#0b2b49_280deg,#0b2b49_360deg)] shadow-[0_0_32px_rgba(34,211,238,.20)]">
+      <div className="grid h-[94px] w-[94px] place-items-center rounded-full sm:h-[108px] sm:w-[108px] border border-cyan-300/10 bg-[#061426]">
         <div className="text-center">
-          <div className="text-[28px] font-black text-white">78%</div>
+          <div className="text-[24px] font-black text-white sm:text-[28px]">78%</div>
           <div className="mt-1 text-[8px] font-bold uppercase tracking-[.10em] text-slate-400">
             skuteczność
           </div>
@@ -224,7 +224,7 @@ export default function SesjePage() {
     : { time: "--:--:--", date: "--.--.----" };
 
   return (
-    <main className="relative isolate min-h-screen overflow-hidden bg-[#020817] text-white">
+    <main className="relative isolate min-h-[100dvh] w-full max-w-full overflow-x-hidden bg-[#020817] text-white">
       <div
         aria-hidden="true"
         className="pointer-events-none fixed inset-0 z-0 bg-cover bg-center bg-no-repeat"
@@ -257,17 +257,17 @@ export default function SesjePage() {
         className="pointer-events-none hidden"
       />
 
-      <div className="relative z-10 mx-auto w-full max-w-[2520px] px-4 py-3 md:px-7 xl:px-[90px] 2xl:px-[120px] min-[1900px]:px-[135px]">
+      <div className="relative z-10 mx-auto w-full min-w-0 max-w-[2520px] px-2 py-3 sm:px-4 md:px-7 xl:px-[90px] 2xl:px-[120px] min-[1900px]:px-[135px]">
         {/* HEADER */}
-        <section className="relative overflow-hidden rounded-[18px] border border-cyan-300/16 bg-[linear-gradient(180deg,#0e5b9b_0%,#0a3f73_100%)] px-4 py-3 shadow-[0_16px_44px_rgba(0,0,0,.34),inset_0_1px_0_rgba(255,255,255,.025)]">
-          <div className="flex items-center justify-between gap-4">
+        <section className="relative overflow-hidden rounded-[14px] border border-cyan-300/16 bg-[linear-gradient(180deg,#0e5b9b_0%,#0a3f73_100%)] px-3 py-3 sm:rounded-[18px] sm:px-4 shadow-[0_16px_44px_rgba(0,0,0,.34),inset_0_1px_0_rgba(255,255,255,.025)]">
+          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
             <div className="flex min-w-0 items-center gap-3">
-              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-cyan-300/20 bg-[#07192b] text-cyan-300">
-                <TrendingUp className="h-7 w-7" />
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-cyan-300/20 bg-[#07192b] text-cyan-300 sm:h-12 sm:w-12">
+                <TrendingUp className="h-5 w-5 sm:h-7 sm:w-7" />
               </div>
 
               <div className="min-w-0">
-                <h1 className="truncate text-[25px] font-black tracking-tight md:text-[34px]">
+                <h1 className="text-[19px] font-black leading-tight tracking-tight sm:text-[25px] md:text-[34px]">
                   HARMONOGRAM{" "}
                   <span className="bg-[linear-gradient(90deg,#67e8f9,#22d3ee,#38bdf8)] bg-clip-text text-transparent">
                     SESJI LIVE
@@ -279,7 +279,7 @@ export default function SesjePage() {
               </div>
             </div>
 
-            <div className="flex shrink-0 items-center gap-3">
+            <div className="flex w-full shrink-0 items-center justify-between gap-2 sm:w-auto sm:justify-end sm:gap-3">
               <div className="hidden text-right md:block">
                 <div className="flex items-center justify-end gap-2 text-[18px] font-black">
                   <Clock3 className="h-5 w-5 text-slate-300" />
@@ -288,7 +288,7 @@ export default function SesjePage() {
                 <div className="mt-0.5 text-[9px] text-slate-400">CET {clock.date}</div>
               </div>
 
-              <div className="flex items-center gap-3 rounded-xl border border-emerald-400/20 bg-[#061b1b]/65 px-4 py-2.5">
+              <div className="flex items-center gap-2 rounded-xl border border-emerald-400/20 bg-[#061b1b]/65 px-3 py-2 sm:gap-3 sm:px-4 sm:py-2.5">
                 <span className="h-3 w-3 rounded-full bg-emerald-400 shadow-[0_0_18px_rgba(52,211,153,.9)]" />
                 <div>
                   <div className="text-[10px] font-black">LIVE SCHEDULE</div>
@@ -300,7 +300,7 @@ export default function SesjePage() {
         </section>
 
         {/* 7 DAY SCHEDULE */}
-        <section className="mt-3 grid gap-2.5 xl:grid-cols-7">
+        <section className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7">
           {DAYS.map((day, index) => {
             const weekend = Boolean(day.weekend);
             const sunday = day.day === "NIEDZIELA";
@@ -308,7 +308,7 @@ export default function SesjePage() {
             return (
               <article
                 key={day.day}
-                className={`overflow-hidden rounded-[16px] border bg-[linear-gradient(180deg,#0b5795_0%,#083a69_100%)] shadow-[0_14px_36px_rgba(0,0,0,.25)] ${
+                className={`min-w-0 overflow-hidden rounded-[16px] border bg-[linear-gradient(180deg,#0b5795_0%,#083a69_100%)] shadow-[0_14px_36px_rgba(0,0,0,.25)] ${
                   weekend
                     ? sunday
                       ? "border-cyan-400/35"
@@ -326,7 +326,7 @@ export default function SesjePage() {
                 </div>
 
                 {weekend ? (
-                  <div className="relative h-[215px] overflow-hidden border-b border-cyan-300/10 bg-[#06111c]">
+                  <div className="relative h-[170px] overflow-hidden border-b border-cyan-300/10 bg-[#06111c] sm:h-[190px] xl:h-[215px]">
                     <Image
                       src={day.image}
                       alt={`${day.day} BTC session`}
@@ -337,7 +337,7 @@ export default function SesjePage() {
                   </div>
                 ) : (
                   <>
-                    <div className="relative h-[132px] overflow-hidden border-b border-cyan-300/10 bg-[#061320]">
+                    <div className="relative h-[150px] overflow-hidden border-b border-cyan-300/10 bg-[#061320] sm:h-[132px]">
                       <Image
                         src={day.image}
                         alt={`${day.city} trading session`}
@@ -428,7 +428,7 @@ export default function SesjePage() {
         </section>
 
         {/* LOWER ROW */}
-        <section className="mt-3 grid gap-3 xl:grid-cols-[1.02fr_1.28fr_1.02fr]">
+        <section className="mt-3 grid min-w-0 grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.02fr)_minmax(0,1.28fr)_minmax(0,1.02fr)]">
           {/* CURRENT SESSION */}
           <div className="relative overflow-hidden rounded-[16px] border border-cyan-200/40 bg-[radial-gradient(circle_at_75%_15%,rgba(103,232,249,.20),transparent_34%),linear-gradient(180deg,#0d65a8,#08457a)] p-4">
             <div className="absolute inset-0 opacity-15 [background-image:linear-gradient(rgba(34,211,238,.08)_1px,transparent_1px),linear-gradient(90deg,rgba(34,211,238,.08)_1px,transparent_1px)] [background-size:34px_34px]" />
@@ -442,7 +442,7 @@ export default function SesjePage() {
                 </span>
               </div>
 
-              <div className="mt-3 grid grid-cols-[.9fr_1.1fr] items-end gap-3">
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-[.9fr_1.1fr] sm:items-end">
                 <div>
                   <div className="mb-2 flex items-center gap-3">
                     <div className="relative h-14 w-20 overflow-hidden rounded-xl border border-amber-400/20 bg-amber-500/5">
@@ -454,11 +454,11 @@ export default function SesjePage() {
                         sizes="80px"
                       />
                     </div>
-                    <div className="text-[23px] font-black text-orange-300">
+                    <div className="text-[19px] font-black text-orange-300 sm:text-[23px]">
                       GOLD <span className="text-[9px] font-semibold text-slate-400">(XAUUSD)</span>
                     </div>
                   </div>
-                  <div className="mt-1 text-[29px] font-black">16:00</div>
+                  <div className="mt-1 text-[24px] font-black sm:text-[29px]">16:00</div>
                   <div className="mt-2 text-[9px] font-semibold text-cyan-300">TRWA SESJA</div>
                   <div className="mt-1 text-[10px] text-slate-300">FOREX Scalping</div>
                 </div>
@@ -469,7 +469,7 @@ export default function SesjePage() {
                 </div>
               </div>
 
-              <div className="mt-3 grid grid-cols-3 gap-2">
+              <div className="mt-3 grid grid-cols-1 gap-2 min-[390px]:grid-cols-3">
                 {[
                   ["LIKWIDNOŚĆ", "85%", "text-cyan-300"],
                   ["ZMIENNOŚĆ", "ŚREDNIA", "text-cyan-300"],
@@ -516,7 +516,7 @@ export default function SesjePage() {
               return (
                 <div
                   key={`${name}-${index}`}
-                  className="grid grid-cols-[42px_1fr_auto_auto] items-center gap-3 border-b border-cyan-300/10 px-4 py-3 last:border-b-0"
+                  className="grid min-w-0 grid-cols-[38px_minmax(0,1fr)_auto] items-center gap-2 border-b border-cyan-300/10 px-3 py-3 last:border-b-0 sm:grid-cols-[42px_minmax(0,1fr)_auto_auto] sm:gap-3 sm:px-4"
                 >
                   <div
                     className={`grid h-9 w-9 place-items-center rounded-xl border ${
@@ -548,7 +548,7 @@ export default function SesjePage() {
                       LIVE
                     </span>
                   ) : (
-                    <div className="text-[9px] font-bold text-slate-400">{status}</div>
+                    <div className="hidden text-[9px] font-bold text-slate-400 sm:block">{status}</div>
                   )}
                 </div>
               );
@@ -559,7 +559,7 @@ export default function SesjePage() {
           <div className="rounded-[16px] border border-cyan-200/35 bg-[linear-gradient(180deg,#0d65a8,#08457a)] p-4">
             <div className="text-[11px] font-black">STATYSTYKI SESJI</div>
 
-            <div className="mt-4 grid grid-cols-[150px_1fr] items-center gap-5">
+            <div className="mt-4 grid grid-cols-1 items-center justify-items-center gap-4 sm:grid-cols-[150px_1fr] sm:justify-items-stretch sm:gap-5">
               <Donut78 />
 
               <div className="space-y-3">
@@ -599,7 +599,7 @@ export default function SesjePage() {
         </section>
 
         {/* BOTTOM STRIP */}
-        <section className="mt-3 grid overflow-hidden rounded-[14px] border border-cyan-200/30 bg-[linear-gradient(180deg,#0b5795,#073b6b)] sm:grid-cols-2 xl:grid-cols-5">
+        <section className="mt-3 grid grid-cols-1 overflow-hidden rounded-[14px] border border-cyan-200/30 bg-[linear-gradient(180deg,#0b5795,#073b6b)] sm:grid-cols-2 xl:grid-cols-5">
           {[
             [Radio, "SESSION LIVE", "Sesje z analizą i transakcjami na żywo", "text-violet-300"],
             [Zap, "SCALPING LIVE", "Szybkie setupy i scalping na żywo", "text-cyan-300"],
@@ -629,11 +629,11 @@ export default function SesjePage() {
           })}
         </section>
 
-        <footer className="mt-3 flex items-center justify-center gap-4 py-2 text-[8px] font-semibold uppercase tracking-[.30em] text-cyan-100/55">
-          <span className="h-px w-28 bg-cyan-500/20" />
+        <footer className="mt-3 flex min-w-0 items-center justify-center gap-2 px-2 py-2 text-center text-[7px] font-semibold uppercase tracking-[.16em] text-cyan-100/55 sm:gap-4 sm:text-[8px] sm:tracking-[.30em]">
+          <span className="hidden h-px w-28 bg-cyan-500/20 sm:block" />
           <ShieldCheck className="h-4 w-4 text-cyan-400" />
           FX TRADE PROFESSIONAL – TRADING Z PROFESJONALISTAMI
-          <span className="h-px w-28 bg-cyan-500/20" />
+          <span className="hidden h-px w-28 bg-cyan-500/20 sm:block" />
         </footer>
       </div>
     </main>
