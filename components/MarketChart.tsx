@@ -1009,6 +1009,17 @@ patternsEnabled = false,
     to: number;
   } | null>(null);
 
+  // Ręczne przesuwanie całego obszaru wykresu w trybie SELECT.
+  // Działa identycznie dla myszy, palca i rysika.
+  const plotPanRef = React.useRef<{
+    pointerId: number;
+    startX: number;
+    from: number;
+    to: number;
+    width: number;
+  } | null>(null);
+  const manualPanRef = React.useRef(false);
+
   const emaSeriesMapRef = React.useRef<Map<number, ISeriesApi<"Line">>>(new Map());
   const bbSeriesRef = React.useRef<{
     upper?: ISeriesApi<"Line">;
@@ -1637,7 +1648,7 @@ patternsEnabled = false,
     if (!chart) return;
     chart.applyOptions({ timeScale: { rightOffset } });
     setOverlayTick((v) => v + 1);
-    if (followOnTick && !detached) {
+    if (followOnTick && !detached && !manualPanRef.current) {
       try {
         chart.timeScale().scrollToRealTime();
       } catch {}
@@ -2094,11 +2105,11 @@ patternsEnabled = false,
         secondsVisible: false,
       },
 handleScroll: {
-  // Desktop: przeciąganie wykresu lewo/prawo myszką.
-  pressedMouseMove: true,
-  // Mobile/tablet: przeciąganie wykresu palcem lewo/prawo.
-  horzTouchDrag: true,
-  vertTouchDrag: true,
+  // Pan lewo/prawo obsługujemy własnym pointer handlerem poniżej.
+  // Wyłączenie natywnego drag usuwa podwójne/przeciwne przesuwanie.
+  pressedMouseMove: false,
+  horzTouchDrag: false,
+  vertTouchDrag: false,
   mouseWheel: true,
 },
 
@@ -2147,7 +2158,7 @@ kineticScroll: {
         const lr = ts.getVisibleLogicalRange?.();
         if (lr && typeof lr.to === "number") {
           const approxLast = ds.length - 1;
-          setDetached(approxLast - lr.to > TH);
+          if (approxLast - lr.to > TH) setDetached(true);
           return;
         }
 
@@ -2155,7 +2166,7 @@ kineticScroll: {
         const last = lastBarTimeRef.current;
         if (vr && last) {
           const maxT = (vr.to as number) ?? 0;
-          setDetached((last as number) - maxT > TH);
+          if ((last as number) - maxT > TH) setDetached(true);
         }
       } catch {}
     };
@@ -2289,7 +2300,7 @@ kineticScroll: {
       try {
         chart.timeScale().fitContent();
       } catch {}
-    } else if (followOnTick && !detached) {
+    } else if (followOnTick && !detached && !manualPanRef.current) {
       try {
         chart.timeScale().scrollToRealTime();
       } catch {}
@@ -2603,7 +2614,7 @@ kineticScroll: {
       const minMove = minMoveFromPrecision(prec);
       applyIndicators(renkoData, prec, minMove);
 
-      if (followOnTick && !detached) {
+      if (followOnTick && !detached && !manualPanRef.current) {
         try {
           chart.timeScale().scrollToRealTime();
         } catch {}
@@ -2622,7 +2633,7 @@ kineticScroll: {
       const minMove = minMoveFromPrecision(prec);
       applyIndicators(ha, prec, minMove);
 
-      if (followOnTick && !detached) {
+      if (followOnTick && !detached && !manualPanRef.current) {
         try {
           chart.timeScale().scrollToRealTime();
         } catch {}
@@ -2641,7 +2652,7 @@ kineticScroll: {
       applyIndicators(ds, prec, minMove);
     }
 
-    if (followOnTick && !detached) {
+    if (followOnTick && !detached && !manualPanRef.current) {
       try {
         chart.timeScale().scrollToRealTime();
       } catch {}
@@ -2957,9 +2968,73 @@ kineticScroll: {
 
     try {
       chart.timeScale().fitContent();
-      setDetached(false);
+      manualPanRef.current = true;
+      setDetached(true);
+      setFollowOnTick(false);
       setOverlayTick((v) => v + 1);
     } catch {}
+  }, []);
+
+  const beginPlotPan = React.useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (activeDrawTool !== "SELECT") return;
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+
+    const chart = chartRef.current;
+    if (!chart) return;
+
+    try {
+      const ts: any = chart.timeScale();
+      const range = ts.getVisibleLogicalRange?.();
+      if (!range || !Number.isFinite(range.from) || !Number.isFinite(range.to)) return;
+
+      manualPanRef.current = true;
+      setFollowOnTick(false);
+      setDetached(true);
+
+      plotPanRef.current = {
+        pointerId: e.pointerId,
+        startX: e.clientX,
+        from: Number(range.from),
+        to: Number(range.to),
+        width: Math.max(1, e.currentTarget.clientWidth),
+      };
+
+      e.currentTarget.setPointerCapture?.(e.pointerId);
+      e.preventDefault();
+      e.stopPropagation();
+    } catch {}
+  }, [activeDrawTool]);
+
+  const movePlotPan = React.useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const state = plotPanRef.current;
+    const chart = chartRef.current;
+    if (!state || !chart || state.pointerId !== e.pointerId) return;
+
+    try {
+      const span = Math.max(1, state.to - state.from);
+      const dx = e.clientX - state.startX;
+      const barsDelta = (dx / state.width) * span;
+
+      // Zawartość wykresu podąża za palcem/myszą:
+      // ruch w prawo -> starsze świece przesuwają się w prawo,
+      // ruch w lewo -> przechodzimy w stronę nowszych świec.
+      (chart.timeScale() as any).setVisibleLogicalRange?.({
+        from: state.from - barsDelta,
+        to: state.to - barsDelta,
+      });
+
+      setOverlayTick((v) => v + 1);
+      e.preventDefault();
+      e.stopPropagation();
+    } catch {}
+  }, []);
+
+  const endPlotPan = React.useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (plotPanRef.current?.pointerId !== e.pointerId) return;
+    plotPanRef.current = null;
+    try { e.currentTarget.releasePointerCapture?.(e.pointerId); } catch {}
+    e.preventDefault();
+    e.stopPropagation();
   }, []);
 
 
@@ -3002,7 +3077,7 @@ kineticScroll: {
                     timeScale: { rightOffset: next ? 28 : 8 },
                   });
                   setOverlayTick((x) => x + 1);
-                  if (followOnTick && !detached) {
+                  if (followOnTick && !detached && !manualPanRef.current) {
                     chartRef.current?.timeScale().scrollToRealTime();
                   }
                 } catch {}
@@ -3076,28 +3151,6 @@ kineticScroll: {
         <div className="relative">
           <div
             ref={containerRef}
-            onPointerDownCapture={(e) => {
-              // SELECT = ręczne przesuwanie wykresu myszką LUB palcem.
-              // Dla dotyku PointerEvent nie zawsze zachowuje się jak klasyczny
-              // lewy przycisk myszy, dlatego sprawdzamy też pointerType === "touch".
-              // Od razu odłączamy FOLLOW, aby live candle nie cofała wykresu
-              // do prawej krawędzi podczas ręcznego przeciągania.
-              if (
-                activeDrawTool === "SELECT" &&
-                (e.pointerType === "touch" || e.pointerType === "pen" || e.button === 0)
-              ) {
-                setDetached(true);
-                setFollowOnTick(false);
-              }
-            }}
-            onTouchStartCapture={() => {
-              // Fallback dla Safari/iOS oraz urządzeń, które nie raportują
-              // PointerEvent w sposób identyczny jak desktop.
-              if (activeDrawTool === "SELECT") {
-                setDetached(true);
-                setFollowOnTick(false);
-              }
-            }}
             style={{
               width: "100%",
               height,
@@ -3107,6 +3160,25 @@ kineticScroll: {
               cursor: activeDrawTool === "SELECT" ? "grab" : "crosshair",
             }}
           />
+
+          {/* Pełny obszar PAN dla SELECT — obsługuje mouse/touch/pen.
+              Osi ceny i czasu nie przykrywamy, bo mają własne uchwyty. */}
+          {activeDrawTool === "SELECT" ? (
+            <div
+              className="absolute left-0 top-0 z-[35]"
+              style={{
+                right: 86,
+                bottom: 30,
+                cursor: plotPanRef.current ? "grabbing" : "grab",
+                touchAction: "none",
+                background: "transparent",
+              }}
+              onPointerDown={beginPlotPan}
+              onPointerMove={movePlotPan}
+              onPointerUp={endPlotPan}
+              onPointerCancel={endPlotPan}
+            />
+          ) : null}
 
           {/* Własny uchwyt PRAWEJ OSI CENY.
               Jest aktywny tylko w SELECT i ma prawdziwy kursor ns-resize. */}

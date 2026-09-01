@@ -2,6 +2,7 @@
 
 import type { DrawTool } from "@/components/DrawingsLayer";
 import React from "react";
+import { createPortal } from "react-dom";
 import { Card, CardContent, Pill, cn, Button } from "@/components/ui";
 import MarketChart, {
   type EmaConfig,
@@ -3278,18 +3279,26 @@ if (closedNow.length) {
 
   <button
     type="button"
+    title="Ustawienia Bollinger Bands"
+    aria-label="Ustawienia Bollinger Bands"
+    aria-expanded={bbPanelOpen}
     onClick={(e) => {
       e.stopPropagation();
       setBbPanelOpen((v) => !v);
     }}
-    className="rounded-full border border-sky-300/15 bg-[#0b315c]/75 px-2 py-2 text-sky-100/70 hover:border-sky-300/30 hover:bg-[#12477f]"
+    className={cn(
+      "rounded-full border px-2 py-2 transition",
+      bbPanelOpen
+        ? "border-fuchsia-300/50 bg-fuchsia-500/20 text-fuchsia-100 shadow-[0_0_16px_rgba(217,70,239,.20)]"
+        : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/70 hover:border-sky-300/30 hover:bg-[#12477f]"
+    )}
   >
     <GearIcon />
   </button>
 
-  {bbPanelOpen ? (
+  {bbPanelOpen && typeof document !== "undefined" ? createPortal(
   <div
-    className="absolute right-0 top-full mt-3 z-[99999] w-[420px] rounded-3xl border border-sky-300/20 bg-[linear-gradient(180deg,#10477f_0%,#0b315c_48%,#082749_100%)] p-5 shadow-[0_24px_60px_rgba(0,0,0,.45),0_0_28px_rgba(14,165,233,.12)]"
+    className="fixed right-3 top-20 z-[999999] max-h-[calc(100dvh-6rem)] w-[calc(100vw-1.5rem)] max-w-[420px] overflow-y-auto rounded-3xl border border-sky-300/20 bg-[linear-gradient(180deg,#10477f_0%,#0b315c_48%,#082749_100%)] p-5 shadow-[0_24px_60px_rgba(0,0,0,.45),0_0_28px_rgba(14,165,233,.12)] sm:right-5 sm:top-24"
     onClick={(e) => e.stopPropagation()}
     onMouseDown={(e) => e.stopPropagation()}
   >
@@ -3478,7 +3487,8 @@ if (closedNow.length) {
         Zapisz
       </button>
     </div>
-  </div>
+  </div>,
+  document.body
 ) : null}
 </div>
                     <button
