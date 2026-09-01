@@ -620,20 +620,19 @@ type CandlePattern = {
 
 function detectCandlePatterns(candles: CandlestickData[]): CandlePattern[] {
   const out: CandlePattern[] = [];
-  if (candles.length < 35) return out;
+  if (candles.length < 30) return out;
 
   const n = (v: any) => toNum(v);
   const body = (c: any) => Math.abs(n(c.close) - n(c.open));
   const range = (c: any) => Math.max(1e-12, n(c.high) - n(c.low));
   const bull = (c: any) => n(c.close) > n(c.open);
   const bear = (c: any) => n(c.close) < n(c.open);
-  const top = (c: any) => Math.max(n(c.open), n(c.close));
-  const bottom = (c: any) => Math.min(n(c.open), n(c.close));
-  const upper = (c: any) => n(c.high) - top(c);
-  const lower = (c: any) => bottom(c) - n(c.low);
-  const mid = (c: any) => (n(c.open) + n(c.close)) / 2;
 
-  const push = (c: any, label: string, side: "BUY" | "SELL") => {
+  const push = (
+    c: any,
+    label: string,
+    side: "BUY" | "SELL"
+  ) => {
     out.push({
       time: c.time as UTCTimestamp,
       label,
@@ -643,30 +642,33 @@ function detectCandlePatterns(candles: CandlestickData[]): CandlePattern[] {
   };
 
   // ============================================================
-  // FX TRADE PRO HYBRID
+  // HH + HL + BREAKOUT
   //
   // BUY:
-  // TREND PASS
-  // + HH/HL STRUCTURE PASS
-  // + LIQUIDITY SWEEP HL PASS
-  // + PRICE ACTION PASS
-  // + MOMENTUM/POTWIERDZENIE PASS
-  // + BREAKOUT HH PASS
-  // = BUY
+  // 1. wykrywamy swing low
+  // 2. potem swing high = HH
+  // 3. kolejny swing low musi być wyżej = HL
+  // 4. poziom wejścia = poprzedni HH
+  // 5. BUY dopiero gdy zamknięta zielona świeca wybije HH
   //
-  // SELL = dokładne odbicie lustrzane:
-  // DOWN + LL/LH + sweep LH + bearish PA + momentum + breakout LL.
+  // SELL:
+  // 1. swing high
+  // 2. potem swing low = LL
+  // 3. kolejny swing high niżej = LH
+  // 4. poziom wejścia = poprzedni LL
+  // 5. SELL po zamknięciu czerwonej świecy poniżej LL
   // ============================================================
 
   const SWING = 3;
-  const MIN_MOMENTUM_BODY = 0.55;
-  const SWEEP_LOOKBACK = 8;
+  const MIN_BODY_RATIO = 0.45;
 
   const isSwingHigh = (idx: number) => {
     if (idx < SWING || idx >= candles.length - SWING) return false;
     const h = n((candles[idx] as any).high);
+
     for (let j = idx - SWING; j <= idx + SWING; j++) {
-      if (j !== idx && n((candles[j] as any).high) >= h) return false;
+      if (j === idx) continue;
+      if (n((candles[j] as any).high) >= h) return false;
     }
     return true;
   };
@@ -674,8 +676,10 @@ function detectCandlePatterns(candles: CandlestickData[]): CandlePattern[] {
   const isSwingLow = (idx: number) => {
     if (idx < SWING || idx >= candles.length - SWING) return false;
     const l = n((candles[idx] as any).low);
+
     for (let j = idx - SWING; j <= idx + SWING; j++) {
-      if (j !== idx && n((candles[j] as any).low) <= l) return false;
+      if (j === idx) continue;
+      if (n((candles[j] as any).low) <= l) return false;
     }
     return true;
   };
@@ -688,310 +692,111 @@ function detectCandlePatterns(candles: CandlestickData[]): CandlePattern[] {
     if (isSwingLow(i)) lows.push(i);
   }
 
-  // PRICE ACTION na końcu korekty.
-  const bullishPAAt = (i: number) => {
-    if (i < 0) return null;
-    const c: any = candles[i];
-
-    // Hammer
-    if (
-      lower(c) >= Math.max(body(c) * 2, range(c) * 0.42) &&
-      upper(c) <= Math.max(body(c) * 0.8, range(c) * 0.18)
-    ) {
-      return { start: i, end: i, label: "HAMMER" };
-    }
-
-    // Bullish Engulfing
-    if (i >= 1) {
-      const p: any = candles[i - 1];
-      if (
-        bear(p) &&
-        bull(c) &&
-        bottom(c) <= bottom(p) &&
-        top(c) >= top(p) &&
-        body(c) >= body(p) * 0.9
-      ) {
-        return { start: i - 1, end: i, label: "BULL ENGULF" };
-      }
-    }
-
-    // Morning Star
-    if (i >= 2) {
-      const a: any = candles[i - 2];
-      const b: any = candles[i - 1];
-      if (
-        bear(a) &&
-        body(a) / range(a) >= 0.50 &&
-        body(b) / range(b) <= 0.38 &&
-        bull(c) &&
-        body(c) / range(c) >= 0.50 &&
-        n(c.close) > mid(a)
-      ) {
-        return { start: i - 2, end: i, label: "MORNING STAR" };
-      }
-    }
-
-    // Bullish Harami
-    if (i >= 1) {
-      const p: any = candles[i - 1];
-      if (
-        bear(p) &&
-        bull(c) &&
-        body(c) < body(p) * 0.65 &&
-        top(c) <= top(p) &&
-        bottom(c) >= bottom(p)
-      ) {
-        return { start: i - 1, end: i, label: "BULL HARAMI" };
-      }
-    }
-
-    return null;
-  };
-
-  const bearishPAAt = (i: number) => {
-    if (i < 0) return null;
-    const c: any = candles[i];
-
-    // Shooting Star
-    if (
-      upper(c) >= Math.max(body(c) * 2, range(c) * 0.42) &&
-      lower(c) <= Math.max(body(c) * 0.8, range(c) * 0.18)
-    ) {
-      return { start: i, end: i, label: "SHOOTING STAR" };
-    }
-
-    // Bearish Engulfing
-    if (i >= 1) {
-      const p: any = candles[i - 1];
-      if (
-        bull(p) &&
-        bear(c) &&
-        bottom(c) <= bottom(p) &&
-        top(c) >= top(p) &&
-        body(c) >= body(p) * 0.9
-      ) {
-        return { start: i - 1, end: i, label: "BEAR ENGULF" };
-      }
-    }
-
-    // Evening Star
-    if (i >= 2) {
-      const a: any = candles[i - 2];
-      const b: any = candles[i - 1];
-      if (
-        bull(a) &&
-        body(a) / range(a) >= 0.50 &&
-        body(b) / range(b) <= 0.38 &&
-        bear(c) &&
-        body(c) / range(c) >= 0.50 &&
-        n(c.close) < mid(a)
-      ) {
-        return { start: i - 2, end: i, label: "EVENING STAR" };
-      }
-    }
-
-    // Bearish Harami
-    if (i >= 1) {
-      const p: any = candles[i - 1];
-      if (
-        bull(p) &&
-        bear(c) &&
-        body(c) < body(p) * 0.65 &&
-        top(c) <= top(p) &&
-        bottom(c) >= bottom(p)
-      ) {
-        return { start: i - 1, end: i, label: "BEAR HARAMI" };
-      }
-    }
-
-    return null;
-  };
-
-  // Liquidity sweep BUY:
-  // knot schodzi poniżej wcześniejszego lokalnego minimum,
-  // ale świeca zamyka się ponownie NAD tym poziomem.
-  const bullishSweepAt = (idx: number) => {
-    if (idx < 2) return false;
-    const c: any = candles[idx];
-    const from = Math.max(0, idx - SWEEP_LOOKBACK);
-    const prev = candles.slice(from, idx) as any[];
-    if (!prev.length) return false;
-
-    const liquidityLow = Math.min(...prev.map((x) => n(x.low)));
-    return n(c.low) < liquidityLow && n(c.close) > liquidityLow;
-  };
-
-  // Liquidity sweep SELL:
-  // knot wybija wcześniejszy lokalny szczyt,
-  // ale świeca zamyka się z powrotem POD nim.
-  const bearishSweepAt = (idx: number) => {
-    if (idx < 2) return false;
-    const c: any = candles[idx];
-    const from = Math.max(0, idx - SWEEP_LOOKBACK);
-    const prev = candles.slice(from, idx) as any[];
-    if (!prev.length) return false;
-
-    const liquidityHigh = Math.max(...prev.map((x) => n(x.high)));
-    return n(c.high) > liquidityHigh && n(c.close) < liquidityHigh;
-  };
-
-  // ============================================================
-  // BUY: HH -> HL -> sweep -> PA -> momentum -> breakout HH
-  // ============================================================
-  for (let h = 1; h < highs.length; h++) {
+  // ========================= BUY =========================
+  // Szukamy sekwencji:
+  // LOW -> HH -> HL -> breakout HH
+  for (let h = 0; h < highs.length; h++) {
     const hhIdx = highs[h];
-    const previousHighIdx = highs[h - 1];
 
-    const hh = n((candles[hhIdx] as any).high);
-    const previousHigh = n((candles[previousHighIdx] as any).high);
+    const prevLowIdx = [...lows]
+      .filter((i) => i < hhIdx)
+      .pop();
 
-    // STRUCTURE/TREND PASS: Higher High.
-    if (hh <= previousHigh) continue;
-
-    const previousLowIdx = [...lows].filter((i) => i < hhIdx).pop();
     const hlIdx = lows.find((i) => i > hhIdx);
-    if (previousLowIdx == null || hlIdx == null) continue;
 
-    const previousLow = n((candles[previousLowIdx] as any).low);
+    if (prevLowIdx == null || hlIdx == null) continue;
+
+    const prevLow = n((candles[prevLowIdx] as any).low);
+    const hh = n((candles[hhIdx] as any).high);
     const hl = n((candles[hlIdx] as any).low);
 
-    // STRUCTURE/TREND PASS: Higher Low.
-    if (hl <= previousLow) continue;
+    // HL musi być wyżej niż poprzedni swing low.
+    if (!(hl > prevLow)) continue;
 
-    // Szukamy PA w strefie HL: od 2 świec przed HL do 4 po HL.
-    const paFrom = Math.max(hhIdx + 1, hlIdx - 2);
-    const paTo = Math.min(candles.length - 2, hlIdx + 4);
+    // HH powinien być wyżej niż wcześniejszy swing high.
+    const previousHighIdx = [...highs]
+      .filter((i) => i < hhIdx)
+      .pop();
 
-    for (let paIdx = paFrom; paIdx <= paTo; paIdx++) {
-      const pa = bullishPAAt(paIdx);
-      if (!pa) continue;
+    if (previousHighIdx != null) {
+      const previousHigh = n((candles[previousHighIdx] as any).high);
+      if (!(hh > previousHigh)) continue;
+    }
 
-      // LIQUIDITY PASS:
-      // sweep może być na jednej ze świec samej formacji lub bezpośrednio przed nią.
-      let sweepPass = false;
-      for (let s = Math.max(hhIdx + 1, pa.start - 1); s <= pa.end; s++) {
-        if (bullishSweepAt(s)) {
-          sweepPass = true;
-          break;
-        }
+    // Po HL szukamy wybicia HH świecą zamkniętą.
+    for (let i = hlIdx + 1; i < candles.length; i++) {
+      const c: any = candles[i];
+
+      // Jeśli przed wybiciem cena zaneguje HL, setup anulowany.
+      if (n(c.low) < hl) break;
+
+      const bodyRatio = body(c) / range(c);
+
+      const breakout =
+        bull(c) &&
+        bodyRatio >= MIN_BODY_RATIO &&
+        n(c.close) > hh;
+
+      if (breakout) {
+        push(c, "BUY", "BUY");
+        break;
       }
-      if (!sweepPass) continue;
-
-      const formation = candles.slice(pa.start, pa.end + 1) as any[];
-      const formationHigh = Math.max(...formation.map((c) => n(c.high)));
-
-      // Następna świeca = POTWIERDZENIE/MOMENTUM.
-      const confirmIdx = pa.end + 1;
-      if (confirmIdx >= candles.length) continue;
-      const confirm: any = candles[confirmIdx];
-
-      const momentumPass =
-        bull(confirm) &&
-        body(confirm) / range(confirm) >= MIN_MOMENTUM_BODY &&
-        n(confirm.close) > formationHigh;
-
-      if (!momentumPass) continue;
-
-      // BREAKOUT HH może nastąpić na świecy momentum albo kilka świec później.
-      for (let i = confirmIdx; i < candles.length; i++) {
-        const c: any = candles[i];
-
-        // Setup zanegowany przed breakoutem.
-        if (n(c.close) < hl) break;
-
-        const breakoutPass =
-          bull(c) &&
-          body(c) / range(c) >= 0.45 &&
-          n(c.close) > hh;
-
-        if (breakoutPass) {
-          push(c, "BUY", "BUY");
-          break;
-        }
-
-        // Nie czekamy bez końca na stare setupy.
-        if (i - confirmIdx >= 8) break;
-      }
-
-      break;
     }
   }
 
-  // ============================================================
-  // SELL: LL -> LH -> sweep -> PA -> momentum -> breakout LL
-  // ============================================================
-  for (let l = 1; l < lows.length; l++) {
+  // ========================= SELL =========================
+  // Szukamy sekwencji:
+  // HIGH -> LL -> LH -> breakout LL
+  for (let l = 0; l < lows.length; l++) {
     const llIdx = lows[l];
-    const previousLowIdx = lows[l - 1];
 
-    const ll = n((candles[llIdx] as any).low);
-    const previousLow = n((candles[previousLowIdx] as any).low);
+    const prevHighIdx = [...highs]
+      .filter((i) => i < llIdx)
+      .pop();
 
-    // STRUCTURE/TREND PASS: Lower Low.
-    if (ll >= previousLow) continue;
-
-    const previousHighIdx = [...highs].filter((i) => i < llIdx).pop();
     const lhIdx = highs.find((i) => i > llIdx);
-    if (previousHighIdx == null || lhIdx == null) continue;
 
-    const previousHigh = n((candles[previousHighIdx] as any).high);
+    if (prevHighIdx == null || lhIdx == null) continue;
+
+    const prevHigh = n((candles[prevHighIdx] as any).high);
+    const ll = n((candles[llIdx] as any).low);
     const lh = n((candles[lhIdx] as any).high);
 
-    // STRUCTURE/TREND PASS: Lower High.
-    if (lh >= previousHigh) continue;
+    // LH musi być niżej niż poprzedni swing high.
+    if (!(lh < prevHigh)) continue;
 
-    const paFrom = Math.max(llIdx + 1, lhIdx - 2);
-    const paTo = Math.min(candles.length - 2, lhIdx + 4);
+    // LL powinien być niżej niż wcześniejszy swing low.
+    const previousLowIdx = [...lows]
+      .filter((i) => i < llIdx)
+      .pop();
 
-    for (let paIdx = paFrom; paIdx <= paTo; paIdx++) {
-      const pa = bearishPAAt(paIdx);
-      if (!pa) continue;
+    if (previousLowIdx != null) {
+      const previousLow = n((candles[previousLowIdx] as any).low);
+      if (!(ll < previousLow)) continue;
+    }
 
-      let sweepPass = false;
-      for (let s = Math.max(llIdx + 1, pa.start - 1); s <= pa.end; s++) {
-        if (bearishSweepAt(s)) {
-          sweepPass = true;
-          break;
-        }
+    // Po LH szukamy wybicia LL świecą zamkniętą.
+    for (let i = lhIdx + 1; i < candles.length; i++) {
+      const c: any = candles[i];
+
+      // Jeśli przed wybiciem cena zaneguje LH, setup anulowany.
+      if (n(c.high) > lh) break;
+
+      const bodyRatio = body(c) / range(c);
+
+      const breakout =
+        bear(c) &&
+        bodyRatio >= MIN_BODY_RATIO &&
+        n(c.close) < ll;
+
+      if (breakout) {
+        push(c, "SELL", "SELL");
+        break;
       }
-      if (!sweepPass) continue;
-
-      const formation = candles.slice(pa.start, pa.end + 1) as any[];
-      const formationLow = Math.min(...formation.map((c) => n(c.low)));
-
-      const confirmIdx = pa.end + 1;
-      if (confirmIdx >= candles.length) continue;
-      const confirm: any = candles[confirmIdx];
-
-      const momentumPass =
-        bear(confirm) &&
-        body(confirm) / range(confirm) >= MIN_MOMENTUM_BODY &&
-        n(confirm.close) < formationLow;
-
-      if (!momentumPass) continue;
-
-      for (let i = confirmIdx; i < candles.length; i++) {
-        const c: any = candles[i];
-
-        if (n(c.close) > lh) break;
-
-        const breakoutPass =
-          bear(c) &&
-          body(c) / range(c) >= 0.45 &&
-          n(c.close) < ll;
-
-        if (breakoutPass) {
-          push(c, "SELL", "SELL");
-          break;
-        }
-
-        if (i - confirmIdx >= 8) break;
-      }
-
-      break;
     }
   }
 
+  // Bez duplikatów, maksymalnie 40 najnowszych sygnałów.
   const unique = Array.from(
     new Map(
       out.map((p) => [
@@ -1003,6 +808,86 @@ function detectCandlePatterns(candles: CandlestickData[]): CandlePattern[] {
 
   return unique.slice(-40);
 }
+
+/* =========================
+   RENKO FORMATIONS
+   BUY  = minimum 2 czerwone cegły -> minimum 2 zielone cegły
+   SELL = minimum 2 zielone cegły -> minimum 2 czerwone cegły
+
+   Sygnałem jest DRUGA cegła potwierdzająca zmianę kierunku.
+   To właśnie ona jest zaznaczana na żółto.
+========================= */
+function detectRenkoPatterns(candles: CandlestickData[]): CandlePattern[] {
+  const out: CandlePattern[] = [];
+  if (candles.length < 4) return out;
+
+  const n = (v: any) => toNum(v);
+  const bull = (c: any) => n(c.close) > n(c.open);
+  const bear = (c: any) => n(c.close) < n(c.open);
+
+  for (let i = 3; i < candles.length; i++) {
+    const a: any = candles[i - 3];
+    const b: any = candles[i - 2];
+    const c: any = candles[i - 1];
+    const d: any = candles[i];
+
+    // BUY: dwie czerwone cegły korekty + dwie zielone cegły potwierdzenia.
+    if (bear(a) && bear(b) && bull(c) && bull(d)) {
+      out.push({
+        time: d.time as UTCTimestamp,
+        label: "BUY",
+        side: "BUY",
+        price: n(d.low),
+      });
+      continue;
+    }
+
+    // SELL: dwie zielone cegły wzrostowe + dwie czerwone cegły potwierdzenia.
+    if (bull(a) && bull(b) && bear(c) && bear(d)) {
+      out.push({
+        time: d.time as UTCTimestamp,
+        label: "SELL",
+        side: "SELL",
+        price: n(d.low),
+      });
+    }
+  }
+
+  const unique = Array.from(
+    new Map(
+      out.map((p) => [
+        `${Number(p.time)}-${p.side}`,
+        p,
+      ])
+    ).values()
+  ).sort((a, b) => Number(a.time) - Number(b.time));
+
+  return unique.slice(-40);
+}
+
+/* =========================
+   RENKO PATTERN HIGHLIGHT
+========================= */
+function highlightRenkoPatternBricks(candles: CandlestickData[]) {
+  if (!candles.length) return candles;
+
+  const signals = detectRenkoPatterns(candles);
+  if (!signals.length) return candles;
+
+  const signalTimes = new Set(signals.map((s) => Number(s.time)));
+
+  return candles.map((c) => {
+    if (!signalTimes.has(Number(c.time))) return c;
+
+    return {
+      ...c,
+      color: "#facc15",
+      borderColor: "#fde047",
+      wickColor: "#facc15",
+    } as CandlestickData;
+  });
+}
+
 /* =========================
    TRADE HELPERS
 ========================= */
@@ -1110,6 +995,20 @@ patternsEnabled = false,
   const chartRef = React.useRef<IChartApi | null>(null);
   const candleSeriesRef = React.useRef<ISeriesApi<"Candlestick"> | null>(null);
 
+  // Własne uchwyty osi — gwarantują skalowanie nawet wtedy,
+  // gdy natywny hit-test osi Lightweight Charts jest przykryty przez layout.
+  const priceAxisDragRef = React.useRef<{
+    startY: number;
+    minValue: number;
+    maxValue: number;
+  } | null>(null);
+
+  const timeAxisDragRef = React.useRef<{
+    startX: number;
+    from: number;
+    to: number;
+  } | null>(null);
+
   const emaSeriesMapRef = React.useRef<Map<number, ISeriesApi<"Line">>>(new Map());
   const bbSeriesRef = React.useRef<{
     upper?: ISeriesApi<"Line">;
@@ -1170,7 +1069,7 @@ patternsEnabled = false,
   const rightOffset = rightPadOn ? 28 : 8;
 
   const patternLabels = React.useMemo(() => {
-    if (!patternsEnabled || renko) return [] as Array<{
+    if (!patternsEnabled) return [] as Array<{
       key: string;
       x: number;
       y: number;
@@ -1184,16 +1083,33 @@ patternsEnabled = false,
     if (!chart || !candleSeries || !safe?.length) return [];
 
     try {
-      return detectCandlePatterns(safe).flatMap((p, idx) => {
+      const detectedPatterns = renko
+        ? detectRenkoPatterns(safe)
+        : detectCandlePatterns(safe);
+
+      return detectedPatterns.flatMap((p, idx) => {
         const x = chart.timeScale().timeToCoordinate(p.time);
-        const y0 = candleSeries.priceToCoordinate(p.price);
+        const signalCandle = safe.find(
+          (c) => Number(c.time) === Number(p.time)
+        ) as any;
+
+        // W RENKO etykieta BUY / SELL ma być POD wykrytą cegłą.
+        const labelPrice = renko
+          ? toNum(signalCandle?.low ?? p.price)
+          : p.price;
+
+        const y0 = candleSeries.priceToCoordinate(labelPrice);
         if (x == null || y0 == null) return [];
-        const y = Number(y0) + (p.side === "SELL" ? -26 : 14);
+
+        const y = renko
+          ? Number(y0) + 12
+          : Number(y0) + (p.side === "SELL" ? -26 : 14);
+
         return [{
           key: `${Number(p.time)}-${p.label}-${idx}`,
           x: Number(x),
           y,
-          label: p.label,
+          label: renko ? p.side : p.label,
           side: p.side,
         }];
       });
@@ -2134,7 +2050,7 @@ patternsEnabled = false,
       rightPriceScale: {
         visible: true,
         borderVisible: true,
-        borderColor: "rgba(148,163,184,0.32)",
+        borderColor: "rgba(148,163,184,0.38)",
         entireTextOnly: false,
         scaleMargins: {
           top: 0.08,
@@ -2143,7 +2059,7 @@ patternsEnabled = false,
       },
       timeScale: {
         borderVisible: true,
-        borderColor: "rgba(148,163,184,0.32)",
+        borderColor: "rgba(148,163,184,0.38)",
         rightOffset,
         barSpacing: 10,
         minBarSpacing: 2,
@@ -2328,7 +2244,13 @@ kineticScroll: {
     }
 
     displayCacheRef.current = safeForChart;
-    candleSeries.setData(safeForChart);
+
+    const chartData =
+      renko && patternsEnabled
+        ? highlightRenkoPatternBricks(safeForChart)
+        : safeForChart;
+
+    candleSeries.setData(chartData);
 
     lastBarTimeRef.current = safeForChart.length
       ? (safeForChart[safeForChart.length - 1].time as UTCTimestamp)
@@ -2612,7 +2534,13 @@ kineticScroll: {
           : autoRenkoBoxSize(renkoRaw);
       const renkoData = toRenkoCandles(renkoRaw, box);
       displayCacheRef.current = renkoData;
-      candleSeries.setData(renkoData);
+
+      const renkoChartData =
+        patternsEnabled
+          ? highlightRenkoPatternBricks(renkoData)
+          : renkoData;
+
+      candleSeries.setData(renkoChartData);
       lastBarTimeRef.current = renkoData[renkoData.length - 1]?.time as UTCTimestamp;
 
       const lastClose = toNum((renkoData[renkoData.length - 1] as any)?.close);
@@ -2672,6 +2600,7 @@ kineticScroll: {
     currentRenkoBox,
     followOnTick,
     detached,
+    patternsEnabled,
     applyIndicators,
     pricePrecision,
   ]);
@@ -2756,6 +2685,229 @@ kineticScroll: {
   const qualityLabel =
     rrValue !== undefined ? (rrValue >= 3 ? "STRONG" : rrValue >= 2 ? "GOOD" : "NORMAL") : "GOOD";
 
+  const beginPriceAxisDrag = React.useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (activeDrawTool !== "SELECT") return;
+
+      const chart = chartRef.current;
+      const candleSeries = candleSeriesRef.current;
+      const safe = displayCacheRef.current;
+
+      if (!chart || !candleSeries || !safe?.length) return;
+
+      try {
+        // Bierzemy tylko świece aktualnie widoczne na ekranie.
+        const logical = (chart.timeScale() as any).getVisibleLogicalRange?.();
+
+        let fromIdx = 0;
+        let toIdx = safe.length - 1;
+
+        if (logical) {
+          fromIdx = Math.max(0, Math.floor(Number(logical.from ?? 0)));
+          toIdx = Math.min(
+            safe.length - 1,
+            Math.ceil(Number(logical.to ?? safe.length - 1))
+          );
+        }
+
+        const visible = safe.slice(fromIdx, toIdx + 1);
+        const source = visible.length ? visible : safe;
+
+        const lows = source
+          .map((c: any) => Number(c.low))
+          .filter(Number.isFinite);
+
+        const highs = source
+          .map((c: any) => Number(c.high))
+          .filter(Number.isFinite);
+
+        if (!lows.length || !highs.length) return;
+
+        const minValue = Math.min(...lows);
+        const maxValue = Math.max(...highs);
+
+        if (!Number.isFinite(minValue) || !Number.isFinite(maxValue)) return;
+        if (maxValue <= minValue) return;
+
+        priceAxisDragRef.current = {
+          startY: e.clientY,
+          minValue,
+          maxValue,
+        };
+
+        e.currentTarget.setPointerCapture?.(e.pointerId);
+        e.preventDefault();
+        e.stopPropagation();
+      } catch {}
+    },
+    [activeDrawTool]
+  );
+
+  const movePriceAxisDrag = React.useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const state = priceAxisDragRef.current;
+      const chart = chartRef.current;
+      const candleSeries = candleSeriesRef.current;
+
+      if (!state || !chart || !candleSeries) return;
+
+      try {
+        const dy = e.clientY - state.startY;
+
+        const center = (state.minValue + state.maxValue) / 2;
+        const initialSpan = Math.max(
+          1e-12,
+          state.maxValue - state.minValue
+        );
+
+        // Ruch w dół = większy zakres cen.
+        // Ruch w górę = mniejszy zakres cen.
+        const factor = Math.exp(dy * 0.008);
+        const span = initialSpan * factor;
+
+        const minValue = center - span / 2;
+        const maxValue = center + span / 2;
+
+        // Lightweight Charts nie udostępnia publicznego setVisibleRange()
+        // dla priceScale. Dlatego wymuszamy zakres przez autoscaleInfoProvider
+        // na głównej serii świec.
+        candleSeries.applyOptions({
+          autoscaleInfoProvider: (() => ({
+            priceRange: {
+              minValue,
+              maxValue,
+            },
+            margins: {
+              above: 0,
+              below: 0,
+            },
+          })) as any,
+        } as any);
+
+        chart.priceScale("right").applyOptions({
+          autoScale: true,
+        });
+
+        setOverlayTick((v) => v + 1);
+
+        e.preventDefault();
+        e.stopPropagation();
+      } catch {}
+    },
+    []
+  );
+
+  const endPriceAxisDrag = React.useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      priceAxisDragRef.current = null;
+
+      try {
+        e.currentTarget.releasePointerCapture?.(e.pointerId);
+      } catch {}
+    },
+    []
+  );
+
+  const resetPriceAxis = React.useCallback(() => {
+    const chart = chartRef.current;
+    const candleSeries = candleSeriesRef.current;
+
+    if (!chart || !candleSeries) return;
+
+    try {
+      // Przywracamy normalny autoscale Lightweight Charts.
+      candleSeries.applyOptions({
+        autoscaleInfoProvider: undefined,
+      } as any);
+
+      chart.priceScale("right").applyOptions({
+        autoScale: true,
+      });
+
+      setOverlayTick((v) => v + 1);
+    } catch {}
+  }, []);
+
+  const beginTimeAxisDrag = React.useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (activeDrawTool !== "SELECT") return;
+
+      const chart = chartRef.current;
+      if (!chart) return;
+
+      try {
+        const ts: any = chart.timeScale();
+        const range = ts.getVisibleLogicalRange?.();
+        if (!range || !Number.isFinite(range.from) || !Number.isFinite(range.to)) {
+          return;
+        }
+
+        timeAxisDragRef.current = {
+          startX: e.clientX,
+          from: Number(range.from),
+          to: Number(range.to),
+        };
+
+        setDetached(true);
+        e.currentTarget.setPointerCapture?.(e.pointerId);
+        e.preventDefault();
+        e.stopPropagation();
+      } catch {}
+    },
+    [activeDrawTool]
+  );
+
+  const moveTimeAxisDrag = React.useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const state = timeAxisDragRef.current;
+      const chart = chartRef.current;
+      if (!state || !chart) return;
+
+      try {
+        const dx = e.clientX - state.startX;
+        const center = (state.from + state.to) / 2;
+        const initialSpan = Math.max(2, state.to - state.from);
+
+        // W prawo = rozszerz oś czasu, w lewo = zawęź.
+        const factor = Math.exp(dx * 0.006);
+        const span = Math.max(2, initialSpan * factor);
+
+        const ts: any = chart.timeScale();
+        ts.setVisibleLogicalRange?.({
+          from: center - span / 2,
+          to: center + span / 2,
+        });
+
+        setOverlayTick((v) => v + 1);
+        e.preventDefault();
+        e.stopPropagation();
+      } catch {}
+    },
+    []
+  );
+
+  const endTimeAxisDrag = React.useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      timeAxisDragRef.current = null;
+      try {
+        e.currentTarget.releasePointerCapture?.(e.pointerId);
+      } catch {}
+    },
+    []
+  );
+
+  const resetTimeAxis = React.useCallback(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+
+    try {
+      chart.timeScale().fitContent();
+      setDetached(false);
+      setOverlayTick((v) => v + 1);
+    } catch {}
+  }, []);
+
+
   return (
     <div
       className={
@@ -2813,7 +2965,7 @@ kineticScroll: {
           </button>
         </div>
 
-        <div className="pointer-events-none absolute left-2 top-12 z-[31] hidden rounded-xl border border-white/10 bg-black/45 px-2 py-1.5 text-[9px] text-white/70 backdrop-blur min-[420px]:block sm:left-3 sm:top-14 sm:text-[10px] xl:top-16 xl:rounded-2xl xl:px-3 xl:py-2 xl:text-[11px]">
+        <div className="pointer-events-none absolute left-3 top-16 z-[31] rounded-2xl border border-white/10 bg-black/50 px-3 py-2 text-[11px] text-white/80 backdrop-blur">
           <div>
             <span className="text-slate-400">FREEZE:</span> {freezeDebug.frozen ? "YES" : "NO"}
           </div>
@@ -2872,17 +3024,64 @@ kineticScroll: {
             style={{
               width: "100%",
               height,
-              cursor: activeDrawTool === "SELECT" ? "grab" : "crosshair",
               touchAction: "none",
+              userSelect: "none",
+              WebkitUserSelect: "none",
             }}
           />
+
+          {/* Własny uchwyt PRAWEJ OSI CENY.
+              Jest aktywny tylko w SELECT i ma prawdziwy kursor ns-resize. */}
+          {activeDrawTool === "SELECT" ? (
+            <div
+              className="absolute right-0 top-0 z-[45]"
+              style={{
+                width: 86,
+                bottom: 30,
+                cursor: "ns-resize",
+                touchAction: "none",
+                background: "transparent",
+              }}
+              onPointerDown={beginPriceAxisDrag}
+              onPointerMove={movePriceAxisDrag}
+              onPointerUp={endPriceAxisDrag}
+              onPointerCancel={endPriceAxisDrag}
+              onDoubleClick={resetPriceAxis}
+              title="Przeciągnij góra/dół, aby skalować cenę"
+            />
+          ) : null}
+
+          {/* Własny uchwyt DOLNEJ OSI CZASU.
+              Ostatnie 72 px zostawiamy osi ceny. */}
+          {activeDrawTool === "SELECT" ? (
+            <div
+              className="absolute bottom-0 left-0 z-[45]"
+              style={{
+                height: 30,
+                right: 86,
+                cursor: "ew-resize",
+                touchAction: "none",
+                background: "transparent",
+              }}
+              onPointerDown={beginTimeAxisDrag}
+              onPointerMove={moveTimeAxisDrag}
+              onPointerUp={endTimeAxisDrag}
+              onPointerCancel={endTimeAxisDrag}
+              onDoubleClick={resetTimeAxis}
+              title="Przeciągnij lewo/prawo, aby skalować czas"
+            />
+          ) : null}
 
           {patternsEnabled && patternLabels.length ? (
             <div className="pointer-events-none absolute inset-0 z-[18] overflow-hidden">
               {patternLabels.map((p) => (
                 <div
                   key={p.key}
-                  className="absolute -translate-x-1/2 whitespace-nowrap rounded-md border border-yellow-300/70 bg-yellow-400/95 px-1.5 py-0.5 text-[9px] font-black tracking-[0.03em] text-slate-950 shadow-[0_0_10px_rgba(250,204,21,.35)]"
+                  className={`absolute -translate-x-1/2 whitespace-nowrap border font-black text-slate-950 shadow-[0_0_10px_rgba(250,204,21,.35)] ${
+                    renko
+                      ? "rounded px-1.5 py-0.5 text-[9px] border-yellow-200 bg-yellow-400"
+                      : "rounded-md px-1.5 py-0.5 text-[9px] tracking-[0.03em] border-yellow-300/70 bg-yellow-400/95"
+                  }`}
                   style={{ left: p.x, top: p.y }}
                 >
                   {p.label}
@@ -2962,6 +3161,9 @@ kineticScroll: {
             className={`absolute inset-0 z-[20] ${
               activeDrawTool === "SELECT" ? "pointer-events-none" : "pointer-events-auto"
             }`}
+            style={{
+              cursor: activeDrawTool === "SELECT" ? undefined : "crosshair",
+            }}
           >
             <DrawingsLayer
               wrapRef={containerRef}
@@ -3187,7 +3389,6 @@ kineticScroll: {
     </div>
   );
 }
-
 
 
 

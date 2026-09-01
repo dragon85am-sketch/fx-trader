@@ -105,7 +105,7 @@ type Row = {
   hammerTime?: UTCTimestamp;
   signalCandleTime?: UTCTimestamp;
   signalPattern?: CandlePattern;
-  confirmationCount?: 0 | 1 | 2 | 3;
+  confirmationCount?: 0 | 1 | 2 | 3 | 4;
   confirmationSide?: Side | null;
   higherTfSignal?: Signal;
   tp1Hit?: boolean;
@@ -789,115 +789,121 @@ function isBearishPatternAt(candles: Candle[], idx: number): CandlePattern | nul
   return null;
 }
 
-function countConfirmations(params: {
-  side: Side;
-  liquidity: number;
-  candles: Candle[];
-}): {
-  count: 0 | 1 | 2 | 3;
-  pattern: CandlePattern | "NONE";
-} {
-  const { side, liquidity, candles } = params;
+function hasRecentDirectionalSweep(candles: Candle[], side: Side, lookback = 4) {
+  if (candles.length < 3) return false;
 
-  let count = 0;
-  let pattern: CandlePattern | "NONE" = "NONE";
+  const lastClosedIdx = Math.max(0, candles.length - 2);
+  const from = Math.max(2, lastClosedIdx - lookback + 1);
 
-  if (side === "BUY") {
-    if (liquidity >= 70) count += 1;
-
-    if (candles.length >= 5) {
-      const patternIdx = candles.length - 4;
-
-      const p = isBullishPatternAt(
-        candles,
-        patternIdx
-      );
-
-      const confirmCandle =
-        candles[patternIdx + 1];
-
-      if (
-        p &&
-        confirmCandle &&
-        isNearRecentLow(candles, patternIdx, 8) &&
-        isInPullbackBuyZone(
-          candles,
-          patternIdx
-        ) &&
-        hasBullishLiquiditySweep(
-          candles,
-          patternIdx
-        ) &&
-        hasMomentumCandle(
-          confirmCandle,
-          "BUY"
-        )
-      ) {
-        count += 2;
-        pattern = p;
-      }
-    }
-  } else {
-    if (liquidity <= 30) count += 1;
-
-    if (candles.length >= 5) {
-      const patternIdx = candles.length - 4;
-
-      const p = isBearishPatternAt(
-        candles,
-        patternIdx
-      );
-
-      const confirmCandle =
-        candles[patternIdx + 1];
-
-      if (
-        p &&
-        confirmCandle &&
-        isNearRecentHigh(candles, patternIdx, 8) &&
-        isInPullbackSellZone(
-          candles,
-          patternIdx
-        ) &&
-        hasBearishLiquiditySweep(
-          candles,
-          patternIdx
-        ) &&
-        hasMomentumCandle(
-          confirmCandle,
-          "SELL"
-        )
-      ) {
-        count += 2;
-        pattern = p;
-      }
-    }
+  for (let idx = from; idx <= lastClosedIdx; idx++) {
+    if (side === "BUY" && hasBullishLiquiditySweep(candles, idx)) return true;
+    if (side === "SELL" && hasBearishLiquiditySweep(candles, idx)) return true;
   }
 
-  return {
-    count: Math.min(count, 3) as
-      | 0
-      | 1
-      | 2
-      | 3,
-    pattern,
-  };
+  return false;
 }
-function getBestConfirmation(params: {
-  liquidity: number;
+
+function hasRecentDirectionalMomentum(candles: Candle[], side: Side, lookback = 3) {
+  if (!candles.length) return false;
+
+  const lastClosedIdx = Math.max(0, candles.length - 2);
+  const from = Math.max(0, lastClosedIdx - lookback + 1);
+
+  for (let idx = from; idx <= lastClosedIdx; idx++) {
+    const candle = candles[idx];
+    if (candle && hasMomentumCandle(candle, side)) return true;
+  }
+
+  return false;
+}
+
+function getRecentPattern(candles: Candle[], side: Side, lookback = 5): CandlePattern | "NONE" {
+  if (candles.length < 3) return "NONE";
+
+  const lastClosedIdx = Math.max(2, candles.length - 2);
+  const from = Math.max(2, lastClosedIdx - lookback + 1);
+
+  for (let idx = lastClosedIdx; idx >= from; idx--) {
+    const pattern =
+      side === "BUY"
+        ? isBullishPatternAt(candles, idx)
+        : isBearishPatternAt(candles, idx);
+
+    if (pattern) return pattern;
+  }
+
+  return "NONE";
+}
+
+function getDirectionalConfirmations(params: {
+  side: Side;
   candles: Candle[];
+  emaWmaSignal: Signal;
+  supertrendSignal: Signal;
 }): {
-  side: Side | null;
-  count: 0 | 1 | 2 | 3;
+  count: 0 | 1 | 2 | 3 | 4;
   pattern: CandlePattern | "NONE";
 } {
-  const { liquidity, candles } = params;
-  const buy = countConfirmations({ side: "BUY", liquidity, candles });
-  const sell = countConfirmations({ side: "SELL", liquidity, candles });
+  const { side, candles, emaWmaSignal, supertrendSignal } = params;
+  const wanted: Signal = side === "BUY" ? "UP" : "DOWN";
 
-  if (buy.count === 0 && sell.count === 0) return { side: null, count: 0, pattern: "NONE" };
-  if (buy.count > sell.count) return { side: "BUY", count: buy.count, pattern: buy.pattern };
-  if (sell.count > buy.count) return { side: "SELL", count: sell.count, pattern: sell.pattern };
+  let count = 0;
+
+  // 1/4 — kierunek EMA14 + WMA40.
+  if (emaWmaSignal === wanted) count += 1;
+
+  // 2/4 — niezależne potwierdzenie SuperTrend.
+  if (supertrendSignal === wanted) count += 1;
+
+  // 3/4 — kierunkowy liquidity sweep z ostatnich zamkniętych świec.
+  if (hasRecentDirectionalSweep(candles, side, 4)) count += 1;
+
+  // 4/4 — kierunkowe momentum z ostatnich zamkniętych świec.
+  if (hasRecentDirectionalMomentum(candles, side, 3)) count += 1;
+
+  return {
+    count: Math.min(count, 4) as 0 | 1 | 2 | 3 | 4,
+    // Price Action zostaje jako dodatkowa informacja/etykieta setupu.
+    pattern: getRecentPattern(candles, side, 5),
+  };
+}
+
+function getBestConfirmation(params: {
+  candles: Candle[];
+  emaWmaSignal: Signal;
+  supertrendSignal: Signal;
+}): {
+  side: Side | null;
+  count: 0 | 1 | 2 | 3 | 4;
+  pattern: CandlePattern | "NONE";
+} {
+  const { candles, emaWmaSignal, supertrendSignal } = params;
+
+  const buy = getDirectionalConfirmations({
+    side: "BUY",
+    candles,
+    emaWmaSignal,
+    supertrendSignal,
+  });
+
+  const sell = getDirectionalConfirmations({
+    side: "SELL",
+    candles,
+    emaWmaSignal,
+    supertrendSignal,
+  });
+
+  if (buy.count === 0 && sell.count === 0) {
+    return { side: null, count: 0, pattern: "NONE" };
+  }
+
+  if (buy.count > sell.count) {
+    return { side: "BUY", count: buy.count, pattern: buy.pattern };
+  }
+
+  if (sell.count > buy.count) {
+    return { side: "SELL", count: sell.count, pattern: sell.pattern };
+  }
 
   return { side: null, count: 0, pattern: "NONE" };
 }
@@ -1365,16 +1371,49 @@ function getPocSummary(cells: PocCell[]) {
   return { label, strength, net };
 }
 
+const LIQ_THRESHOLD_HIGH = 70;
+
 function PocMiniScanner({
   state,
+  confirmationCount,
+  confirmationSide,
+  liquidity,
 }: {
   state: PocScannerState;
+  confirmationCount: 0 | 1 | 2 | 3 | 4;
+  confirmationSide: Side | null;
+  liquidity: number;
 }) {
   const summary = getPocSummary(state.cells);
   const bullish = summary.net > 0;
   const bearish = summary.net < 0;
+  const activityReady = liquidity >= LIQ_THRESHOLD_HIGH;
+  const waitLiquidity =
+    confirmationCount === 4 &&
+    !!confirmationSide &&
+    !activityReady;
 
-  const resultLabel = state.loading ? "LOADING" : summary.label;
+  const premiumStrongBuy =
+    activityReady &&
+    confirmationCount === 4 &&
+    confirmationSide === "BUY" &&
+    summary.label === "STRONG BUY";
+
+  const premiumStrongSell =
+    activityReady &&
+    confirmationCount === 4 &&
+    confirmationSide === "SELL" &&
+    summary.label === "STRONG SELL";
+
+  const resultLabel = state.loading
+    ? "LOADING"
+    : waitLiquidity
+      ? `WAIT LIQUIDITY ${Math.round(liquidity)}%`
+      : premiumStrongBuy
+        ? "PREMIUM STRONG BUY"
+        : premiumStrongSell
+          ? "PREMIUM STRONG SELL"
+          : summary.label;
 
   return (
     <div className="w-[860px] min-w-[720px] max-w-none self-start overflow-hidden rounded-[18px] sm:rounded-[22px] border border-sky-300/35 bg-[linear-gradient(180deg,#174f86_0%,#123f6d_48%,#0d335a_100%)] shadow-[0_14px_35px_rgba(0,0,0,.22),0_0_28px_rgba(14,165,233,.08),inset_0_1px_0_rgba(255,255,255,.08)]">
@@ -1593,19 +1632,21 @@ function SignalDot({ s }: { s: Signal }) {
   return <span className={cn("inline-block h-3 w-3 rounded-full", cls)} />;
 }
 
-function ConfirmationBadge({ count, side }: { count: 0 | 1 | 2 | 3; side: Side | null }) {
+function ConfirmationBadge({ count, side }: { count: 0 | 1 | 2 | 3 | 4; side: Side | null }) {
   const cls =
-    count === 3
+    count === 4
       ? side === "BUY"
         ? "border-emerald-400/30 bg-emerald-500/15 text-emerald-200"
         : "border-red-400/30 bg-red-500/15 text-red-200"
-      : count === 2
+      : count === 3
         ? "border-amber-400/30 bg-amber-500/15 text-amber-200"
-        : count === 1
-          ? "border-sky-400/30 bg-sky-500/15 text-sky-200"
-          : "border-sky-300/15 bg-[#0b315c]/70 text-sky-100/55";
+        : count === 2
+          ? "border-cyan-400/30 bg-cyan-500/15 text-cyan-200"
+          : count === 1
+            ? "border-sky-400/30 bg-sky-500/15 text-sky-200"
+            : "border-sky-300/15 bg-[#0b315c]/70 text-sky-100/55";
 
-  const label = side && count > 0 ? `${count}/3 ${side}` : `${count}/3`;
+  const label = side && count > 0 ? `${count}/4 ${side}` : `${count}/4`;
 
   return <span className={cn("rounded-full border px-2 py-1 text-[11px] font-extrabold", cls)}>{label}</span>;
 }
@@ -1630,7 +1671,7 @@ function GearIcon({ className }: { className?: string }) {
   );
 }
 
-type SortKey = "LIQ_DESC" | "LIQ_ASC";
+type DirectionFilter = "BUY" | "SELL" | null;
 
 type EmaSlot = {
   id: number;
@@ -1780,8 +1821,6 @@ export default function MarketScannerPage() {
     error: null,
   });
 
-  const LIQ_THRESHOLD_HIGH = 70;
-  const LIQ_THRESHOLD_LOW = 30;
   const ZONE_TICKS = 12;
   
 
@@ -1862,7 +1901,7 @@ export default function MarketScannerPage() {
   { tool: "BRUSH", icon: Brush, title: "Brush" },
 ];
   const [search, setSearch] = React.useState("");
-  const [sortKey, setSortKey] = React.useState<SortKey>("LIQ_DESC");
+  const [directionFilter, setDirectionFilter] = React.useState<DirectionFilter>(null);
   const [onlyReady, setOnlyReady] = React.useState(false);
 
   const [panelH, setPanelH] = React.useState<number>(780);
@@ -1922,7 +1961,7 @@ const DRAW_TOOL_BUTTONS = [
         hammerTime: savedRow?.hammerTime,
         signalCandleTime: savedRow?.signalCandleTime,
         signalPattern: (savedRow?.signalPattern ?? "NONE") as CandlePattern,
-confirmationCount: (savedRow?.confirmationCount ?? 0) as 0 | 1 | 2 | 3,
+confirmationCount: (savedRow?.confirmationCount ?? 0) as 0 | 1 | 2 | 3 | 4,
 higherTfSignal: (savedRow?.higherTfSignal ?? "NONE") as Signal,
       };
     });
@@ -2150,13 +2189,22 @@ React.useEffect(() => {
 
   const filteredRows = React.useMemo(() => {
     const q = search.trim().toUpperCase();
-    const base = q ? rows.filter((r) => r.symbol.toUpperCase().includes(q)) : rows;
-    const sorted = [...base].sort((a, b) =>
-      sortKey === "LIQ_DESC" ? b.liquidity - a.liquidity : a.liquidity - b.liquidity
-    );
+
+    let base = q
+      ? rows.filter((r) => r.symbol.toUpperCase().includes(q))
+      : rows;
+
+    if (directionFilter === "BUY") {
+      base = base.filter((r) => r.confirmationSide === "BUY");
+    } else if (directionFilter === "SELL") {
+      base = base.filter((r) => r.confirmationSide === "SELL");
+    }
+
+    // W obu kierunkach pokazujemy najaktywniejsze instrumenty na górze.
+    const sorted = [...base].sort((a, b) => b.liquidity - a.liquidity);
 
     return onlyReady ? sorted.filter((r) => r.status === "READY") : sorted;
-  }, [rows, search, sortKey, onlyReady]);
+  }, [rows, search, directionFilter, onlyReady]);
 
   const beep = React.useCallback(() => {
     try {
@@ -2300,8 +2348,8 @@ const signal: Signal = supertrendEnabled
     : "NONE"
   : emaWmaSignal;
           const liquidity = liqs[idx] ?? 0;
-          const status: Status =
-            liquidity >= LIQ_THRESHOLD_HIGH || liquidity <= LIQ_THRESHOLD_LOW ? "READY" : "CLOSE";
+          // Liquidity jest filtrem aktywności rynku. READY ustawiamy dopiero po 4/4.
+          const status: Status = "CLOSE";
 
           patchMap.set(m.symbol, { liquidity, tf, signal, status });
         });
@@ -2311,21 +2359,10 @@ const signal: Signal = supertrendEnabled
         setRows((prev) => {
   const closedNow: ClosedTrade[] = [];
 
-  const nextRows = prev.map((r) => {
+  const nextRows: Row[] = prev.map((r): Row => {
     const p = patchMap.get(r.symbol);
 
     const nextLiquidity = p?.liquidity ?? r.liquidity;
-    const isOnNow =
-      nextLiquidity >= LIQ_THRESHOLD_HIGH || nextLiquidity <= LIQ_THRESHOLD_LOW;
-    const wasOn = scannerPrevRef.current.get(r.symbol) ?? false;
-
-    scannerPrevRef.current.set(r.symbol, isOnNow);
-
-    if (!wasOn && isOnNow) {
-      beep();
-      triggerFlash(r.symbol);
-      scrollToRow(r.symbol);
-    }
 
     let levels = r.levels;
     let tradeActive = !!r.tradeActive;
@@ -2337,9 +2374,18 @@ const signal: Signal = supertrendEnabled
     const cs = candlesCache.current.get(r.symbol) ?? [];
     const tick = getTickSize(r.symbol);
 
+    const emaWmaDirection = getEmaWmaSignal(cs);
+    const supertrendDirection = getSupertrendSignal(
+      cs,
+      supertrendSettings.atrPeriod,
+      supertrendSettings.factor,
+      supertrendSettings.waitForClose
+    );
+
     const best = getBestConfirmation({
-      liquidity: nextLiquidity,
       candles: cs,
+      emaWmaSignal: emaWmaDirection,
+      supertrendSignal: supertrendDirection,
     });
 
     const htfOk =
@@ -2353,9 +2399,22 @@ const sessionOk = isTradingSession(
   new Date()
 );
 
+const activityReady = nextLiquidity >= LIQ_THRESHOLD_HIGH;
+
 const setupReadyNow =
-  best.count === 3 &&
+  activityReady &&
+  best.count === 4 &&
   !!best.side;
+
+    const wasOn = scannerPrevRef.current.get(r.symbol) ?? false;
+    scannerPrevRef.current.set(r.symbol, setupReadyNow);
+
+    if (!wasOn && setupReadyNow) {
+      beep();
+      triggerFlash(r.symbol);
+      scrollToRow(r.symbol);
+    }
+
     const setupReadyPrev = setupPrevRef.current.get(r.symbol) ?? false;
     setupPrevRef.current.set(r.symbol, setupReadyNow);
 
@@ -2572,11 +2631,14 @@ const closedStatus = closedResult.status;
       tradesMemoryRef.current.delete(tradeKey(r.symbol, tf));
     }
 
+    const rowStatus: Status = setupReadyNow ? "READY" : "CLOSE";
+
     return {
       ...r,
       ...p,
       tf,
       liquidity: nextLiquidity,
+      status: rowStatus,
       tradeActive,
       side: sideOut,
       levels,
@@ -2802,7 +2864,7 @@ if (closedNow.length) {
         <div>
           <h1 className="text-lg font-extrabold tracking-tight text-white drop-shadow-[0_0_16px_rgba(56,189,248,.20)] sm:text-xl md:text-2xl xl:text-3xl">Skaner rynku</h1>
           <p className="mt-0.5 max-w-[760px] text-[9px] leading-3.5 text-sky-100/55 sm:mt-1 sm:text-xs xl:mt-2 xl:text-sm">
-            Live: <span className="font-semibold">{source}</span> • 3 potwierdzenia: Liquidity + Price Action + 2 Confirmation Candles
+            Live: <span className="font-semibold">{source}</span> • Liquidity ≥ 70% + 4 potwierdzenia: Trend + SuperTrend + Sweep + Momentum
           </p>
         </div>
 
@@ -2830,7 +2892,7 @@ if (closedNow.length) {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-bold text-white sm:text-sm xl:text-lg">Lista instrumentów</p>
-                <p className="hidden text-xs text-sky-100/50 sm:block xl:text-sm">Search • Sort Liquidity • Filter READY</p>
+                <p className="hidden text-xs text-sky-100/50 sm:block xl:text-sm">Search • BUY / SELL • Filter READY</p>
               </div>
 
               <div className="text-right text-xs text-sky-100/55">
@@ -2849,27 +2911,31 @@ if (closedNow.length) {
               <button
                 className={cn(
                   "rounded-lg border px-2.5 py-1.5 text-[10px] font-semibold transition sm:rounded-xl sm:text-xs xl:rounded-2xl xl:px-3 xl:py-2 xl:text-sm",
-                  sortKey === "LIQ_DESC"
-                    ? "border-cyan-300/45 bg-[linear-gradient(135deg,#0ea5e9_0%,#2563eb_100%)] text-white shadow-[0_0_18px_rgba(14,165,233,.22)]"
-                    : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/75 hover:border-sky-300/30 hover:bg-[#12477f] hover:text-white"
+                  directionFilter === "BUY"
+                    ? "border-emerald-300/40 bg-emerald-500/20 text-emerald-100 shadow-[0_0_18px_rgba(16,185,129,.18)]"
+                    : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/75 hover:border-emerald-300/30 hover:bg-emerald-500/10 hover:text-emerald-100"
                 )}
-                onClick={() => setSortKey("LIQ_DESC")}
+                onClick={() =>
+                  setDirectionFilter((prev) => (prev === "BUY" ? null : "BUY"))
+                }
                 type="button"
               >
-                Liquidity ↓
+                BUY ↑
               </button>
 
               <button
                 className={cn(
                   "rounded-lg border px-2.5 py-1.5 text-[10px] font-semibold transition sm:rounded-xl sm:text-xs xl:rounded-2xl xl:px-3 xl:py-2 xl:text-sm",
-                  sortKey === "LIQ_ASC"
-                    ? "border-cyan-300/45 bg-[linear-gradient(135deg,#0ea5e9_0%,#2563eb_100%)] text-white shadow-[0_0_18px_rgba(14,165,233,.22)]"
-                    : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/75 hover:border-sky-300/30 hover:bg-[#12477f] hover:text-white"
+                  directionFilter === "SELL"
+                    ? "border-red-300/40 bg-red-500/20 text-red-100 shadow-[0_0_18px_rgba(239,68,68,.18)]"
+                    : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/75 hover:border-red-300/30 hover:bg-red-500/10 hover:text-red-100"
                 )}
-                onClick={() => setSortKey("LIQ_ASC")}
+                onClick={() =>
+                  setDirectionFilter((prev) => (prev === "SELL" ? null : "SELL"))
+                }
                 type="button"
               >
-                Liquidity ↑
+                SELL ↓
               </button>
 
               <button
@@ -2895,7 +2961,11 @@ if (closedNow.length) {
             <div className="min-h-0 flex-1 space-y-2 overflow-auto pr-1">
               {filteredRows.map((r) => {
                 const active = r.symbol === selectedSymbol;
-                const scannerOn = r.liquidity >= LIQ_THRESHOLD_HIGH || r.liquidity <= LIQ_THRESHOLD_LOW;
+                const scannerOn = r.liquidity >= LIQ_THRESHOLD_HIGH && (r.confirmationCount ?? 0) === 4 && !!r.confirmationSide;
+                const waitLiquidity =
+                  (r.confirmationCount ?? 0) === 4 &&
+                  !!r.confirmationSide &&
+                  r.liquidity < LIQ_THRESHOLD_HIGH;
                 const isFlashing = flashMapRef.current.has(r.symbol);
 
                 return (
@@ -2922,10 +2992,18 @@ if (closedNow.length) {
                             "rounded-full border px-2 py-1 text-[11px] font-extrabold",
                             scannerOn
                               ? "border-emerald-300/30 bg-emerald-500/20 text-emerald-100 shadow-[0_0_16px_rgba(16,185,129,.16)]"
-                              : "border-sky-300/15 bg-[#082749]/75 text-sky-100/40"
+                              : waitLiquidity
+                                ? "border-amber-300/30 bg-amber-500/15 text-amber-200 shadow-[0_0_14px_rgba(245,158,11,.10)]"
+                                : "border-sky-300/15 bg-[#082749]/75 text-sky-100/40"
                           )}
                         >
-                          {scannerOn ? "SCANNER ON" : "SCANNER OFF"}
+                          {scannerOn
+                            ? `SCANNER ${r.confirmationSide ?? "ON"}`
+                            : waitLiquidity
+                              ? `WAIT LIQ ${Math.round(r.liquidity)}%`
+                              : (r.confirmationCount ?? 0) >= 2
+                                ? "WATCH"
+                                : "SCANNER OFF"}
                         </span>
 
                         <SignalDot s={r.signal} />
@@ -3520,7 +3598,12 @@ if (closedNow.length) {
               </div>
 
               <div className="w-full min-w-0">
-                <PocMiniScanner state={pocScanner} />
+                <PocMiniScanner
+                  state={pocScanner}
+                  confirmationCount={selected.confirmationCount ?? 0}
+                  confirmationSide={selected.confirmationSide ?? null}
+                  liquidity={selected.liquidity}
+                />
               </div>
 
               <div className="min-w-0">
