@@ -2094,7 +2094,9 @@ patternsEnabled = false,
         secondsVisible: false,
       },
 handleScroll: {
+  // Desktop: przeciąganie wykresu lewo/prawo myszką.
   pressedMouseMove: true,
+  // Mobile/tablet: przeciąganie wykresu palcem lewo/prawo.
   horzTouchDrag: true,
   vertTouchDrag: true,
   mouseWheel: true,
@@ -3074,12 +3076,35 @@ kineticScroll: {
         <div className="relative">
           <div
             ref={containerRef}
+            onPointerDownCapture={(e) => {
+              // SELECT = ręczne przesuwanie wykresu myszką LUB palcem.
+              // Dla dotyku PointerEvent nie zawsze zachowuje się jak klasyczny
+              // lewy przycisk myszy, dlatego sprawdzamy też pointerType === "touch".
+              // Od razu odłączamy FOLLOW, aby live candle nie cofała wykresu
+              // do prawej krawędzi podczas ręcznego przeciągania.
+              if (
+                activeDrawTool === "SELECT" &&
+                (e.pointerType === "touch" || e.pointerType === "pen" || e.button === 0)
+              ) {
+                setDetached(true);
+                setFollowOnTick(false);
+              }
+            }}
+            onTouchStartCapture={() => {
+              // Fallback dla Safari/iOS oraz urządzeń, które nie raportują
+              // PointerEvent w sposób identyczny jak desktop.
+              if (activeDrawTool === "SELECT") {
+                setDetached(true);
+                setFollowOnTick(false);
+              }
+            }}
             style={{
               width: "100%",
               height,
               touchAction: "none",
               userSelect: "none",
               WebkitUserSelect: "none",
+              cursor: activeDrawTool === "SELECT" ? "grab" : "crosshair",
             }}
           />
 
