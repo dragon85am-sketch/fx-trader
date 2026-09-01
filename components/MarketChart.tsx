@@ -1233,6 +1233,29 @@ patternsEnabled = false,
     return undefined;
   }, [patternsEnabled, overlayTick, candles, liveCandle, heikinAshi, renko]);
 
+  // Czas świecy sygnałowej dla automatycznych stref FORMATION.
+  // Dzięki temu strefy zaczynają się dokładnie przy świecy breakout,
+  // zamiast od lewej krawędzi całego wykresu.
+  const patternTradeSignalTime = React.useMemo<UTCTimestamp | null>(() => {
+    if (!patternsEnabled || renko) return null;
+
+    const safe = displayCacheRef.current;
+    if (!safe?.length) return null;
+
+    const signals = detectCandlePatterns(safe);
+    const latest = signals[signals.length - 1];
+    if (!latest) return null;
+
+    const signalIdx = safe.findIndex(
+      (c) => Number(c.time) === Number(latest.time)
+    );
+
+    // Ta sama zasada co dla patternTradeLevels: tylko świeży sygnał.
+    if (signalIdx < 0 || signalIdx < safe.length - 4) return null;
+
+    return latest.time as UTCTimestamp;
+  }, [patternsEnabled, overlayTick, candles, liveCandle, heikinAshi, renko]);
+
   // Priorytet ma setup przesłany z głównego skanera.
   // Jeśli go nie ma, używamy stref z HH/HL / LL/LH breakout.
   const activeLevels = showTradeLines && levels ? levels : patternTradeLevels;
@@ -2289,30 +2312,56 @@ kineticScroll: {
     }
 
     if (frozenAnchorTimeRef.current == null && activeShowTradeLines && activeLevels && safeForChart.length) {
-  const signalIdx =
-    highlightTime != null ? findNearestIndexByTime(safeForChart, highlightTime) : 0;
+      const lastClosedIdx = Math.max(0, safeForChart.length - 2);
+      let anchorIdx = lastClosedIdx;
 
-  const anchorIdx = signalIdx >= 0 ? signalIdx : Math.max(0, safeForChart.length - 1);
-  const anchorTime = safeForChart[anchorIdx].time as UTCTimestamp;
+      if (showTradeLines && levels) {
+        // GŁÓWNY SKANER:
+        // page.tsx przekazuje highlightTime z pattern/hammer candle.
+        // Sygnał wejścia jest następną zamkniętą świecą, dlatego
+        // przesuwamy kotwicę o 1 świecę do przodu.
+        if (highlightTime != null) {
+          const patternIdx = findNearestIndexByTime(safeForChart, highlightTime);
+          if (patternIdx >= 0) {
+            anchorIdx = Math.min(patternIdx + 1, lastClosedIdx);
+          }
+        }
+      } else if (patternTradeSignalTime != null) {
+        // FORMACJE HH/HL / LL/LH:
+        // tutaj latest.time jest już świecą breakout = świecą sygnałową.
+        const formationSignalIdx = findNearestIndexByTime(
+          safeForChart,
+          patternTradeSignalTime
+        );
+        if (formationSignalIdx >= 0) {
+          anchorIdx = Math.min(formationSignalIdx, lastClosedIdx);
+        }
+      }
 
-  frozenAnchorTimeRef.current = anchorTime;
+      const anchorTime = safeForChart[anchorIdx].time as UTCTimestamp;
 
-  setFreezeDebug({
-    frozen: true,
-    entry: activeLevels.entry,
-    anchorTime: Number(anchorTime),
-    crossedIdx: anchorIdx,
-  });
-}
+      frozenAnchorTimeRef.current = anchorTime;
+
+      setFreezeDebug({
+        frozen: true,
+        entry: activeLevels.entry,
+        anchorTime: Number(anchorTime),
+        crossedIdx: anchorIdx,
+      });
+    }
     const anchorTime = frozenAnchorTimeRef.current;
 
     if (activeShowTradeLines && activeLevels && safeForChart.length && anchorTime != null) {
       applyTradeLinesWithLevels(safeForChart, prec, anchorTime, activeLevels);
 
       const containerW = containerRef.current?.clientWidth ?? 0;
-      const RIGHT_MARGIN_PX = rightUiReservePx(rightPadOn);
-      const LABEL_GAP_PX = 14;
-      const ZONE_TO_LABEL_GAP_PX = 18;
+
+      // STREFY: od sygnału -> prawie do prawej osi ceny.
+      // Nie przykrywamy świecy sygnałowej i zostawiamy mały odstęp
+      // przed osią/etykietami ceny, tak jak na wzorze użytkownika.
+      const SIGNAL_TO_ZONE_GAP_PX = 10;
+      const PRICE_AXIS_RESERVE_PX = 78;
+      const ZONE_TO_PRICE_AXIS_GAP_PX = 8;
 
       const startXCoord = chart.timeScale().timeToCoordinate(anchorTime);
 
@@ -2323,8 +2372,12 @@ kineticScroll: {
         return;
       }
 
-      const startX = Number(startXCoord);
-      const endX = containerW - RIGHT_MARGIN_PX - LABEL_GAP_PX - ZONE_TO_LABEL_GAP_PX;
+      const rawStartX = Number(startXCoord) + SIGNAL_TO_ZONE_GAP_PX;
+      const endX = Math.max(
+        rawStartX + 1,
+        containerW - PRICE_AXIS_RESERVE_PX - ZONE_TO_PRICE_AXIS_GAP_PX
+      );
+      const startX = Math.min(rawStartX, endX - 1);
       const zoneW = Math.max(1, endX - startX);
 
       const tps = (
