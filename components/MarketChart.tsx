@@ -253,38 +253,6 @@ function rightUiReservePx(rightPadOn: boolean) {
   return BASE + DRAW_PANEL_W;
 }
 
-
-// =========================
-// LOCAL CHART TIME
-// =========================
-// Lightweight Charts używa timestampów UTC.
-// Te formatery zmieniają tylko sposób wyświetlania czasu na lokalny czas
-// przeglądarki. Same timestampy pozostają bez zmian, więc RENKO i zwykłe
-// świece nadal są zsynchronizowane 1:1 po przełączaniu.
-function localChartDate(time: unknown) {
-  const ts = Number(toUTCTimestamp(time));
-  return new Date(ts * 1000);
-}
-
-function formatLocalChartTime(time: unknown) {
-  return localChartDate(time).toLocaleTimeString("pl-PL", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
-}
-
-function formatLocalChartDateTime(time: unknown) {
-  return localChartDate(time).toLocaleString("pl-PL", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
-}
-
 /* =========================
    INDICATORS
 ========================= */
@@ -469,57 +437,28 @@ function toRenkoCandles(safeRaw: CandlestickData[], boxSize: number): Candlestic
   const first = safeRaw[0] as any;
 
   let lastClose = Number(first.close);
-  let lastUsedTime = Number(first.time) - 1;
+  let t = (safeRaw[0].time as number) || Math.floor(Date.now() / 1000);
 
-  // RENKO ma korzystać z TEJ SAMEJ osi czasu co zwykłe świece.
-  // Pierwsza cegła utworzona z danej świecy dostaje dokładny czas tej świecy.
-  // Jeśli jedna świeca tworzy kilka cegieł, kolejne dostają +1s, +2s...
-  // Dzięki temu czasy pozostają unikalne dla Lightweight Charts, ale wizualnie
-  // wszystkie cegły nadal siedzą dokładnie przy czasie świecy źródłowej.
-  const renkoTimeForSource = (sourceTimeRaw: unknown, brickOffset: number) => {
-    const sourceTime = Number(sourceTimeRaw);
-    const base = Number.isFinite(sourceTime)
-      ? Math.floor(sourceTime)
-      : Math.max(lastUsedTime + 1, Math.floor(Date.now() / 1000));
-
-    const candidate = base + brickOffset;
-    const next = Math.max(candidate, lastUsedTime + 1);
-    lastUsedTime = next;
-    return next as UTCTimestamp;
+  const nextTime = () => {
+    t += 1;
+    return t as UTCTimestamp;
   };
 
   for (let i = 1; i < safeRaw.length; i++) {
     const c = safeRaw[i] as any;
     const price = Number(c.close);
-    let brickOffset = 0;
 
     while (price >= lastClose + box) {
       const open = lastClose;
       const close = lastClose + box;
-      out.push({
-        time: renkoTimeForSource(c.time, brickOffset++),
-        open,
-        high: close,
-        low: open,
-        close,
-        // Oryginalny czas świecy źródłowej zachowujemy także osobno do mapowania
-        // sygnałów Bollingera na odpowiadającą cegłę RENKO.
-        sourceTime: Number(c.time),
-      } as any);
+      out.push({ time: nextTime(), open, high: close, low: open, close });
       lastClose = close;
     }
 
     while (price <= lastClose - box) {
       const open = lastClose;
       const close = lastClose - box;
-      out.push({
-        time: renkoTimeForSource(c.time, brickOffset++),
-        open,
-        high: open,
-        low: close,
-        close,
-        sourceTime: Number(c.time),
-      } as any);
+      out.push({ time: nextTime(), open, high: open, low: close, close });
       lastClose = close;
     }
   }
@@ -527,14 +466,7 @@ function toRenkoCandles(safeRaw: CandlestickData[], boxSize: number): Candlestic
   if (!out.length) {
     const base = safeRaw[safeRaw.length - 1] as any;
     const p = Number(base.close);
-    out.push({
-      time: renkoTimeForSource(base.time, 0),
-      open: p,
-      high: p,
-      low: p,
-      close: p,
-      sourceTime: Number(base.time),
-    } as any);
+    out.push({ time: nextTime(), open: p, high: p, low: p, close: p });
   }
 
   return ensureStrictlyIncreasingTimes(out);
@@ -686,7 +618,7 @@ type CandlePattern = {
   price: number;
 };
 
-function detectClassicCandlePatterns(candles: CandlestickData[]): CandlePattern[] {
+function detectCandlePatterns(candles: CandlestickData[]): CandlePattern[] {
   const out: CandlePattern[] = [];
   if (candles.length < 30) return out;
 
@@ -877,149 +809,48 @@ function detectClassicCandlePatterns(candles: CandlestickData[]): CandlePattern[
   return unique.slice(-40);
 }
 
-function detectCandlePatterns(
-  candles: CandlestickData[],
-  bb?: BbConfig
-): CandlePattern[] {
+/* =========================
+   RENKO FORMATIONS
+   BUY  = minimum 2 czerwone cegły -> minimum 2 zielone cegły
+   SELL = minimum 2 zielone cegły -> minimum 2 czerwone cegły
+
+   Sygnałem jest DRUGA cegła potwierdzająca zmianę kierunku.
+   To właśnie ona jest zaznaczana na żółto.
+========================= */
+function detectRenkoPatterns(candles: CandlestickData[]): CandlePattern[] {
   const out: CandlePattern[] = [];
-
-  // LOGIKA BB — tylko zewnętrzne bandy + potwierdzenie BAR 2.
-  // BUY:
-  //   Bar 1 wychodzi LOW pod dolną BB i zamyka się z powrotem w paśmie.
-  //   Bar 2 MUSI być zamkniętą zieloną świecą -> BUY na Bar 2.
-  // SELL:
-  //   Bar 1 wychodzi HIGH nad górną BB i zamyka się z powrotem w paśmie.
-  //   Bar 2 MUSI być zamkniętą czerwoną świecą -> SELL na Bar 2.
-  // Brak zgodnego koloru Bar 2 = brak sygnału.
-  // Środkowa banda nigdy nie generuje sygnału.
-  // WAŻNE: logika formacji BB działa niezależnie od widoczności pasm.
-  // `bb.enabled` steruje tylko rysowaniem Bollingera na wykresie.
-  // Gdy FORMACJE są włączone, nadal używamy tych samych ustawień BB
-  // do wykrywania BUY/SELL nawet jeśli pasma są wizualnie wyłączone.
-  if (!bb) return out;
-
-  const len = clampInt(bb.length, 2, 500);
-  if (candles.length < len + 3) return out;
+  if (candles.length < 4) return out;
 
   const n = (v: any) => toNum(v);
-  const isBullish = (c: any) => n(c.close) > n(c.open);
-  const isBearish = (c: any) => n(c.close) < n(c.open);
+  const bull = (c: any) => n(c.close) > n(c.open);
+  const bear = (c: any) => n(c.close) < n(c.open);
 
-  const lines = buildBbLines(candles, bb, 8);
-  const upperByTime = new Map<number, number>();
-  const lowerByTime = new Map<number, number>();
+  for (let i = 3; i < candles.length; i++) {
+    const a: any = candles[i - 3];
+    const b: any = candles[i - 2];
+    const c: any = candles[i - 1];
+    const d: any = candles[i];
 
-  for (const p of lines.upper as any[]) {
-    upperByTime.set(Number(p.time), n(p.value));
-  }
-  for (const p of lines.lower as any[]) {
-    lowerByTime.set(Number(p.time), n(p.value));
-  }
-
-  // Ostatnia świeca może być otwarta. Bar 2 musi być ZAMKNIĘTY.
-  const lastClosedIdx = Math.max(0, candles.length - 2);
-
-  for (let signalIdx = len - 1; signalIdx < lastClosedIdx; signalIdx++) {
-    const signal: any = candles[signalIdx];
-    const confirm: any = candles[signalIdx + 1];
-    if (!signal || !confirm) continue;
-
-    const t = Number(signal.time);
-    const upper = upperByTime.get(t);
-    const lower = lowerByTime.get(t);
-    if (!Number.isFinite(upper) || !Number.isFinite(lower)) continue;
-
-    const lowerReentry =
-      n(signal.low) < Number(lower) &&
-      n(signal.close) > Number(lower);
-
-    const upperReentry =
-      n(signal.high) > Number(upper) &&
-      n(signal.close) < Number(upper);
-
-    // BUY tylko wtedy, gdy po odrzuceniu dolnej BB Bar 2 jest zielony.
-    if (lowerReentry && isBullish(confirm)) {
+    // BUY: dwie czerwone cegły korekty + dwie zielone cegły potwierdzenia.
+    if (bear(a) && bear(b) && bull(c) && bull(d)) {
       out.push({
-        time: confirm.time as UTCTimestamp,
+        time: d.time as UTCTimestamp,
         label: "BUY",
         side: "BUY",
-        price: n(confirm.low),
+        price: n(d.low),
       });
       continue;
     }
 
-    // SELL tylko wtedy, gdy po odrzuceniu górnej BB Bar 2 jest czerwony.
-    if (upperReentry && isBearish(confirm)) {
+    // SELL: dwie zielone cegły wzrostowe + dwie czerwone cegły potwierdzenia.
+    if (bull(a) && bull(b) && bear(c) && bear(d)) {
       out.push({
-        time: confirm.time as UTCTimestamp,
+        time: d.time as UTCTimestamp,
         label: "SELL",
         side: "SELL",
-        price: n(confirm.high),
+        price: n(d.low),
       });
     }
-
-    // lowerReentry + czerwony Bar 2 = NIC.
-    // upperReentry + zielony Bar 2 = NIC.
-  }
-
-  return out.slice(-40);
-}
-
-/* =========================
-   RENKO SIGNALS = TA SAMA LOGIKA CO BOLLINGER
-
-   Sygnały nie są już liczone z układu kolorów cegieł RENKO.
-   Najpierw wykrywamy BUY/SELL na zwykłych świecach dokładnie tą samą
-   logiką BB Bar1 + Bar2 co na wykresie Bollinger, a potem przypinamy
-   wynik do cegły RENKO utworzonej z tej samej świecy źródłowej.
-
-   Dzięki temu:
-   - Bollinger BUY  -> BUY na odpowiadającej cegle RENKO
-   - Bollinger SELL -> SELL na odpowiadającej cegle RENKO
-   - nie powstają dodatkowe sygnały tylko dlatego, że zmienił się kolor cegieł
-========================= */
-function detectRenkoPatternsFromBollinger(
-  rawCandles: CandlestickData[],
-  renkoBricks: CandlestickData[],
-  bb?: BbConfig
-): CandlePattern[] {
-  if (!bb || !rawCandles.length || !renkoBricks.length) return [];
-
-  const bbSignals = detectCandlePatterns(rawCandles, bb);
-  if (!bbSignals.length) return [];
-
-  const out: CandlePattern[] = [];
-  const n = (v: any) => toNum(v);
-
-  for (const signal of bbSignals) {
-    const signalSourceTime = Number(signal.time);
-
-    // Najlepiej: ostatnia cegła wygenerowana przez dokładnie tę świecę Bar 2.
-    const exact = renkoBricks.filter(
-      (brick: any) => Number(brick?.sourceTime) === signalSourceTime
-    );
-
-    let brick: any = exact.length ? exact[exact.length - 1] : undefined;
-
-    // Jeżeli Bar 2 nie utworzył nowej cegły, przypnij sygnał do pierwszej
-    // kolejnej cegły. To zachowuje sygnał z BB bez wymyślania nowego RENKO setupu.
-    if (!brick) {
-      brick = renkoBricks.find(
-        (b: any) => Number(b?.sourceTime) > signalSourceTime
-      ) as any;
-    }
-
-    if (!brick) continue;
-
-    out.push({
-      time: brick.time as UTCTimestamp,
-      label: signal.label,
-      side: signal.side,
-      price:
-        signal.side === "SELL"
-          ? n(brick.high)
-          : n(brick.low),
-    });
   }
 
   const unique = Array.from(
@@ -1037,11 +868,10 @@ function detectRenkoPatternsFromBollinger(
 /* =========================
    RENKO PATTERN HIGHLIGHT
 ========================= */
-function highlightRenkoPatternBricks(
-  candles: CandlestickData[],
-  signals: CandlePattern[]
-) {
+function highlightRenkoPatternBricks(candles: CandlestickData[]) {
   if (!candles.length) return candles;
+
+  const signals = detectRenkoPatterns(candles);
   if (!signals.length) return candles;
 
   const signalTimes = new Set(signals.map((s) => Number(s.time)));
@@ -1183,6 +1013,8 @@ patternsEnabled = false,
   // Działa identycznie dla myszy, palca i rysika.
   const plotPanRef = React.useRef<{
     pointerId: number;
+    pointerType: string;
+    gesture: "pending" | "chart";
     startX: number;
     startY: number;
     from: number;
@@ -1269,14 +1101,8 @@ patternsEnabled = false,
 
     try {
       const detectedPatterns = renko
-        ? detectRenkoPatternsFromBollinger(
-            rawCacheRef.current?.length
-              ? rawCacheRef.current
-              : normalizeCandles(candles),
-            safe,
-            bbConfig
-          )
-        : detectCandlePatterns(safe, bbConfig);
+        ? detectRenkoPatterns(safe)
+        : detectCandlePatterns(safe);
 
       return detectedPatterns.flatMap((p, idx) => {
         const x = chart.timeScale().timeToCoordinate(p.time);
@@ -1307,7 +1133,7 @@ patternsEnabled = false,
     } catch {
       return [];
     }
-  }, [patternsEnabled, overlayTick, candles, liveCandle, heikinAshi, renko, bbConfig]);
+  }, [patternsEnabled, overlayTick, candles, liveCandle, heikinAshi, renko]);
 
   // ============================================================
   // AUTO STREFY DLA NOWEJ LOGIKI HH/HL / LL/LH
@@ -1325,7 +1151,7 @@ patternsEnabled = false,
     const safe = displayCacheRef.current;
     if (!safe?.length) return undefined;
 
-    const signals = detectCandlePatterns(safe, bbConfig);
+    const signals = detectCandlePatterns(safe);
     const latest = signals[signals.length - 1];
     if (!latest) return undefined;
 
@@ -1422,7 +1248,7 @@ patternsEnabled = false,
     }
 
     return undefined;
-  }, [patternsEnabled, overlayTick, candles, liveCandle, heikinAshi, renko, bbConfig]);
+  }, [patternsEnabled, overlayTick, candles, liveCandle, heikinAshi, renko]);
 
   // Czas świecy sygnałowej dla automatycznych stref FORMATION.
   // Dzięki temu strefy zaczynają się dokładnie przy świecy breakout,
@@ -1433,7 +1259,7 @@ patternsEnabled = false,
     const safe = displayCacheRef.current;
     if (!safe?.length) return null;
 
-    const signals = detectCandlePatterns(safe, bbConfig);
+    const signals = detectCandlePatterns(safe);
     const latest = signals[signals.length - 1];
     if (!latest) return null;
 
@@ -1445,7 +1271,7 @@ patternsEnabled = false,
     if (signalIdx < 0 || signalIdx < safe.length - 4) return null;
 
     return latest.time as UTCTimestamp;
-  }, [patternsEnabled, overlayTick, candles, liveCandle, heikinAshi, renko, bbConfig]);
+  }, [patternsEnabled, overlayTick, candles, liveCandle, heikinAshi, renko]);
 
   // Priorytet ma setup przesłany z głównego skanera.
   // Jeśli go nie ma, używamy stref z HH/HL / LL/LH breakout.
@@ -2271,10 +2097,6 @@ patternsEnabled = false,
           bottom: 0.12,
         },
       },
-      localization: {
-        locale: "pl-PL",
-        timeFormatter: (time: any) => formatLocalChartDateTime(time),
-      },
       timeScale: {
         borderVisible: true,
         borderColor: "rgba(148,163,184,0.38)",
@@ -2287,7 +2109,6 @@ patternsEnabled = false,
         rightBarStaysOnScroll: true,
         timeVisible: true,
         secondsVisible: false,
-        tickMarkFormatter: (time: any) => formatLocalChartTime(time),
       },
 handleScroll: {
   // Pan lewo/prawo obsługujemy własnym pointer handlerem poniżej.
@@ -2466,14 +2287,9 @@ kineticScroll: {
 
     displayCacheRef.current = safeForChart;
 
-    const renkoBbSignals =
-      renko && patternsEnabled
-        ? detectRenkoPatternsFromBollinger(safeRaw, safeForChart, bbConfig)
-        : [];
-
     const chartData =
       renko && patternsEnabled
-        ? highlightRenkoPatternBricks(safeForChart, renkoBbSignals)
+        ? highlightRenkoPatternBricks(safeForChart)
         : safeForChart;
 
     candleSeries.setData(chartData);
@@ -2559,12 +2375,12 @@ kineticScroll: {
 
       const containerW = containerRef.current?.clientWidth ?? 0;
 
-      // STREFY: od sygnału -> krótki, czytelny blok zamiast aż do prawej osi.
-      // Maksymalna szerokość odpowiada mniej więcej odległości zaznaczonej na screenie.
+      // STREFY: od sygnału -> prawie do prawej osi ceny.
+      // Nie przykrywamy świecy sygnałowej i zostawiamy mały odstęp
+      // przed osią/etykietami ceny, tak jak na wzorze użytkownika.
       const SIGNAL_TO_ZONE_GAP_PX = 10;
       const PRICE_AXIS_RESERVE_PX = 78;
       const ZONE_TO_PRICE_AXIS_GAP_PX = 8;
-      const MAX_ZONE_WIDTH_PX = 520;
 
       const startXCoord = chart.timeScale().timeToCoordinate(anchorTime);
 
@@ -2576,11 +2392,10 @@ kineticScroll: {
       }
 
       const rawStartX = Number(startXCoord) + SIGNAL_TO_ZONE_GAP_PX;
-      const maxRightX = Math.max(
+      const endX = Math.max(
         rawStartX + 1,
         containerW - PRICE_AXIS_RESERVE_PX - ZONE_TO_PRICE_AXIS_GAP_PX
       );
-      const endX = Math.min(maxRightX, rawStartX + MAX_ZONE_WIDTH_PX);
       const startX = Math.min(rawStartX, endX - 1);
       const zoneW = Math.max(1, endX - startX);
 
@@ -2669,24 +2484,26 @@ kineticScroll: {
         lbls.push({ key: `${text}-${price}`, y, text, kind, price });
       };
 
-      // Strefy trade bez nakładania osobnej zielonej strefy ENTRY.
-      // ENTRY pozostaje tylko linią/etykietą graniczną.
-      // Dzięki temu:
-      // BUY  -> czerwony dokładnie ENTRY -> SL, zielony ENTRY -> TP1 -> TP2 -> TP3.
-      // SELL -> czerwony dokładnie ENTRY -> SL, zielony ENTRY -> TP1 -> TP2 -> TP3
-      //         (po przeciwnej stronie ceny, zgodnie z kierunkiem pozycji).
-      if (Number.isFinite(activeLevels.sl) && Number.isFinite(activeLevels.entry)) {
-        addBand(activeLevels.entry, activeLevels.sl, "SL", "SL");
+      const entryZone = activeLevels.zones?.find((z) => z.label === "ENTRY");
+      if (entryZone && Number.isFinite(entryZone.from) && Number.isFinite(entryZone.to)) {
+        addBand(entryZone.from, entryZone.to, "ENTRY", "ENTRY");
+      } else {
+        const pad = Math.max(1, Math.abs(activeLevels.entry - activeLevels.sl) * 0.06);
+        addBand(activeLevels.entry - pad, activeLevels.entry + pad, "ENTRY", "ENTRY-FB");
       }
 
-      if (tp1 !== undefined) {
-        addBand(activeLevels.entry, tp1, "TP1", "TP1");
+      if (Number.isFinite(activeLevels.sl) && Number.isFinite(activeLevels.entry)) {
+        addBand(activeLevels.sl, activeLevels.entry, "SL", "SL");
       }
-      if (tp2 !== undefined && tp1 !== undefined) {
-        addBand(tp1, tp2, "TP2", "TP2");
-      }
-      if (tp3 !== undefined && tp2 !== undefined) {
-        addBand(tp2, tp3, "TP3", "TP3");
+
+      if (side === "BUY") {
+        if (tp1 !== undefined) addBand(activeLevels.entry, tp1, "TP1", "TP1");
+        if (tp2 !== undefined && tp1 !== undefined) addBand(tp1, tp2, "TP2", "TP2");
+        if (tp3 !== undefined && tp2 !== undefined) addBand(tp2, tp3, "TP3", "TP3");
+      } else {
+        if (tp1 !== undefined) addBand(tp1, activeLevels.entry, "TP1", "TP1");
+        if (tp2 !== undefined && tp1 !== undefined) addBand(tp2, tp1, "TP2", "TP2");
+        if (tp3 !== undefined && tp2 !== undefined) addBand(tp3, tp2, "TP3", "TP3");
       }
 
       const entryLineColor =
@@ -2790,13 +2607,9 @@ kineticScroll: {
       const renkoData = toRenkoCandles(renkoRaw, box);
       displayCacheRef.current = renkoData;
 
-      const renkoBbSignals = patternsEnabled
-        ? detectRenkoPatternsFromBollinger(safeRaw, renkoData, bbConfig)
-        : [];
-
       const renkoChartData =
         patternsEnabled
-          ? highlightRenkoPatternBricks(renkoData, renkoBbSignals)
+          ? highlightRenkoPatternBricks(renkoData)
           : renkoData;
 
       candleSeries.setData(renkoChartData);
@@ -3168,141 +2981,110 @@ kineticScroll: {
     } catch {}
   }, []);
 
-  const touchPointersRef = React.useRef<Map<number, { x: number; y: number }>>(new Map());
-  const pinchRef = React.useRef<{
-    startDistance: number;
-    from: number;
-    to: number;
-    width: number;
-    height: number;
-    anchorRatioX: number;
-    priceMin: number;
-    priceMax: number;
-  } | null>(null);
-
-  const getVisiblePriceRange = React.useCallback(() => {
-    const chart = chartRef.current;
-    const safe = displayCacheRef.current;
-    if (!chart || !safe.length) return { min: 0, max: 1 };
-
-    try {
-      const range: any = (chart.timeScale() as any).getVisibleLogicalRange?.();
-      if (!range || !Number.isFinite(range.from) || !Number.isFinite(range.to)) {
-        const lows = safe.map((c: any) => Number(c.low)).filter(Number.isFinite);
-        const highs = safe.map((c: any) => Number(c.high)).filter(Number.isFinite);
-        return { min: Math.min(...lows), max: Math.max(...highs) };
-      }
-
-      const fromIdx = Math.max(0, Math.floor(Number(range.from)));
-      const toIdx = Math.min(safe.length - 1, Math.ceil(Number(range.to)));
-      const visible = safe.slice(fromIdx, toIdx + 1) as any[];
-      const lows = visible.map((c) => Number(c.low)).filter(Number.isFinite);
-      const highs = visible.map((c) => Number(c.high)).filter(Number.isFinite);
-      const min = lows.length ? Math.min(...lows) : 0;
-      const max = highs.length ? Math.max(...highs) : 1;
-      return Number.isFinite(min) && Number.isFinite(max) && max > min
-        ? { min, max }
-        : { min: 0, max: 1 };
-    } catch {
-      return { min: 0, max: 1 };
-    }
-  }, []);
-
   const beginPlotPan = React.useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (activeDrawTool !== "SELECT") return;
     if (e.pointerType === "mouse" && e.button !== 0) return;
 
     const chart = chartRef.current;
     const candleSeries = candleSeriesRef.current;
+    const safe = displayCacheRef.current;
     if (!chart || !candleSeries) return;
 
     try {
-      if (e.pointerType !== "mouse") {
-        touchPointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      }
-
       const ts: any = chart.timeScale();
       const range = ts.getVisibleLogicalRange?.();
       if (!range || !Number.isFinite(range.from) || !Number.isFinite(range.to)) return;
+
+      const fromIdx = Math.max(0, Math.floor(Number(range.from)));
+      const toIdx = Math.min(safe.length - 1, Math.ceil(Number(range.to)));
+      const visible = safe.slice(fromIdx, toIdx + 1) as any[];
+      const lows = visible.map((c) => Number(c.low)).filter(Number.isFinite);
+      const highs = visible.map((c) => Number(c.high)).filter(Number.isFinite);
+
+      let priceMin = lows.length ? Math.min(...lows) : 0;
+      let priceMax = highs.length ? Math.max(...highs) : 1;
+      if (!Number.isFinite(priceMin) || !Number.isFinite(priceMax) || priceMax <= priceMin) {
+        priceMin = 0;
+        priceMax = 1;
+      }
 
       manualPanRef.current = true;
       setFollowOnTick(false);
       setDetached(true);
 
-      // DWA PALCE = PINCH ZOOM. Drugi palec przełącza gest z PAN na ZOOM.
-      if (e.pointerType !== "mouse" && touchPointersRef.current.size >= 2) {
-        const pts = Array.from(touchPointersRef.current.values()).slice(0, 2);
-        const dx = pts[1].x - pts[0].x;
-        const dy = pts[1].y - pts[0].y;
-        const distance = Math.max(8, Math.hypot(dx, dy));
-        const rect = e.currentTarget.getBoundingClientRect();
-        const midX = (pts[0].x + pts[1].x) / 2;
-        const priceRange = getVisiblePriceRange();
+      plotPanRef.current = {
+        pointerId: e.pointerId,
+        pointerType: e.pointerType || "mouse",
+        gesture: e.pointerType === "touch" ? "pending" : "chart",
+        startX: e.clientX,
+        startY: e.clientY,
+        from: Number(range.from),
+        to: Number(range.to),
+        width: Math.max(1, e.currentTarget.clientWidth),
+        height: Math.max(1, e.currentTarget.clientHeight),
+        priceMin,
+        priceMax,
+      };
 
-        pinchRef.current = {
-          startDistance: distance,
-          from: Number(range.from),
-          to: Number(range.to),
-          width: Math.max(1, rect.width),
-          height: Math.max(1, rect.height),
-          anchorRatioX: Math.max(0, Math.min(1, (midX - rect.left) / Math.max(1, rect.width))),
-          priceMin: priceRange.min,
-          priceMax: priceRange.max,
-        };
-        plotPanRef.current = null;
-      } else {
-        const priceRange = getVisiblePriceRange();
-        plotPanRef.current = {
-          pointerId: e.pointerId,
-          startX: e.clientX,
-          startY: e.clientY,
-          from: Number(range.from),
-          to: Number(range.to),
-          width: Math.max(1, e.currentTarget.clientWidth),
-          height: Math.max(1, e.currentTarget.clientHeight),
-          priceMin: priceRange.min,
-          priceMax: priceRange.max,
-        };
+      // Mysz/pen: pełny PAN wykresu.
+      // Touch: nie blokujemy od razu gestu, aby pionowy ruch mógł przewijać stronę.
+      if (e.pointerType !== "touch") {
+        e.currentTarget.setPointerCapture?.(e.pointerId);
+        e.preventDefault();
+        e.stopPropagation();
       }
-
-      e.currentTarget.setPointerCapture?.(e.pointerId);
-      e.preventDefault();
-      e.stopPropagation();
     } catch {}
-  }, [activeDrawTool, getVisiblePriceRange]);
+  }, [activeDrawTool]);
 
   const movePlotPan = React.useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const state = plotPanRef.current;
     const chart = chartRef.current;
     const candleSeries = candleSeriesRef.current;
-    if (!chart || !candleSeries) return;
+    if (!state || !chart || !candleSeries || state.pointerId !== e.pointerId) return;
 
     try {
-      if (e.pointerType !== "mouse" && touchPointersRef.current.has(e.pointerId)) {
-        touchPointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      const dx = e.clientX - state.startX;
+      const dy = e.clientY - state.startY;
+
+      // TOUCH:
+      // - pionowy gest przewija STRONĘ (ważne w landscape/fullscreen),
+      // - poziomy gest przesuwa WYKRES w czasie.
+      // Dzięki temu wykres nie "połyka" całego scrolla strony.
+      if (state.pointerType === "touch" && state.gesture === "pending") {
+        const ax = Math.abs(dx);
+        const ay = Math.abs(dy);
+        const threshold = 8;
+
+        if (ay >= threshold && ay > ax * 1.15) {
+          plotPanRef.current = null;
+          return;
+        }
+
+        if (ax >= threshold && ax > ay * 1.15) {
+          state.gesture = "chart";
+          try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch {}
+        } else {
+          return;
+        }
       }
 
-      // PINCH: rozsuń 2 palce = przybliż, zsuń = oddal.
-      const pinch = pinchRef.current;
-      if (pinch && touchPointersRef.current.size >= 2) {
-        const pts = Array.from(touchPointersRef.current.values()).slice(0, 2);
-        const dx = pts[1].x - pts[0].x;
-        const dy = pts[1].y - pts[0].y;
-        const distance = Math.max(8, Math.hypot(dx, dy));
-        const ratio = Math.max(0.25, Math.min(4, pinch.startDistance / distance));
+      // PAN X — przeciąganie lewo/prawo.
+      const span = Math.max(1, state.to - state.from);
+      const barsDelta = (dx / state.width) * span;
 
-        const initialSpan = Math.max(2, pinch.to - pinch.from);
-        const nextSpan = Math.max(6, Math.min(500, initialSpan * ratio));
-        const anchor = pinch.from + initialSpan * pinch.anchorRatioX;
-        const nextFrom = anchor - nextSpan * pinch.anchorRatioX;
-        const nextTo = nextFrom + nextSpan;
-        (chart.timeScale() as any).setVisibleLogicalRange?.({ from: nextFrom, to: nextTo });
+      (chart.timeScale() as any).setVisibleLogicalRange?.({
+        from: state.from - barsDelta,
+        to: state.to - barsDelta,
+      });
 
-        // Skalujemy również pionowo zakres ceny, żeby gest był naturalny na tablecie.
-        const priceCenter = (pinch.priceMin + pinch.priceMax) / 2;
-        const initialPriceSpan = Math.max(1e-12, pinch.priceMax - pinch.priceMin);
-        const nextPriceSpan = initialPriceSpan * ratio;
-        const minValue = priceCenter - nextPriceSpan / 2;
-        const maxValue = priceCenter + nextPriceSpan / 2;
+      // PAN Y myszką/penem zostaje bez zmian.
+      // Na dotyku pionowy gest jest zarezerwowany dla scrolla strony.
+      if (state.pointerType !== "touch") {
+        const priceSpan = Math.max(1e-12, state.priceMax - state.priceMin);
+        const priceShift = (dy / state.height) * priceSpan;
+        const minValue = state.priceMin + priceShift;
+        const maxValue = state.priceMax + priceShift;
+
         candleSeries.applyOptions({
           autoscaleInfoProvider: (() => ({
             priceRange: { minValue, maxValue },
@@ -3310,38 +3092,7 @@ kineticScroll: {
           })) as any,
         } as any);
         chart.priceScale("right").applyOptions({ autoScale: true });
-
-        setOverlayTick((v) => v + 1);
-        e.preventDefault();
-        e.stopPropagation();
-        return;
       }
-
-      const state = plotPanRef.current;
-      if (!state || state.pointerId !== e.pointerId) return;
-
-      // PAN X — przeciąganie lewo/prawo.
-      const span = Math.max(1, state.to - state.from);
-      const dx = e.clientX - state.startX;
-      const barsDelta = (dx / state.width) * span;
-      (chart.timeScale() as any).setVisibleLogicalRange?.({
-        from: state.from - barsDelta,
-        to: state.to - barsDelta,
-      });
-
-      // PAN Y — przeciąganie góra/dół.
-      const dy = e.clientY - state.startY;
-      const priceSpan = Math.max(1e-12, state.priceMax - state.priceMin);
-      const priceShift = (dy / state.height) * priceSpan;
-      const minValue = state.priceMin + priceShift;
-      const maxValue = state.priceMax + priceShift;
-      candleSeries.applyOptions({
-        autoscaleInfoProvider: (() => ({
-          priceRange: { minValue, maxValue },
-          margins: { above: 0, below: 0 },
-        })) as any,
-      } as any);
-      chart.priceScale("right").applyOptions({ autoScale: true });
 
       setOverlayTick((v) => v + 1);
       e.preventDefault();
@@ -3385,18 +3136,8 @@ kineticScroll: {
   }, [activeDrawTool]);
 
   const endPlotPan = React.useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    touchPointersRef.current.delete(e.pointerId);
-
-    if (plotPanRef.current?.pointerId === e.pointerId) {
-      plotPanRef.current = null;
-    }
-
-    // Po zakończeniu gestu dwoma palcami nie zaczynamy przypadkowego PAN
-    // pozostałym palcem. Nowy PAN zacznie się przy kolejnym dotknięciu.
-    if (touchPointersRef.current.size < 2) {
-      pinchRef.current = null;
-    }
-
+    if (plotPanRef.current?.pointerId !== e.pointerId) return;
+    plotPanRef.current = null;
     try { e.currentTarget.releasePointerCapture?.(e.pointerId); } catch {}
     e.preventDefault();
     e.stopPropagation();
@@ -3416,10 +3157,6 @@ kineticScroll: {
           <button
             type="button"
             onClick={() => {
-              manualPanRef.current = false;
-              touchPointersRef.current.clear();
-              pinchRef.current = null;
-              plotPanRef.current = null;
               setDetached(false);
               setFollowOnTick(true);
               try {
@@ -3462,6 +3199,21 @@ kineticScroll: {
           >
             PAD
           </button>
+        </div>
+
+        <div className="pointer-events-none absolute left-3 top-16 z-[31] rounded-2xl border border-white/10 bg-black/50 px-3 py-2 text-[11px] text-white/80 backdrop-blur">
+          <div>
+            <span className="text-slate-400">FREEZE:</span> {freezeDebug.frozen ? "YES" : "NO"}
+          </div>
+          <div>
+            <span className="text-slate-400">ENTRY:</span> {freezeDebug.entry ?? "—"}
+          </div>
+          <div>
+            <span className="text-slate-400">ANCHOR:</span> {freezeDebug.anchorTime ?? "—"}
+          </div>
+          <div>
+            <span className="text-slate-400">IDX:</span> {freezeDebug.crossedIdx ?? "—"}
+          </div>
         </div>
 
         <style>{`
@@ -3508,20 +3260,32 @@ kineticScroll: {
             style={{
               width: "100%",
               height,
-              touchAction: "none",
+              touchAction: activeDrawTool === "SELECT" ? "pan-y" : "none",
               userSelect: "none",
               WebkitUserSelect: "none",
               cursor: activeDrawTool === "SELECT" ? "grab" : "crosshair",
             }}
           />
 
-          {/* SELECT / ŁAPKA:
-              Nie kładziemy osobnego overlay PAN nad wykresem, ponieważ blokował on
-              kliknięcie i przesuwanie narysowanych obiektów (BOX/FIBO/TREND).
-              DrawingsLayer sam rozróżnia:
-              - klik na rysunku -> zaznacz / przesuń rysunek,
-              - klik na pustym wykresie -> przesuń wykres.
-              Osie ceny i czasu nadal mają własne uchwyty poniżej. */}
+          {/* Pełny obszar PAN dla SELECT — obsługuje mouse/touch/pen.
+              Osi ceny i czasu nie przykrywamy, bo mają własne uchwyty. */}
+          {activeDrawTool === "SELECT" ? (
+            <div
+              className="absolute left-0 top-0 z-[35]"
+              style={{
+                right: 86,
+                bottom: 30,
+                cursor: plotPanRef.current ? "grabbing" : "grab",
+                touchAction: "pan-y",
+                background: "transparent",
+              }}
+              onPointerDown={beginPlotPan}
+              onPointerMove={movePlotPan}
+              onPointerUp={endPlotPan}
+              onPointerCancel={endPlotPan}
+              onWheel={handlePlotWheel}
+            />
+          ) : null}
 
           {/* Własny uchwyt PRAWEJ OSI CENY.
               Jest aktywny tylko w SELECT i ma prawdziwy kursor ns-resize. */}
@@ -3644,32 +3408,19 @@ kineticScroll: {
           ) : null}
 
           {/*
-            DrawingsLayer musi odbierać zdarzenia także w trybie SELECT.
-            Dzięki temu łapka działa kontekstowo:
-            - nad BOX-em przesuwa BOX,
-            - nad pustym miejscem przesuwa cały wykres.
-            Sam rysunek pozostaje przypięty do TIME + PRICE podczas pan/zoom.
+            IMPORTANT:
+            DrawingsLayer has its own canvas above lightweight-charts.
+            In SELECT mode we let mouse/touch events pass through to the chart,
+            so drag left/right + wheel zoom + axis scaling work normally.
+            Drawing tools re-enable the drawing overlay.
           */}
           <div
-            className="absolute inset-0 z-[20] pointer-events-auto"
+            className={`absolute inset-0 z-[20] ${
+              activeDrawTool === "SELECT" ? "pointer-events-none" : "pointer-events-auto"
+            }`}
             style={{
-              cursor: activeDrawTool === "SELECT" ? "grab" : "crosshair",
-              // Tablet / telefon: blokujemy natywny scroll strony nad wykresem,
-              // żeby Pointer Events mogły przesuwać wykres jednym palcem.
-              touchAction: activeDrawTool === "SELECT" ? "none" : "none",
-              userSelect: "none",
-              WebkitUserSelect: "none",
+              cursor: activeDrawTool === "SELECT" ? undefined : "crosshair",
             }}
-            // WAŻNE: wcześniej funkcje beginPlotPan/movePlotPan istniały, ale nie były
-            // podpięte do warstwy nad wykresem. Dlatego na tablecie działały tylko
-            // osobne uchwyty osi ceny/czasu. Teraz pusty obszar wykresu obsługuje
-            // pan X/Y dla touch, pen i myszy. DrawingsLayer nadal ma pierwszeństwo
-            // nad obiektami i może zatrzymać propagację podczas edycji rysunku.
-            onPointerDown={activeDrawTool === "SELECT" ? beginPlotPan : undefined}
-            onPointerMove={activeDrawTool === "SELECT" ? movePlotPan : undefined}
-            onPointerUp={activeDrawTool === "SELECT" ? endPlotPan : undefined}
-            onPointerCancel={activeDrawTool === "SELECT" ? endPlotPan : undefined}
-            onWheel={activeDrawTool === "SELECT" ? handlePlotWheel : undefined}
           >
             <DrawingsLayer
               wrapRef={containerRef}
