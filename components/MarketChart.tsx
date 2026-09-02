@@ -3027,7 +3027,7 @@ kineticScroll: {
       };
 
       // Mysz/pen: pełny PAN wykresu.
-      // Touch: nie blokujemy od razu gestu, aby pionowy ruch mógł przewijać stronę.
+      // Touch: po małym progu ruchu przejmujemy pełny PAN X/Y wykresu.
       if (e.pointerType !== "touch") {
         e.currentTarget.setPointerCapture?.(e.pointerId);
         e.preventDefault();
@@ -3046,26 +3046,19 @@ kineticScroll: {
       const dx = e.clientX - state.startX;
       const dy = e.clientY - state.startY;
 
-      // TOUCH:
-      // - pionowy gest przewija STRONĘ (ważne w landscape/fullscreen),
-      // - poziomy gest przesuwa WYKRES w czasie.
-      // Dzięki temu wykres nie "połyka" całego scrolla strony.
+      // TOUCH W ŚRODKU WYKRESU:
+      // po przekroczeniu małego progu przejmujemy gest dla wykresu.
+      // Dzięki temu palcem można przesuwać wykres jednocześnie X i Y.
+      // Przewijanie całej strony nadal działa poza obszarem wykresu.
       if (state.pointerType === "touch" && state.gesture === "pending") {
         const ax = Math.abs(dx);
         const ay = Math.abs(dy);
-        const threshold = 8;
+        const threshold = 6;
 
-        if (ay >= threshold && ay > ax * 1.15) {
-          plotPanRef.current = null;
-          return;
-        }
+        if (Math.max(ax, ay) < threshold) return;
 
-        if (ax >= threshold && ax > ay * 1.15) {
-          state.gesture = "chart";
-          try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch {}
-        } else {
-          return;
-        }
+        state.gesture = "chart";
+        try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch {}
       }
 
       // PAN X — przeciąganie lewo/prawo.
@@ -3077,22 +3070,20 @@ kineticScroll: {
         to: state.to - barsDelta,
       });
 
-      // PAN Y myszką/penem zostaje bez zmian.
-      // Na dotyku pionowy gest jest zarezerwowany dla scrolla strony.
-      if (state.pointerType !== "touch") {
-        const priceSpan = Math.max(1e-12, state.priceMax - state.priceMin);
-        const priceShift = (dy / state.height) * priceSpan;
-        const minValue = state.priceMin + priceShift;
-        const maxValue = state.priceMax + priceShift;
+      // PAN Y — działa dla myszki, pena i dotyku.
+      // Przeciągnięcie palcem w górę/dół w środku wykresu przesuwa zakres cen.
+      const priceSpan = Math.max(1e-12, state.priceMax - state.priceMin);
+      const priceShift = (dy / state.height) * priceSpan;
+      const minValue = state.priceMin + priceShift;
+      const maxValue = state.priceMax + priceShift;
 
-        candleSeries.applyOptions({
-          autoscaleInfoProvider: (() => ({
-            priceRange: { minValue, maxValue },
-            margins: { above: 0, below: 0 },
-          })) as any,
-        } as any);
-        chart.priceScale("right").applyOptions({ autoScale: true });
-      }
+      candleSeries.applyOptions({
+        autoscaleInfoProvider: (() => ({
+          priceRange: { minValue, maxValue },
+          margins: { above: 0, below: 0 },
+        })) as any,
+      } as any);
+      chart.priceScale("right").applyOptions({ autoScale: true });
 
       setOverlayTick((v) => v + 1);
       e.preventDefault();
@@ -3201,21 +3192,6 @@ kineticScroll: {
           </button>
         </div>
 
-        <div className="pointer-events-none absolute left-3 top-16 z-[31] rounded-2xl border border-white/10 bg-black/50 px-3 py-2 text-[11px] text-white/80 backdrop-blur">
-          <div>
-            <span className="text-slate-400">FREEZE:</span> {freezeDebug.frozen ? "YES" : "NO"}
-          </div>
-          <div>
-            <span className="text-slate-400">ENTRY:</span> {freezeDebug.entry ?? "—"}
-          </div>
-          <div>
-            <span className="text-slate-400">ANCHOR:</span> {freezeDebug.anchorTime ?? "—"}
-          </div>
-          <div>
-            <span className="text-slate-400">IDX:</span> {freezeDebug.crossedIdx ?? "—"}
-          </div>
-        </div>
-
         <style>{`
           @keyframes entryPulse {
             0% {
@@ -3260,7 +3236,7 @@ kineticScroll: {
             style={{
               width: "100%",
               height,
-              touchAction: activeDrawTool === "SELECT" ? "pan-y" : "none",
+              touchAction: "none",
               userSelect: "none",
               WebkitUserSelect: "none",
               cursor: activeDrawTool === "SELECT" ? "grab" : "crosshair",
@@ -3276,7 +3252,7 @@ kineticScroll: {
                 right: 86,
                 bottom: 30,
                 cursor: plotPanRef.current ? "grabbing" : "grab",
-                touchAction: "pan-y",
+                touchAction: "none",
                 background: "transparent",
               }}
               onPointerDown={beginPlotPan}
