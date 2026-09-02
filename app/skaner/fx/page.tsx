@@ -1781,7 +1781,7 @@ function PocMiniScanner({
           : summary.label;
 
   return (
-    <div className="w-[860px] min-w-[720px] max-w-none self-start overflow-hidden rounded-[18px] sm:rounded-[22px] border border-sky-300/35 bg-[linear-gradient(180deg,#174f86_0%,#123f6d_48%,#0d335a_100%)] shadow-[0_14px_35px_rgba(0,0,0,.22),0_0_28px_rgba(14,165,233,.08),inset_0_1px_0_rgba(255,255,255,.08)]">
+    <div className="w-full min-w-0 self-start overflow-hidden rounded-[18px] sm:rounded-[22px] border border-sky-300/35 bg-[linear-gradient(180deg,#174f86_0%,#123f6d_48%,#0d335a_100%)] shadow-[0_14px_35px_rgba(0,0,0,.22),0_0_28px_rgba(14,165,233,.08),inset_0_1px_0_rgba(255,255,255,.08)]">
       {/* HEADER */}
       <div className="flex items-center justify-between gap-2 border-b border-sky-200/10 bg-[#123d68]/70 px-2.5 py-2 sm:px-3 sm:py-2.5 xl:px-4 xl:py-3">
         <div className="flex min-w-0 items-center gap-3">
@@ -1843,7 +1843,7 @@ function PocMiniScanner({
       </div>
 
       {/* TIMEFRAMES */}
-      <div className="flex gap-1.5 overflow-x-auto px-2 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-2 sm:px-3 xl:grid xl:grid-cols-7 xl:overflow-visible xl:px-3.5 xl:py-3">
+      <div className="flex gap-1.5 overflow-x-auto px-2 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:grid sm:grid-cols-7 sm:gap-1.5 sm:overflow-visible sm:px-2.5 sm:py-2 xl:gap-2 xl:px-3.5 xl:py-3">
         {POC_TIMEFRAMES.map((pocTf) => {
           const cell = state.cells.find((item) => item.tf === pocTf);
 
@@ -1882,7 +1882,7 @@ function PocMiniScanner({
             <div
               key={pocTf}
               className={cn(
-                "group min-w-[92px] shrink-0 rounded-[10px] border px-2 py-2 text-center transition sm:min-w-[105px] sm:rounded-[12px] xl:min-w-0 xl:rounded-[14px] xl:py-2.5",
+                "group min-w-[82px] shrink-0 rounded-[10px] border px-1.5 py-1.5 text-center transition sm:min-w-0 sm:rounded-[12px] sm:px-1.5 sm:py-1.5 xl:rounded-[14px] xl:px-2 xl:py-2.5",
                 isBuy
                   ? "border-emerald-300/15 bg-[linear-gradient(180deg,#104b69_0%,#0d3f61_100%)]"
                   : isSell
@@ -1924,7 +1924,7 @@ function PocMiniScanner({
                 {trendText}
               </div>
 
-              <div className="mt-2 flex justify-center gap-[2px]">
+              <div className="mt-1.5 flex justify-center gap-[2px]">
                 {Array.from({ length: 5 }).map((_, segmentIndex) => (
                   <span
                     key={segmentIndex}
@@ -2604,8 +2604,8 @@ React.useEffect(() => {
 
       // Tablet: trochę większy wykres, nadal kompaktowe panele.
       if (width < 1280) {
-        setPanelH(300);
-        setChartHeight(Math.max(400, Math.min(500, window.innerHeight - 280)));
+        setPanelH(230);
+        setChartHeight(Math.max(430, Math.min(540, window.innerHeight - 250)));
         return;
       }
 
@@ -3682,7 +3682,7 @@ if (closedNow.length) {
                     }}
                     onClick={() => setSelectedSymbol(r.symbol)}
                     className={cn(
-                      "relative cursor-pointer overflow-hidden rounded-lg border p-2 transition-all duration-200 sm:rounded-xl sm:p-2.5 xl:rounded-2xl xl:p-4",
+                      "relative cursor-pointer overflow-hidden rounded-lg border p-2 transition-all duration-200 sm:rounded-xl sm:p-2 xl:rounded-2xl xl:p-4",
                       active ? "border-cyan-300/45 bg-[linear-gradient(135deg,rgba(13,107,184,.88),rgba(10,67,125,.88))] shadow-[0_0_24px_rgba(34,211,238,.16),inset_0_1px_0_rgba(255,255,255,.06)]" : "border-sky-300/14 bg-[linear-gradient(180deg,rgba(11,49,92,.78),rgba(7,37,72,.84))] hover:border-sky-300/28 hover:bg-[#10477e]",
                       isFlashing ? "ring-2 ring-emerald-400/60 shadow-[0_0_24px_rgba(52,211,153,0.25)]" : ""
                     )}
@@ -3716,7 +3716,7 @@ if (closedNow.length) {
                       </div>
                     </div>
 
-                    <div className="mt-2">
+                    <div className="mt-1.5">
                       <LiquidityBar value={r.liquidity} />
                     </div>
 
@@ -3783,7 +3783,7 @@ if (closedNow.length) {
                     <h2 className="text-base font-extrabold tracking-tight text-white sm:text-lg xl:text-xl">{selected.symbol}</h2>
                   </div>
 
-                  <div className="flex w-full min-w-0 items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-2">
+                  <div className="flex w-full min-w-0 items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:overflow-visible sm:gap-1.5 lg:gap-2 xl:flex-nowrap xl:overflow-x-auto">
                     {TIMEFRAMES.map((t) => (
                       <button
                         key={t}
@@ -4420,11 +4420,11 @@ if (closedNow.length) {
               </div>
 
               <div className="mt-1 w-full overflow-hidden rounded-2xl border border-sky-300/16 bg-[#061c37]/78 shadow-[inset_0_1px_0_rgba(255,255,255,.03)]">
-                <div className="border-b border-sky-300/12 bg-[#0b315c]/75 px-4 py-3">
+                <div className="border-b border-sky-300/12 bg-[#0b315c]/75 px-3 py-2 sm:px-4 sm:py-2.5 xl:py-3">
                   <div className="text-sm font-semibold text-white">Closed Trades</div>
                 </div>
 
-                <div className="h-[220px] overflow-auto rounded-b-2xl sm:h-[250px]">
+                <div className="h-[150px] overflow-auto rounded-b-2xl sm:h-[170px] xl:h-[250px]">
                   <table className="min-w-[840px] w-full text-xs sm:text-sm">
                     <thead className="sticky top-0 bg-[#082749] text-sky-100/80">
                       <tr className="border-b border-sky-300/12">

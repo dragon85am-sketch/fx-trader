@@ -253,6 +253,38 @@ function rightUiReservePx(rightPadOn: boolean) {
   return BASE + DRAW_PANEL_W;
 }
 
+
+// =========================
+// LOCAL CHART TIME
+// =========================
+// Lightweight Charts używa timestampów UTC.
+// Te formatery zmieniają tylko sposób wyświetlania czasu na lokalny czas
+// przeglądarki. Same timestampy pozostają bez zmian, więc RENKO i zwykłe
+// świece nadal są zsynchronizowane 1:1 po przełączaniu.
+function localChartDate(time: unknown) {
+  const ts = Number(toUTCTimestamp(time));
+  return new Date(ts * 1000);
+}
+
+function formatLocalChartTime(time: unknown) {
+  return localChartDate(time).toLocaleTimeString("pl-PL", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+function formatLocalChartDateTime(time: unknown) {
+  return localChartDate(time).toLocaleString("pl-PL", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
 /* =========================
    INDICATORS
 ========================= */
@@ -437,28 +469,57 @@ function toRenkoCandles(safeRaw: CandlestickData[], boxSize: number): Candlestic
   const first = safeRaw[0] as any;
 
   let lastClose = Number(first.close);
-  let t = (safeRaw[0].time as number) || Math.floor(Date.now() / 1000);
+  let lastUsedTime = Number(first.time) - 1;
 
-  const nextTime = () => {
-    t += 1;
-    return t as UTCTimestamp;
+  // RENKO ma korzystać z TEJ SAMEJ osi czasu co zwykłe świece.
+  // Pierwsza cegła utworzona z danej świecy dostaje dokładny czas tej świecy.
+  // Jeśli jedna świeca tworzy kilka cegieł, kolejne dostają +1s, +2s...
+  // Dzięki temu czasy pozostają unikalne dla Lightweight Charts, ale wizualnie
+  // wszystkie cegły nadal siedzą dokładnie przy czasie świecy źródłowej.
+  const renkoTimeForSource = (sourceTimeRaw: unknown, brickOffset: number) => {
+    const sourceTime = Number(sourceTimeRaw);
+    const base = Number.isFinite(sourceTime)
+      ? Math.floor(sourceTime)
+      : Math.max(lastUsedTime + 1, Math.floor(Date.now() / 1000));
+
+    const candidate = base + brickOffset;
+    const next = Math.max(candidate, lastUsedTime + 1);
+    lastUsedTime = next;
+    return next as UTCTimestamp;
   };
 
   for (let i = 1; i < safeRaw.length; i++) {
     const c = safeRaw[i] as any;
     const price = Number(c.close);
+    let brickOffset = 0;
 
     while (price >= lastClose + box) {
       const open = lastClose;
       const close = lastClose + box;
-      out.push({ time: nextTime(), open, high: close, low: open, close });
+      out.push({
+        time: renkoTimeForSource(c.time, brickOffset++),
+        open,
+        high: close,
+        low: open,
+        close,
+        // Oryginalny czas świecy źródłowej zachowujemy także osobno do mapowania
+        // sygnałów Bollingera na odpowiadającą cegłę RENKO.
+        sourceTime: Number(c.time),
+      } as any);
       lastClose = close;
     }
 
     while (price <= lastClose - box) {
       const open = lastClose;
       const close = lastClose - box;
-      out.push({ time: nextTime(), open, high: open, low: close, close });
+      out.push({
+        time: renkoTimeForSource(c.time, brickOffset++),
+        open,
+        high: open,
+        low: close,
+        close,
+        sourceTime: Number(c.time),
+      } as any);
       lastClose = close;
     }
   }
@@ -466,7 +527,14 @@ function toRenkoCandles(safeRaw: CandlestickData[], boxSize: number): Candlestic
   if (!out.length) {
     const base = safeRaw[safeRaw.length - 1] as any;
     const p = Number(base.close);
-    out.push({ time: nextTime(), open: p, high: p, low: p, close: p });
+    out.push({
+      time: renkoTimeForSource(base.time, 0),
+      open: p,
+      high: p,
+      low: p,
+      close: p,
+      sourceTime: Number(base.time),
+    } as any);
   }
 
   return ensureStrictlyIncreasingTimes(out);
@@ -898,47 +966,60 @@ function detectCandlePatterns(
 }
 
 /* =========================
-   RENKO FORMATIONS
-   BUY  = minimum 2 czerwone cegły -> minimum 2 zielone cegły
-   SELL = minimum 2 zielone cegły -> minimum 2 czerwone cegły
+   RENKO SIGNALS = TA SAMA LOGIKA CO BOLLINGER
 
-   Sygnałem jest DRUGA cegła potwierdzająca zmianę kierunku.
-   To właśnie ona jest zaznaczana na żółto.
+   Sygnały nie są już liczone z układu kolorów cegieł RENKO.
+   Najpierw wykrywamy BUY/SELL na zwykłych świecach dokładnie tą samą
+   logiką BB Bar1 + Bar2 co na wykresie Bollinger, a potem przypinamy
+   wynik do cegły RENKO utworzonej z tej samej świecy źródłowej.
+
+   Dzięki temu:
+   - Bollinger BUY  -> BUY na odpowiadającej cegle RENKO
+   - Bollinger SELL -> SELL na odpowiadającej cegle RENKO
+   - nie powstają dodatkowe sygnały tylko dlatego, że zmienił się kolor cegieł
 ========================= */
-function detectRenkoPatterns(candles: CandlestickData[]): CandlePattern[] {
+function detectRenkoPatternsFromBollinger(
+  rawCandles: CandlestickData[],
+  renkoBricks: CandlestickData[],
+  bb?: BbConfig
+): CandlePattern[] {
+  if (!bb || !rawCandles.length || !renkoBricks.length) return [];
+
+  const bbSignals = detectCandlePatterns(rawCandles, bb);
+  if (!bbSignals.length) return [];
+
   const out: CandlePattern[] = [];
-  if (candles.length < 4) return out;
-
   const n = (v: any) => toNum(v);
-  const bull = (c: any) => n(c.close) > n(c.open);
-  const bear = (c: any) => n(c.close) < n(c.open);
 
-  for (let i = 3; i < candles.length; i++) {
-    const a: any = candles[i - 3];
-    const b: any = candles[i - 2];
-    const c: any = candles[i - 1];
-    const d: any = candles[i];
+  for (const signal of bbSignals) {
+    const signalSourceTime = Number(signal.time);
 
-    // BUY: dwie czerwone cegły korekty + dwie zielone cegły potwierdzenia.
-    if (bear(a) && bear(b) && bull(c) && bull(d)) {
-      out.push({
-        time: d.time as UTCTimestamp,
-        label: "BUY",
-        side: "BUY",
-        price: n(d.low),
-      });
-      continue;
+    // Najlepiej: ostatnia cegła wygenerowana przez dokładnie tę świecę Bar 2.
+    const exact = renkoBricks.filter(
+      (brick: any) => Number(brick?.sourceTime) === signalSourceTime
+    );
+
+    let brick: any = exact.length ? exact[exact.length - 1] : undefined;
+
+    // Jeżeli Bar 2 nie utworzył nowej cegły, przypnij sygnał do pierwszej
+    // kolejnej cegły. To zachowuje sygnał z BB bez wymyślania nowego RENKO setupu.
+    if (!brick) {
+      brick = renkoBricks.find(
+        (b: any) => Number(b?.sourceTime) > signalSourceTime
+      ) as any;
     }
 
-    // SELL: dwie zielone cegły wzrostowe + dwie czerwone cegły potwierdzenia.
-    if (bull(a) && bull(b) && bear(c) && bear(d)) {
-      out.push({
-        time: d.time as UTCTimestamp,
-        label: "SELL",
-        side: "SELL",
-        price: n(d.low),
-      });
-    }
+    if (!brick) continue;
+
+    out.push({
+      time: brick.time as UTCTimestamp,
+      label: signal.label,
+      side: signal.side,
+      price:
+        signal.side === "SELL"
+          ? n(brick.high)
+          : n(brick.low),
+    });
   }
 
   const unique = Array.from(
@@ -956,10 +1037,11 @@ function detectRenkoPatterns(candles: CandlestickData[]): CandlePattern[] {
 /* =========================
    RENKO PATTERN HIGHLIGHT
 ========================= */
-function highlightRenkoPatternBricks(candles: CandlestickData[]) {
+function highlightRenkoPatternBricks(
+  candles: CandlestickData[],
+  signals: CandlePattern[]
+) {
   if (!candles.length) return candles;
-
-  const signals = detectRenkoPatterns(candles);
   if (!signals.length) return candles;
 
   const signalTimes = new Set(signals.map((s) => Number(s.time)));
@@ -1187,7 +1269,13 @@ patternsEnabled = false,
 
     try {
       const detectedPatterns = renko
-        ? detectRenkoPatterns(safe)
+        ? detectRenkoPatternsFromBollinger(
+            rawCacheRef.current?.length
+              ? rawCacheRef.current
+              : normalizeCandles(candles),
+            safe,
+            bbConfig
+          )
         : detectCandlePatterns(safe, bbConfig);
 
       return detectedPatterns.flatMap((p, idx) => {
@@ -2183,6 +2271,10 @@ patternsEnabled = false,
           bottom: 0.12,
         },
       },
+      localization: {
+        locale: "pl-PL",
+        timeFormatter: (time: any) => formatLocalChartDateTime(time),
+      },
       timeScale: {
         borderVisible: true,
         borderColor: "rgba(148,163,184,0.38)",
@@ -2195,6 +2287,7 @@ patternsEnabled = false,
         rightBarStaysOnScroll: true,
         timeVisible: true,
         secondsVisible: false,
+        tickMarkFormatter: (time: any) => formatLocalChartTime(time),
       },
 handleScroll: {
   // Pan lewo/prawo obsługujemy własnym pointer handlerem poniżej.
@@ -2373,9 +2466,14 @@ kineticScroll: {
 
     displayCacheRef.current = safeForChart;
 
+    const renkoBbSignals =
+      renko && patternsEnabled
+        ? detectRenkoPatternsFromBollinger(safeRaw, safeForChart, bbConfig)
+        : [];
+
     const chartData =
       renko && patternsEnabled
-        ? highlightRenkoPatternBricks(safeForChart)
+        ? highlightRenkoPatternBricks(safeForChart, renkoBbSignals)
         : safeForChart;
 
     candleSeries.setData(chartData);
@@ -2692,9 +2790,13 @@ kineticScroll: {
       const renkoData = toRenkoCandles(renkoRaw, box);
       displayCacheRef.current = renkoData;
 
+      const renkoBbSignals = patternsEnabled
+        ? detectRenkoPatternsFromBollinger(safeRaw, renkoData, bbConfig)
+        : [];
+
       const renkoChartData =
         patternsEnabled
-          ? highlightRenkoPatternBricks(renkoData)
+          ? highlightRenkoPatternBricks(renkoData, renkoBbSignals)
           : renkoData;
 
       candleSeries.setData(renkoChartData);
