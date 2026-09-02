@@ -2364,7 +2364,6 @@ export default function MarketScannerPage() {
 
   const [panelH, setPanelH] = React.useState<number>(780);
   const [chartHeight, setChartHeight] = React.useState<number>(600);
-  const [compactTouchUi, setCompactTouchUi] = React.useState(false);
 
   const candlesCache = React.useRef<Map<string, Candle[]>>(new Map());
   const [loading, setLoading] = React.useState(false);
@@ -2594,33 +2593,27 @@ React.useEffect(() => {
 
     const compute = () => {
       const width = window.innerWidth;
-      const height = window.innerHeight;
-      const coarsePointer = window.matchMedia?.("(pointer: coarse)")?.matches ?? false;
-      const touchTablet = coarsePointer && width < 1700;
 
-      setCompactTouchUi(touchTablet || width < 1280);
-
-      // TELEFON: bardzo kompaktowa lista, ale zostawiamy miejsce na pierwszy instrument.
+      // MOBILE: mały panel instrumentów + duży wykres.
       if (width < 640) {
-        setPanelH(205);
-        setChartHeight(Math.max(330, Math.min(420, height - 320)));
+        // Telefon: panel instrumentów mały, wykres wygodny ale nie za wysoki.
+        setPanelH(165);
+        setChartHeight(Math.max(330, Math.min(420, window.innerHeight - 320)));
         return;
       }
 
-      // TABLET / urządzenie dotykowe.
-      // Samsung w trybie poziomym potrafi zgłaszać szerokość > 1280 px,
-      // dlatego wykrywamy też pointer: coarse zamiast traktować go jak desktop.
-      if (touchTablet || width < 1280) {
-        setPanelH(225);
-        setChartHeight(Math.max(410, Math.min(540, height - 230)));
+      // Tablet: trochę większy wykres, nadal kompaktowe panele.
+      if (width < 1280) {
+        setPanelH(155);
+        setChartHeight(Math.max(430, Math.min(540, window.innerHeight - 250)));
         return;
       }
 
       // DESKTOP: zachowujemy dotychczasowy układ.
-      const h = Math.max(620, height - HEADER_OFFSET - BOTTOM_PAD);
+      const h = Math.max(620, window.innerHeight - HEADER_OFFSET - BOTTOM_PAD);
       setPanelH(h);
       setChartHeight(
-        Math.max(560, Math.min(780, height - 360))
+        Math.max(560, Math.min(780, window.innerHeight - 360))
       );
     };
 
@@ -3601,43 +3594,29 @@ if (closedNow.length) {
 
       <div className="flex w-full min-w-0 flex-col gap-3 xl:flex-row xl:gap-4">
         <Card className="w-full min-w-0 shrink-0 overflow-hidden border-sky-300/20 xl:w-[380px] bg-[linear-gradient(180deg,rgba(20,74,128,.96)_0%,rgba(12,54,101,.96)_52%,rgba(8,40,78,.98)_100%)] shadow-[0_18px_45px_rgba(0,10,35,.34),0_0_28px_rgba(14,165,233,.10),inset_0_1px_0_rgba(255,255,255,.06)]" style={{ height: panelH }}>
-          <CardContent className={cn(
-            "flex h-full flex-col",
-            compactTouchUi ? "gap-1.5 p-2.5" : "gap-1.5 p-2.5 sm:gap-2 sm:p-3 xl:gap-3 xl:p-5"
-          )}>
+          <CardContent className="flex h-full flex-col gap-1.5 p-2.5 sm:gap-2 sm:p-3 xl:gap-3 xl:p-5">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className={cn("font-bold text-white", compactTouchUi ? "text-sm" : "text-xs sm:text-sm xl:text-lg")}>Lista instrumentów</p>
-                {!compactTouchUi ? (
-                  <p className="hidden text-xs text-sky-100/50 sm:block xl:text-sm">Search • BUY / SELL • Filter READY</p>
-                ) : null}
+                <p className="text-xs font-bold text-white sm:text-sm xl:text-lg">Lista instrumentów</p>
+                <p className="hidden text-xs text-sky-100/50 sm:block xl:text-sm">Search • BUY / SELL • Filter READY</p>
               </div>
 
-              {!compactTouchUi ? (
-                <div className="text-right text-xs text-sky-100/55">
-                  {loading ? "Sync…" : lastSync ? `Sync: ${formatSyncUTC(lastSync)}` : "—"}
-                </div>
-              ) : null}
+              <div className="text-right text-xs text-sky-100/55">
+                {loading ? "Sync…" : lastSync ? `Sync: ${formatSyncUTC(lastSync)}` : "—"}
+              </div>
             </div>
 
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Szukaj… (np. EURUSD / BTCUSDT)"
-              className={cn(
-                "w-full border border-sky-300/20 bg-[#061c37]/80 text-white shadow-[inset_0_1px_8px_rgba(0,0,0,.16)] outline-none placeholder:text-sky-100/35 focus:border-cyan-300/45 focus:ring-2 focus:ring-cyan-400/10",
-                compactTouchUi
-                  ? "h-8 rounded-lg px-2.5 py-1 text-[11px]"
-                  : "rounded-lg px-2.5 py-1.5 text-[10px] sm:rounded-xl sm:px-3 sm:py-2 sm:text-xs xl:rounded-2xl xl:px-4 xl:py-2.5 xl:text-sm"
-              )}
+              className="w-full rounded-lg border border-sky-300/20 bg-[#061c37]/80 px-2.5 py-1.5 text-[10px] sm:rounded-xl sm:px-3 sm:py-2 sm:text-xs xl:rounded-2xl xl:px-4 xl:py-2.5 xl:text-sm text-white shadow-[inset_0_1px_8px_rgba(0,0,0,.16)] outline-none placeholder:text-sky-100/35 focus:border-cyan-300/45 focus:ring-2 focus:ring-cyan-400/10"
             />
 
-            <div className={cn("flex flex-wrap", compactTouchUi ? "gap-1.5" : "gap-2")}>
+            <div className="flex flex-wrap gap-2">
               <button
                 className={cn(
-                  compactTouchUi
-                    ? "rounded-lg border px-2.5 py-1 text-[10px] font-semibold transition"
-                    : "rounded-lg border px-2.5 py-1.5 text-[10px] font-semibold transition sm:rounded-xl sm:text-xs xl:rounded-2xl xl:px-3 xl:py-2 xl:text-sm",
+                  "rounded-lg border px-2.5 py-1.5 text-[10px] font-semibold transition sm:rounded-xl sm:text-xs xl:rounded-2xl xl:px-3 xl:py-2 xl:text-sm",
                   directionFilter === "BUY"
                     ? "border-emerald-300/40 bg-emerald-500/20 text-emerald-100 shadow-[0_0_18px_rgba(16,185,129,.18)]"
                     : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/75 hover:border-emerald-300/30 hover:bg-emerald-500/10 hover:text-emerald-100"
@@ -3652,9 +3631,7 @@ if (closedNow.length) {
 
               <button
                 className={cn(
-                  compactTouchUi
-                    ? "rounded-lg border px-2.5 py-1 text-[10px] font-semibold transition"
-                    : "rounded-lg border px-2.5 py-1.5 text-[10px] font-semibold transition sm:rounded-xl sm:text-xs xl:rounded-2xl xl:px-3 xl:py-2 xl:text-sm",
+                  "rounded-lg border px-2.5 py-1.5 text-[10px] font-semibold transition sm:rounded-xl sm:text-xs xl:rounded-2xl xl:px-3 xl:py-2 xl:text-sm",
                   directionFilter === "SELL"
                     ? "border-red-300/40 bg-red-500/20 text-red-100 shadow-[0_0_18px_rgba(239,68,68,.18)]"
                     : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/75 hover:border-red-300/30 hover:bg-red-500/10 hover:text-red-100"
@@ -3669,9 +3646,7 @@ if (closedNow.length) {
 
               <button
                 className={cn(
-                  compactTouchUi
-                    ? "rounded-lg border px-2.5 py-1 text-[10px] font-semibold transition"
-                    : "rounded-lg border px-2.5 py-1.5 text-[10px] font-semibold transition sm:rounded-xl sm:text-xs xl:rounded-2xl xl:px-3 xl:py-2 xl:text-sm",
+                  "rounded-lg border px-2.5 py-1.5 text-[10px] font-semibold transition sm:rounded-xl sm:text-xs xl:rounded-2xl xl:px-3 xl:py-2 xl:text-sm",
                   onlyReady
                     ? "border-emerald-300/30 bg-emerald-500/20 text-emerald-100 shadow-[0_0_16px_rgba(16,185,129,.16)]"
                     : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/75 hover:border-sky-300/30 hover:bg-[#12477f] hover:text-white"
@@ -3689,7 +3664,7 @@ if (closedNow.length) {
               </div>
             )}
 
-            <div className={cn("min-h-0 flex-1 overflow-auto pr-1", compactTouchUi ? "space-y-1.5" : "space-y-2")}>
+            <div className="min-h-0 flex-1 space-y-2 overflow-auto pr-1">
               {filteredRows.map((r) => {
                 const active = r.symbol === selectedSymbol;
                 const scannerOn = r.liquidity >= LIQ_THRESHOLD_HIGH && (r.confirmationCount ?? 0) === 4 && !!r.confirmationSide;
@@ -3707,9 +3682,7 @@ if (closedNow.length) {
                     }}
                     onClick={() => setSelectedSymbol(r.symbol)}
                     className={cn(
-                      compactTouchUi
-                        ? "relative cursor-pointer overflow-hidden rounded-lg border p-2 transition-all duration-200"
-                        : "relative cursor-pointer overflow-hidden rounded-lg border p-2 transition-all duration-200 sm:rounded-xl sm:p-2 xl:rounded-2xl xl:p-4",
+                      "relative cursor-pointer overflow-hidden rounded-lg border p-2 transition-all duration-200 sm:rounded-xl sm:p-2 xl:rounded-2xl xl:p-4",
                       active ? "border-cyan-300/45 bg-[linear-gradient(135deg,rgba(13,107,184,.88),rgba(10,67,125,.88))] shadow-[0_0_24px_rgba(34,211,238,.16),inset_0_1px_0_rgba(255,255,255,.06)]" : "border-sky-300/14 bg-[linear-gradient(180deg,rgba(11,49,92,.78),rgba(7,37,72,.84))] hover:border-sky-300/28 hover:bg-[#10477e]",
                       isFlashing ? "ring-2 ring-emerald-400/60 shadow-[0_0_24px_rgba(52,211,153,0.25)]" : ""
                     )}
@@ -3743,11 +3716,11 @@ if (closedNow.length) {
                       </div>
                     </div>
 
-                    <div className={compactTouchUi ? "mt-1" : "mt-1.5"}>
+                    <div className="mt-1.5">
                       <LiquidityBar value={r.liquidity} />
                     </div>
 
-                    <div className={cn("flex justify-between text-sky-100/78", compactTouchUi ? "mt-1 text-xs" : "mt-2 text-sm")}>
+                    <div className="mt-2 flex justify-between text-sm text-sky-100/78">
                       <span>TF: {tf}</span>
                       <span>{r.signal === "UP" ? "Trend UP" : r.signal === "DOWN" ? "Trend DOWN" : "Brak"}</span>
                     </div>
@@ -3792,7 +3765,7 @@ if (closedNow.length) {
                         }</span> : null}
                       </div>
                     ) : (
-                      compactTouchUi ? null : <div className="mt-2 text-xs text-sky-100/30">—</div>
+                      <div className="mt-2 text-xs text-sky-100/30">—</div>
                     )}
                   </div>
                 );
