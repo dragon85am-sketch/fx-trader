@@ -147,13 +147,19 @@ React.useEffect(() => {
 
   // SELECT mode:
   // - drag on drawing => move/edit drawing
-  // - drag on empty chart => pan chart horizontally
+  // - drag on empty chart => pan chart horizontally AND vertically
   const chartPanRef = React.useRef<{
     active: boolean;
     lastClientX: number;
+    lastClientY: number;
+    priceMin: number | null;
+    priceMax: number | null;
   }>({
     active: false,
     lastClientX: 0,
+    lastClientY: 0,
+    priceMin: null,
+    priceMax: null,
   });
 
   React.useEffect(() => {
@@ -562,6 +568,62 @@ if (o.type === "FIBO") {
     draw();
   }, [draw]);
 
+  // ============================================================
+  // FREEZE DRAWINGS TO MARKET COORDINATES
+  //
+  // Drawings are stored as TIME + PRICE, not as screen pixels.
+  // When the chart is panned/zoomed, Lightweight Charts changes the
+  // conversion from TIME/PRICE -> X/Y. The canvas must therefore be
+  // redrawn on every visible-range change. Without this subscription
+  // the candles move, but the already rendered canvas can remain in the
+  // old pixel position, which makes RECT/lines look like they slide.
+  // ============================================================
+  React.useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+
+    let raf = 0;
+    const redraw = () => {
+      if (raf) cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        resize();
+        draw();
+      });
+    };
+
+    const timeScale = chart.timeScale();
+
+    try {
+      timeScale.subscribeVisibleLogicalRangeChange(redraw);
+    } catch {}
+
+    try {
+      timeScale.subscribeVisibleTimeRangeChange(redraw);
+    } catch {}
+
+    // Also redraw while the user wheels or drags anywhere around the chart.
+    // This covers custom pan/axis handlers that live outside this canvas.
+    const wrap = wrapRef.current;
+    const onPointerMove = () => redraw();
+    const onWheel = () => redraw();
+    wrap?.addEventListener("pointermove", onPointerMove, { passive: true });
+    wrap?.addEventListener("wheel", onWheel, { passive: true });
+
+    redraw();
+
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      try {
+        timeScale.unsubscribeVisibleLogicalRangeChange(redraw);
+      } catch {}
+      try {
+        timeScale.unsubscribeVisibleTimeRangeChange(redraw);
+      } catch {}
+      wrap?.removeEventListener("pointermove", onPointerMove);
+      wrap?.removeEventListener("wheel", onWheel);
+    };
+  }, [chartRef, wrapRef, resize, draw]);
+
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -618,6 +680,9 @@ if (o.type === "FIBO") {
         chartPanRef.current = {
           active: false,
           lastClientX: e.clientX,
+          lastClientY: e.clientY,
+          priceMin: null,
+          priceMax: null,
         };
 
         return;
@@ -637,6 +702,9 @@ if (o.type === "FIBO") {
         chartPanRef.current = {
           active: false,
           lastClientX: e.clientX,
+          lastClientY: e.clientY,
+          priceMin: null,
+          priceMax: null,
         };
 
         return;
@@ -651,9 +719,34 @@ if (o.type === "FIBO") {
         mode: "move",
       };
 
+      let priceMin: number | null = null;
+      let priceMax: number | null = null;
+
+      try {
+        const chart = chartRef.current;
+        const candles = getCandles();
+        const range = chart?.timeScale().getVisibleLogicalRange();
+
+        if (range && candles.length) {
+          const fromIdx = Math.max(0, Math.floor(Number(range.from)));
+          const toIdx = Math.min(candles.length - 1, Math.ceil(Number(range.to)));
+          const visible = candles.slice(fromIdx, toIdx + 1) as any[];
+          const lows = visible.map((c) => Number(c.low)).filter(Number.isFinite);
+          const highs = visible.map((c) => Number(c.high)).filter(Number.isFinite);
+
+          if (lows.length && highs.length) {
+            priceMin = Math.min(...lows);
+            priceMax = Math.max(...highs);
+          }
+        }
+      } catch {}
+
       chartPanRef.current = {
         active: true,
         lastClientX: e.clientX,
+        lastClientY: e.clientY,
+        priceMin,
+        priceMax,
       };
 
       return;
@@ -719,27 +812,48 @@ if (o.type === "FIBO") {
 
       if (chart) {
         const dx = e.clientX - chartPanRef.current.lastClientX;
+        const dy = e.clientY - chartPanRef.current.lastClientY;
         chartPanRef.current.lastClientX = e.clientX;
+        chartPanRef.current.lastClientY = e.clientY;
 
         try {
           const timeScale = chart.timeScale();
           const range = timeScale.getVisibleLogicalRange();
 
           if (range) {
-            const canvasWidth =
-              e.currentTarget.clientWidth || 1;
-
-            const logicalPerPixel =
-              (range.to - range.from) /
-              canvasWidth;
-
-            const shift =
-              -dx * logicalPerPixel;
+            const canvasWidth = e.currentTarget.clientWidth || 1;
+            const logicalPerPixel = (range.to - range.from) / canvasWidth;
+            const shift = -dx * logicalPerPixel;
 
             timeScale.setVisibleLogicalRange({
               from: range.from + shift,
               to: range.to + shift,
             });
+          }
+
+          // PAN Y: przesuwanie wykresu góra/dół myszką w pustym miejscu.
+          const series = candleSeriesRef.current;
+          const min = chartPanRef.current.priceMin;
+          const max = chartPanRef.current.priceMax;
+
+          if (series && min != null && max != null && max > min) {
+            const canvasHeight = e.currentTarget.clientHeight || 1;
+            const span = max - min;
+            const priceShift = (dy / canvasHeight) * span;
+            const nextMin = min + priceShift;
+            const nextMax = max + priceShift;
+
+            chartPanRef.current.priceMin = nextMin;
+            chartPanRef.current.priceMax = nextMax;
+
+            series.applyOptions({
+              autoscaleInfoProvider: (() => ({
+                priceRange: { minValue: nextMin, maxValue: nextMax },
+                margins: { above: 0, below: 0 },
+              })) as any,
+            } as any);
+
+            chart.priceScale("right").applyOptions({ autoScale: true });
           }
         } catch {}
       }
@@ -858,6 +972,9 @@ if (o.type === "FIBO") {
     chartPanRef.current = {
       active: false,
       lastClientX: 0,
+      lastClientY: 0,
+      priceMin: null,
+      priceMax: null,
     };
 
     dragRef.current = {

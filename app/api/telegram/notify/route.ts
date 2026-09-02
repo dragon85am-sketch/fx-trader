@@ -1,342 +1,464 @@
-﻿import { NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 
-type Payload = {
-  event?: "SCANNER_ON" | "ENTRY_FROZEN";
+export const runtime = "nodejs";
 
-  symbol?: string;
-  Symbol?: string;
-  ticker?: string;
-  pair?: string;
-  market?: string;
+type Side = "BUY" | "SELL";
+type ClosedStatus = "TP3" | "SL" | "TP1_BE";
+
+type WeeklyRow = {
+  instrument: string;
+  wins: number;
+  losses: number;
+  value: number;
+  unit: "pips" | "pts";
+};
+
+type TelegramPayload = {
+  type?: "SIGNAL" | "CLOSED" | "WEEKLY";
+
   instrument?: string;
-  data?: { symbol?: string };
-
+  side?: Side;
   tf?: string;
-  timeframe?: string;
-  interval?: string;
 
   liquidity?: number;
-  side?: "BUY" | "SELL";
+  rr?: number;
 
   entry?: number;
   sl?: number;
 
-  tps?: number[];
   tp1?: number;
   tp2?: number;
   tp3?: number;
 
-  rr?: number;
+  status?: ClosedStatus;
+  tp1Hit?: boolean;
+  tp2Hit?: boolean;
+  tp3Hit?: boolean;
 
-  time?: number; // unix seconds
-  timestamp?: number; // unix seconds
-
+  timeISO?: string;
   imageUrl?: string;
+
+  weekly?: {
+    periodStartISO: string;
+    periodEndISO: string;
+    total: number;
+    wins: number;
+    losses: number;
+    winRate: number;
+    totalPips: number;
+    totalPoints: number;
+    rows: WeeklyRow[];
+  };
 };
 
-function esc(s: string) {
-  return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+function esc(value: unknown) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
 }
 
-function fmtNum(n?: number, dp = 5) {
-  if (typeof n !== "number" || !Number.isFinite(n)) return "â€”";
-  return n.toFixed(dp);
+function price(value: number | undefined, instrument = "") {
+  if (value == null || !Number.isFinite(Number(value))) return "—";
+
+  const symbol = instrument.toUpperCase();
+  const n = Number(value);
+
+  if (symbol.endsWith("USDT")) return n.toFixed(5);
+  if (symbol.startsWith("XAU") || symbol.startsWith("XAG")) return n.toFixed(3);
+  if (symbol.includes("JPY")) return n.toFixed(3);
+  if (symbol.length === 6) return n.toFixed(5);
+
+  return n.toFixed(5);
 }
 
-function fmtPct(x?: number, dp = 2) {
-  if (typeof x !== "number" || !Number.isFinite(x)) return "â€”";
-  return `${x.toFixed(dp)}%`;
+function buildSignalMessage(p: TelegramPayload) {
+  const sideIcon = p.side === "BUY" ? "🟢" : "🔴";
+  const instrument = p.instrument ?? "UNKNOWN";
+  const tf = p.tf ?? "";
+  const liq = Number.isFinite(Number(p.liquidity))
+    ? `${Math.round(Number(p.liquidity))}%`
+    : "—";
+  const rr = Number.isFinite(Number(p.rr))
+    ? Number(p.rr).toFixed(2)
+    : "—";
+
+  return [
+    "🚨 <b>FXTRADE SIGNAL</b>",
+    "",
+    `<b>${esc(instrument)}${tf ? ` · ${esc(tf)}` : ""}</b>`,
+    `${sideIcon} <b>${esc(p.side)}</b>`,
+    "",
+    "📊 <b>SETUP</b>",
+    `Liquidity: <b>${liq}</b>`,
+    `RR: <b>${rr}</b>`,
+    "",
+    "📍 <b>POZIOMY</b>",
+    `Entry: <code>${price(p.entry, instrument)}</code>`,
+    `SL: <code>${price(p.sl, instrument)}</code>`,
+    "",
+    "🎯 <b>TAKE PROFIT</b>",
+    `⚪ TP1: <code>${price(p.tp1, instrument)}</code>`,
+    `⚪ TP2: <code>${price(p.tp2, instrument)}</code>`,
+    `⚪ TP3: <code>${price(p.tp3, instrument)}</code>`,
+    "",
+    "🛡 TP1 → SL na BE",
+    "🚀 TP2 → trade dalej aktywny",
+    "🏆 TP3 → pełny WIN",
+    "",
+    "🔵 <b>FxTrade Professional Trading</b>",
+  ].join("\n");
 }
 
-function pickSymbol(b: Payload) {
-  return (
-    b.symbol ??
-    b.Symbol ??
-    b.ticker ??
-    b.pair ??
-    b.market ??
-    b.instrument ??
-    b.data?.symbol ??
-    "UNKNOWN"
-  );
+function buildClosedMessage(p: TelegramPayload) {
+  const status = p.status;
+  const sideIcon = p.side === "BUY" ? "🟢" : "🔴";
+  const instrument = p.instrument ?? "UNKNOWN";
+  const tf = p.tf ?? "";
+
+  const tp1 = p.tp1Hit ? "✅" : "⚪";
+  const tp2 = p.tp2Hit ? "✅" : "⚪";
+  const tp3 = p.tp3Hit ? "✅" : "⚪";
+
+  let title = "✅ <b>TRADE CLOSED</b>";
+  let result = "📈 <b>RESULT: SUCCESS</b>";
+  let detail = "";
+
+  if (status === "TP3") {
+    title = "🏆 <b>TRADE CLOSED — FULL WIN</b>";
+    result = "💰 <b>RESULT: SUCCESS — TP3</b>";
+    detail = "Wszystkie cele Take Profit zaliczone.";
+  } else if (status === "TP1_BE") {
+    title = "✅ <b>TRADE CLOSED — SUCCESS</b>";
+    result = p.tp2Hit
+      ? "📈 <b>RESULT: SUCCESS — TP2 + BE</b>"
+      : "📈 <b>RESULT: SUCCESS — TP1 + BE</b>";
+    detail = "🛡 Po realizacji zysku pozycja wróciła do BE.";
+  } else if (status === "SL") {
+    title = "❌ <b>TRADE CLOSED</b>";
+    result = "📉 <b>RESULT: LOSS — SL</b>";
+    detail = "❌ Stop Loss został trafiony przed TP1.";
+  }
+
+  return [
+    title,
+    "",
+    `<b>${esc(instrument)}${tf ? ` · ${esc(tf)}` : ""}</b>`,
+    `${sideIcon} <b>${esc(p.side)}</b>`,
+    "",
+    "🎯 <b>WYNIK TAKE PROFIT</b>",
+    `${tp1} TP1: <code>${price(p.tp1, instrument)}</code>${p.tp1Hit ? "  <b>HIT</b>" : ""}`,
+    `${tp2} TP2: <code>${price(p.tp2, instrument)}</code>${p.tp2Hit ? "  <b>HIT</b>" : ""}`,
+    `${tp3} TP3: <code>${price(p.tp3, instrument)}</code>${p.tp3Hit ? "  <b>HIT</b>" : ""}`,
+    "",
+    detail,
+    result,
+    "",
+    `📍 Entry: <code>${price(p.entry, instrument)}</code>`,
+    `🛡 SL/BE: <code>${price(p.sl, instrument)}</code>`,
+    "",
+    "🔵 <b>FxTrade Professional Trading</b>",
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
-function pickTf(b: Payload) {
-  return b.tf ?? b.timeframe ?? b.interval ?? "";
-}
-
-function pickTimeStr(b: Payload) {
-  const t =
-    typeof b.time === "number"
-      ? b.time
-      : typeof b.timestamp === "number"
-        ? b.timestamp
-        : null;
-
-  if (!t) return "";
-  const dt = new Date(t * 1000);
-  return dt.toLocaleString("pl-PL", {
+function fmtDate(iso?: string) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("pl-PL", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
   });
 }
 
-function isFxSymbol(symbol: string) {
-  return /^[A-Z]{6}$/.test(symbol.toUpperCase());
+function fmtSigned(value: number, digits = 0) {
+  if (!Number.isFinite(value)) return "0";
+  const n = Number(value.toFixed(digits));
+  return `${n > 0 ? "+" : ""}${n}`;
 }
 
-function pipSize(symbol: string) {
-  const s = symbol.toUpperCase();
-  return s.endsWith("JPY") ? 0.01 : 0.0001;
+function buildWeeklyMessage(p: TelegramPayload) {
+  const w = p.weekly;
+
+  if (!w) {
+    return "📊 <b>FXTRADE WEEKLY REPORT</b>\n\nBrak danych raportu.";
+  }
+
+  const rows = Array.isArray(w.rows) ? w.rows : [];
+  const header = "INSTRUMENT   W   L      WYNIK";
+  const sep = "-------------------------------";
+  const tableRows = rows.length
+    ? rows.map((r) => {
+        const instrument = String(r.instrument ?? "").slice(0, 10).padEnd(10, " ");
+        const wins = String(r.wins ?? 0).padStart(2, " ");
+        const losses = String(r.losses ?? 0).padStart(2, " ");
+        const value = `${fmtSigned(Number(r.value ?? 0), r.unit === "pts" ? 2 : 0)} ${r.unit}`;
+        return `${instrument}  ${wins}  ${losses}  ${value.padStart(11, " ")}`;
+      })
+    : ["BRAK TRADE'ÓW W TYM TYGODNIU"];
+
+  const table = [header, sep, ...tableRows].join("\n");
+
+  return [
+    "📊 <b>FXTRADE — RAPORT TYGODNIOWY</b>",
+    "",
+    `🗓 <b>${esc(fmtDate(w.periodStartISO))} → ${esc(fmtDate(w.periodEndISO))}</b>`,
+    "",
+    `<pre>${esc(table)}</pre>`,
+    "",
+    `✅ Wygrane: <b>${Math.round(w.wins ?? 0)}</b>`,
+    `❌ Przegrane: <b>${Math.round(w.losses ?? 0)}</b>`,
+    `🎯 Win rate: <b>${Number(w.winRate ?? 0).toFixed(1)}%</b>`,
+    `📈 Forex / metale: <b>${fmtSigned(Number(w.totalPips ?? 0), 0)} pips</b>`,
+    `₿ Crypto: <b>${fmtSigned(Number(w.totalPoints ?? 0), 2)} pts</b>`,
+    `📋 Wszystkie zamknięte: <b>${Math.round(w.total ?? 0)}</b>`,
+    "",
+    "🔵 <b>FxTrade Professional Trading</b>",
+  ].join("\n");
 }
 
-function toPips(symbol: string, distance: number) {
-  const ps = pipSize(symbol);
-  return Math.round(distance / ps);
-}
-
-function computeAutoRR(args: {
-  side?: "BUY" | "SELL";
-  entry?: number;
-  sl?: number;
-  tp1?: number;
-  rr?: number;
+async function sendText(args: {
+  botToken: string;
+  chatId: string;
+  threadId?: number;
+  text: string;
 }) {
-  const { side, entry, sl, tp1, rr } = args;
+  const { botToken, chatId, threadId, text } = args;
 
-  if (typeof rr === "number" && Number.isFinite(rr)) return rr;
-
-  const ok =
-    typeof entry === "number" &&
-    typeof sl === "number" &&
-    typeof tp1 === "number" &&
-    Number.isFinite(entry) &&
-    Number.isFinite(sl) &&
-    Number.isFinite(tp1) &&
-    entry !== sl &&
-    !!side;
-
-  if (!ok) return null;
-
-  if (side === "BUY") {
-    const risk = entry - sl;
-    const reward = tp1 - entry;
-    if (risk > 0 && reward > 0) return reward / risk;
-    return null;
-  }
-
-  const risk = sl - entry;
-  const reward = entry - tp1;
-  if (risk > 0 && reward > 0) return reward / risk;
-  return null;
+  return fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json; charset=utf-8" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      ...(threadId ? { message_thread_id: threadId } : {}),
+      text,
+      parse_mode: "HTML",
+      disable_web_page_preview: true,
+    }),
+    cache: "no-store",
+  });
 }
 
-function buildCaption(body: Payload) {
-  const event = body.event ?? "ENTRY_FROZEN";
-  const symbol = pickSymbol(body);
-  const tf = pickTf(body);
+async function sendPhoto(args: {
+  botToken: string;
+  chatId: string;
+  threadId?: number;
+  photoUrl: string;
+  caption: string;
+}) {
+  const { botToken, chatId, threadId, photoUrl, caption } = args;
 
-  const liquidity = body.liquidity;
-  const side = body.side;
-
-  const entry = body.entry;
-  const sl = body.sl;
-
-  const tp1 = body.tps?.[0] ?? body.tp1;
-  const tp2 = body.tps?.[1] ?? body.tp2;
-  const tp3 = body.tps?.[2] ?? body.tp3;
-
-  const timeStr = pickTimeStr(body);
-
-  const sideEmoji = side === "BUY" ? "ðŸŸ¢" : side === "SELL" ? "ðŸ”´" : "âšª";
-
-  const canCalc =
-    typeof entry === "number" &&
-    typeof sl === "number" &&
-    Number.isFinite(entry) &&
-    Number.isFinite(sl);
-
-  const canCalcTp1 = canCalc && typeof tp1 === "number" && Number.isFinite(tp1);
-
-  let slDistPct: number | null = null;
-  let tp1DistPct: number | null = null;
-  let slDistPips: number | null = null;
-  let tp1DistPips: number | null = null;
-
-  if (canCalc) {
-    const slAbs = Math.abs(entry! - sl!);
-    slDistPct = (slAbs / entry!) * 100;
-    if (isFxSymbol(symbol)) slDistPips = toPips(symbol, slAbs);
-  }
-
-  if (canCalcTp1) {
-    const tp1Abs = Math.abs(tp1! - entry!);
-    tp1DistPct = (tp1Abs / entry!) * 100;
-    if (isFxSymbol(symbol)) tp1DistPips = toPips(symbol, tp1Abs);
-  }
-
-  const rrValue = computeAutoRR({ side, entry, sl, tp1, rr: body.rr });
-  const rrStr = rrValue !== null ? rrValue.toFixed(2) : "â€”";
-
-  const slInfo =
-    slDistPct === null
-      ? ""
-      : isFxSymbol(symbol)
-        ? ` <i>(odstÄ™p: ${fmtPct(slDistPct)} â€¢ ${slDistPips} pips)</i>`
-        : ` <i>(odstÄ™p: ${fmtPct(slDistPct)})</i>`;
-
-  const tp1Info =
-    tp1DistPct === null
-      ? ""
-      : isFxSymbol(symbol)
-        ? ` <i>(odstÄ™p: ${fmtPct(tp1DistPct)} â€¢ ${tp1DistPips} pips)</i>`
-        : ` <i>(odstÄ™p: ${fmtPct(tp1DistPct)})</i>`;
-
-  const sym = esc(symbol);
-  const tfStr = tf ? esc(tf) : "";
-  const timeStrEsc = timeStr ? esc(timeStr) : "";
-
-  if (event === "SCANNER_ON") {
-    return (
-      `<b>ðŸ“Œ Instrument:</b> <code>${sym}</code>` +
-      (tfStr ? `  â€¢  <b>TF:</b> <code>${tfStr}</code>` : "") +
-      (side ? `  â€¢  <b>Side:</b> ${sideEmoji} <b>${esc(side)}</b>` : "") +
-      `\n` +
-      (typeof liquidity === "number"
-        ? `<b>ðŸ’§ Liquidity:</b> <b>${Math.round(liquidity)}%</b>`
-        : `<b>ðŸ’§ Liquidity:</b> <b>â€”</b>`) +
-      `\n` +
-      (timeStrEsc ? `\n<b>ðŸ•’ Time:</b> <code>${timeStrEsc}</code>` : "") +
-      `\n<b>ðŸ§  FxTrade</b>`
-    );
-  }
-
-  return (
-    `<b>ðŸ“Œ Instrument:</b> <code>${sym}</code>` +
-    (tfStr ? `  â€¢  <b>TF:</b> <code>${tfStr}</code>` : "") +
-    (side ? `  â€¢  <b>Side:</b> ${sideEmoji} <b>${esc(side)}</b>` : "") +
-    `\n` +
-    (typeof liquidity === "number"
-      ? `<b>ðŸ’§ Liquidity:</b> <b>${Math.round(liquidity)}%</b>`
-      : `<b>ðŸ’§ Liquidity:</b> <b>â€”</b>`) +
-    `  â€¢  <b>ðŸŽ¯ RR:</b> <b>${rrStr}</b>\n\n` +
-    `<b>ðŸ“ Poziomy</b>\n` +
-    `â€¢ <b>Entry:</b> <code>${fmtNum(entry)}</code>\n` +
-    `â€¢ <b>SL:</b> <code>${fmtNum(sl)}</code>${slInfo}\n\n` +
-    `<b>âœ… Take Profit</b>\n` +
-    `â€¢ <b>TP1:</b> <code>${fmtNum(tp1)}</code>${tp1Info}\n` +
-    `â€¢ <b>TP2:</b> <code>${fmtNum(tp2)}</code>\n` +
-    `â€¢ <b>TP3:</b> <code>${fmtNum(tp3)}</code>\n` +
-    (timeStrEsc ? `\n<b>ðŸ•’ Time:</b> <code>${timeStrEsc}</code>\n` : `\n`) +
-    `<b>ðŸ§  FxTrade</b>`
-  );
+  return fetch(`https://api.telegram.org/bot${botToken}/sendPhoto`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json; charset=utf-8" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      ...(threadId ? { message_thread_id: threadId } : {}),
+      photo: photoUrl,
+      caption,
+      parse_mode: "HTML",
+    }),
+    cache: "no-store",
+  });
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const token = process.env.TELEGRAM_BOT_TOKEN;
-    const chatId = process.env.TELEGRAM_CHAT_ID;
+    const payload = (await req.json()) as TelegramPayload;
 
-    // FORUM/WÄ„TEK (opcjonalnie)
+    const type = payload.type ?? "SIGNAL";
+
+    if (type !== "WEEKLY" && (!payload?.instrument || !payload?.side || !payload?.tf)) {
+      return NextResponse.json(
+        { error: "Missing instrument/side/tf" },
+        { status: 400 }
+      );
+    }
+
+    if (type === "WEEKLY" && !payload.weekly) {
+      return NextResponse.json(
+        { error: "Missing weekly report data" },
+        { status: 400 }
+      );
+    }
+
+    const botToken =
+      process.env.TELEGRAM_BOT_TOKEN ||
+      process.env.TELEGRAM_TOKEN ||
+      process.env.TG_BOT_TOKEN;
+
+    const chatId =
+      process.env.TELEGRAM_CHAT_ID ||
+      process.env.TG_CHAT_ID;
+
     const threadIdRaw = process.env.TELEGRAM_THREAD_ID;
     const threadId =
-      threadIdRaw && /^\d+$/.test(threadIdRaw) ? Number(threadIdRaw) : undefined;
+      threadIdRaw && /^\d+$/.test(threadIdRaw)
+        ? Number(threadIdRaw)
+        : undefined;
 
-    const logoUrl = process.env.FXTRADE_LOGO_URL;
+    const defaultLogoUrl = process.env.FXTRADE_LOGO_URL;
 
-    if (!token || !chatId) {
+    // Osobny, stały obraz dla raportu tygodniowego.
+    // Najpierw może być nadpisany przez FXTRADE_WEEKLY_IMAGE_URL.
+    // Jeśli nie ustawisz tego ENV, route spróbuje użyć:
+    //   {APP_URL}/images/fxtrade-weekly-report.png
+    const appUrlRaw =
+      process.env.NEXT_PUBLIC_APP_URL ||
+      process.env.APP_URL ||
+      process.env.NEXTAUTH_URL;
+
+    const appUrl = appUrlRaw
+      ? appUrlRaw.replace(/\/$/, "")
+      : "";
+
+    const builtInWeeklyImageUrl = appUrl
+      ? `${appUrl}/images/fxtrade-weekly-report.png`
+      : undefined;
+
+    const weeklyReportImageUrl =
+      process.env.FXTRADE_WEEKLY_IMAGE_URL ||
+      builtInWeeklyImageUrl;
+
+    if (!botToken || !chatId) {
+      console.error(
+        "Telegram config missing: TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID"
+      );
+
       return NextResponse.json(
-        { ok: false, error: "Missing TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID" },
+        { error: "Telegram configuration missing" },
         { status: 500 }
       );
     }
 
-    const body = (await req.json()) as Payload;
+    const text =
+      type === "WEEKLY"
+        ? buildWeeklyMessage(payload)
+        : type === "CLOSED"
+          ? buildClosedMessage(payload)
+          : buildSignalMessage(payload);
 
-    // 1) Tu sprawdzisz czy skaner w ogÃ³le wywoÅ‚uje endpoint:
-    console.log("ðŸ”¥ TELEGRAM NOTIFY PAYLOAD:", JSON.stringify(body, null, 2));
+    const photoUrl =
+      payload.imageUrl ||
+      (type === "WEEKLY" ? weeklyReportImageUrl || defaultLogoUrl : defaultLogoUrl);
 
-    const caption = buildCaption(body);
-    const photoUrl = body.imageUrl || logoUrl;
-
-    // wspÃ³lne pole dla forum topic
-    const threadPart = threadId ? { message_thread_id: threadId } : {};
-
-    // 2) JeÅ›li nie masz photoUrl -> sendMessage
     if (!photoUrl) {
-      const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: chatId,
-          ...threadPart,
-          text: caption,
-          parse_mode: "HTML",
-          disable_web_page_preview: true,
-        }),
+      const response = await sendText({
+        botToken,
+        chatId,
+        threadId,
+        text,
       });
 
-      const data = await res.json();
-      console.log("ðŸ“¨ TELEGRAM sendMessage status:", res.status, "resp:", data);
+      const data = await response.json().catch(() => null);
 
-      if (!res.ok) {
-        return NextResponse.json({ ok: false, telegram: data }, { status: 500 });
-      }
-      return NextResponse.json({ ok: true, mode: "text" });
-    }
+      if (!response.ok) {
+        console.error("Telegram sendMessage error:", data);
 
-    // 3) sendPhoto (UWAGA: caption limit ~1024 znaki)
-    // JeÅ›li caption bywa dÅ‚ugi, Telegram odrzuci â€” dlatego tniemy bezpiecznie.
-    const safeCaption = caption.length > 1000 ? caption.slice(0, 1000) + "â€¦" : caption;
-
-    const res = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        ...threadPart,
-        photo: photoUrl,
-        caption: safeCaption,
-        parse_mode: "HTML",
-      }),
-    });
-
-    const data = await res.json();
-    console.log("ðŸ“¸ TELEGRAM sendPhoto status:", res.status, "resp:", data);
-
-    if (!res.ok) {
-      // fallback: jak foto nie przejdzie, wyÅ›lij sam tekst
-      const res2 = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: chatId,
-          ...threadPart,
-          text: caption,
-          parse_mode: "HTML",
-          disable_web_page_preview: true,
-        }),
-      });
-      const data2 = await res2.json();
-      console.log("â†©ï¸ TELEGRAM fallback sendMessage status:", res2.status, "resp:", data2);
-
-      if (!res2.ok) {
         return NextResponse.json(
-          { ok: false, telegram: data, fallback: data2 },
-          { status: 500 }
+          { error: "Telegram send failed", details: data },
+          { status: response.status }
         );
       }
 
-      return NextResponse.json({ ok: true, mode: "fallback_text" });
+      return NextResponse.json({
+        ok: true,
+        type,
+        mode: "text",
+      });
     }
 
-    return NextResponse.json({ ok: true, mode: "photo" });
-  } catch (e: any) {
-    console.error("âŒ TELEGRAM NOTIFY ERROR:", e);
-    return NextResponse.json({ ok: false, error: e?.message ?? "Unknown error" }, { status: 500 });
+    const isLongMessage = text.length > 1000;
+    const safeCaption = isLongMessage
+      ? type === "WEEKLY"
+        ? "📊 <b>FXTRADE — RAPORT TYGODNIOWY</b>"
+        : "🔵 <b>FxTrade Professional Trading</b>"
+      : text;
+
+    const photoResponse = await sendPhoto({
+      botToken,
+      chatId,
+      threadId,
+      photoUrl,
+      caption: safeCaption,
+    });
+
+    const photoData = await photoResponse.json().catch(() => null);
+
+    if (photoResponse.ok) {
+      if (isLongMessage) {
+        const textResponse = await sendText({
+          botToken,
+          chatId,
+          threadId,
+          text,
+        });
+
+        const textData = await textResponse.json().catch(() => null);
+        if (!textResponse.ok) {
+          console.error("Telegram weekly/details sendMessage error:", textData);
+          return NextResponse.json(
+            { error: "Photo sent, but report text failed", details: textData },
+            { status: textResponse.status }
+          );
+        }
+
+        return NextResponse.json({ ok: true, type, mode: "photo_plus_text" });
+      }
+
+      return NextResponse.json({
+        ok: true,
+        type,
+        mode: "photo",
+      });
+    }
+
+    console.error(
+      "Telegram sendPhoto error, fallback to text:",
+      photoData
+    );
+
+    const fallbackResponse = await sendText({
+      botToken,
+      chatId,
+      threadId,
+      text,
+    });
+
+    const fallbackData = await fallbackResponse
+      .json()
+      .catch(() => null);
+
+    if (!fallbackResponse.ok) {
+      console.error(
+        "Telegram fallback sendMessage error:",
+        fallbackData
+      );
+
+      return NextResponse.json(
+        {
+          error: "Telegram photo and fallback text failed",
+          photo: photoData,
+          fallback: fallbackData,
+        },
+        { status: fallbackResponse.status }
+      );
+    }
+
+    return NextResponse.json({
+      ok: true,
+      type,
+      mode: "fallback_text",
+    });
+  } catch (error) {
+    console.error("Telegram notify error:", error);
+
+    return NextResponse.json(
+      { error: "Telegram notify failed" },
+      { status: 500 }
+    );
   }
 }

@@ -618,7 +618,7 @@ type CandlePattern = {
   price: number;
 };
 
-function detectCandlePatterns(candles: CandlestickData[]): CandlePattern[] {
+function detectClassicCandlePatterns(candles: CandlestickData[]): CandlePattern[] {
   const out: CandlePattern[] = [];
   if (candles.length < 30) return out;
 
@@ -807,6 +807,94 @@ function detectCandlePatterns(candles: CandlestickData[]): CandlePattern[] {
   ).sort((a, b) => Number(a.time) - Number(b.time));
 
   return unique.slice(-40);
+}
+
+function detectCandlePatterns(
+  candles: CandlestickData[],
+  bb?: BbConfig
+): CandlePattern[] {
+  const out: CandlePattern[] = [];
+
+  // LOGIKA BB — tylko zewnętrzne bandy + potwierdzenie BAR 2.
+  // BUY:
+  //   Bar 1 wychodzi LOW pod dolną BB i zamyka się z powrotem w paśmie.
+  //   Bar 2 MUSI być zamkniętą zieloną świecą -> BUY na Bar 2.
+  // SELL:
+  //   Bar 1 wychodzi HIGH nad górną BB i zamyka się z powrotem w paśmie.
+  //   Bar 2 MUSI być zamkniętą czerwoną świecą -> SELL na Bar 2.
+  // Brak zgodnego koloru Bar 2 = brak sygnału.
+  // Środkowa banda nigdy nie generuje sygnału.
+  // WAŻNE: logika formacji BB działa niezależnie od widoczności pasm.
+  // `bb.enabled` steruje tylko rysowaniem Bollingera na wykresie.
+  // Gdy FORMACJE są włączone, nadal używamy tych samych ustawień BB
+  // do wykrywania BUY/SELL nawet jeśli pasma są wizualnie wyłączone.
+  if (!bb) return out;
+
+  const len = clampInt(bb.length, 2, 500);
+  if (candles.length < len + 3) return out;
+
+  const n = (v: any) => toNum(v);
+  const isBullish = (c: any) => n(c.close) > n(c.open);
+  const isBearish = (c: any) => n(c.close) < n(c.open);
+
+  const lines = buildBbLines(candles, bb, 8);
+  const upperByTime = new Map<number, number>();
+  const lowerByTime = new Map<number, number>();
+
+  for (const p of lines.upper as any[]) {
+    upperByTime.set(Number(p.time), n(p.value));
+  }
+  for (const p of lines.lower as any[]) {
+    lowerByTime.set(Number(p.time), n(p.value));
+  }
+
+  // Ostatnia świeca może być otwarta. Bar 2 musi być ZAMKNIĘTY.
+  const lastClosedIdx = Math.max(0, candles.length - 2);
+
+  for (let signalIdx = len - 1; signalIdx < lastClosedIdx; signalIdx++) {
+    const signal: any = candles[signalIdx];
+    const confirm: any = candles[signalIdx + 1];
+    if (!signal || !confirm) continue;
+
+    const t = Number(signal.time);
+    const upper = upperByTime.get(t);
+    const lower = lowerByTime.get(t);
+    if (!Number.isFinite(upper) || !Number.isFinite(lower)) continue;
+
+    const lowerReentry =
+      n(signal.low) < Number(lower) &&
+      n(signal.close) > Number(lower);
+
+    const upperReentry =
+      n(signal.high) > Number(upper) &&
+      n(signal.close) < Number(upper);
+
+    // BUY tylko wtedy, gdy po odrzuceniu dolnej BB Bar 2 jest zielony.
+    if (lowerReentry && isBullish(confirm)) {
+      out.push({
+        time: confirm.time as UTCTimestamp,
+        label: "BUY",
+        side: "BUY",
+        price: n(confirm.low),
+      });
+      continue;
+    }
+
+    // SELL tylko wtedy, gdy po odrzuceniu górnej BB Bar 2 jest czerwony.
+    if (upperReentry && isBearish(confirm)) {
+      out.push({
+        time: confirm.time as UTCTimestamp,
+        label: "SELL",
+        side: "SELL",
+        price: n(confirm.high),
+      });
+    }
+
+    // lowerReentry + czerwony Bar 2 = NIC.
+    // upperReentry + zielony Bar 2 = NIC.
+  }
+
+  return out.slice(-40);
 }
 
 /* =========================
@@ -1014,9 +1102,13 @@ patternsEnabled = false,
   const plotPanRef = React.useRef<{
     pointerId: number;
     startX: number;
+    startY: number;
     from: number;
     to: number;
     width: number;
+    height: number;
+    priceMin: number;
+    priceMax: number;
   } | null>(null);
   const manualPanRef = React.useRef(false);
 
@@ -1096,7 +1188,7 @@ patternsEnabled = false,
     try {
       const detectedPatterns = renko
         ? detectRenkoPatterns(safe)
-        : detectCandlePatterns(safe);
+        : detectCandlePatterns(safe, bbConfig);
 
       return detectedPatterns.flatMap((p, idx) => {
         const x = chart.timeScale().timeToCoordinate(p.time);
@@ -1127,7 +1219,7 @@ patternsEnabled = false,
     } catch {
       return [];
     }
-  }, [patternsEnabled, overlayTick, candles, liveCandle, heikinAshi, renko]);
+  }, [patternsEnabled, overlayTick, candles, liveCandle, heikinAshi, renko, bbConfig]);
 
   // ============================================================
   // AUTO STREFY DLA NOWEJ LOGIKI HH/HL / LL/LH
@@ -1145,7 +1237,7 @@ patternsEnabled = false,
     const safe = displayCacheRef.current;
     if (!safe?.length) return undefined;
 
-    const signals = detectCandlePatterns(safe);
+    const signals = detectCandlePatterns(safe, bbConfig);
     const latest = signals[signals.length - 1];
     if (!latest) return undefined;
 
@@ -1242,7 +1334,7 @@ patternsEnabled = false,
     }
 
     return undefined;
-  }, [patternsEnabled, overlayTick, candles, liveCandle, heikinAshi, renko]);
+  }, [patternsEnabled, overlayTick, candles, liveCandle, heikinAshi, renko, bbConfig]);
 
   // Czas świecy sygnałowej dla automatycznych stref FORMATION.
   // Dzięki temu strefy zaczynają się dokładnie przy świecy breakout,
@@ -1253,7 +1345,7 @@ patternsEnabled = false,
     const safe = displayCacheRef.current;
     if (!safe?.length) return null;
 
-    const signals = detectCandlePatterns(safe);
+    const signals = detectCandlePatterns(safe, bbConfig);
     const latest = signals[signals.length - 1];
     if (!latest) return null;
 
@@ -1265,7 +1357,7 @@ patternsEnabled = false,
     if (signalIdx < 0 || signalIdx < safe.length - 4) return null;
 
     return latest.time as UTCTimestamp;
-  }, [patternsEnabled, overlayTick, candles, liveCandle, heikinAshi, renko]);
+  }, [patternsEnabled, overlayTick, candles, liveCandle, heikinAshi, renko, bbConfig]);
 
   // Priorytet ma setup przesłany z głównego skanera.
   // Jeśli go nie ma, używamy stref z HH/HL / LL/LH breakout.
@@ -2369,12 +2461,12 @@ kineticScroll: {
 
       const containerW = containerRef.current?.clientWidth ?? 0;
 
-      // STREFY: od sygnału -> prawie do prawej osi ceny.
-      // Nie przykrywamy świecy sygnałowej i zostawiamy mały odstęp
-      // przed osią/etykietami ceny, tak jak na wzorze użytkownika.
+      // STREFY: od sygnału -> krótki, czytelny blok zamiast aż do prawej osi.
+      // Maksymalna szerokość odpowiada mniej więcej odległości zaznaczonej na screenie.
       const SIGNAL_TO_ZONE_GAP_PX = 10;
       const PRICE_AXIS_RESERVE_PX = 78;
       const ZONE_TO_PRICE_AXIS_GAP_PX = 8;
+      const MAX_ZONE_WIDTH_PX = 520;
 
       const startXCoord = chart.timeScale().timeToCoordinate(anchorTime);
 
@@ -2386,10 +2478,11 @@ kineticScroll: {
       }
 
       const rawStartX = Number(startXCoord) + SIGNAL_TO_ZONE_GAP_PX;
-      const endX = Math.max(
+      const maxRightX = Math.max(
         rawStartX + 1,
         containerW - PRICE_AXIS_RESERVE_PX - ZONE_TO_PRICE_AXIS_GAP_PX
       );
+      const endX = Math.min(maxRightX, rawStartX + MAX_ZONE_WIDTH_PX);
       const startX = Math.min(rawStartX, endX - 1);
       const zoneW = Math.max(1, endX - startX);
 
@@ -2478,26 +2571,24 @@ kineticScroll: {
         lbls.push({ key: `${text}-${price}`, y, text, kind, price });
       };
 
-      const entryZone = activeLevels.zones?.find((z) => z.label === "ENTRY");
-      if (entryZone && Number.isFinite(entryZone.from) && Number.isFinite(entryZone.to)) {
-        addBand(entryZone.from, entryZone.to, "ENTRY", "ENTRY");
-      } else {
-        const pad = Math.max(1, Math.abs(activeLevels.entry - activeLevels.sl) * 0.06);
-        addBand(activeLevels.entry - pad, activeLevels.entry + pad, "ENTRY", "ENTRY-FB");
-      }
-
+      // Strefy trade bez nakładania osobnej zielonej strefy ENTRY.
+      // ENTRY pozostaje tylko linią/etykietą graniczną.
+      // Dzięki temu:
+      // BUY  -> czerwony dokładnie ENTRY -> SL, zielony ENTRY -> TP1 -> TP2 -> TP3.
+      // SELL -> czerwony dokładnie ENTRY -> SL, zielony ENTRY -> TP1 -> TP2 -> TP3
+      //         (po przeciwnej stronie ceny, zgodnie z kierunkiem pozycji).
       if (Number.isFinite(activeLevels.sl) && Number.isFinite(activeLevels.entry)) {
-        addBand(activeLevels.sl, activeLevels.entry, "SL", "SL");
+        addBand(activeLevels.entry, activeLevels.sl, "SL", "SL");
       }
 
-      if (side === "BUY") {
-        if (tp1 !== undefined) addBand(activeLevels.entry, tp1, "TP1", "TP1");
-        if (tp2 !== undefined && tp1 !== undefined) addBand(tp1, tp2, "TP2", "TP2");
-        if (tp3 !== undefined && tp2 !== undefined) addBand(tp2, tp3, "TP3", "TP3");
-      } else {
-        if (tp1 !== undefined) addBand(tp1, activeLevels.entry, "TP1", "TP1");
-        if (tp2 !== undefined && tp1 !== undefined) addBand(tp2, tp1, "TP2", "TP2");
-        if (tp3 !== undefined && tp2 !== undefined) addBand(tp3, tp2, "TP3", "TP3");
+      if (tp1 !== undefined) {
+        addBand(activeLevels.entry, tp1, "TP1", "TP1");
+      }
+      if (tp2 !== undefined && tp1 !== undefined) {
+        addBand(tp1, tp2, "TP2", "TP2");
+      }
+      if (tp3 !== undefined && tp2 !== undefined) {
+        addBand(tp2, tp3, "TP3", "TP3");
       }
 
       const entryLineColor =
@@ -2980,12 +3071,27 @@ kineticScroll: {
     if (e.pointerType === "mouse" && e.button !== 0) return;
 
     const chart = chartRef.current;
-    if (!chart) return;
+    const candleSeries = candleSeriesRef.current;
+    const safe = displayCacheRef.current;
+    if (!chart || !candleSeries) return;
 
     try {
       const ts: any = chart.timeScale();
       const range = ts.getVisibleLogicalRange?.();
       if (!range || !Number.isFinite(range.from) || !Number.isFinite(range.to)) return;
+
+      const fromIdx = Math.max(0, Math.floor(Number(range.from)));
+      const toIdx = Math.min(safe.length - 1, Math.ceil(Number(range.to)));
+      const visible = safe.slice(fromIdx, toIdx + 1) as any[];
+      const lows = visible.map((c) => Number(c.low)).filter(Number.isFinite);
+      const highs = visible.map((c) => Number(c.high)).filter(Number.isFinite);
+
+      let priceMin = lows.length ? Math.min(...lows) : 0;
+      let priceMax = highs.length ? Math.max(...highs) : 1;
+      if (!Number.isFinite(priceMin) || !Number.isFinite(priceMax) || priceMax <= priceMin) {
+        priceMin = 0;
+        priceMax = 1;
+      }
 
       manualPanRef.current = true;
       setFollowOnTick(false);
@@ -2994,9 +3100,13 @@ kineticScroll: {
       plotPanRef.current = {
         pointerId: e.pointerId,
         startX: e.clientX,
+        startY: e.clientY,
         from: Number(range.from),
         to: Number(range.to),
         width: Math.max(1, e.currentTarget.clientWidth),
+        height: Math.max(1, e.currentTarget.clientHeight),
+        priceMin,
+        priceMax,
       };
 
       e.currentTarget.setPointerCapture?.(e.pointerId);
@@ -3008,26 +3118,76 @@ kineticScroll: {
   const movePlotPan = React.useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     const state = plotPanRef.current;
     const chart = chartRef.current;
-    if (!state || !chart || state.pointerId !== e.pointerId) return;
+    const candleSeries = candleSeriesRef.current;
+    if (!state || !chart || !candleSeries || state.pointerId !== e.pointerId) return;
 
     try {
+      // PAN X — przeciąganie lewo/prawo.
       const span = Math.max(1, state.to - state.from);
       const dx = e.clientX - state.startX;
       const barsDelta = (dx / state.width) * span;
 
-      // Zawartość wykresu podąża za palcem/myszą:
-      // ruch w prawo -> starsze świece przesuwają się w prawo,
-      // ruch w lewo -> przechodzimy w stronę nowszych świec.
       (chart.timeScale() as any).setVisibleLogicalRange?.({
         from: state.from - barsDelta,
         to: state.to - barsDelta,
       });
+
+      // PAN Y — przeciąganie góra/dół po środku wykresu.
+      // Przesuwamy cały widoczny zakres cen bez zmiany jego wysokości.
+      const dy = e.clientY - state.startY;
+      const priceSpan = Math.max(1e-12, state.priceMax - state.priceMin);
+      const priceShift = (dy / state.height) * priceSpan;
+      const minValue = state.priceMin + priceShift;
+      const maxValue = state.priceMax + priceShift;
+
+      candleSeries.applyOptions({
+        autoscaleInfoProvider: (() => ({
+          priceRange: { minValue, maxValue },
+          margins: { above: 0, below: 0 },
+        })) as any,
+      } as any);
+      chart.priceScale("right").applyOptions({ autoScale: true });
 
       setOverlayTick((v) => v + 1);
       e.preventDefault();
       e.stopPropagation();
     } catch {}
   }, []);
+
+  const handlePlotWheel = React.useCallback((e: React.WheelEvent<HTMLDivElement>) => {
+    if (activeDrawTool !== "SELECT") return;
+    const chart = chartRef.current;
+    if (!chart) return;
+
+    try {
+      const ts: any = chart.timeScale();
+      const range = ts.getVisibleLogicalRange?.();
+      if (!range || !Number.isFinite(range.from) || !Number.isFinite(range.to)) return;
+
+      manualPanRef.current = true;
+      setFollowOnTick(false);
+      setDetached(true);
+
+      const from = Number(range.from);
+      const to = Number(range.to);
+      const span = Math.max(2, to - from);
+      const rect = e.currentTarget.getBoundingClientRect();
+      const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / Math.max(1, rect.width)));
+      const anchor = from + span * ratio;
+
+      // scroll w górę = zoom in, w dół = zoom out
+      const zoomFactor = e.deltaY < 0 ? 0.88 : 1.14;
+      const nextSpan = Math.max(6, Math.min(500, span * zoomFactor));
+      const nextFrom = anchor - nextSpan * ratio;
+      const nextTo = nextFrom + nextSpan;
+
+      ts.setVisibleLogicalRange?.({ from: nextFrom, to: nextTo });
+      setOverlayTick((v) => v + 1);
+
+      e.preventDefault();
+      e.stopPropagation();
+    } catch {}
+  }, [activeDrawTool]);
 
   const endPlotPan = React.useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (plotPanRef.current?.pointerId !== e.pointerId) return;
@@ -3161,24 +3321,13 @@ kineticScroll: {
             }}
           />
 
-          {/* Pełny obszar PAN dla SELECT — obsługuje mouse/touch/pen.
-              Osi ceny i czasu nie przykrywamy, bo mają własne uchwyty. */}
-          {activeDrawTool === "SELECT" ? (
-            <div
-              className="absolute left-0 top-0 z-[35]"
-              style={{
-                right: 86,
-                bottom: 30,
-                cursor: plotPanRef.current ? "grabbing" : "grab",
-                touchAction: "none",
-                background: "transparent",
-              }}
-              onPointerDown={beginPlotPan}
-              onPointerMove={movePlotPan}
-              onPointerUp={endPlotPan}
-              onPointerCancel={endPlotPan}
-            />
-          ) : null}
+          {/* SELECT / ŁAPKA:
+              Nie kładziemy osobnego overlay PAN nad wykresem, ponieważ blokował on
+              kliknięcie i przesuwanie narysowanych obiektów (BOX/FIBO/TREND).
+              DrawingsLayer sam rozróżnia:
+              - klik na rysunku -> zaznacz / przesuń rysunek,
+              - klik na pustym wykresie -> przesuń wykres.
+              Osie ceny i czasu nadal mają własne uchwyty poniżej. */}
 
           {/* Własny uchwyt PRAWEJ OSI CENY.
               Jest aktywny tylko w SELECT i ma prawdziwy kursor ns-resize. */}
@@ -3301,18 +3450,16 @@ kineticScroll: {
           ) : null}
 
           {/*
-            IMPORTANT:
-            DrawingsLayer has its own canvas above lightweight-charts.
-            In SELECT mode we let mouse/touch events pass through to the chart,
-            so drag left/right + wheel zoom + axis scaling work normally.
-            Drawing tools re-enable the drawing overlay.
+            DrawingsLayer musi odbierać zdarzenia także w trybie SELECT.
+            Dzięki temu łapka działa kontekstowo:
+            - nad BOX-em przesuwa BOX,
+            - nad pustym miejscem przesuwa cały wykres.
+            Sam rysunek pozostaje przypięty do TIME + PRICE podczas pan/zoom.
           */}
           <div
-            className={`absolute inset-0 z-[20] ${
-              activeDrawTool === "SELECT" ? "pointer-events-none" : "pointer-events-auto"
-            }`}
+            className="absolute inset-0 z-[20] pointer-events-auto"
             style={{
-              cursor: activeDrawTool === "SELECT" ? undefined : "crosshair",
+              cursor: activeDrawTool === "SELECT" ? "grab" : "crosshair",
             }}
           >
             <DrawingsLayer

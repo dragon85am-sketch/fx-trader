@@ -79,6 +79,14 @@ const COINBASE_GRANULARITY: Record<Timeframe, number> = {
 type Signal = "UP" | "DOWN" | "NONE";
 type Status = "READY" | "CLOSE";
 type Side = "BUY" | "SELL";
+type PatternSignalMode =
+  | "STANDARD"
+  | "STRUCTURE"
+  | "BOLLINGER"
+  | "BOLLINGER_STRUCTURE"
+  | "BOLLINGER_EARLY"
+  | "BOLLINGER_CONFIRMED"
+  | "BOLLINGER_STRONG";
 
 type CandlePattern =
   | "BULLISH_ENGULFING"
@@ -88,6 +96,9 @@ type CandlePattern =
   | "BEARISH_PIN_BAR"
   | "MORNING_STAR"
   | "EVENING_STAR"
+  | "INVERTED_HAMMER"
+  | "THREE_WHITE_SOLDIERS"
+  | "THREE_BLACK_CROWS"
   | "THREE_INSIDE_UP"
   | "THREE_OUTSIDE_UP"
   | "THREE_INSIDE_DOWN"
@@ -106,24 +117,31 @@ type Row = {
   hammerTime?: UTCTimestamp;
   signalCandleTime?: UTCTimestamp;
   signalPattern?: CandlePattern;
+  patternSignalMode?: PatternSignalMode;
   confirmationCount?: 0 | 1 | 2 | 3 | 4;
   confirmationSide?: Side | null;
   higherTfSignal?: Signal;
   tp1Hit?: boolean;
+  tp2Hit?: boolean;
   
 };
 
 type ClosedTrade = {
   id: string;
   date: string;
+  closedAt?: string;
   instrument: string;
   direction: Side;
+  tf?: string;
   entry: number;
   tp1?: number;
   tp2?: number;
+  tp3?: number;
   sl: number;
-  status: "TP2" | "SL" | "BE" | "TP1_BE";
-  
+  status: "TP3" | "SL" | "TP1_BE";
+  tp1Hit?: boolean;
+  tp2Hit?: boolean;
+  tp3Hit?: boolean;
 };
 
 type Candle = {
@@ -766,8 +784,10 @@ function isBullishPatternAt(candles: Candle[], idx: number): CandlePattern | nul
   if (isBullishPinBar(c)) return "BULLISH_PIN_BAR";
   if (isHammer(c)) return "HAMMER";
   if (isMorningStar(p2, p1, c)) return "MORNING_STAR";
-  if (isInvertedHammer(c)) return "HAMMER";
-  if (isThreeWhiteSoldiers(candles, idx)) return "MORNING_STAR";
+  if (isInvertedHammer(c)) return "INVERTED_HAMMER";
+  if (isThreeWhiteSoldiers(candles, idx)) return "THREE_WHITE_SOLDIERS";
+  if (isThreeInsideUp(p2, p1, c)) return "THREE_INSIDE_UP";
+  if (isThreeOutsideUp(p2, p1, c)) return "THREE_OUTSIDE_UP";
 
   return null;
 }
@@ -784,8 +804,9 @@ function isBearishPatternAt(candles: Candle[], idx: number): CandlePattern | nul
   if (isBearishEngulfing(p1, c)) return "BEARISH_ENGULFING";
   if (isBearishPinBar(c)) return "BEARISH_PIN_BAR";
   if (isEveningStar(p2, p1, c)) return "EVENING_STAR";
-  if (isInvertedHammer(c)) return "HAMMER";
-  if (isThreeBlackCrows(candles, idx)) return "EVENING_STAR";
+  if (isThreeBlackCrows(candles, idx)) return "THREE_BLACK_CROWS";
+  if (isThreeInsideDown(p2, p1, c)) return "THREE_INSIDE_DOWN";
+  if (isThreeOutsideDown(p2, p1, c)) return "THREE_OUTSIDE_DOWN";
 
   return null;
 }
@@ -818,19 +839,350 @@ function hasRecentDirectionalMomentum(candles: Candle[], side: Side, lookback = 
   return false;
 }
 
-function getRecentPattern(candles: Candle[], side: Side, lookback = 5): CandlePattern | "NONE" {
-  if (candles.length < 3) return "NONE";
+function patternLength(pattern: CandlePattern) {
+  switch (pattern) {
+    case "BULLISH_ENGULFING":
+    case "BEARISH_ENGULFING":
+      return 2;
+    case "MORNING_STAR":
+    case "EVENING_STAR":
+    case "THREE_WHITE_SOLDIERS":
+    case "THREE_BLACK_CROWS":
+    case "THREE_INSIDE_UP":
+    case "THREE_OUTSIDE_UP":
+    case "THREE_INSIDE_DOWN":
+    case "THREE_OUTSIDE_DOWN":
+      return 3;
+    default:
+      return 1;
+  }
+}
 
-  const lastClosedIdx = Math.max(2, candles.length - 2);
-  const from = Math.max(2, lastClosedIdx - lookback + 1);
+function hasTwoWicks(c: Candle) {
+  const range = candleRange(c);
+  if (range <= 0) return false;
 
-  for (let idx = lastClosedIdx; idx >= from; idx--) {
+  // Ma być widoczny knot nad i pod korpusem, a nie świeca typu marubozu.
+  const minWick = range * 0.02;
+  return upperWick(c) >= minWick && lowerWick(c) >= minWick;
+}
+
+function isPatternConfirmed(
+  candles: Candle[],
+  patternEndIdx: number,
+  pattern: CandlePattern,
+  side: Side
+) {
+  const confirmation = candles[patternEndIdx + 1];
+  if (!confirmation) return false;
+
+  const len = patternLength(pattern);
+  const startIdx = Math.max(0, patternEndIdx - len + 1);
+  const formation = candles.slice(startIdx, patternEndIdx + 1);
+  if (!formation.length) return false;
+
+  const formationHigh = Math.max(...formation.map((c) => c.high));
+  const formationLow = Math.min(...formation.map((c) => c.low));
+
+  if (side === "BUY") {
+    return (
+      isBullish(confirmation) &&
+      hasTwoWicks(confirmation) &&
+      confirmation.close > formationHigh
+    );
+  }
+
+  return (
+    isBearish(confirmation) &&
+    hasTwoWicks(confirmation) &&
+    confirmation.close < formationLow
+  );
+}
+
+function hasBullishStructure(candles: Candle[], confirmationIdx: number) {
+  // Prosta struktura swingowa: dwa ostatnie lokalne high i low przed/podczas setupu.
+  const from = Math.max(2, confirmationIdx - 24);
+  const highs: number[] = [];
+  const lows: number[] = [];
+
+  for (let i = from; i <= confirmationIdx - 1; i++) {
+    const p = candles[i - 1];
+    const c = candles[i];
+    const n = candles[i + 1];
+    if (!p || !c || !n) continue;
+    if (c.high > p.high && c.high >= n.high) highs.push(c.high);
+    if (c.low < p.low && c.low <= n.low) lows.push(c.low);
+  }
+
+  if (highs.length < 2 || lows.length < 2) return false;
+  const hh = highs[highs.length - 1] > highs[highs.length - 2];
+  const hl = lows[lows.length - 1] > lows[lows.length - 2];
+  return hh && hl;
+}
+
+function hasBearishStructure(candles: Candle[], confirmationIdx: number) {
+  const from = Math.max(2, confirmationIdx - 24);
+  const highs: number[] = [];
+  const lows: number[] = [];
+
+  for (let i = from; i <= confirmationIdx - 1; i++) {
+    const p = candles[i - 1];
+    const c = candles[i];
+    const n = candles[i + 1];
+    if (!p || !c || !n) continue;
+    if (c.high > p.high && c.high >= n.high) highs.push(c.high);
+    if (c.low < p.low && c.low <= n.low) lows.push(c.low);
+  }
+
+  if (highs.length < 2 || lows.length < 2) return false;
+  const lh = highs[highs.length - 1] < highs[highs.length - 2];
+  const ll = lows[lows.length - 1] < lows[lows.length - 2];
+  return lh && ll;
+}
+
+function getPatternSignalMode(candles: Candle[], side: Side): PatternSignalMode | null {
+  if (candles.length < 4) return null;
+  const lastClosedIdx = candles.length - 2;
+  const from = Math.max(3, lastClosedIdx - 5 + 1);
+
+  for (let confirmationIdx = lastClosedIdx; confirmationIdx >= from; confirmationIdx--) {
+    const patternIdx = confirmationIdx - 1;
+    const pattern = side === "BUY"
+      ? isBullishPatternAt(candles, patternIdx)
+      : isBearishPatternAt(candles, patternIdx);
+
+    if (!pattern || !isPatternConfirmed(candles, patternIdx, pattern, side)) continue;
+
+    const structureOk = side === "BUY"
+      ? hasBullishStructure(candles, confirmationIdx)
+      : hasBearishStructure(candles, confirmationIdx);
+
+    return structureOk ? "STRUCTURE" : "STANDARD";
+  }
+  return null;
+}
+
+type BollingerSignalConfig = {
+  length: number;
+  maType: "SMA" | "EMA";
+  stdDev: number;
+};
+
+function getBollingerAt(
+  candles: Candle[],
+  idx: number,
+  config: BollingerSignalConfig
+): { basis: number; upper: number; lower: number } | null {
+  const length = Math.max(2, Math.round(config.length || 20));
+  if (idx < length - 1 || idx >= candles.length) return null;
+
+  const closes = candles.slice(idx - length + 1, idx + 1).map((c) => c.close);
+  if (closes.length < length) return null;
+
+  let basis: number;
+  if (config.maType === "EMA") {
+    const alpha = 2 / (length + 1);
+    // EMA liczona do badanego indeksu, żeby logika nie korzystała z przyszłych świec.
+    let ema = candles[0]?.close ?? closes[0];
+    for (let i = 1; i <= idx; i++) {
+      ema = candles[i].close * alpha + ema * (1 - alpha);
+    }
+    basis = ema;
+  } else {
+    basis = closes.reduce((sum, value) => sum + value, 0) / closes.length;
+  }
+
+  const mean = closes.reduce((sum, value) => sum + value, 0) / closes.length;
+  const variance = closes.reduce((sum, value) => sum + (value - mean) ** 2, 0) / closes.length;
+  const deviation = Math.sqrt(variance) * Math.max(0.1, config.stdDev || 2);
+
+  return {
+    basis,
+    upper: basis + deviation,
+    lower: basis - deviation,
+  };
+}
+
+// Luźniejsza definicja świecy odrzucenia używana WYŁĄCZNIE przez logikę Bollingera.
+// Klasyczny isHammer() pozostaje bez zmian dla pozostałych formacji skanera.
+function isBollingerHammerRejection(c: Candle) {
+  const range = candleRange(c);
+  if (range <= 0) return false;
+
+  const body = candleBody(c);
+  const lowW = lowerWick(c);
+
+  // Ma być widoczne odrzucenie dołu, ale nie wymagamy klasycznego 2x body.
+  // To pozwala złapać setupy jak na wykresie: mocne wyjście pod bandę + szybki powrót.
+  return lowW >= range * 0.12 && body <= range * 0.82;
+}
+
+function isBollingerBearishRejection(c: Candle) {
+  const range = candleRange(c);
+  if (range <= 0) return false;
+
+  const body = candleBody(c);
+  const upW = upperWick(c);
+
+  return upW >= range * 0.12 && body <= range * 0.82;
+}
+
+function isBollingerPatternSetup(
+  candles: Candle[],
+  patternEndIdx: number,
+  pattern: CandlePattern,
+  side: Side,
+  config: BollingerSignalConfig
+) {
+  // LOGIKA BB BUY:
+  // 1) świeca Hammer/rejection wychodzi LOW poniżej dolnej bandy,
+  // 2) nie musi sama zamknąć się z powrotem w bandzie,
+  // 3) DRUGA świeca musi być zielona i już zamknięta,
+  // 4) druga świeca wraca do środka Bollingera,
+  // 5) druga świeca zamyka się powyżej HIGH Hammera -> BUY.
+  //
+  // SELL działa lustrzanie na górnej bandzie.
+  if (side === "BUY" && pattern !== "HAMMER") return false;
+  if (side === "SELL" && pattern !== "BEARISH_PIN_BAR") return false;
+
+  const confirmationIdx = patternEndIdx + 1;
+  const patternCandle = candles[patternEndIdx];
+  const confirmation = candles[confirmationIdx];
+  if (!patternCandle || !confirmation) return false;
+
+  const patternBand = getBollingerAt(candles, patternEndIdx, config);
+  const confirmationBand = getBollingerAt(candles, confirmationIdx, config);
+  if (!patternBand || !confirmationBand) return false;
+
+  if (side === "BUY") {
+    const hammerOutsideLowerBand = patternCandle.low < patternBand.lower;
+    const greenConfirmation = isBullish(confirmation);
+    const confirmationBackInsideBand = confirmation.close > confirmationBand.lower;
+    const confirmationClosedAboveHammerHigh = confirmation.close > patternCandle.high;
+
+    return (
+      hammerOutsideLowerBand &&
+      greenConfirmation &&
+      confirmationBackInsideBand &&
+      confirmationClosedAboveHammerHigh
+    );
+  }
+
+  const bearishPatternOutsideUpperBand = patternCandle.high > patternBand.upper;
+  const redConfirmation = isBearish(confirmation);
+  const confirmationBackInsideBand = confirmation.close < confirmationBand.upper;
+  const confirmationClosedBelowPatternLow = confirmation.close < patternCandle.low;
+
+  return (
+    bearishPatternOutsideUpperBand &&
+    redConfirmation &&
+    confirmationBackInsideBand &&
+    confirmationClosedBelowPatternLow
+  );
+}
+
+function getRecentBollingerPattern(
+  candles: Candle[],
+  side: Side,
+  config: BollingerSignalConfig,
+  lookback = 6
+): {
+  pattern: CandlePattern;
+  mode: PatternSignalMode;
+  patternTime: UTCTimestamp;
+  confirmationTime: UTCTimestamp;
+} | null {
+  if (candles.length < Math.max(7, config.length + 3)) return null;
+
+  // Ostatnia świeca może być nadal otwarta — Bar 2 musi być zamknięty.
+  const lastClosedIdx = candles.length - 2;
+  const firstConfirmIdx = Math.max(5, lastClosedIdx - lookback + 1);
+
+  // ============================================================
+  // JEDYNA LOGIKA BB DLA SYGNAŁU:
+  //
+  // BUY:
+  // Bar 1: LOW wychodzi pod DOLNĄ BB i CLOSE wraca nad dolną BB.
+  // Bar 2: zamknięta ZIELONA świeca.
+  // => BUY na Bar 2.
+  //
+  // SELL:
+  // Bar 1: HIGH wychodzi nad GÓRNĄ BB i CLOSE wraca pod górną BB.
+  // Bar 2: zamknięta CZERWONA świeca.
+  // => SELL na Bar 2.
+  //
+  // Dolna BB + czerwony Bar 2 = BRAK sygnału.
+  // Górna BB + zielony Bar 2 = BRAK sygnału.
+  // Środkowa BB nie generuje sygnałów.
+  // RENKO bez zmian.
+  // ============================================================
+  for (let confirmIdx = lastClosedIdx; confirmIdx >= firstConfirmIdx; confirmIdx--) {
+    const signalIdx = confirmIdx - 1;
+    const signal = candles[signalIdx];
+    const confirm = candles[confirmIdx];
+    if (!signal || !confirm) continue;
+
+    const band = getBollingerAt(candles, signalIdx, config);
+    if (!band) continue;
+
+    if (side === "BUY") {
+      const lowerReentry =
+        signal.low < band.lower &&
+        signal.close > band.lower;
+
+      const greenBar2 = isBullish(confirm);
+
+      if (lowerReentry && greenBar2) {
+        const structureOk = hasBullishStructure(candles, confirmIdx);
+        return {
+          pattern: "HAMMER",
+          mode: structureOk ? "BOLLINGER_STRONG" : "BOLLINGER_CONFIRMED",
+          patternTime: signal.time,
+          confirmationTime: confirm.time,
+        };
+      }
+
+      continue;
+    }
+
+    const upperReentry =
+      signal.high > band.upper &&
+      signal.close < band.upper;
+
+    const redBar2 = isBearish(confirm);
+
+    if (upperReentry && redBar2) {
+      const structureOk = hasBearishStructure(candles, confirmIdx);
+      return {
+        pattern: "BEARISH_PIN_BAR",
+        mode: structureOk ? "BOLLINGER_STRONG" : "BOLLINGER_CONFIRMED",
+        patternTime: signal.time,
+        confirmationTime: confirm.time,
+      };
+    }
+  }
+
+  return null;
+}
+
+function getRecentPattern(candles: Candle[], side: Side, lookback = 6): CandlePattern | "NONE" {
+  if (candles.length < 4) return "NONE";
+
+  // Ostatnia świeca w tablicy może być nadal otwarta.
+  // Sygnał wolno utworzyć wyłącznie z ZAMKNIĘTEJ świecy potwierdzającej.
+  const lastClosedIdx = candles.length - 2;
+  const firstConfirmationIdx = Math.max(3, lastClosedIdx - lookback + 1);
+
+  for (let confirmationIdx = lastClosedIdx; confirmationIdx >= firstConfirmationIdx; confirmationIdx--) {
+    const patternIdx = confirmationIdx - 1;
     const pattern =
       side === "BUY"
-        ? isBullishPatternAt(candles, idx)
-        : isBearishPatternAt(candles, idx);
+        ? isBullishPatternAt(candles, patternIdx)
+        : isBearishPatternAt(candles, patternIdx);
 
-    if (pattern) return pattern;
+    if (pattern && isPatternConfirmed(candles, patternIdx, pattern, side)) {
+      return pattern;
+    }
   }
 
   return "NONE";
@@ -988,60 +1340,72 @@ function detectClosedTradeStatus(params: {
   levels: Levels;
   signalTime: UTCTimestamp;
   tp1Hit?: boolean;
-}): { status: "TP2" | "SL" | "BE" | "TP1_BE" | null; tp1Hit: boolean } {
+  tp2Hit?: boolean;
+}): {
+  status: "TP3" | "SL" | "TP1_BE" | null;
+  tp1Hit: boolean;
+  tp2Hit: boolean;
+} {
   const { candles, side, levels, signalTime } = params;
   let tp1Hit = params.tp1Hit ?? false;
+  let tp2Hit = params.tp2Hit ?? false;
 
-  if (!candles.length) return { status: null, tp1Hit };
+  if (!candles.length) return { status: null, tp1Hit, tp2Hit };
 
   const startIdx = candles.findIndex(
     (c) => Number(c.time) > Number(signalTime)
   );
 
-  if (startIdx < 0) return { status: null, tp1Hit };
+  if (startIdx < 0) return { status: null, tp1Hit, tp2Hit };
 
   const tp1 = levels.tps?.[0];
   const tp2 = levels.tps?.[1];
+  const tp3 = levels.tps?.[2];
 
-  if (tp1 == null || tp2 == null) return { status: null, tp1Hit };
+  if (tp1 == null || tp2 == null || tp3 == null) {
+    return { status: null, tp1Hit, tp2Hit };
+  }
 
   for (let i = startIdx; i < candles.length; i++) {
     const c = candles[i];
+    const hadTp1BeforeThisCandle = tp1Hit;
 
     if (side === "BUY") {
-      if (!tp1Hit && c.high >= tp1) tp1Hit = true;
-
-      if (c.high >= tp2) {
-        return { status: "TP2", tp1Hit };
-      }
-
-      if (tp1Hit && c.close <= levels.entry) {
-        return { status: "TP1_BE", tp1Hit };
-      }
-
       if (!tp1Hit && c.low <= levels.sl) {
-        return { status: "SL", tp1Hit };
+        return { status: "SL", tp1Hit: false, tp2Hit: false };
+      }
+
+      if (!tp1Hit && c.high >= tp1) tp1Hit = true;
+      if (tp1Hit && !tp2Hit && c.high >= tp2) tp2Hit = true;
+
+      if (c.high >= tp3) {
+        return { status: "TP3", tp1Hit: true, tp2Hit: true };
+      }
+
+      if (hadTp1BeforeThisCandle && c.low <= levels.entry) {
+        return { status: "TP1_BE", tp1Hit: true, tp2Hit };
       }
     }
 
     if (side === "SELL") {
-      if (!tp1Hit && c.low <= tp1) tp1Hit = true;
-
-      if (c.low <= tp2) {
-        return { status: "TP2", tp1Hit };
-      }
-
-      if (tp1Hit && c.close >= levels.entry) {
-        return { status: "TP1_BE", tp1Hit };
-      }
-
       if (!tp1Hit && c.high >= levels.sl) {
-        return { status: "SL", tp1Hit };
+        return { status: "SL", tp1Hit: false, tp2Hit: false };
+      }
+
+      if (!tp1Hit && c.low <= tp1) tp1Hit = true;
+      if (tp1Hit && !tp2Hit && c.low <= tp2) tp2Hit = true;
+
+      if (c.low <= tp3) {
+        return { status: "TP3", tp1Hit: true, tp2Hit: true };
+      }
+
+      if (hadTp1BeforeThisCandle && c.high >= levels.entry) {
+        return { status: "TP1_BE", tp1Hit: true, tp2Hit };
       }
     }
   }
 
-  return { status: null, tp1Hit };
+  return { status: null, tp1Hit, tp2Hit };
 }
 
 function toTwelveSymbol(symbol: string) {
@@ -1761,6 +2125,99 @@ function tradeKey(symbol: string, tf: Timeframe) {
 
 const ACTIVE_TRADES_KEY = "fx_active_trades_v1";
 const CLOSED_TRADES_KEY = "fx_closed_trades_v1";
+const WEEKLY_TELEGRAM_LAST_SENT_KEY = "fx_weekly_telegram_last_sent_v1";
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+type WeeklyTelegramRow = {
+  instrument: string;
+  wins: number;
+  losses: number;
+  value: number;
+  unit: "pips" | "pts";
+};
+
+function resultDistanceForTrade(t: ClosedTrade) {
+  const entry = Number(t.entry);
+  if (!Number.isFinite(entry)) return null;
+
+  if (t.status === "SL") {
+    const sl = Number(t.sl);
+    return Number.isFinite(sl) ? -Math.abs(sl - entry) : null;
+  }
+
+  if (t.status === "TP3") {
+    const tp3 = Number(t.tp3);
+    return Number.isFinite(tp3) ? Math.abs(tp3 - entry) : null;
+  }
+
+  // TP1 + BE / TP2 + BE: liczymy najdalszy faktycznie zaliczony target.
+  const target = t.tp2Hit ? Number(t.tp2) : Number(t.tp1);
+  return Number.isFinite(target) ? Math.abs(target - entry) : null;
+}
+
+function tradeResultUnits(t: ClosedTrade): { value: number; unit: "pips" | "pts" } | null {
+  const distance = resultDistanceForTrade(t);
+  if (distance == null) return null;
+
+  const symbol = t.instrument.toUpperCase();
+
+  // Forex: klasyczny pip. Metale: 0.01 jako pip. Crypto: ruch ceny w punktach.
+  if (symbol === "XAUUSD" || symbol === "XAGUSD") {
+    return { value: distance / 0.01, unit: "pips" };
+  }
+
+  if (/^[A-Z]{6}$/.test(symbol)) {
+    const pip = symbol.endsWith("JPY") ? 0.01 : 0.0001;
+    return { value: distance / pip, unit: "pips" };
+  }
+
+  return { value: distance, unit: "pts" };
+}
+
+function buildWeeklyTelegramStats(trades: ClosedTrade[]) {
+  const wins = trades.filter((t) => t.status === "TP3" || t.status === "TP1_BE").length;
+  const losses = trades.filter((t) => t.status === "SL").length;
+  const rowsMap = new Map<string, WeeklyTelegramRow>();
+
+  let totalPips = 0;
+  let totalPoints = 0;
+
+  for (const t of trades) {
+    const r = tradeResultUnits(t);
+    const key = t.instrument.toUpperCase();
+    const unit = r?.unit ?? (key.endsWith("USDT") ? "pts" : "pips");
+    const row = rowsMap.get(key) ?? {
+      instrument: key,
+      wins: 0,
+      losses: 0,
+      value: 0,
+      unit,
+    };
+
+    if (t.status === "SL") row.losses += 1;
+    else row.wins += 1;
+
+    if (r) {
+      row.value += r.value;
+      if (r.unit === "pips") totalPips += r.value;
+      else totalPoints += r.value;
+    }
+
+    rowsMap.set(key, row);
+  }
+
+  const total = wins + losses;
+  return {
+    total,
+    wins,
+    losses,
+    winRate: total > 0 ? (wins / total) * 100 : 0,
+    totalPips,
+    totalPoints,
+    rows: Array.from(rowsMap.values()).sort((a, b) => a.instrument.localeCompare(b.instrument)),
+  };
+}
+
 function saveClosedTradesToStorage(trades: ClosedTrade[]) {
   try {
     localStorage.setItem(CLOSED_TRADES_KEY, JSON.stringify(trades)); 
@@ -1962,6 +2419,7 @@ const DRAW_TOOL_BUTTONS = [
         hammerTime: savedRow?.hammerTime,
         signalCandleTime: savedRow?.signalCandleTime,
         signalPattern: (savedRow?.signalPattern ?? "NONE") as CandlePattern,
+        patternSignalMode: savedRow?.patternSignalMode as PatternSignalMode | undefined,
 confirmationCount: (savedRow?.confirmationCount ?? 0) as 0 | 1 | 2 | 3 | 4,
 higherTfSignal: (savedRow?.higherTfSignal ?? "NONE") as Signal,
       };
@@ -1979,9 +2437,12 @@ higherTfSignal: (savedRow?.higherTfSignal ?? "NONE") as Signal,
       hammerTime: undefined,
       signalCandleTime: undefined,
       signalPattern: "NONE" as CandlePattern,
+      patternSignalMode: undefined,
       confirmationCount: 0,
       confirmationSide: null,
       higherTfSignal: "NONE",
+      tp1Hit: false,
+      tp2Hit: false,
     }));
   }
 });
@@ -2111,6 +2572,7 @@ React.useEffect(() => {
           hammerTime: saved?.hammerTime,
           signalCandleTime: saved?.signalCandleTime,
           signalPattern: (saved?.signalPattern ?? "NONE") as CandlePattern,
+          patternSignalMode: saved?.patternSignalMode as PatternSignalMode | undefined,
           confirmationCount: 0,
           confirmationSide: null,
           higherTfSignal: "NONE",
@@ -2259,17 +2721,33 @@ React.useEffect(() => {
 
   const sendTelegram = React.useCallback(
     async (payload: {
-      instrument: string;
-      side: Side;
-      tf: string;
-      liquidity: number;
-      rr: number;
-      entry: number;
-      sl: number;
+      type: "SIGNAL" | "CLOSED" | "WEEKLY";
+      instrument?: string;
+      side?: Side;
+      tf?: string;
+      liquidity?: number;
+      rr?: number;
+      entry?: number;
+      sl?: number;
       tp1?: number;
       tp2?: number;
       tp3?: number;
+      status?: "TP3" | "SL" | "TP1_BE";
+      tp1Hit?: boolean;
+      tp2Hit?: boolean;
+      tp3Hit?: boolean;
       timeISO: string;
+      weekly?: {
+        periodStartISO: string;
+        periodEndISO: string;
+        total: number;
+        wins: number;
+        losses: number;
+        winRate: number;
+        totalPips: number;
+        totalPoints: number;
+        rows: WeeklyTelegramRow[];
+      };
     }) => {
       if (!TELEGRAM_ON) return;
 
@@ -2283,6 +2761,61 @@ React.useEffect(() => {
     },
     []
   );
+
+  // Cotygodniowe podsumowanie Telegram.
+  // Działa po 7 dniach i wysyła raport przy pierwszym uruchomieniu/odświeżeniu skanera po terminie.
+  React.useEffect(() => {
+    if (!TELEGRAM_ON) return;
+
+    const checkWeeklyReport = async () => {
+      try {
+        const now = Date.now();
+        const rawLast = localStorage.getItem(WEEKLY_TELEGRAM_LAST_SENT_KEY);
+        const last = rawLast ? Number(rawLast) : NaN;
+
+        if (!Number.isFinite(last) || last <= 0) {
+          localStorage.setItem(WEEKLY_TELEGRAM_LAST_SENT_KEY, String(now));
+          return;
+        }
+
+        if (now - last < WEEK_MS) return;
+
+        const stored = loadClosedTradesFromStorage();
+        const weekTrades = stored.filter((t) => {
+          const ts = new Date(t.closedAt ?? t.date).getTime();
+          return Number.isFinite(ts) && ts > last && ts <= now;
+        });
+
+        const stats = buildWeeklyTelegramStats(weekTrades);
+        const response = await fetch("/api/telegram/notify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: "WEEKLY",
+            timeISO: new Date(now).toISOString(),
+            weekly: {
+              periodStartISO: new Date(last).toISOString(),
+              periodEndISO: new Date(now).toISOString(),
+              ...stats,
+            },
+          }),
+        });
+
+        if (response.ok) {
+          localStorage.setItem(WEEKLY_TELEGRAM_LAST_SENT_KEY, String(now));
+        }
+      } catch (error) {
+        console.error("Weekly Telegram report error:", error);
+      }
+    };
+
+    void checkWeeklyReport();
+    const weeklyTimer = window.setInterval(() => {
+      void checkWeeklyReport();
+    }, 10 * 60 * 1000);
+
+    return () => window.clearInterval(weeklyTimer);
+  }, []);
 
   React.useEffect(() => {
     let alive = true;
@@ -2371,7 +2904,9 @@ const signal: Signal = supertrendEnabled
     let sideOut: Row["side"] = r.side;
     let signalCandleTime = r.signalCandleTime;
     let signalPattern = r.signalPattern ?? "NONE";
+    let patternSignalMode = r.patternSignalMode;
     let tp1Hit = r.tp1Hit ?? false;
+    let tp2Hit = r.tp2Hit ?? false;
     const cs = candlesCache.current.get(r.symbol) ?? [];
     const tick = getTickSize(r.symbol);
 
@@ -2389,11 +2924,82 @@ const signal: Signal = supertrendEnabled
       supertrendSignal: supertrendDirection,
     });
 
+    const classicPatternMode = best.side && best.pattern !== "NONE"
+      ? getPatternSignalMode(cs, best.side)
+      : null;
+
+    // Jedna logika BB z trzema poziomami jakości: EARLY -> BUY/SELL -> STRONG.
+    // Zewnętrzna banda tworzy setup; środkowa banda nie generuje sygnału BB.
+    // Używa ustawień BB z wykresu. RENKO nie jest tutaj modyfikowane.
+    const bbLogicConfig: BollingerSignalConfig = {
+      length: bbState.length,
+      maType: bbState.maType,
+      stdDev: bbState.stdDev,
+    };
+    const bbBuy = getRecentBollingerPattern(cs, "BUY", bbLogicConfig, 5);
+    const bbSell = getRecentBollingerPattern(cs, "SELL", bbLogicConfig, 5);
+    const bbSignal = bbBuy && !bbSell
+      ? { side: "BUY" as Side, ...bbBuy }
+      : bbSell && !bbBuy
+      ? { side: "SELL" as Side, ...bbSell }
+      : null;
+
+    const classicReady = best.count === 4 && !!best.side && best.pattern !== "NONE";
+
+    // Gdy Bollinger jest WŁĄCZONY na wykresie, markery BUY/SELL skanera
+    // pochodzą WYŁĄCZNIE z logiki zewnętrznych band:
+    // BUY = dolna banda, SELL = górna banda.
+    // Dzięki temu środkowa linia BB nie może generować markerów BUY/SELL.
+    // Po wyłączeniu Bollingera klasyczna logika skanera nadal działa jak wcześniej.
+    const bollingerOuterBandMode = !!bbState.enabled;
+
+    // STRICT BB MODE:
+    // przy włączonym Bollingerze akceptujemy WYŁĄCZNIE sygnały z ZEWNĘTRZNYCH band.
+    // BUY może powstać tylko po odrzuceniu DOLNEJ bandy,
+    // SELL może powstać tylko po odrzuceniu GÓRNEJ bandy.
+    // Środkowa linia BB nigdy nie tworzy wejścia.
+    const isStrictBbMode = (mode?: PatternSignalMode) =>
+      mode === "BOLLINGER_EARLY" ||
+      mode === "BOLLINGER_CONFIRMED" ||
+      mode === "BOLLINGER_STRONG";
+
+    // Jeżeli po włączeniu BB w pamięci został stary trade z klasycznej logiki
+    // (np. sygnał przy środkowej linii), usuwamy go z aktywnego widoku.
+    if (bollingerOuterBandMode && tradeActive && !isStrictBbMode(patternSignalMode)) {
+      tradeActive = false;
+      sideOut = undefined;
+      levels = undefined;
+      hammerTime = undefined;
+      signalCandleTime = undefined;
+      signalPattern = "NONE";
+      patternSignalMode = undefined;
+      tp1Hit = false;
+      tp2Hit = false;
+    }
+
+    const setupSide: Side | null = bollingerOuterBandMode
+      ? bbSignal?.side ?? null
+      : classicReady
+      ? best.side
+      : bbSignal?.side ?? null;
+
+    const setupPattern: CandlePattern | "NONE" = bollingerOuterBandMode
+      ? bbSignal?.pattern ?? "NONE"
+      : classicReady
+      ? best.pattern
+      : bbSignal?.pattern ?? "NONE";
+
+    const detectedPatternMode: PatternSignalMode | null = bollingerOuterBandMode
+      ? bbSignal?.mode ?? null
+      : classicReady
+      ? classicPatternMode
+      : bbSignal?.mode ?? null;
+
     const htfOk =
   !r.higherTfSignal ||
   r.higherTfSignal === "NONE" ||
-  (best.side === "BUY" && r.higherTfSignal === "UP") ||
-  (best.side === "SELL" && r.higherTfSignal === "DOWN");
+  (setupSide === "BUY" && r.higherTfSignal === "UP") ||
+  (setupSide === "SELL" && r.higherTfSignal === "DOWN");
 
 const sessionOk = isTradingSession(
   r.symbol,
@@ -2402,10 +3008,14 @@ const sessionOk = isTradingSession(
 
 const activityReady = nextLiquidity >= LIQ_THRESHOLD_HIGH;
 
+// Bollinger ma własny kompletny trigger wejścia, więc nie blokujemy go
+// dodatkowo progiem liquidity/4-of-4. Klasyczna logika skanera nadal go wymaga.
 const setupReadyNow =
-  activityReady &&
-  best.count === 4 &&
-  !!best.side;
+  !!setupSide &&
+  setupPattern !== "NONE" &&
+  (bollingerOuterBandMode
+    ? !!bbSignal
+    : (!!bbSignal || (activityReady && classicReady)));
 
     const wasOn = scannerPrevRef.current.get(r.symbol) ?? false;
     scannerPrevRef.current.set(r.symbol, setupReadyNow);
@@ -2419,9 +3029,17 @@ const setupReadyNow =
     const setupReadyPrev = setupPrevRef.current.get(r.symbol) ?? false;
     setupPrevRef.current.set(r.symbol, setupReadyNow);
 
-    if (!tradeActive && setupReadyNow && best.side && cs.length >= 5) {
-      const signalTime = cs[cs.length - 2]?.time;
-      const patternTime = cs[cs.length - 3]?.time;
+    if (!tradeActive && setupReadyNow && setupSide && cs.length >= 5) {
+      const signalTime = bollingerOuterBandMode
+        ? bbSignal?.confirmationTime ?? cs[cs.length - 2]?.time
+        : classicReady
+        ? cs[cs.length - 2]?.time
+        : bbSignal?.confirmationTime ?? cs[cs.length - 2]?.time;
+      const patternTime = bollingerOuterBandMode
+        ? bbSignal?.patternTime ?? cs[cs.length - 3]?.time
+        : classicReady
+        ? cs[cs.length - 3]?.time
+        : bbSignal?.patternTime ?? cs[cs.length - 3]?.time;
 
       if (signalTime && patternTime) {
         const lv = buildLevelsLiquidityOnly({
@@ -2429,7 +3047,7 @@ const setupReadyNow =
           candles: cs,
           tickSize: tick,
           zoneTicks: ZONE_TICKS,
-          side: best.side,
+          side: setupSide,
           signalTime,
         });
 
@@ -2438,9 +3056,9 @@ const setupReadyNow =
   const buffer = tick * 2;
 
   const newSL =
-    signalCandle && best.side === "BUY"
+    signalCandle && setupSide === "BUY"
       ? signalCandle.low - buffer
-      : signalCandle && best.side === "SELL"
+      : signalCandle && setupSide === "SELL"
       ? signalCandle.high + buffer
       : lv.sl;
 
@@ -2457,19 +3075,19 @@ let tp2Price = lv.tps?.[1] ?? entryPrice;
 let tp3Price = lv.tps?.[2] ?? entryPrice;
 
 if (atr && Number.isFinite(atr)) {
-  if (best.side === "BUY") {
+  if (setupSide === "BUY") {
     const signalCandle = cs.find(
   (c) => Number(c.time) === Number(signalTime)
 );
 
-if (best.side === "BUY") {
-  slPrice = signalCandle
-    ? signalCandle.low - buffer
-    : entryPrice - atr;
-
+if (setupSide === "BUY") {
   tp1Price = entryPrice + atr * TP1_ATR_MULT;
   tp2Price = entryPrice + atr * TP2_ATR_MULT;
   tp3Price = entryPrice + atr * TP3_ATR_MULT;
+
+  // 1R: odległość Entry -> SL jest dokładnie taka sama jak Entry -> TP1.
+  const oneR = Math.abs(tp1Price - entryPrice);
+  slPrice = entryPrice - oneR;
 }
 
     tp1Price = entryPrice + atr * TP1_ATR_MULT;
@@ -2477,15 +3095,15 @@ if (best.side === "BUY") {
     tp3Price = entryPrice + atr * TP3_ATR_MULT;
   }
 
-  if (best.side === "SELL") {
-    if (best.side === "SELL") {
-  slPrice = signalCandle
-    ? signalCandle.high + buffer
-    : entryPrice + atr;
-
+  if (setupSide === "SELL") {
+    if (setupSide === "SELL") {
   tp1Price = entryPrice - atr * TP1_ATR_MULT;
   tp2Price = entryPrice - atr * TP2_ATR_MULT;
   tp3Price = entryPrice - atr * TP3_ATR_MULT;
+
+  // 1R: odległość Entry -> SL jest dokładnie taka sama jak Entry -> TP1.
+  const oneR = Math.abs(entryPrice - tp1Price);
+  slPrice = entryPrice + oneR;
 }
 
     tp1Price = entryPrice - atr * TP1_ATR_MULT;
@@ -2496,7 +3114,7 @@ if (best.side === "BUY") {
 
 levels = {
   ...lv,
-  side: best.side,
+  side: setupSide,
 
   entry: round(entryPrice, 6),
 
@@ -2547,18 +3165,21 @@ levels = {
 };
 
           tradeActive = true;
-sideOut = best.side;
+sideOut = setupSide;
 hammerTime = patternTime;
 signalCandleTime = signalTime;
-signalPattern = best.pattern;
+signalPattern = setupPattern;
+patternSignalMode = detectedPatternMode ?? "STANDARD";
 tp1Hit = false;
+tp2Hit = false;
 
           if (!setupReadyPrev) {
             const now = new Date();
 
             void sendTelegram({
+              type: "SIGNAL",
               instrument: r.symbol,
-              side: best.side,
+              side: setupSide,
               tf,
               liquidity: Math.round(nextLiquidity),
               rr: Number((levels.rr ?? 0).toFixed(2)),
@@ -2571,6 +3192,31 @@ tp1Hit = false;
             });
           }
         }
+      }
+    }
+
+    // Jeżeli po EARLY kolejna świeca się zamknie i potwierdzi setup,
+    // podnosimy etykietę aktywnego trade'u do BUY/SELL albo STRONG BUY/SELL.
+    // Nie zmieniamy ceny wejścia ani poziomów otwartej pozycji.
+    if (
+      tradeActive &&
+      sideOut &&
+      bbSignal &&
+      bbSignal.side === sideOut &&
+      hammerTime &&
+      Number(bbSignal.patternTime) === Number(hammerTime)
+    ) {
+      const modeRank = (mode?: PatternSignalMode) => {
+        if (mode === "BOLLINGER_STRONG") return 3;
+        if (mode === "BOLLINGER_CONFIRMED") return 2;
+        if (mode === "BOLLINGER_EARLY") return 1;
+        return 0;
+      };
+
+      if (modeRank(bbSignal.mode) > modeRank(patternSignalMode)) {
+        patternSignalMode = bbSignal.mode;
+        signalPattern = bbSignal.pattern;
+        signalCandleTime = bbSignal.confirmationTime;
       }
     }
 
@@ -2589,24 +3235,78 @@ tp1Hit = false;
   levels: activeLevels,
   signalTime: signalCandleTime,
   tp1Hit,
+  tp2Hit,
 });
 
+const tp1WasHit = tp1Hit;
 tp1Hit = closedResult.tp1Hit;
+tp2Hit = closedResult.tp2Hit;
 const closedStatus = closedResult.status;
+
+// TP1 trafione -> przesuwamy aktywny SL na BE (ENTRY).
+// TP2 pozostaje tylko etapem po drodze i nie zamyka trade'u.
+if (!closedStatus && !tp1WasHit && tp1Hit) {
+  const bePrice = Number(activeLevels.entry);
+  const bePad = Math.max(tick * 2, Math.abs(bePrice) * 0.00001);
+
+  levels = {
+    ...activeLevels,
+    sl: bePrice,
+    zones: activeLevels.zones?.map((z) =>
+      z.label === "SL"
+        ? {
+            ...z,
+            from: round(bePrice - bePad, 6),
+            to: round(bePrice + bePad, 6),
+          }
+        : z
+    ),
+  };
+}
 
       if (closedStatus) {
   const tradeId = `${r.symbol}-${tf}-${activeSide}-${Number(signalCandleTime)}`;
 
+  const closedAt = new Date().toISOString();
+  const finalTp1Hit = closedStatus === "TP3" || closedStatus === "TP1_BE" || tp1Hit;
+  const finalTp2Hit = closedStatus === "TP3" || tp2Hit;
+  const finalTp3Hit = closedStatus === "TP3";
+
   closedNow.push({
     id: tradeId,
     date: new Date(Number(signalCandleTime) * 1000).toISOString(),
+    closedAt,
     instrument: r.symbol,
     direction: activeSide,
+    tf,
     entry: Number(activeLevels.entry),
     tp1: activeLevels.tps?.[0] ? Number(activeLevels.tps[0]) : undefined,
     tp2: activeLevels.tps?.[1] ? Number(activeLevels.tps[1]) : undefined,
-    sl: Number(activeLevels.sl),
+    tp3: activeLevels.tps?.[2] ? Number(activeLevels.tps[2]) : undefined,
+    sl: Number((levels ?? activeLevels).sl),
     status: closedStatus,
+    tp1Hit: finalTp1Hit,
+    tp2Hit: finalTp2Hit,
+    tp3Hit: finalTp3Hit,
+  });
+
+  // Drugie powiadomienie Telegram: tylko po FINALNYM zamknięciu trade'u.
+  // Pokazuje dokładnie które TP zostały zaliczone i końcowy wynik.
+  void sendTelegram({
+    type: "CLOSED",
+    instrument: r.symbol,
+    side: activeSide,
+    tf,
+    entry: Number(activeLevels.entry),
+    sl: Number((levels ?? activeLevels).sl),
+    tp1: activeLevels.tps?.[0] ? Number(activeLevels.tps[0]) : undefined,
+    tp2: activeLevels.tps?.[1] ? Number(activeLevels.tps[1]) : undefined,
+    tp3: activeLevels.tps?.[2] ? Number(activeLevels.tps[2]) : undefined,
+    status: closedStatus,
+    tp1Hit: finalTp1Hit,
+    tp2Hit: finalTp2Hit,
+    tp3Hit: finalTp3Hit,
+    timeISO: closedAt,
   });
 
   tradeActive = false;
@@ -2615,6 +3315,7 @@ const closedStatus = closedResult.status;
   hammerTime = undefined;
   signalCandleTime = undefined;
   signalPattern = "NONE";
+  patternSignalMode = undefined;
 }
     }
 
@@ -2626,7 +3327,9 @@ const closedStatus = closedResult.status;
         hammerTime,
         signalCandleTime,
         signalPattern,
+        patternSignalMode,
         tp1Hit,
+        tp2Hit,
       });
     } else {
       tradesMemoryRef.current.delete(tradeKey(r.symbol, tf));
@@ -2646,7 +3349,9 @@ const closedStatus = closedResult.status;
       hammerTime,
       signalCandleTime,
       signalPattern,
+      patternSignalMode,
       tp1Hit,
+      tp2Hit,
       confirmationCount: best.count,
       confirmationSide: best.side,
       higherTfSignal: r.higherTfSignal ?? "NONE",
@@ -3022,8 +3727,42 @@ if (closedNow.length) {
 
                     {r.tradeActive && r.side ? (
                       <div className="mt-2 text-xs text-amber-200/90">
-                        ✅ <span className="font-extrabold">FX TRADE • {r.side}</span> • RR {r.levels?.rr?.toFixed?.(2) ?? "—"}
+                        ✅ <span className="font-extrabold">FX TRADE • {
+                          r.patternSignalMode === "BOLLINGER_EARLY"
+                            ? `EARLY ${r.side}`
+                            : r.patternSignalMode === "BOLLINGER_CONFIRMED"
+                            ? `${r.side}`
+                            : r.patternSignalMode === "BOLLINGER_STRONG"
+                            ? `STRONG ${r.side}`
+                            : r.patternSignalMode === "STRUCTURE" || r.patternSignalMode === "BOLLINGER_STRUCTURE"
+                            ? `STRONG ${r.side}`
+                            : r.patternSignalMode === "BOLLINGER"
+                            ? `BB ${r.side}`
+                            : r.side
+                        }</span> • RR {r.levels?.rr?.toFixed?.(2) ?? "—"}
                         {r.signalPattern && r.signalPattern !== "NONE" ? <span className="ml-2 text-yellow-200">• {r.signalPattern}</span> : null}
+                        {r.patternSignalMode ? <span className={cn(
+                          "ml-2 font-black",
+                          r.patternSignalMode === "BOLLINGER_STRONG" || r.patternSignalMode === "STRUCTURE" || r.patternSignalMode === "BOLLINGER_STRUCTURE"
+                            ? "text-emerald-300"
+                            : r.patternSignalMode === "BOLLINGER_EARLY"
+                            ? "text-amber-300"
+                            : "text-sky-200"
+                        )}>• {
+                          r.patternSignalMode === "BOLLINGER_EARLY"
+                            ? "BB REENTRY • EARLY"
+                            : r.patternSignalMode === "BOLLINGER_CONFIRMED"
+                            ? "BB REENTRY • CONFIRMED"
+                            : r.patternSignalMode === "BOLLINGER_STRONG"
+                            ? `BB REENTRY + ${r.side === "BUY" ? "HH/HL" : "LL/LH"}`
+                            : r.patternSignalMode === "BOLLINGER_STRUCTURE"
+                            ? `BOLLINGER + ${r.side === "BUY" ? "HH/HL" : "LL/LH"}`
+                            : r.patternSignalMode === "BOLLINGER"
+                            ? "BOLLINGER"
+                            : r.patternSignalMode === "STRUCTURE"
+                            ? (r.side === "BUY" ? "HH/HL" : "LL/LH")
+                            : "STANDARD"
+                        }</span> : null}
                       </div>
                     ) : (
                       <div className="mt-2 text-xs text-sky-100/30">—</div>
@@ -3686,7 +4425,7 @@ if (closedNow.length) {
                 </div>
 
                 <div className="h-[220px] overflow-auto rounded-b-2xl sm:h-[250px]">
-                  <table className="min-w-[760px] w-full text-xs sm:text-sm">
+                  <table className="min-w-[840px] w-full text-xs sm:text-sm">
                     <thead className="sticky top-0 bg-[#082749] text-sky-100/80">
                       <tr className="border-b border-sky-300/12">
                         <th className="px-3 py-2 text-left">Data</th>
@@ -3695,6 +4434,7 @@ if (closedNow.length) {
                         <th className="px-3 py-2 text-left">Wejście</th>
                         <th className="px-3 py-2 text-left">TP1</th>
                         <th className="px-3 py-2 text-left">TP2</th>
+                        <th className="px-3 py-2 text-left">TP3</th>
                         <th className="px-3 py-2 text-left">SL</th>
                         <th className="px-3 py-2 text-left">Status</th>
                       </tr>
@@ -3727,6 +4467,7 @@ closedTrades.map((t) => (
     <td className="px-3 py-2">{t.entry}</td>
     <td className="px-3 py-2">{t.tp1 ?? "—"}</td>
     <td className="px-3 py-2">{t.tp2 ?? "—"}</td>
+    <td className="px-3 py-2">{t.tp3 ?? "—"}</td>
     <td className="px-3 py-2">{t.sl}</td>
 
     {/* 🔥 STATUS */}
@@ -3740,14 +4481,11 @@ closedTrades.map((t) => (
             className={cn(
   "rounded-full px-3 py-1 text-xs font-bold",
 
-  safeStatus === "TP2"
-    ? "bg-emerald-500/20 text-emerald-300"
+  safeStatus === "TP3"
+    ? "bg-emerald-500/25 text-emerald-200"
 
     : safeStatus === "TP1_BE"
     ? "bg-yellow-500/20 text-yellow-300"
-
-    : safeStatus === "BE"
-    ? "bg-blue-500/20 text-blue-300"
 
     : "bg-red-500/20 text-red-300"
 )}
@@ -3761,7 +4499,7 @@ closedTrades.map((t) => (
 ))
                       ) : (
                         <tr>
-                          <td colSpan={8} className="px-3 py-6 text-center text-sky-100/45">
+                          <td colSpan={9} className="px-3 py-6 text-center text-sky-100/45">
                             Brak zamkniętych trade’ów
                           </td>
                         </tr>
