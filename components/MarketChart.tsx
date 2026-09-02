@@ -3357,21 +3357,6 @@ kineticScroll: {
           </button>
         </div>
 
-        <div className="pointer-events-none absolute left-3 top-16 z-[31] rounded-2xl border border-white/10 bg-black/50 px-3 py-2 text-[11px] text-white/80 backdrop-blur">
-          <div>
-            <span className="text-slate-400">FREEZE:</span> {freezeDebug.frozen ? "YES" : "NO"}
-          </div>
-          <div>
-            <span className="text-slate-400">ENTRY:</span> {freezeDebug.entry ?? "—"}
-          </div>
-          <div>
-            <span className="text-slate-400">ANCHOR:</span> {freezeDebug.anchorTime ?? "—"}
-          </div>
-          <div>
-            <span className="text-slate-400">IDX:</span> {freezeDebug.crossedIdx ?? "—"}
-          </div>
-        </div>
-
         <style>{`
           @keyframes entryPulse {
             0% {
