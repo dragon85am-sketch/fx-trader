@@ -3562,7 +3562,22 @@ kineticScroll: {
             className="absolute inset-0 z-[20] pointer-events-auto"
             style={{
               cursor: activeDrawTool === "SELECT" ? "grab" : "crosshair",
+              // Tablet / telefon: blokujemy natywny scroll strony nad wykresem,
+              // żeby Pointer Events mogły przesuwać wykres jednym palcem.
+              touchAction: activeDrawTool === "SELECT" ? "none" : "none",
+              userSelect: "none",
+              WebkitUserSelect: "none",
             }}
+            // WAŻNE: wcześniej funkcje beginPlotPan/movePlotPan istniały, ale nie były
+            // podpięte do warstwy nad wykresem. Dlatego na tablecie działały tylko
+            // osobne uchwyty osi ceny/czasu. Teraz pusty obszar wykresu obsługuje
+            // pan X/Y dla touch, pen i myszy. DrawingsLayer nadal ma pierwszeństwo
+            // nad obiektami i może zatrzymać propagację podczas edycji rysunku.
+            onPointerDown={activeDrawTool === "SELECT" ? beginPlotPan : undefined}
+            onPointerMove={activeDrawTool === "SELECT" ? movePlotPan : undefined}
+            onPointerUp={activeDrawTool === "SELECT" ? endPlotPan : undefined}
+            onPointerCancel={activeDrawTool === "SELECT" ? endPlotPan : undefined}
+            onWheel={activeDrawTool === "SELECT" ? handlePlotWheel : undefined}
           >
             <DrawingsLayer
               wrapRef={containerRef}
