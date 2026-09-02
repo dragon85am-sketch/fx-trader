@@ -3144,10 +3144,11 @@ kineticScroll: {
       }
     >
       <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-[#0B1220]">
-        <div className="pointer-events-auto absolute left-2 top-2 z-[30] flex items-center gap-1.5 sm:left-3 sm:top-3 sm:gap-2">
+        <div className="pointer-events-auto absolute left-2 top-2 z-[60] flex items-center gap-1.5 sm:left-3 sm:top-3 sm:gap-2">
           <button
             type="button"
             onClick={() => {
+              manualPanRef.current = false;
               setDetached(false);
               setFollowOnTick(true);
               try {
