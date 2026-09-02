@@ -2597,14 +2597,14 @@ React.useEffect(() => {
       // MOBILE: mały panel instrumentów + duży wykres.
       if (width < 640) {
         // Telefon: panel instrumentów mały, wykres wygodny ale nie za wysoki.
-        setPanelH(250);
+        setPanelH(210);
         setChartHeight(Math.max(330, Math.min(420, window.innerHeight - 320)));
         return;
       }
 
       // Tablet: trochę większy wykres, nadal kompaktowe panele.
       if (width < 1280) {
-        setPanelH(230);
+        setPanelH(190);
         setChartHeight(Math.max(430, Math.min(540, window.innerHeight - 250)));
         return;
       }
@@ -3774,7 +3774,14 @@ if (closedNow.length) {
           </CardContent>
         </Card>
 
-        <div ref={rightPanelRef} className="w-full min-w-0 flex-1">
+        <div
+          ref={rightPanelRef}
+          className={cn(
+            "w-full min-w-0 flex-1",
+            isFullscreen &&
+              "h-[100dvh] max-h-[100dvh] overflow-y-auto overscroll-y-contain bg-[#061a34] p-2 sm:p-3 [scrollbar-gutter:stable]"
+          )}
+        >
           <Card className="overflow-visible border-sky-300/18 bg-[linear-gradient(180deg,rgba(17,66,117,.94)_0%,rgba(10,48,91,.97)_45%,rgba(7,35,69,.98)_100%)] shadow-[0_18px_50px_rgba(0,10,35,.34),0_0_30px_rgba(14,165,233,.08),inset_0_1px_0_rgba(255,255,255,.05)]">
             <CardContent className="flex min-w-0 flex-col gap-2 p-2 sm:p-2.5 md:p-3 xl:gap-4 xl:p-5">
               <div className="flex min-w-0 flex-col gap-2 sm:gap-3 xl:flex-row xl:items-center xl:justify-between">

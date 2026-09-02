@@ -3168,80 +3168,173 @@ kineticScroll: {
     } catch {}
   }, []);
 
-  const beginPlotPan = React.useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (activeDrawTool !== "SELECT") return;
-    if (e.pointerType === "mouse" && e.button !== 0) return;
+  const touchPointersRef = React.useRef<Map<number, { x: number; y: number }>>(new Map());
+  const pinchRef = React.useRef<{
+    startDistance: number;
+    from: number;
+    to: number;
+    width: number;
+    height: number;
+    anchorRatioX: number;
+    priceMin: number;
+    priceMax: number;
+  } | null>(null);
 
+  const getVisiblePriceRange = React.useCallback(() => {
     const chart = chartRef.current;
-    const candleSeries = candleSeriesRef.current;
     const safe = displayCacheRef.current;
-    if (!chart || !candleSeries) return;
+    if (!chart || !safe.length) return { min: 0, max: 1 };
 
     try {
-      const ts: any = chart.timeScale();
-      const range = ts.getVisibleLogicalRange?.();
-      if (!range || !Number.isFinite(range.from) || !Number.isFinite(range.to)) return;
+      const range: any = (chart.timeScale() as any).getVisibleLogicalRange?.();
+      if (!range || !Number.isFinite(range.from) || !Number.isFinite(range.to)) {
+        const lows = safe.map((c: any) => Number(c.low)).filter(Number.isFinite);
+        const highs = safe.map((c: any) => Number(c.high)).filter(Number.isFinite);
+        return { min: Math.min(...lows), max: Math.max(...highs) };
+      }
 
       const fromIdx = Math.max(0, Math.floor(Number(range.from)));
       const toIdx = Math.min(safe.length - 1, Math.ceil(Number(range.to)));
       const visible = safe.slice(fromIdx, toIdx + 1) as any[];
       const lows = visible.map((c) => Number(c.low)).filter(Number.isFinite);
       const highs = visible.map((c) => Number(c.high)).filter(Number.isFinite);
+      const min = lows.length ? Math.min(...lows) : 0;
+      const max = highs.length ? Math.max(...highs) : 1;
+      return Number.isFinite(min) && Number.isFinite(max) && max > min
+        ? { min, max }
+        : { min: 0, max: 1 };
+    } catch {
+      return { min: 0, max: 1 };
+    }
+  }, []);
 
-      let priceMin = lows.length ? Math.min(...lows) : 0;
-      let priceMax = highs.length ? Math.max(...highs) : 1;
-      if (!Number.isFinite(priceMin) || !Number.isFinite(priceMax) || priceMax <= priceMin) {
-        priceMin = 0;
-        priceMax = 1;
+  const beginPlotPan = React.useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (activeDrawTool !== "SELECT") return;
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+
+    const chart = chartRef.current;
+    const candleSeries = candleSeriesRef.current;
+    if (!chart || !candleSeries) return;
+
+    try {
+      if (e.pointerType !== "mouse") {
+        touchPointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
       }
+
+      const ts: any = chart.timeScale();
+      const range = ts.getVisibleLogicalRange?.();
+      if (!range || !Number.isFinite(range.from) || !Number.isFinite(range.to)) return;
 
       manualPanRef.current = true;
       setFollowOnTick(false);
       setDetached(true);
 
-      plotPanRef.current = {
-        pointerId: e.pointerId,
-        startX: e.clientX,
-        startY: e.clientY,
-        from: Number(range.from),
-        to: Number(range.to),
-        width: Math.max(1, e.currentTarget.clientWidth),
-        height: Math.max(1, e.currentTarget.clientHeight),
-        priceMin,
-        priceMax,
-      };
+      // DWA PALCE = PINCH ZOOM. Drugi palec przełącza gest z PAN na ZOOM.
+      if (e.pointerType !== "mouse" && touchPointersRef.current.size >= 2) {
+        const pts = Array.from(touchPointersRef.current.values()).slice(0, 2);
+        const dx = pts[1].x - pts[0].x;
+        const dy = pts[1].y - pts[0].y;
+        const distance = Math.max(8, Math.hypot(dx, dy));
+        const rect = e.currentTarget.getBoundingClientRect();
+        const midX = (pts[0].x + pts[1].x) / 2;
+        const priceRange = getVisiblePriceRange();
+
+        pinchRef.current = {
+          startDistance: distance,
+          from: Number(range.from),
+          to: Number(range.to),
+          width: Math.max(1, rect.width),
+          height: Math.max(1, rect.height),
+          anchorRatioX: Math.max(0, Math.min(1, (midX - rect.left) / Math.max(1, rect.width))),
+          priceMin: priceRange.min,
+          priceMax: priceRange.max,
+        };
+        plotPanRef.current = null;
+      } else {
+        const priceRange = getVisiblePriceRange();
+        plotPanRef.current = {
+          pointerId: e.pointerId,
+          startX: e.clientX,
+          startY: e.clientY,
+          from: Number(range.from),
+          to: Number(range.to),
+          width: Math.max(1, e.currentTarget.clientWidth),
+          height: Math.max(1, e.currentTarget.clientHeight),
+          priceMin: priceRange.min,
+          priceMax: priceRange.max,
+        };
+      }
 
       e.currentTarget.setPointerCapture?.(e.pointerId);
       e.preventDefault();
       e.stopPropagation();
     } catch {}
-  }, [activeDrawTool]);
+  }, [activeDrawTool, getVisiblePriceRange]);
 
   const movePlotPan = React.useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    const state = plotPanRef.current;
     const chart = chartRef.current;
     const candleSeries = candleSeriesRef.current;
-    if (!state || !chart || !candleSeries || state.pointerId !== e.pointerId) return;
+    if (!chart || !candleSeries) return;
 
     try {
+      if (e.pointerType !== "mouse" && touchPointersRef.current.has(e.pointerId)) {
+        touchPointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      }
+
+      // PINCH: rozsuń 2 palce = przybliż, zsuń = oddal.
+      const pinch = pinchRef.current;
+      if (pinch && touchPointersRef.current.size >= 2) {
+        const pts = Array.from(touchPointersRef.current.values()).slice(0, 2);
+        const dx = pts[1].x - pts[0].x;
+        const dy = pts[1].y - pts[0].y;
+        const distance = Math.max(8, Math.hypot(dx, dy));
+        const ratio = Math.max(0.25, Math.min(4, pinch.startDistance / distance));
+
+        const initialSpan = Math.max(2, pinch.to - pinch.from);
+        const nextSpan = Math.max(6, Math.min(500, initialSpan * ratio));
+        const anchor = pinch.from + initialSpan * pinch.anchorRatioX;
+        const nextFrom = anchor - nextSpan * pinch.anchorRatioX;
+        const nextTo = nextFrom + nextSpan;
+        (chart.timeScale() as any).setVisibleLogicalRange?.({ from: nextFrom, to: nextTo });
+
+        // Skalujemy również pionowo zakres ceny, żeby gest był naturalny na tablecie.
+        const priceCenter = (pinch.priceMin + pinch.priceMax) / 2;
+        const initialPriceSpan = Math.max(1e-12, pinch.priceMax - pinch.priceMin);
+        const nextPriceSpan = initialPriceSpan * ratio;
+        const minValue = priceCenter - nextPriceSpan / 2;
+        const maxValue = priceCenter + nextPriceSpan / 2;
+        candleSeries.applyOptions({
+          autoscaleInfoProvider: (() => ({
+            priceRange: { minValue, maxValue },
+            margins: { above: 0, below: 0 },
+          })) as any,
+        } as any);
+        chart.priceScale("right").applyOptions({ autoScale: true });
+
+        setOverlayTick((v) => v + 1);
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+
+      const state = plotPanRef.current;
+      if (!state || state.pointerId !== e.pointerId) return;
+
       // PAN X — przeciąganie lewo/prawo.
       const span = Math.max(1, state.to - state.from);
       const dx = e.clientX - state.startX;
       const barsDelta = (dx / state.width) * span;
-
       (chart.timeScale() as any).setVisibleLogicalRange?.({
         from: state.from - barsDelta,
         to: state.to - barsDelta,
       });
 
-      // PAN Y — przeciąganie góra/dół po środku wykresu.
-      // Przesuwamy cały widoczny zakres cen bez zmiany jego wysokości.
+      // PAN Y — przeciąganie góra/dół.
       const dy = e.clientY - state.startY;
       const priceSpan = Math.max(1e-12, state.priceMax - state.priceMin);
       const priceShift = (dy / state.height) * priceSpan;
       const minValue = state.priceMin + priceShift;
       const maxValue = state.priceMax + priceShift;
-
       candleSeries.applyOptions({
         autoscaleInfoProvider: (() => ({
           priceRange: { minValue, maxValue },
@@ -3292,8 +3385,18 @@ kineticScroll: {
   }, [activeDrawTool]);
 
   const endPlotPan = React.useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (plotPanRef.current?.pointerId !== e.pointerId) return;
-    plotPanRef.current = null;
+    touchPointersRef.current.delete(e.pointerId);
+
+    if (plotPanRef.current?.pointerId === e.pointerId) {
+      plotPanRef.current = null;
+    }
+
+    // Po zakończeniu gestu dwoma palcami nie zaczynamy przypadkowego PAN
+    // pozostałym palcem. Nowy PAN zacznie się przy kolejnym dotknięciu.
+    if (touchPointersRef.current.size < 2) {
+      pinchRef.current = null;
+    }
+
     try { e.currentTarget.releasePointerCapture?.(e.pointerId); } catch {}
     e.preventDefault();
     e.stopPropagation();
@@ -3313,6 +3416,10 @@ kineticScroll: {
           <button
             type="button"
             onClick={() => {
+              manualPanRef.current = false;
+              touchPointersRef.current.clear();
+              pinchRef.current = null;
+              plotPanRef.current = null;
               setDetached(false);
               setFollowOnTick(true);
               try {
