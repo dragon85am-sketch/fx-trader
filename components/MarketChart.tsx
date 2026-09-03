@@ -3070,8 +3070,9 @@ kineticScroll: {
         to: state.to - barsDelta,
       });
 
-      // PAN Y — działa dla myszki, pena i dotyku.
-      // Przeciągnięcie palcem w górę/dół w środku wykresu przesuwa zakres cen.
+      // PAN Y — przesuwamy widoczny zakres cen bez ponownego autoskalowania.
+      // Kluczowe dla pełnego ekranu: autoScale=false, inaczej biblioteka
+      // potrafi natychmiast przyciągnąć cenę z powrotem do świec.
       const priceSpan = Math.max(1e-12, state.priceMax - state.priceMin);
       const priceShift = (dy / state.height) * priceSpan;
       const minValue = state.priceMin + priceShift;
@@ -3083,7 +3084,7 @@ kineticScroll: {
           margins: { above: 0, below: 0 },
         })) as any,
       } as any);
-      chart.priceScale("right").applyOptions({ autoScale: true });
+      chart.priceScale("right").applyOptions({ autoScale: false });
 
       setOverlayTick((v) => v + 1);
       e.preventDefault();
