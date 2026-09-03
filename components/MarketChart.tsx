@@ -3047,18 +3047,24 @@ kineticScroll: {
       const dy = e.clientY - state.startY;
 
       // TOUCH W ŚRODKU WYKRESU:
-      // po przekroczeniu małego progu przejmujemy gest dla wykresu.
-      // Dzięki temu palcem można przesuwać wykres jednocześnie X i Y.
-      // Przewijanie całej strony nadal działa poza obszarem wykresu.
+      // pionowy gest zostawiamy przeglądarce = scroll całej strony/panelu,
+      // poziomy gest przejmujemy = PAN wykresu lewo/prawo.
       if (state.pointerType === "touch" && state.gesture === "pending") {
         const ax = Math.abs(dx);
         const ay = Math.abs(dy);
-        const threshold = 6;
+        const threshold = 7;
 
-        if (Math.max(ax, ay) < threshold) return;
+        if (ay >= threshold && ay > ax * 1.08) {
+          plotPanRef.current = null;
+          return;
+        }
 
-        state.gesture = "chart";
-        try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch {}
+        if (ax >= threshold && ax > ay * 1.08) {
+          state.gesture = "chart";
+          try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch {}
+        } else {
+          return;
+        }
       }
 
       // PAN X — przeciąganie lewo/prawo.
@@ -3070,21 +3076,22 @@ kineticScroll: {
         to: state.to - barsDelta,
       });
 
-      // PAN Y — przesuwamy widoczny zakres cen bez ponownego autoskalowania.
-      // Kluczowe dla pełnego ekranu: autoScale=false, inaczej biblioteka
-      // potrafi natychmiast przyciągnąć cenę z powrotem do świec.
-      const priceSpan = Math.max(1e-12, state.priceMax - state.priceMin);
-      const priceShift = (dy / state.height) * priceSpan;
-      const minValue = state.priceMin + priceShift;
-      const maxValue = state.priceMax + priceShift;
+      // PAN Y wykresu tylko myszką / penem.
+      // Na dotyku pionowy ruch jest zarezerwowany dla scrolla strony.
+      if (state.pointerType !== "touch") {
+        const priceSpan = Math.max(1e-12, state.priceMax - state.priceMin);
+        const priceShift = (dy / state.height) * priceSpan;
+        const minValue = state.priceMin + priceShift;
+        const maxValue = state.priceMax + priceShift;
 
-      candleSeries.applyOptions({
-        autoscaleInfoProvider: (() => ({
-          priceRange: { minValue, maxValue },
-          margins: { above: 0, below: 0 },
-        })) as any,
-      } as any);
-      chart.priceScale("right").applyOptions({ autoScale: false });
+        candleSeries.applyOptions({
+          autoscaleInfoProvider: (() => ({
+            priceRange: { minValue, maxValue },
+            margins: { above: 0, below: 0 },
+          })) as any,
+        } as any);
+        chart.priceScale("right").applyOptions({ autoScale: true });
+      }
 
       setOverlayTick((v) => v + 1);
       e.preventDefault();
@@ -3128,11 +3135,14 @@ kineticScroll: {
   }, [activeDrawTool]);
 
   const endPlotPan = React.useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (plotPanRef.current?.pointerId !== e.pointerId) return;
+    const state = plotPanRef.current;
+    if (state?.pointerId !== e.pointerId) return;
     plotPanRef.current = null;
     try { e.currentTarget.releasePointerCapture?.(e.pointerId); } catch {}
-    e.preventDefault();
-    e.stopPropagation();
+    if (state.pointerType !== "touch" || state.gesture === "chart") {
+      e.preventDefault();
+      e.stopPropagation();
+    }
   }, []);
 
 
@@ -3238,7 +3248,7 @@ kineticScroll: {
             style={{
               width: "100%",
               height,
-              touchAction: "none",
+              touchAction: activeDrawTool === "SELECT" ? "pan-y" : "none",
               userSelect: "none",
               WebkitUserSelect: "none",
               cursor: activeDrawTool === "SELECT" ? "grab" : "crosshair",
@@ -3254,7 +3264,7 @@ kineticScroll: {
                 right: 86,
                 bottom: 30,
                 cursor: plotPanRef.current ? "grabbing" : "grab",
-                touchAction: "none",
+                touchAction: "pan-y",
                 background: "transparent",
               }}
               onPointerDown={beginPlotPan}
