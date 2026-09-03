@@ -96,7 +96,35 @@ type AutoScanMatch = ScanResult & {
   pattern: HarmonicPattern;
   candles: CandlestickData[];
   levels: HarmonicLevels | null;
+  rr: number;
+  grade: "PREMIUM" | "STRONG" | "VALID";
 };
+
+function setupGrade(score: number): "PREMIUM" | "STRONG" | "VALID" {
+  if (score >= 90) return "PREMIUM";
+  if (score >= 80) return "STRONG";
+  return "VALID";
+}
+
+function gradeClasses(score: number) {
+  if (score >= 90) return "border-amber-400/30 bg-amber-400/10 text-amber-200";
+  if (score >= 80) return "border-cyan-400/30 bg-cyan-400/10 text-cyan-200";
+  return "border-emerald-400/25 bg-emerald-500/10 text-emerald-300";
+}
+
+function calculateRR(levels: HarmonicLevels | null) {
+  if (!levels) return 0;
+  const risk = Math.abs(levels.entry - levels.sl);
+  if (risk <= 0) return 0;
+  return Math.abs(levels.tp2 - levels.entry) / risk;
+}
+
+function proScore(harmonicScore: number, rr: number) {
+  // Harmonic/Fibonacci quality remains the dominant factor. RR can add up to
+  // 15 points, but it is not presented as a probability of winning.
+  const rrQuality = Math.max(0, Math.min(1, (rr - 1) / 2.5));
+  return Math.max(1, Math.min(99, Math.round(harmonicScore * 0.85 + rrQuality * 15)));
+}
 
 type TwelveDataCandle = {
   datetime: string;
@@ -148,7 +176,7 @@ async function fetchLiveCandles(
     outputsize: "220",
   });
 
-  const res = await fetch(`/api/twelve-data/candles?${params.toString()}`, {
+  const res = await fetch(`/api/twelve-data?${params.toString()}`, {
     cache: "no-store",
     signal,
   });
@@ -741,11 +769,13 @@ export default function HarmonicScannerPage() {
                 const best = matches[0];
                 if (!best) continue;
 
-                // Quality gate for AUTO SCAN. Lower this if you want more,
-                // but weaker, setups in the result list.
-                if (best.score < 70) continue;
-
                 const levels = makeLevels(best.pattern);
+                const rr = calculateRR(levels);
+                const score = proScore(best.score, rr);
+
+                // AUTO SCAN PRO gate: only VALID / STRONG / PREMIUM setups.
+                if (score < 70) continue;
+
                 const dTime = best.pattern.points[4].time;
                 const id = `auto-${symbol}-${scanTf}-${name}-${scanDirection}-${Number(dTime)}`;
 
@@ -755,11 +785,13 @@ export default function HarmonicScannerPage() {
                   tf: scanTf,
                   name,
                   direction: scanDirection,
-                  score: best.score,
+                  score,
                   age: formatAgeFromTime(dTime),
                   pattern: best.pattern,
                   candles: liveCandles,
                   levels,
+                  rr,
+                  grade: setupGrade(score),
                 };
 
                 allMatches.push(result);
@@ -813,7 +845,7 @@ export default function HarmonicScannerPage() {
       setCandles(best.candles);
       setLastLiveUpdate(new Date());
       setScanMessage(
-        `AUTO SCAN: znaleziono ${deduped.length} aktywnych formacji. Najlepsza: ${best.symbol} ${best.tf} ${best.name} ${best.direction} â€¢ ${best.score}%`
+        `AUTO SCAN PRO: ${deduped.length} setupów 70%+. TOP: ${best.grade} • ${best.symbol} ${best.tf} ${best.name} ${best.direction} • SCORE ${best.score}% • RR 1:${best.rr.toFixed(1)}`
       );
     } finally {
       setAutoScanning(false);
@@ -1110,8 +1142,15 @@ export default function HarmonicScannerPage() {
                         {r.direction}
                       </div>
                     </div>
-                    <div className="rounded-md bg-emerald-500/15 px-1.5 py-1 text-[9px] font-bold text-emerald-300">
-                      {r.score}%
+                    <div className="flex flex-col items-end gap-1">
+                      <div className={`rounded-md border px-1.5 py-1 text-[8px] font-black ${gradeClasses(r.score)}`}>
+                        {setupGrade(r.score)} • {r.score}%
+                      </div>
+                      {autoMatchCacheRef.current.get(r.id) ? (
+                        <div className="text-[7px] font-bold text-sky-200/65">
+                          RR 1:{autoMatchCacheRef.current.get(r.id)!.rr.toFixed(1)}
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 </button>
@@ -1196,6 +1235,10 @@ export default function HarmonicScannerPage() {
 
             <div className="mt-2 text-[8px] text-slate-500">
               {activeSetup.symbol} Â· {activeSetup.tf}
+            </div>
+
+            <div className={`mt-3 inline-flex rounded-lg border px-2.5 py-1.5 text-[8px] font-black ${gradeClasses(activeSetup.score)}`}>
+              {setupGrade(activeSetup.score)} • SCORE {activeSetup.score}%
             </div>
 
             {pattern ? (
@@ -1362,8 +1405,8 @@ export default function HarmonicScannerPage() {
                     </td>
 
                     <td className="px-4 py-3">
-                      <span className="rounded-md bg-emerald-500/10 px-2 py-1 font-bold text-emerald-300">
-                        {row.score}%
+                      <span className={`rounded-md border px-2 py-1 font-bold ${gradeClasses(row.score)}`}>
+                        {setupGrade(row.score)} • {row.score}%
                       </span>
                     </td>
 
