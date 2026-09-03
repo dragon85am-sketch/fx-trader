@@ -1026,6 +1026,20 @@ patternsEnabled = false,
   } | null>(null);
   const manualPanRef = React.useRef(false);
 
+  // TOUCH: dwa palce na środku wykresu.
+  // - przesunięcie obu palców góra/dół = PAN ceny Y
+  // - pinch = zoom osi czasu
+  // Jeden palec nadal: poziomo = PAN wykresu, pionowo = scroll strony.
+  const twoFingerTouchRef = React.useRef<{
+    startMidY: number;
+    startDistance: number;
+    from: number;
+    to: number;
+    priceMin: number;
+    priceMax: number;
+    height: number;
+  } | null>(null);
+
   const emaSeriesMapRef = React.useRef<Map<number, ISeriesApi<"Line">>>(new Map());
   const bbSeriesRef = React.useRef<{
     upper?: ISeriesApi<"Line">;
@@ -3008,9 +3022,13 @@ kineticScroll: {
         priceMax = 1;
       }
 
-      manualPanRef.current = true;
-      setFollowOnTick(false);
-      setDetached(true);
+      // Dla TOUCH nie odpinamy FOLLOW przy samym dotknięciu.
+      // Pionowy gest ma pozostać natywnym scrollem strony.
+      if (e.pointerType !== "touch") {
+        manualPanRef.current = true;
+        setFollowOnTick(false);
+        setDetached(true);
+      }
 
       plotPanRef.current = {
         pointerId: e.pointerId,
@@ -3061,6 +3079,9 @@ kineticScroll: {
 
         if (ax >= threshold && ax > ay * 1.08) {
           state.gesture = "chart";
+          manualPanRef.current = true;
+          setFollowOnTick(false);
+          setDetached(true);
           try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch {}
         } else {
           return;
@@ -3097,6 +3118,113 @@ kineticScroll: {
       e.preventDefault();
       e.stopPropagation();
     } catch {}
+  }, []);
+
+  const beginTwoFingerTouch = React.useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+    if (activeDrawTool !== "SELECT" || e.touches.length !== 2) return;
+
+    const chart = chartRef.current;
+    const candleSeries = candleSeriesRef.current;
+    const safe = displayCacheRef.current;
+    if (!chart || !candleSeries || !safe.length) return;
+
+    const t0 = e.touches[0];
+    const t1 = e.touches[1];
+    const dx = t1.clientX - t0.clientX;
+    const dy = t1.clientY - t0.clientY;
+    const distance = Math.max(1, Math.hypot(dx, dy));
+    const midY = (t0.clientY + t1.clientY) / 2;
+
+    try {
+      const ts: any = chart.timeScale();
+      const range = ts.getVisibleLogicalRange?.();
+      if (!range || !Number.isFinite(range.from) || !Number.isFinite(range.to)) return;
+
+      const fromIdx = Math.max(0, Math.floor(Number(range.from)));
+      const toIdx = Math.min(safe.length - 1, Math.ceil(Number(range.to)));
+      const visible = safe.slice(fromIdx, toIdx + 1) as any[];
+      const lows = visible.map((c) => Number(c.low)).filter(Number.isFinite);
+      const highs = visible.map((c) => Number(c.high)).filter(Number.isFinite);
+      let priceMin = lows.length ? Math.min(...lows) : 0;
+      let priceMax = highs.length ? Math.max(...highs) : 1;
+      if (!Number.isFinite(priceMin) || !Number.isFinite(priceMax) || priceMax <= priceMin) {
+        priceMin = 0;
+        priceMax = 1;
+      }
+
+      twoFingerTouchRef.current = {
+        startMidY: midY,
+        startDistance: distance,
+        from: Number(range.from),
+        to: Number(range.to),
+        priceMin,
+        priceMax,
+        height: Math.max(1, e.currentTarget.clientHeight),
+      };
+
+      // Dwa palce oznaczają świadomą manipulację wykresem.
+      manualPanRef.current = true;
+      setFollowOnTick(false);
+      setDetached(true);
+      plotPanRef.current = null;
+      e.preventDefault();
+      e.stopPropagation();
+    } catch {}
+  }, [activeDrawTool]);
+
+  const moveTwoFingerTouch = React.useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+    const state = twoFingerTouchRef.current;
+    const chart = chartRef.current;
+    const candleSeries = candleSeriesRef.current;
+    if (!state || !chart || !candleSeries || e.touches.length !== 2) return;
+
+    const t0 = e.touches[0];
+    const t1 = e.touches[1];
+    const dx = t1.clientX - t0.clientX;
+    const dy = t1.clientY - t0.clientY;
+    const distance = Math.max(1, Math.hypot(dx, dy));
+    const midY = (t0.clientY + t1.clientY) / 2;
+
+    try {
+      // PINCH: zmiana odległości palców skaluje oś czasu.
+      const distanceRatio = distance / Math.max(1, state.startDistance);
+      const pinchChanged = Math.abs(distanceRatio - 1) > 0.035;
+
+      if (pinchChanged) {
+        const span = Math.max(2, state.to - state.from);
+        const center = (state.from + state.to) / 2;
+        const nextSpan = Math.max(6, Math.min(500, span / distanceRatio));
+        (chart.timeScale() as any).setVisibleLogicalRange?.({
+          from: center - nextSpan / 2,
+          to: center + nextSpan / 2,
+        });
+      } else {
+        // Dwa palce przesuwane razem góra/dół = PAN ceny Y.
+        const moveY = midY - state.startMidY;
+        const priceSpan = Math.max(1e-12, state.priceMax - state.priceMin);
+        const priceShift = (moveY / state.height) * priceSpan;
+        const minValue = state.priceMin + priceShift;
+        const maxValue = state.priceMax + priceShift;
+
+        candleSeries.applyOptions({
+          autoscaleInfoProvider: (() => ({
+            priceRange: { minValue, maxValue },
+            margins: { above: 0, below: 0 },
+          })) as any,
+        } as any);
+        chart.priceScale("right").applyOptions({ autoScale: true });
+      }
+
+      setOverlayTick((v) => v + 1);
+      e.preventDefault();
+      e.stopPropagation();
+    } catch {}
+  }, []);
+
+  const endTwoFingerTouch = React.useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length < 2) {
+      twoFingerTouchRef.current = null;
+    }
   }, []);
 
   const handlePlotWheel = React.useCallback((e: React.WheelEvent<HTMLDivElement>) => {
@@ -3271,6 +3399,10 @@ kineticScroll: {
               onPointerMove={movePlotPan}
               onPointerUp={endPlotPan}
               onPointerCancel={endPlotPan}
+              onTouchStart={beginTwoFingerTouch}
+              onTouchMove={moveTwoFingerTouch}
+              onTouchEnd={endTwoFingerTouch}
+              onTouchCancel={endTwoFingerTouch}
               onWheel={handlePlotWheel}
             />
           ) : null}
@@ -3284,7 +3416,7 @@ kineticScroll: {
                 width: 86,
                 bottom: 30,
                 cursor: "ns-resize",
-                touchAction: "none",
+                touchAction: "pan-y",
                 background: "transparent",
               }}
               onPointerDown={beginPriceAxisDrag}
@@ -3305,7 +3437,7 @@ kineticScroll: {
                 height: 30,
                 right: 86,
                 cursor: "ew-resize",
-                touchAction: "none",
+                touchAction: "pan-y",
                 background: "transparent",
               }}
               onPointerDown={beginTimeAxisDrag}
