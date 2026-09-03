@@ -2364,6 +2364,7 @@ export default function MarketScannerPage() {
 
   const [panelH, setPanelH] = React.useState<number>(780);
   const [chartHeight, setChartHeight] = React.useState<number>(600);
+  const [fullscreenChartHeight, setFullscreenChartHeight] = React.useState<number>(600);
 
   const candlesCache = React.useRef<Map<string, Candle[]>>(new Map());
   const [loading, setLoading] = React.useState(false);
@@ -2498,7 +2499,13 @@ React.useEffect(() => {
   }, [closedTrades]);
 
   React.useEffect(() => {
-    const onFsChange = () => setIsFullscreen(!!document.fullscreenElement);
+    const onFsChange = () => {
+      const active = !!document.fullscreenElement;
+      setIsFullscreen(active);
+      if (!active) {
+        try { screen.orientation?.unlock?.(); } catch {}
+      }
+    };
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape" && document.fullscreenElement) {
@@ -2517,8 +2524,15 @@ React.useEffect(() => {
 
   const toggleFullscreen = React.useCallback(async () => {
     try {
-      if (!document.fullscreenElement) await rightPanelRef.current?.requestFullscreen?.();
-      else await document.exitFullscreen?.();
+      if (!document.fullscreenElement) {
+        await rightPanelRef.current?.requestFullscreen?.();
+        try {
+          await (screen.orientation as any)?.lock?.("landscape");
+        } catch {}
+      } else {
+        await document.exitFullscreen?.();
+        try { screen.orientation?.unlock?.(); } catch {}
+      }
     } catch {}
   }, []);
 
@@ -2593,6 +2607,7 @@ React.useEffect(() => {
 
     const compute = () => {
       const width = window.innerWidth;
+      setFullscreenChartHeight(Math.max(320, window.innerHeight - 118));
 
       // MOBILE: mały panel instrumentów + duży wykres.
       if (width < 640) {
@@ -3775,9 +3790,15 @@ if (closedNow.length) {
           </CardContent>
         </Card>
 
-        <div ref={rightPanelRef} className="w-full min-w-0 flex-1">
-          <Card className="overflow-visible border-sky-300/18 bg-[linear-gradient(180deg,rgba(17,66,117,.94)_0%,rgba(10,48,91,.97)_45%,rgba(7,35,69,.98)_100%)] shadow-[0_18px_50px_rgba(0,10,35,.34),0_0_30px_rgba(14,165,233,.08),inset_0_1px_0_rgba(255,255,255,.05)]">
-            <CardContent className="flex min-w-0 flex-col gap-2 p-2 sm:p-2.5 md:p-3 xl:gap-4 xl:p-5">
+        <div
+          ref={rightPanelRef}
+          className={cn(
+            "w-full min-w-0 flex-1",
+            isFullscreen && "h-[100dvh] w-[100dvw] overflow-hidden bg-[#04152a] p-1 sm:p-2"
+          )}
+        >
+          <Card className={cn("overflow-visible border-sky-300/18 bg-[linear-gradient(180deg,rgba(17,66,117,.94)_0%,rgba(10,48,91,.97)_45%,rgba(7,35,69,.98)_100%)] shadow-[0_18px_50px_rgba(0,10,35,.34),0_0_30px_rgba(14,165,233,.08),inset_0_1px_0_rgba(255,255,255,.05)]", isFullscreen && "h-full overflow-hidden rounded-none border-0")}>
+            <CardContent className={cn("flex min-w-0 flex-col gap-2 p-2 sm:p-2.5 md:p-3 xl:gap-4 xl:p-5", isFullscreen && "h-full justify-center gap-1 p-1 sm:p-2 xl:p-2")}>
               <div className="flex min-w-0 flex-col gap-2 sm:gap-3 xl:flex-row xl:items-center xl:justify-between">
                 <div className="min-w-0">
                   <div className="mb-2 flex items-center justify-between gap-2 xl:mb-0 xl:inline-flex">
@@ -4347,14 +4368,16 @@ if (closedNow.length) {
                 </div>
               </div>
 
-              <div className="w-full min-w-0">
-                <PocMiniScanner
-                  state={pocScanner}
-                  confirmationCount={selected.confirmationCount ?? 0}
-                  confirmationSide={selected.confirmationSide ?? null}
-                  liquidity={selected.liquidity}
-                />
-              </div>
+              {!isFullscreen ? (
+                <div className="w-full min-w-0">
+                  <PocMiniScanner
+                    state={pocScanner}
+                    confirmationCount={selected.confirmationCount ?? 0}
+                    confirmationSide={selected.confirmationSide ?? null}
+                    liquidity={selected.liquidity}
+                  />
+                </div>
+              ) : null}
 
               <div className="min-w-0">
 
@@ -4394,7 +4417,7 @@ if (closedNow.length) {
                   tf={tf}
                   candles={selectedCandles as any}
                   liveCandle={null}
-                  height={chartHeight}
+                  height={isFullscreen ? fullscreenChartHeight : chartHeight}
                   emaConfigs={emaConfigs}
                   bbConfig={bbConfig}
                   heikinAshi={heikinAshi}
@@ -4417,9 +4440,12 @@ if (closedNow.length) {
                   supertrendUpColor={supertrendSettings.upColor}
                   supertrendDownColor={supertrendSettings.downColor}
                   patternsEnabled={patternsEnabled}
+                  fullscreenMode={isFullscreen}
                 />
               </div>
 
+              {!isFullscreen ? (
+                <>
               <div className="mt-1 w-full overflow-hidden rounded-2xl border border-sky-300/16 bg-[#061c37]/78 shadow-[inset_0_1px_0_rgba(255,255,255,.03)]">
                 <div className="border-b border-sky-300/12 bg-[#0b315c]/75 px-3 py-2 sm:px-4 sm:py-2.5 xl:py-3">
                   <div className="text-sm font-semibold text-white">Closed Trades</div>
@@ -4523,6 +4549,8 @@ closedTrades.map((t) => (
                   Clean log
                 </Button>
               </div>
+                </>
+              ) : null}
 
             </CardContent>
           </Card>

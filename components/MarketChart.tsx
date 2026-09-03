@@ -92,6 +92,7 @@ type Props = {
   supertrendUpColor?: string;
   supertrendDownColor?: string;
   patternsEnabled?: boolean;
+  fullscreenMode?: boolean;
 };
 
 /* =========================
@@ -990,6 +991,7 @@ supertrendDownBackground = true,
 supertrendUpColor = "#22c55e",
 supertrendDownColor = "#ef4444",
 patternsEnabled = false,
+fullscreenMode = false,
 }: Props) {
   const containerRef = React.useRef<HTMLDivElement | null>(null);
   const chartRef = React.useRef<IChartApi | null>(null);
@@ -3024,7 +3026,7 @@ kineticScroll: {
 
       // Dla TOUCH nie odpinamy FOLLOW przy samym dotknięciu.
       // Pionowy gest ma pozostać natywnym scrollem strony.
-      if (e.pointerType !== "touch") {
+      if (e.pointerType !== "touch" || fullscreenMode) {
         manualPanRef.current = true;
         setFollowOnTick(false);
         setDetached(true);
@@ -3033,7 +3035,7 @@ kineticScroll: {
       plotPanRef.current = {
         pointerId: e.pointerId,
         pointerType: e.pointerType || "mouse",
-        gesture: e.pointerType === "touch" ? "pending" : "chart",
+        gesture: e.pointerType === "touch" && !fullscreenMode ? "pending" : "chart",
         startX: e.clientX,
         startY: e.clientY,
         from: Number(range.from),
@@ -3046,13 +3048,13 @@ kineticScroll: {
 
       // Mysz/pen: pełny PAN wykresu.
       // Touch: po małym progu ruchu przejmujemy pełny PAN X/Y wykresu.
-      if (e.pointerType !== "touch") {
+      if (e.pointerType !== "touch" || fullscreenMode) {
         e.currentTarget.setPointerCapture?.(e.pointerId);
         e.preventDefault();
         e.stopPropagation();
       }
     } catch {}
-  }, [activeDrawTool]);
+  }, [activeDrawTool, fullscreenMode]);
 
   const movePlotPan = React.useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     const state = plotPanRef.current;
@@ -3067,7 +3069,7 @@ kineticScroll: {
       // TOUCH W ŚRODKU WYKRESU:
       // pionowy gest zostawiamy przeglądarce = scroll całej strony/panelu,
       // poziomy gest przejmujemy = PAN wykresu lewo/prawo.
-      if (state.pointerType === "touch" && state.gesture === "pending") {
+      if (state.pointerType === "touch" && !fullscreenMode && state.gesture === "pending") {
         const ax = Math.abs(dx);
         const ay = Math.abs(dy);
         const threshold = 7;
@@ -3099,7 +3101,7 @@ kineticScroll: {
 
       // PAN Y wykresu tylko myszką / penem.
       // Na dotyku pionowy ruch jest zarezerwowany dla scrolla strony.
-      if (state.pointerType !== "touch") {
+      if (state.pointerType !== "touch" || fullscreenMode) {
         const priceSpan = Math.max(1e-12, state.priceMax - state.priceMin);
         const priceShift = (dy / state.height) * priceSpan;
         const minValue = state.priceMin + priceShift;
@@ -3118,7 +3120,7 @@ kineticScroll: {
       e.preventDefault();
       e.stopPropagation();
     } catch {}
-  }, []);
+  }, [fullscreenMode]);
 
   const beginTwoFingerTouch = React.useCallback((e: React.TouchEvent<HTMLDivElement>) => {
     if (activeDrawTool !== "SELECT" || e.touches.length !== 2) return;
@@ -3376,7 +3378,7 @@ kineticScroll: {
             style={{
               width: "100%",
               height,
-              touchAction: activeDrawTool === "SELECT" ? "pan-y" : "none",
+              touchAction: activeDrawTool === "SELECT" ? (fullscreenMode ? "none" : "pan-y") : "none",
               userSelect: "none",
               WebkitUserSelect: "none",
               cursor: activeDrawTool === "SELECT" ? "grab" : "crosshair",
@@ -3392,7 +3394,7 @@ kineticScroll: {
                 right: 86,
                 bottom: 30,
                 cursor: plotPanRef.current ? "grabbing" : "grab",
-                touchAction: "pan-y",
+                touchAction: fullscreenMode ? "none" : "pan-y",
                 background: "transparent",
               }}
               onPointerDown={beginPlotPan}
@@ -3416,7 +3418,7 @@ kineticScroll: {
                 width: 86,
                 bottom: 30,
                 cursor: "ns-resize",
-                touchAction: "pan-y",
+                touchAction: fullscreenMode ? "none" : "pan-y",
                 background: "transparent",
               }}
               onPointerDown={beginPriceAxisDrag}
@@ -3437,7 +3439,7 @@ kineticScroll: {
                 height: 30,
                 right: 86,
                 cursor: "ew-resize",
-                touchAction: "pan-y",
+                touchAction: fullscreenMode ? "none" : "pan-y",
                 background: "transparent",
               }}
               onPointerDown={beginTimeAxisDrag}
