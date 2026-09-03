@@ -2597,14 +2597,14 @@ React.useEffect(() => {
       // MOBILE: mały panel instrumentów + duży wykres.
       if (width < 640) {
         // Telefon: panel instrumentów mały, wykres wygodny ale nie za wysoki.
-        setPanelH(165);
+        setPanelH(185);
         setChartHeight(Math.max(330, Math.min(420, window.innerHeight - 320)));
         return;
       }
 
       // Tablet: trochę większy wykres, nadal kompaktowe panele.
       if (width < 1280) {
-        setPanelH(155);
+        setPanelH(175);
         setChartHeight(Math.max(430, Math.min(540, window.innerHeight - 250)));
         return;
       }
@@ -3682,13 +3682,13 @@ if (closedNow.length) {
                     }}
                     onClick={() => setSelectedSymbol(r.symbol)}
                     className={cn(
-                      "relative cursor-pointer overflow-hidden rounded-lg border p-2 transition-all duration-200 sm:rounded-xl sm:p-2 xl:rounded-2xl xl:p-4",
+                      "relative cursor-pointer overflow-hidden rounded-lg border px-2 py-1.5 transition-all duration-200 sm:rounded-xl sm:px-2 sm:py-1.5 xl:rounded-2xl xl:p-4",
                       active ? "border-cyan-300/45 bg-[linear-gradient(135deg,rgba(13,107,184,.88),rgba(10,67,125,.88))] shadow-[0_0_24px_rgba(34,211,238,.16),inset_0_1px_0_rgba(255,255,255,.06)]" : "border-sky-300/14 bg-[linear-gradient(180deg,rgba(11,49,92,.78),rgba(7,37,72,.84))] hover:border-sky-300/28 hover:bg-[#10477e]",
                       isFlashing ? "ring-2 ring-emerald-400/60 shadow-[0_0_24px_rgba(52,211,153,0.25)]" : ""
                     )}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold">{r.symbol}</span>
+                      <span className="text-sm font-semibold xl:text-base">{r.symbol}</span>
 
                       <div className="flex items-center gap-2">
                         <ConfirmationBadge count={r.confirmationCount ?? 0} side={r.confirmationSide ?? null} />
@@ -3712,21 +3712,22 @@ if (closedNow.length) {
                                 : "SCANNER OFF"}
                         </span>
 
+                        <span className="text-[10px] font-bold text-cyan-200 xl:hidden">{Math.round(r.liquidity)}%</span>
                         <SignalDot s={r.signal} />
                       </div>
                     </div>
 
-                    <div className="mt-1.5">
+                    <div className="hidden mt-1.5 xl:block">
                       <LiquidityBar value={r.liquidity} />
                     </div>
 
-                    <div className="mt-2 flex justify-between text-sm text-sky-100/78">
+                    <div className="hidden mt-2 justify-between text-sm text-sky-100/78 xl:flex">
                       <span>TF: {tf}</span>
                       <span>{r.signal === "UP" ? "Trend UP" : r.signal === "DOWN" ? "Trend DOWN" : "Brak"}</span>
                     </div>
 
                     {r.tradeActive && r.side ? (
-                      <div className="mt-2 text-xs text-amber-200/90">
+                      <div className="mt-2 hidden text-xs text-amber-200/90 xl:block">
                         ✅ <span className="font-extrabold">FX TRADE • {
                           r.patternSignalMode === "BOLLINGER_EARLY"
                             ? `EARLY ${r.side}`
@@ -3765,7 +3766,7 @@ if (closedNow.length) {
                         }</span> : null}
                       </div>
                     ) : (
-                      <div className="mt-2 text-xs text-sky-100/30">—</div>
+                      <div className="mt-2 hidden text-xs text-sky-100/30 xl:block">—</div>
                     )}
                   </div>
                 );
