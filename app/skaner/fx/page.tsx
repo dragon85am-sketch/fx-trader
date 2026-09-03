@@ -2541,8 +2541,11 @@ React.useEffect(() => {
     } catch {}
   }, []);
 
-  const landscapeFullscreen = isFullscreen && isLandscape;
-  const fullscreenChartHeight = Math.max(260, viewportH - 150);
+  const landscapeFullscreen = isFullscreen;
+  // Fullscreen = tryb CHART MODE na każdej orientacji.
+  // Nie polegamy na orientation state, bo część mobilnych przeglądarek
+  // aktualizuje fullscreen/orientation w różnej kolejności.
+  const fullscreenChartHeight = Math.max(240, viewportH - 225);
 
   React.useEffect(() => {
     const onDown = (e: MouseEvent) => {
