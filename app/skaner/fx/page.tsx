@@ -2312,6 +2312,8 @@ export default function MarketScannerPage() {
 
   const rightPanelRef = React.useRef<HTMLDivElement | null>(null);
   const [isFullscreen, setIsFullscreen] = React.useState(false);
+  const [isLandscape, setIsLandscape] = React.useState(false);
+  const [viewportH, setViewportH] = React.useState(800);
 
   const [emaState, setEmaState] = React.useState<EmaState>(DEFAULT_EMA);
   const [emaPanelOpen, setEmaPanelOpen] = React.useState(false);
@@ -2364,7 +2366,6 @@ export default function MarketScannerPage() {
 
   const [panelH, setPanelH] = React.useState<number>(780);
   const [chartHeight, setChartHeight] = React.useState<number>(600);
-  const [fullscreenChartHeight, setFullscreenChartHeight] = React.useState<number>(600);
 
   const candlesCache = React.useRef<Map<string, Candle[]>>(new Map());
   const [loading, setLoading] = React.useState(false);
@@ -2499,12 +2500,15 @@ React.useEffect(() => {
   }, [closedTrades]);
 
   React.useEffect(() => {
+    const syncViewport = () => {
+      setIsLandscape(window.innerWidth > window.innerHeight);
+      setViewportH(window.innerHeight);
+    };
+
     const onFsChange = () => {
-      const active = !!document.fullscreenElement;
-      setIsFullscreen(active);
-      if (!active) {
-        try { screen.orientation?.unlock?.(); } catch {}
-      }
+      setIsFullscreen(!!document.fullscreenElement);
+      requestAnimationFrame(syncViewport);
+      window.setTimeout(syncViewport, 120);
     };
 
     const onKey = (e: KeyboardEvent) => {
@@ -2513,12 +2517,17 @@ React.useEffect(() => {
       }
     };
 
+    syncViewport();
     document.addEventListener("fullscreenchange", onFsChange);
     document.addEventListener("keydown", onKey);
+    window.addEventListener("resize", syncViewport);
+    window.addEventListener("orientationchange", syncViewport);
 
     return () => {
       document.removeEventListener("fullscreenchange", onFsChange);
       document.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", syncViewport);
+      window.removeEventListener("orientationchange", syncViewport);
     };
   }, []);
 
@@ -2526,15 +2535,14 @@ React.useEffect(() => {
     try {
       if (!document.fullscreenElement) {
         await rightPanelRef.current?.requestFullscreen?.();
-        try {
-          await (screen.orientation as any)?.lock?.("landscape");
-        } catch {}
       } else {
         await document.exitFullscreen?.();
-        try { screen.orientation?.unlock?.(); } catch {}
       }
     } catch {}
   }, []);
+
+  const landscapeFullscreen = isFullscreen && isLandscape;
+  const fullscreenChartHeight = Math.max(260, viewportH - 150);
 
   React.useEffect(() => {
     const onDown = (e: MouseEvent) => {
@@ -2607,7 +2615,6 @@ React.useEffect(() => {
 
     const compute = () => {
       const width = window.innerWidth;
-      setFullscreenChartHeight(Math.max(320, window.innerHeight - 118));
 
       // MOBILE: mały panel instrumentów + duży wykres.
       if (width < 640) {
@@ -3794,11 +3801,17 @@ if (closedNow.length) {
           ref={rightPanelRef}
           className={cn(
             "w-full min-w-0 flex-1",
-            isFullscreen && "h-[100dvh] w-[100dvw] overflow-hidden bg-[#04152a] p-1 sm:p-2"
+            landscapeFullscreen && "h-[100dvh] overflow-hidden bg-[#071f3e] p-1"
           )}
         >
-          <Card className={cn("overflow-visible border-sky-300/18 bg-[linear-gradient(180deg,rgba(17,66,117,.94)_0%,rgba(10,48,91,.97)_45%,rgba(7,35,69,.98)_100%)] shadow-[0_18px_50px_rgba(0,10,35,.34),0_0_30px_rgba(14,165,233,.08),inset_0_1px_0_rgba(255,255,255,.05)]", isFullscreen && "h-full overflow-hidden rounded-none border-0")}>
-            <CardContent className={cn("flex min-w-0 flex-col gap-2 p-2 sm:p-2.5 md:p-3 xl:gap-4 xl:p-5", isFullscreen && "h-full justify-center gap-1 p-1 sm:p-2 xl:p-2")}>
+          <Card className={cn(
+            "overflow-visible border-sky-300/18 bg-[linear-gradient(180deg,rgba(17,66,117,.94)_0%,rgba(10,48,91,.97)_45%,rgba(7,35,69,.98)_100%)] shadow-[0_18px_50px_rgba(0,10,35,.34),0_0_30px_rgba(14,165,233,.08),inset_0_1px_0_rgba(255,255,255,.05)]",
+            landscapeFullscreen && "h-full rounded-xl"
+          )}>
+            <CardContent className={cn(
+              "flex min-w-0 flex-col gap-2 p-2 sm:p-2.5 md:p-3 xl:gap-4 xl:p-5",
+              landscapeFullscreen && "h-full gap-1 p-2 sm:p-2"
+            )}>
               <div className="flex min-w-0 flex-col gap-2 sm:gap-3 xl:flex-row xl:items-center xl:justify-between">
                 <div className="min-w-0">
                   <div className="mb-2 flex items-center justify-between gap-2 xl:mb-0 xl:inline-flex">
@@ -4361,27 +4374,31 @@ if (closedNow.length) {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 self-start overflow-hidden sm:gap-3 xl:self-auto">
+                <div className={cn(
+                  "flex items-center gap-2 self-start overflow-hidden sm:gap-3 xl:self-auto",
+                  landscapeFullscreen && "hidden"
+                )}>
                   <LiquidityBar value={selected.liquidity} />
                   <SignalDot s={selected.signal} />
                   <ConfirmationBadge count={selected.confirmationCount ?? 0} side={selected.confirmationSide ?? null} />
                 </div>
               </div>
 
-              {!isFullscreen ? (
-                <div className="w-full min-w-0">
-                  <PocMiniScanner
-                    state={pocScanner}
-                    confirmationCount={selected.confirmationCount ?? 0}
-                    confirmationSide={selected.confirmationSide ?? null}
-                    liquidity={selected.liquidity}
-                  />
-                </div>
-              ) : null}
+              <div className={cn("w-full min-w-0", landscapeFullscreen && "hidden")}>
+                <PocMiniScanner
+                  state={pocScanner}
+                  confirmationCount={selected.confirmationCount ?? 0}
+                  confirmationSide={selected.confirmationSide ?? null}
+                  liquidity={selected.liquidity}
+                />
+              </div>
 
-              <div className="min-w-0">
+              <div className={cn("min-w-0", landscapeFullscreen && "flex min-h-0 flex-1 flex-col")}>
 
-<div className="mb-2 flex w-full min-w-0 items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mb-3 sm:gap-2">
+<div className={cn(
+  "mb-2 flex w-full min-w-0 items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mb-3 sm:gap-2",
+  landscapeFullscreen && "mb-1 shrink-0 sm:mb-1"
+)}>
   <button
     type="button"
     onClick={toggleFullscreen}
@@ -4417,7 +4434,7 @@ if (closedNow.length) {
                   tf={tf}
                   candles={selectedCandles as any}
                   liveCandle={null}
-                  height={isFullscreen ? fullscreenChartHeight : chartHeight}
+                  height={landscapeFullscreen ? fullscreenChartHeight : chartHeight}
                   emaConfigs={emaConfigs}
                   bbConfig={bbConfig}
                   heikinAshi={heikinAshi}
@@ -4440,13 +4457,13 @@ if (closedNow.length) {
                   supertrendUpColor={supertrendSettings.upColor}
                   supertrendDownColor={supertrendSettings.downColor}
                   patternsEnabled={patternsEnabled}
-                  fullscreenMode={isFullscreen}
                 />
               </div>
 
-              {!isFullscreen ? (
-                <>
-              <div className="mt-1 w-full overflow-hidden rounded-2xl border border-sky-300/16 bg-[#061c37]/78 shadow-[inset_0_1px_0_rgba(255,255,255,.03)]">
+              <div className={cn(
+                "mt-1 w-full overflow-hidden rounded-2xl border border-sky-300/16 bg-[#061c37]/78 shadow-[inset_0_1px_0_rgba(255,255,255,.03)]",
+                landscapeFullscreen && "hidden"
+              )}>
                 <div className="border-b border-sky-300/12 bg-[#0b315c]/75 px-3 py-2 sm:px-4 sm:py-2.5 xl:py-3">
                   <div className="text-sm font-semibold text-white">Closed Trades</div>
                 </div>
@@ -4536,7 +4553,10 @@ closedTrades.map((t) => (
                 </div>
               </div>
 
-              <div className="flex justify-end border-t border-sky-300/10 px-4 py-3">
+              <div className={cn(
+                "flex justify-end border-t border-sky-300/10 px-4 py-3",
+                landscapeFullscreen && "hidden"
+              )}>
                 <Button
                   variant="outline"
                   onClick={() => {
@@ -4549,8 +4569,6 @@ closedTrades.map((t) => (
                   Clean log
                 </Button>
               </div>
-                </>
-              ) : null}
 
             </CardContent>
           </Card>
