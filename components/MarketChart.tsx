@@ -1099,6 +1099,7 @@ fullscreenMode = false,
 
   const [detached, setDetached] = React.useState<boolean>(false);
   const [overlayTick, setOverlayTick] = React.useState(0);
+  const lastIndicatorLiveUpdateRef = React.useRef(0);
   const rightOffset = rightPadOn ? 28 : 8;
 
   const patternLabels = React.useMemo(() => {
@@ -2585,7 +2586,6 @@ kineticScroll: {
     followOnTick,
     rightPadOn,
     detached,
-    overlayTick,
     applyIndicators,
     clearTradeLineSeries,
   ]);
@@ -2675,7 +2675,9 @@ kineticScroll: {
     lastBarTimeRef.current = lc.time as UTCTimestamp;
 
     const ds = displayCacheRef.current;
-    if (ds?.length) {
+    const nowMs = Date.now();
+    if (ds?.length && nowMs - lastIndicatorLiveUpdateRef.current >= 250) {
+      lastIndicatorLiveUpdateRef.current = nowMs;
       const lastClose = toNum((ds[ds.length - 1] as any)?.close);
       const prec = pricePrecision ?? guessPrecision(symbol, lastClose);
       const minMove = minMoveFromPrecision(prec);

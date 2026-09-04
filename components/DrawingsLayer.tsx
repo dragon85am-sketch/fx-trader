@@ -103,6 +103,7 @@ const [objs, setObjs] = React.useState<AnyObj[]>([]);
   const [draft, setDraft] = React.useState<Point | null>(null);
   const [preview, setPreview] = React.useState<Point | null>(null);
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
+  const [hoverId, setHoverId] = React.useState<string | null>(null);
 const [fiboLevels, setFiboLevels] =
 
   React.useState<FiboLevel[]>(() => {
@@ -138,10 +139,16 @@ React.useEffect(() => {
     id: string | null;
     last: Point | null;
     mode: "move" | "a" | "b";
+    startClientX: number;
+    startClientY: number;
+    startObj: AnyObj | null;
   }>({
     id: null,
     last: null,
     mode: "move",
+    startClientX: 0,
+    startClientY: 0,
+    startObj: null,
   });
 
   const drawingPathRef = React.useRef<Point[]>([]);
@@ -165,12 +172,15 @@ React.useEffect(() => {
   });
 
   React.useEffect(() => {
-  if (!storageReadyRef.current) return;
-  try {
-    const key = getStorageKey(symbol, timeframe);
-    localStorage.setItem(key, JSON.stringify(objs));
-  } catch {}
-}, [objs, symbol, timeframe]);
+    if (!storageReadyRef.current) return;
+    const timer = window.setTimeout(() => {
+      try {
+        const key = getStorageKey(symbol, timeframe);
+        localStorage.setItem(key, JSON.stringify(objs));
+      } catch {}
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [objs, symbol, timeframe]);
 
   const resize = React.useCallback(() => {
     const canvas = canvasRef.current;
@@ -213,6 +223,21 @@ React.useEffect(() => {
       };
     },
     [chartRef, candleSeriesRef, getCandles]
+  );
+
+  const screenToData = React.useCallback(
+    (x: number, y: number): Point | null => {
+      const chart = chartRef.current;
+      const series = candleSeriesRef.current;
+      if (!chart || !series) return null;
+
+      const price = series.coordinateToPrice(y);
+      const time = (chart.timeScale() as any).coordinateToTime?.(x);
+      if (price == null || time == null) return null;
+
+      return { t: time as UTCTimestamp, p: Number(price) };
+    },
+    [chartRef, candleSeriesRef]
   );
 
   const dataToPoint = React.useCallback(
@@ -541,7 +566,7 @@ if (o.type === "FIBO") {
 
     ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
 
-    objs.forEach((o) => drawObject(ctx, o, o.id === selectedId));
+    objs.forEach((o) => drawObject(ctx, o, o.id === selectedId || o.id === hoverId));
 
     if (draft && preview && TWO_POINT_TOOLS.includes(activeDrawTool)) {
       drawObject(ctx, {
@@ -568,7 +593,7 @@ if (o.type === "FIBO") {
         createdAt: Date.now(),
       } as AnyObj);
     }
-  }, [objs, selectedId, draft, preview, activeDrawTool, drawObject]);
+  }, [objs, selectedId, hoverId, draft, preview, activeDrawTool, drawObject]);
 
   React.useEffect(() => {
     resize();
@@ -606,7 +631,6 @@ if (o.type === "FIBO") {
     const redraw = () => {
       if (raf) cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
-        resize();
         draw();
       });
     };
@@ -621,14 +645,6 @@ if (o.type === "FIBO") {
       timeScale.subscribeVisibleTimeRangeChange(redraw);
     } catch {}
 
-    // Also redraw while the user wheels or drags anywhere around the chart.
-    // This covers custom pan/axis handlers that live outside this canvas.
-    const wrap = wrapRef.current;
-    const onPointerMove = () => redraw();
-    const onWheel = () => redraw();
-    wrap?.addEventListener("pointermove", onPointerMove, { passive: true });
-    wrap?.addEventListener("wheel", onWheel, { passive: true });
-
     redraw();
 
     return () => {
@@ -639,8 +655,7 @@ if (o.type === "FIBO") {
       try {
         timeScale.unsubscribeVisibleTimeRangeChange(redraw);
       } catch {}
-      wrap?.removeEventListener("pointermove", onPointerMove);
-      wrap?.removeEventListener("wheel", onWheel);
+
     };
   }, [chartRef, wrapRef, resize, draw]);
 
@@ -695,6 +710,9 @@ if (o.type === "FIBO") {
           id: handleHit.id,
           last: p,
           mode: handleHit.mode,
+          startClientX: e.clientX,
+          startClientY: e.clientY,
+          startObj: objs.find((o) => o.id === handleHit.id) ?? null,
         };
 
         chartPanRef.current = {
@@ -717,6 +735,9 @@ if (o.type === "FIBO") {
           id: hitId,
           last: p,
           mode: "move",
+          startClientX: e.clientX,
+          startClientY: e.clientY,
+          startObj: objs.find((o) => o.id === hitId) ?? null,
         };
 
         chartPanRef.current = {
@@ -737,6 +758,9 @@ if (o.type === "FIBO") {
         id: null,
         last: null,
         mode: "move",
+        startClientX: 0,
+        startClientY: 0,
+        startObj: null,
       };
 
       let priceMin: number | null = null;
@@ -823,6 +847,13 @@ if (o.type === "FIBO") {
 
     if (!p) return;
 
+    if (activeDrawTool === "SELECT" && !isMouseDownRef.current) {
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const hit = findHitHandle(x, y)?.id ?? findHitObject(x, y);
+      setHoverId((prev) => (prev === hit ? prev : hit));
+    }
+
     if (
       activeDrawTool === "SELECT" &&
       chartPanRef.current.active &&
@@ -882,94 +913,67 @@ if (o.type === "FIBO") {
     }
 
     if (activeDrawTool === "SELECT" && dragRef.current.id && dragRef.current.last) {
-      const last = dragRef.current.last;
       const id = dragRef.current.id;
       const mode = dragRef.current.mode;
+      const startObj = dragRef.current.startObj;
+      const dx = e.clientX - dragRef.current.startClientX;
+      const dy = e.clientY - dragRef.current.startClientY;
 
-      const dt = Number(p.t) - Number(last.t);
-      const dp = p.p - last.p;
+      if (startObj) {
+        const movePoint = (pt: Point): Point | null => {
+          const sp = dataToPoint(pt);
+          if (!sp) return null;
+          return screenToData(sp.x + dx, sp.y + dy) ?? pointToData(sp.x + dx, sp.y + dy);
+        };
 
-      setObjs((prev) =>
-        prev.map((o) => {
-          if (o.id !== id) return o;
+        setObjs((prev) =>
+          prev.map((o) => {
+            if (o.id !== id) return o;
 
-          if (
-            mode === "a" &&
-            (o.type === "TREND" ||
-              o.type === "RAY" ||
-              o.type === "HORIZONTAL_RAY" ||
-              o.type === "RECT" ||
-              o.type === "FIBO")
-          ) {
-            return {
-              ...o,
-              a: p,
-            };
-          }
+            if (mode === "a" && "a" in o && "b" in o) {
+              return { ...o, a: p } as AnyObj;
+            }
+            if (mode === "b" && "a" in o && "b" in o) {
+              return { ...o, b: p } as AnyObj;
+            }
 
-          if (
-            mode === "b" &&
-            (o.type === "TREND" ||
-              o.type === "RAY" ||
-              o.type === "HORIZONTAL_RAY" ||
-              o.type === "RECT" ||
-              o.type === "FIBO")
-          ) {
-            return {
-              ...o,
-              b: p,
-            };
-          }
+            if (startObj.type === "HLINE") {
+              const y0 = candleSeriesRef.current?.priceToCoordinate(startObj.price);
+              const price = y0 == null ? null : candleSeriesRef.current?.coordinateToPrice(Number(y0) + dy);
+              return price == null ? o : ({ ...o, price: Number(price) } as AnyObj);
+            }
 
-          if (o.type === "HLINE") {
-            return {
-              ...o,
-              price: o.price + dp,
-            };
-          }
+            if (startObj.type === "VLINE") {
+              const x0 = chartRef.current?.timeScale().timeToCoordinate(startObj.t as any);
+              const time = x0 == null ? null : (chartRef.current?.timeScale() as any)?.coordinateToTime?.(Number(x0) + dx);
+              return time == null ? o : ({ ...o, t: time as UTCTimestamp } as AnyObj);
+            }
 
-          if (o.type === "VLINE") {
-            return {
-              ...o,
-              t: (Number(o.t) + dt) as UTCTimestamp,
-            };
-          }
+            if (
+              startObj.type === "TREND" ||
+              startObj.type === "RAY" ||
+              startObj.type === "HORIZONTAL_RAY" ||
+              startObj.type === "RECT" ||
+              startObj.type === "FIBO"
+            ) {
+              const a = movePoint(startObj.a);
+              const b = movePoint(startObj.b);
+              return a && b ? ({ ...o, a, b } as AnyObj) : o;
+            }
 
-          if (
-            o.type === "TREND" ||
-            o.type === "RAY" ||
-            o.type === "HORIZONTAL_RAY" ||
-            o.type === "RECT" ||
-            o.type === "FIBO"
-          ) {
-            return {
-              ...o,
-              a: {
-                t: (Number(o.a.t) + dt) as UTCTimestamp,
-                p: o.a.p + dp,
-              },
-              b: {
-                t: (Number(o.b.t) + dt) as UTCTimestamp,
-                p: o.b.p + dp,
-              },
-            };
-          }
+            if (startObj.type === "PATH" || startObj.type === "BRUSH") {
+              const points = startObj.points.map(movePoint);
+              if (points.some((pt) => !pt)) return o;
+              return { ...o, points: points as Point[] } as AnyObj;
+            }
 
-          if (o.type === "PATH" || o.type === "BRUSH") {
-            return {
-              ...o,
-              points: o.points.map((pt) => ({
-                t: (Number(pt.t) + dt) as UTCTimestamp,
-                p: pt.p + dp,
-              })),
-            };
-          }
-
-          return o;
-        })
-      );
+            return o;
+          })
+        );
+      }
 
       dragRef.current.last = p;
+      draw();
       return;
     }
 
@@ -1001,6 +1005,9 @@ if (o.type === "FIBO") {
       id: null,
       last: null,
       mode: "move",
+      startClientX: 0,
+      startClientY: 0,
+      startObj: null,
     };
 
     if (
@@ -1169,9 +1176,11 @@ if (o.type === "FIBO") {
     pointerEvents: "auto",
     cursor:
       activeDrawTool === "SELECT"
-        ? chartPanRef.current.active
+        ? dragRef.current.id || chartPanRef.current.active
           ? "grabbing"
-          : "grab"
+          : hoverId
+          ? "move"
+          : "default"
         : "crosshair",
     touchAction: "none",
   }}
@@ -1235,7 +1244,6 @@ if (o.type === "FIBO") {
   onMouseDown={handleMouseDown}
   onMouseMove={handleMouseMove}
   onMouseUp={handleMouseUp}
-  onMouseLeave={handleMouseUp}
 />
     </>
   );
