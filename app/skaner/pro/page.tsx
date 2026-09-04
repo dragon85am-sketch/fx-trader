@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React from "react";
 import {
@@ -9,6 +9,8 @@ import {
   Clock3,
   Crosshair,
   Loader2,
+  Maximize2,
+  Minimize2,
   RefreshCw,
   Search,
   ShieldCheck,
@@ -80,11 +82,36 @@ type MarketState = {
 
 const TWELVE_SYMBOLS: Record<ScannerSymbol, string> = {
   XAUUSD: "XAU/USD",
-
-  // JeÅ›li Twelve Data nie zaakceptuje DJI,
-  // zmienimy pÃ³Åºniej tylko ten ticker.
   US30: "DJI",
 };
+
+let resolvedUs30Symbol: string | null = null;
+
+async function resolveProviderSymbol(symbol: ScannerSymbol): Promise<string> {
+  if (symbol !== "US30") return TWELVE_SYMBOLS[symbol];
+  if (resolvedUs30Symbol) return resolvedUs30Symbol;
+
+  // Index tickers can differ between Twelve Data plans/feeds. Resolve the
+  // Dow dynamically instead of leaving the scanner with an invalid symbol.
+  const queries = ["Dow Jones Industrial Average", "Dow Jones", "DJI"];
+  for (const query of queries) {
+    try {
+      const params = new URLSearchParams({ path: "/symbol_search", symbol: query, outputsize: "20" });
+      const response = await fetch(`/api/twelve-data?${params.toString()}`, { cache: "no-store" });
+      if (!response.ok) continue;
+      const json = await response.json();
+      const rows = Array.isArray(json?.data) ? json.data : Array.isArray(json?.values) ? json.values : [];
+      const match = rows.find((row: any) => {
+        const name = String(row?.instrument_name ?? row?.name ?? "").toLowerCase();
+        const type = String(row?.instrument_type ?? row?.type ?? "").toLowerCase();
+        return (name.includes("dow jones industrial") || String(row?.symbol ?? "").toUpperCase() === "DJI") && (type.includes("index") || !type);
+      }) ?? rows.find((row: any) => String(row?.instrument_name ?? row?.name ?? "").toLowerCase().includes("dow jones"));
+      const candidate = String(match?.symbol ?? "").trim();
+      if (candidate) { resolvedUs30Symbol = candidate; return candidate; }
+    } catch {}
+  }
+  return TWELVE_SYMBOLS.US30;
+}
 
 // ======================================================
 // INITIAL STATE
@@ -216,7 +243,7 @@ async function fetchCandles(
   outputsize: number,
 ): Promise<TwelveValue[]> {
   const providerSymbol =
-    TWELVE_SYMBOLS[symbol];
+    await resolveProviderSymbol(symbol);
 
   const params = new URLSearchParams({
     path: "/time_series",
@@ -285,7 +312,7 @@ async function fetchCandles(
     data.values.length === 0
   ) {
     throw new Error(
-      `${symbol} ${interval}: brak danych Å›wiecowych`,
+      `${symbol} ${interval}: brak danych świecowych`,
     );
   }
 
@@ -304,7 +331,7 @@ function formatPrice(
     value === undefined ||
     !Number.isFinite(value)
   ) {
-    return "â€”";
+    return "—";
   }
 
   return value.toLocaleString(
@@ -520,6 +547,22 @@ export default function ProScanner() {
   const [scanning, setScanning] =
     React.useState(false);
 
+  const [chartFullscreen, setChartFullscreen] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!chartFullscreen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setChartFullscreen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [chartFullscreen]);
+
   const current =
     selectedSymbol === "XAUUSD"
       ? gold
@@ -567,7 +610,7 @@ export default function ProScanner() {
             m1.length < 30
           ) {
             throw new Error(
-              `${symbol}: za maÅ‚o Å›wiec M1`,
+              `${symbol}: za mało świec M1`,
             );
           }
 
@@ -575,7 +618,7 @@ export default function ProScanner() {
             m5.length < 12
           ) {
             throw new Error(
-              `${symbol}: za maÅ‚o Å›wiec M5`,
+              `${symbol}: za mało świec M5`,
             );
           }
 
@@ -708,7 +751,7 @@ export default function ProScanner() {
   React.useEffect(() => {
     void runScan();
 
-    // wykonujemy tylko po pierwszym wejÅ›ciu
+    // wykonujemy tylko po pierwszym wejściu
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -756,19 +799,19 @@ export default function ProScanner() {
                     M5 Bias
                   </span>
 
-                  <span>â†’</span>
+                  <span>→</span>
 
                   <span>
                     M1 Timing
                   </span>
 
-                  <span>Â·</span>
+                  <span>·</span>
 
                   <span>
-                    New York Session
+                    Sesja Nowy Jork
                   </span>
 
-                  <span>Â·</span>
+                  <span>·</span>
 
                   <span>
                     Twelve Data
@@ -778,6 +821,14 @@ export default function ProScanner() {
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setChartFullscreen(true)}
+                className="flex h-11 items-center gap-2 rounded-xl border border-sky-300/25 bg-sky-500/10 px-4 text-[10px] font-black text-sky-100 transition hover:bg-sky-500/20"
+              >
+                <Maximize2 className="h-4 w-4" />
+                PEŁNY EKRAN WYKRESU
+              </button>
               <div className="flex h-11 items-center gap-2 rounded-xl border border-emerald-300/20 bg-emerald-400/[0.08] px-4">
                 <span className="relative flex h-2 w-2">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-40" />
@@ -807,8 +858,8 @@ export default function ProScanner() {
                 )}
 
                 {scanning
-                  ? "SCANNING..."
-                  : "SCAN SETUPS"}
+                  ? "SKANOWANIE..."
+                  : "SKANUJ SETUPY"}
               </button>
             </div>
           </div>
@@ -1008,7 +1059,7 @@ export default function ProScanner() {
               </div>
 
               <div className="mt-4 border-t border-sky-300/15 pt-4 text-[9px] leading-5 text-sky-200/45">
-                60+ FORMING Â· 80+ READY Â· 90+ A+
+                60+ FORMING · 80+ READY · 90+ A+
               </div>
             </section>
           </aside>
@@ -1055,7 +1106,7 @@ export default function ProScanner() {
                     </div>
 
                     <div className="mt-1 text-[9px] text-sky-200/45">
-                      New York Session
+                      Sesja Nowy Jork
                     </div>
                   </div>
                 </div>
@@ -1111,16 +1162,28 @@ export default function ProScanner() {
                 {selectedSymbol ===
                 "US30" ? (
                   <p className="mt-3 text-[9px] leading-5 text-sky-100/55">
-                    JeÅ›li GOLD dziaÅ‚a,
-                    a US30 zwraca bÅ‚Ä…d,
+                    Jeśli GOLD działa,
+                    a US30 zwraca błąd,
                     sprawdzimy ticker
-                    indeksu dostÄ™pny w
+                    indeksu dostępny w
                     Twoim planie Twelve
                     Data.
                   </p>
                 ) : null}
               </div>
             ) : null}
+
+            <div className={chartFullscreen ? "fixed inset-0 z-[150] overflow-auto bg-[#020914] p-3 md:p-5" : ""}>
+              <div className="mb-3 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setChartFullscreen((value) => !value)}
+                  className="inline-flex items-center gap-2 rounded-xl border border-cyan-300/25 bg-cyan-500/10 px-4 py-2 text-[11px] font-black text-cyan-200 transition hover:bg-cyan-500/20"
+                >
+                  {chartFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                  {chartFullscreen ? "ZAMKNIJ PEŁNY EKRAN" : "PEŁNY EKRAN WYKRESU"}
+                </button>
+              </div>
 
             {/* LOADING */}
 
@@ -1158,7 +1221,7 @@ export default function ProScanner() {
                 priceAction={
                   scanner.direction ===
                   "WAIT"
-                    ? "WAIT Â· NO TRADE"
+                    ? "WAIT · NO TRADE"
                     : scanner.priceAction
                 }
                 direction={
@@ -1215,9 +1278,11 @@ export default function ProScanner() {
                 chochPrice={
                   scanner.chochPrice
                 }
-                height={620}
+                height={chartFullscreen ? Math.max(620, typeof window !== "undefined" ? window.innerHeight - 110 : 760) : 620}
               />
             ) : null}
+
+            </div>
 
             {/* CONFIRMATIONS */}
 
@@ -1257,7 +1322,7 @@ export default function ProScanner() {
                           "_",
                           " ",
                         )}`
-                      : "Czekamy na BOS / CHOCH po reakcji z pÅ‚ynnoÅ›ci."
+                      : "Czekamy na BOS / CHOCH po reakcji z płynności."
                   }
                 />
 
@@ -1272,11 +1337,11 @@ export default function ProScanner() {
                   description={`VWAP ${
                     scanner.vwapConfirmed
                       ? "âœ“"
-                      : "â€”"
-                  } Â· Momentum ${
+                      : "—"
+                  } · Momentum ${
                     scanner.momentumConfirmed
                       ? "âœ“"
-                      : "â€”"
+                      : "—"
                   }`}
                 />
               </div>
@@ -1440,7 +1505,7 @@ export default function ProScanner() {
                       <div className="mt-2 text-[9px] leading-5 text-sky-200/45">
                         Scanner czeka na
                         setup o odpowiedniej
-                        jakoÅ›ci.
+                        jakości.
                       </div>
                     </div>
                   ) : (
@@ -1492,7 +1557,7 @@ export default function ProScanner() {
 
                       <div className="flex items-center justify-between rounded-xl border border-emerald-400/10 bg-emerald-500/[0.035] px-3 py-3">
                         <span className="text-[9px] text-sky-100/55">
-                          TP1 Â· 1R
+                          TP1 · 1R
                         </span>
 
                         <span className="font-mono text-[12px] font-black text-emerald-300">
@@ -1505,7 +1570,7 @@ export default function ProScanner() {
 
                       <div className="flex items-center justify-between rounded-xl border border-emerald-400/10 bg-emerald-500/[0.035] px-3 py-3">
                         <span className="text-[9px] text-sky-100/55">
-                          TP2 Â· 2R
+                          TP2 · 2R
                         </span>
 
                         <span className="font-mono text-[12px] font-black text-emerald-300">
@@ -1599,7 +1664,7 @@ export default function ProScanner() {
                   </div>
 
                   <div className="mt-2 text-[9px] text-sky-200/45">
-                    Kliknij SCAN SETUPS
+                    Kliknij SKANUJ SETUPY
                   </div>
                 </div>
               </div>
@@ -1609,14 +1674,14 @@ export default function ProScanner() {
 
             <div className="flex flex-col gap-2 border-t border-sky-300/10 px-1 pt-4 text-[8px] leading-4 text-sky-200/30 sm:flex-row sm:items-center sm:justify-between">
               <span>
-                Scanner edukacyjny Â·
-                wyniki nie stanowiÄ…
+                Scanner edukacyjny ·
+                wyniki nie stanowią
                 rekomendacji
                 inwestycyjnej.
               </span>
 
               <span>
-                GOLD / US30 Â· M5
+                GOLD / US30 · M5
                 Bias â†’ M1 Timing
               </span>
             </div>

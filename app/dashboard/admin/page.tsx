@@ -1,4 +1,4 @@
-﻿import { redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 
 import AdminUsersTable from "@/components/admin/AdminUsersTable";
 import AdminUsersChart from "@/components/admin/AdminUsersChart";
@@ -195,7 +195,7 @@ export default async function AdminPage() {
         </h1>
 
         <p className="mt-2 text-white/50">
-          ZarzÄ…dzanie uÅ¼ytkownikami i subskrypcjami
+          Zarządzanie użytkownikami i subskrypcjami
         </p>
 
         <a
@@ -213,10 +213,10 @@ export default async function AdminPage() {
         <AdminStatCard label="Admins" value={admins} />
         <AdminStatCard
           label="Affiliate Revenue"
-          value={`${affiliateRevenue}â‚¬`}
+          value={`${affiliateRevenue}€`}
         />
         <AdminStatCard label="Active Subs" value={activeSubscriptions} />
-        <AdminStatCard label="MRR" value={`${mrr.toFixed(2)}â‚¬`} />
+        <AdminStatCard label="MRR" value={`${mrr.toFixed(2)}€`} />
       </div>
 
       <div className="mb-8">
@@ -231,11 +231,11 @@ export default async function AdminPage() {
         <AdminStatCard label="Affiliates" value={affiliateCount} />
         <AdminStatCard
           label="Affiliate Pending"
-          value={`${affiliatePending}â‚¬`}
+          value={`${affiliatePending}€`}
         />
         <AdminStatCard
           label="Affiliate Available"
-          value={`${affiliateAvailable}â‚¬`}
+          value={`${affiliateAvailable}€`}
         />
       </div>
 <div className="mb-8 overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03]">
@@ -245,7 +245,7 @@ export default async function AdminPage() {
     </h2>
 
     <p className="mt-1 text-sm text-white/40">
-      Najlepsi partnerzy wedÅ‚ug zarobkÃ³w
+      Najlepsi partnerzy według zarobków
     </p>
   </div>
 
@@ -295,15 +295,15 @@ export default async function AdminPage() {
             </td>
 
             <td className="px-6 py-4 text-emerald-300">
-              â‚¬{affiliate.totalEarned.toFixed(2)}
+              €{affiliate.totalEarned.toFixed(2)}
             </td>
 
             <td className="px-6 py-4 text-amber-300">
-              â‚¬{affiliate.pendingCommission.toFixed(2)}
+              €{affiliate.pendingCommission.toFixed(2)}
             </td>
 
             <td className="px-6 py-4 text-cyan-300">
-              â‚¬{affiliate.availablePayout.toFixed(2)}
+              €{affiliate.availablePayout.toFixed(2)}
             </td>
           </tr>
         ))}
@@ -317,7 +317,7 @@ export default async function AdminPage() {
           </h2>
 
           <p className="mt-1 text-sm text-white/40">
-            Ostatnie pÅ‚atnoÅ›ci Stripe
+            Ostatnie płatności Stripe
           </p>
         </div>
 

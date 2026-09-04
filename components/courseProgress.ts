@@ -1,4 +1,5 @@
 import { ALL_LESSON_IDS_IN_ORDER } from "@/components/course";
+import { scopedStorageKey } from "@/lib/userScopedStorage";
 
 const COURSE_PROGRESS_KEY = "fx-trade-academy-progress";
 
@@ -16,7 +17,7 @@ export function getCourseProgress(): CourseProgress {
   }
 
   try {
-    const raw = window.localStorage.getItem(COURSE_PROGRESS_KEY);
+    const raw = window.localStorage.getItem(scopedStorageKey(COURSE_PROGRESS_KEY));
 
     if (!raw) {
       return EMPTY_PROGRESS;
@@ -38,7 +39,7 @@ export function getCourseProgress(): CourseProgress {
 export function saveCourseProgress(progress: CourseProgress) {
   if (typeof window === "undefined") return;
 
-  window.localStorage.setItem(COURSE_PROGRESS_KEY, JSON.stringify(progress));
+  window.localStorage.setItem(scopedStorageKey(COURSE_PROGRESS_KEY), JSON.stringify(progress));
 }
 
 export function markLessonCompleted(lessonId: string): CourseProgress {

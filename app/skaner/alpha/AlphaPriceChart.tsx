@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React from "react";
 import {
@@ -191,10 +191,10 @@ export default function AlphaPriceChart({
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
         <div>
           <div className="text-[14px] font-bold text-white">
-            {symbol} Â· {tf}
+            {symbol} · {tf}
           </div>
           <div className="mt-1 text-[9px] text-white/40">
-            Twelve Data Â· Price Action chart
+            Twelve Data · Price Action chart
           </div>
         </div>
 
@@ -214,7 +214,7 @@ export default function AlphaPriceChart({
       {loading ? (
         <div className="absolute inset-0 top-[52px] z-20 flex items-center justify-center bg-[#061426]/65 backdrop-blur-[1px]">
           <div className="rounded-xl border border-sky-400/20 bg-[#081a31] px-4 py-3 text-[11px] font-semibold text-sky-200">
-            Pobieranie Å›wiec z Twelve Data...
+            Pobieranie świec z Twelve Data...
           </div>
         </div>
       ) : null}
@@ -222,7 +222,7 @@ export default function AlphaPriceChart({
       {!loading && (!Array.isArray(candles) || candles.length === 0) ? (
         <div className="absolute inset-0 top-[52px] z-20 flex items-center justify-center">
           <div className="rounded-xl border border-amber-400/20 bg-[#081a31] px-4 py-3 text-[11px] font-semibold text-amber-200">
-            Brak danych Å›wiecowych.
+            Brak danych świecowych.
           </div>
         </div>
       ) : null}

@@ -1,7 +1,8 @@
-﻿"use client";
+"use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import ExcelJS from "exceljs";
+import { scopedStorageKey } from "@/lib/userScopedStorage";
 import {
   BarChart3,
   Brain,
@@ -56,8 +57,8 @@ type TradingPlan = {
   isActive: boolean;
 };
 
-const STORAGE_KEY = "fxtrade_journal_trades_v5";
-const TRADING_PLAN_KEY = "fxtrade_trading_plan_v1";
+const STORAGE_KEY = "journal_trades_v6";
+const TRADING_PLAN_KEY = "trading_plan_v2";
 
 function rrToNumber(rr: string): number {
   const cleaned = rr.replace(/\s/g, "").replace(",", ".");
@@ -123,72 +124,19 @@ export default function FxTradeJournalProPage() {
 
   useEffect(() => {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-
-      if (raw) {
-        setTrades(JSON.parse(raw));
-      } else {
-        setTrades([
-          {
-            id: crypto.randomUUID(),
-            date: "2026-03-15",
-            pair: "XAUUSD",
-            side: "BUY",
-            entry: "71648",
-            sl: "70658",
-            tp: "72300",
-            rr: "1:2",
-            outcome: "WIN",
-            resultR: 2,
-            pnl: 240,
-            notes: "Strong breakout after liquidity sweep",
-            screenshot: "",
-          },
-          {
-            id: crypto.randomUUID(),
-            date: "2026-03-14",
-            pair: "EURUSD",
-            side: "BUY",
-            entry: "1.0824",
-            sl: "1.0812",
-            tp: "1.0848",
-            rr: "1:2",
-            outcome: "WIN",
-            resultR: 2,
-            pnl: 180,
-            notes: "London breakout with retest",
-            screenshot: "",
-          },
-          {
-            id: crypto.randomUUID(),
-            date: "2026-03-13",
-            pair: "GBPJPY",
-            side: "SELL",
-            entry: "189.44",
-            sl: "189.82",
-            tp: "189.00",
-            rr: "1:1.2",
-            outcome: "LOSS",
-            resultR: -1,
-            pnl: -100,
-            notes: "Entry too early, weak confirmation",
-            screenshot: "",
-          },
-        ]);
-      }
+      const raw = localStorage.getItem(scopedStorageKey(STORAGE_KEY));
+      setTrades(raw ? JSON.parse(raw) : []);
     } catch (err) {
-      console.error("Błąd odczytu localStorage:", err);
+      console.error("Błąd odczytu journalu:", err);
+      setTrades([]);
     }
 
     try {
-      const savedPlan = localStorage.getItem(TRADING_PLAN_KEY);
-      if (savedPlan) {
-        setTradingPlan(JSON.parse(savedPlan));
-      }
+      const savedPlan = localStorage.getItem(scopedStorageKey(TRADING_PLAN_KEY));
+      if (savedPlan) setTradingPlan(JSON.parse(savedPlan));
     } catch (err) {
       console.error("Błąd odczytu trading plan:", err);
     } finally {
-      // Dopiero od tej chwili wolno zapisywać stan z powrotem do localStorage.
       setStorageReady(true);
     }
   }, []);
@@ -197,7 +145,7 @@ export default function FxTradeJournalProPage() {
     if (!storageReady) return;
 
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(trades));
+      localStorage.setItem(scopedStorageKey(STORAGE_KEY), JSON.stringify(trades));
     } catch (err) {
       console.error("Błąd zapisu do localStorage:", err);
       alert("Nie udało się zapisać trade. Screenshot jest prawdopodobnie za duży.");
@@ -474,13 +422,13 @@ const equityCurve = useMemo(() => {
   const startTradingPlan = () => {
     const activePlan = { ...tradingPlan, isActive: true };
     setTradingPlan(activePlan);
-    localStorage.setItem(TRADING_PLAN_KEY, JSON.stringify(activePlan));
+    localStorage.setItem(scopedStorageKey(TRADING_PLAN_KEY), JSON.stringify(activePlan));
   };
 
   const restartTradingPlan = () => {
     const resetPlan = { ...tradingPlan, isActive: false };
     setTradingPlan(resetPlan);
-    localStorage.setItem(TRADING_PLAN_KEY, JSON.stringify(resetPlan));
+    localStorage.setItem(scopedStorageKey(TRADING_PLAN_KEY), JSON.stringify(resetPlan));
   };
 
   const openPreview = (img: string, tradeId?: string) => {

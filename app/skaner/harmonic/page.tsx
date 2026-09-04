@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React from "react";
 import {
@@ -184,11 +184,11 @@ async function fetchLiveCandles(
   const payload = await res.json();
 
   if (!res.ok) {
-    throw new Error(payload?.message || "Nie udaÅ‚o siÄ™ pobraÄ‡ Å›wiec z Twelve Data.");
+    throw new Error(payload?.message || "Nie udało się pobrać świec z Twelve Data.");
   }
 
   if (!Array.isArray(payload?.values)) {
-    throw new Error(payload?.message || "Twelve Data nie zwrÃ³ciÅ‚o danych OHLC.");
+    throw new Error(payload?.message || "Twelve Data nie zwróciło danych OHLC.");
   }
 
   return normalizeTwelveCandles(payload.values);
@@ -705,7 +705,7 @@ export default function HarmonicScannerPage() {
       setResults([found]);
       setActiveSetup(found);
       setScanMessage(
-        `Znaleziono ${formacja} ${direction} â€¢ jakoÅ›Ä‡ ${best.score}%`
+        `Znaleziono ${formacja} ${direction} • jakość ${best.score}%`
       );
     } catch (error) {
       setResults([]);
@@ -713,7 +713,7 @@ export default function HarmonicScannerPage() {
       setChartError(
         error instanceof Error
           ? error.message
-          : "Nie udaÅ‚o siÄ™ wykonaÄ‡ skanowania."
+          : "Nie udało się wykonać skanowania."
       );
     } finally {
       setScanning(false);
@@ -738,7 +738,7 @@ export default function HarmonicScannerPage() {
     setAutoScanning(true);
     setScanning(false);
     setChartError(null);
-    setScanMessage("AUTO SCAN uruchomiony â€” analizujÄ™ wszystkie instrumenty i timeframe'y...");
+    setScanMessage("AUTO SCAN uruchomiony — analizuję wszystkie instrumenty i timeframe'y...");
     setAutoProgress({
       done: 0,
       total: AUTO_SCAN_SYMBOLS.length * AUTO_SCAN_TFS.length,
@@ -831,7 +831,7 @@ export default function HarmonicScannerPage() {
 
       if (!deduped.length) {
         setScanMessage(
-          "AUTO SCAN zakoÅ„czony â€” brak aktywnych formacji 70%+ w aktualnie zeskanowanych rynkach."
+          "AUTO SCAN zakończony — brak aktywnych formacji 70%+ w aktualnie zeskanowanych rynkach."
         );
         return;
       }
@@ -883,7 +883,7 @@ export default function HarmonicScannerPage() {
         );
 
         if (!next.length) {
-          throw new Error("Brak Å›wiec dla wybranego instrumentu i interwaÅ‚u.");
+          throw new Error("Brak świec dla wybranego instrumentu i interwału.");
         }
 
         setCandles(next);
@@ -892,7 +892,7 @@ export default function HarmonicScannerPage() {
       } catch (error) {
         if ((error as Error)?.name === "AbortError") return;
         setChartError(
-          error instanceof Error ? error.message : "BÅ‚Ä…d pobierania danych."
+          error instanceof Error ? error.message : "Błąd pobierania danych."
         );
       } finally {
         if (!silent) setChartLoading(false);
@@ -906,7 +906,7 @@ export default function HarmonicScannerPage() {
     void loadCandles(controller.signal);
 
     // Live candle refresh. 5 s is responsive enough for the UI while avoiding
-    // excessive REST requests. Increase to 10â€“15 s if your plan has a low API limit.
+    // excessive REST requests. Increase to 10–15 s if your plan has a low API limit.
     const interval = window.setInterval(() => {
       void loadCandles(controller.signal, true);
     }, 5000);
@@ -988,7 +988,13 @@ export default function HarmonicScannerPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#03172f] text-white">
+    <main
+      className="min-h-screen bg-[#03172f] bg-cover bg-center bg-fixed text-white"
+      style={{
+        backgroundImage:
+          "linear-gradient(rgba(3,23,47,0.34), rgba(3,23,47,0.46)), url('/images/harmonic-scanner-bg.png')",
+      }}
+    >
       <div className="mx-auto max-w-[1980px] space-y-3 px-3 py-4">
         <section className="rounded-2xl border border-[#0d579e] bg-[linear-gradient(145deg,#082d59,#041f40)] p-4">
           <div className="text-[9px] font-semibold uppercase tracking-[.18em] text-cyan-300/70">
@@ -996,7 +1002,7 @@ export default function HarmonicScannerPage() {
           </div>
           <h1 className="mt-1 text-[28px] font-bold">Harmonic Scanner</h1>
           <p className="mt-1 text-[10px] text-sky-100/45">
-            Wybierz instrument, TF, formacjÄ™ i kierunek. SKANUJ pobiera realne Å›wiece Twelve Data i pokazuje X-A-B-C-D tylko wtedy, gdy ukÅ‚ad speÅ‚nia reguÅ‚y harmoniczne.
+            Wybierz instrument, TF, formację i kierunek. SKANUJ pobiera realne świece Twelve Data i pokazuje X-A-B-C-D tylko wtedy, gdy układ spełnia reguły harmoniczne.
           </p>
         </section>
 
@@ -1094,7 +1100,7 @@ export default function HarmonicScannerPage() {
               <span>{scanMessage}</span>
               {autoScanning ? (
                 <span className="whitespace-nowrap text-[8px] text-cyan-200">
-                  {autoProgress.done}/{autoProgress.total} rynkÃ³w
+                  {autoProgress.done}/{autoProgress.total} rynków
                 </span>
               ) : null}
             </div>
@@ -1111,7 +1117,7 @@ export default function HarmonicScannerPage() {
             <div className="mt-3 max-h-[610px] space-y-2 overflow-y-auto pr-1">
               {!results.length ? (
                 <div className="rounded-xl border border-dashed border-[#0d579e] bg-[#041b36]/50 p-4 text-center text-[8px] text-sky-100/40">
-                  Kliknij SKANUJ. Wynik pojawi siÄ™ tylko wtedy, gdy prawdziwe Å›wiece speÅ‚niÄ… proporcje wybranej formacji.
+                  Kliknij SKANUJ. Wynik pojawi się tylko wtedy, gdy prawdziwe świece spełnią proporcje wybranej formacji.
                 </div>
               ) : null}
 
@@ -1129,7 +1135,7 @@ export default function HarmonicScannerPage() {
                     <Star className="h-3.5 w-3.5 text-slate-500" />
                     <div className="min-w-0 flex-1">
                       <div className="text-[7px] text-slate-500">
-                        {r.symbol} Â· {r.tf}
+                        {r.symbol} · {r.tf}
                       </div>
                       <div className="text-[10px] font-bold">{r.name}</div>
                       <div
@@ -1193,7 +1199,7 @@ export default function HarmonicScannerPage() {
                   onClick={() => void loadCandles(undefined)}
                   className="rounded-lg border border-cyan-400/25 bg-cyan-400/10 px-3 py-2 text-[8px] font-bold text-cyan-300"
                 >
-                  SprÃ³buj ponownie
+                  Spróbuj ponownie
                 </button>
               </div>
             ) : (
@@ -1210,13 +1216,13 @@ export default function HarmonicScannerPage() {
 
             {chartError && candles.length > 0 ? (
               <div className="absolute bottom-3 right-3 z-20 rounded-lg border border-amber-400/20 bg-[#03172f]/90 px-2.5 py-1.5 text-[7px] text-amber-200 backdrop-blur">
-                LIVE chwilowo niedostÄ™pne â€” pokazujÄ™ ostatnie poprawne Å›wiece.
+                LIVE chwilowo niedostępne — pokazuję ostatnie poprawne świece.
               </div>
             ) : null}
           </div>
 
           <aside className="rounded-2xl border border-[#0d579e] bg-[#061426] p-4">
-            <h2 className="text-[12px] font-bold">SzczegÃ³Å‚y</h2>
+            <h2 className="text-[12px] font-bold">Szczegóły</h2>
 
             <div className="mt-4 flex items-center justify-between">
               <div className="text-[16px] font-bold text-fuchsia-400">
@@ -1234,7 +1240,7 @@ export default function HarmonicScannerPage() {
             </div>
 
             <div className="mt-2 text-[8px] text-slate-500">
-              {activeSetup.symbol} Â· {activeSetup.tf}
+              {activeSetup.symbol} · {activeSetup.tf}
             </div>
 
             <div className={`mt-3 inline-flex rounded-lg border px-2.5 py-1.5 text-[8px] font-black ${gradeClasses(activeSetup.score)}`}>
@@ -1251,7 +1257,7 @@ export default function HarmonicScannerPage() {
                   {pattern.points.map((p) => (
                     <div key={p.label} className="flex justify-between text-[8px]">
                       <span className="text-slate-500">
-                        {p.label} Â· candle {p.index}
+                        {p.label} · candle {p.index}
                       </span>
                       <span className="font-semibold">
                         {p.price.toFixed(4)}
@@ -1332,7 +1338,7 @@ export default function HarmonicScannerPage() {
                 Aktywne formacje harmoniczne ({activeRows.length})
               </h2>
               <p className="mt-1 text-[8px] text-sky-100/40">
-                Aktualne setupy z PRZ, SL, TP i RRR. Kliknij wiersz, aby otworzyÄ‡ formacjÄ™ na wykresie.
+                Aktualne setupy z PRZ, SL, TP i RRR. Kliknij wiersz, aby otworzyć formację na wykresie.
               </p>
             </div>
 
@@ -1353,9 +1359,9 @@ export default function HarmonicScannerPage() {
                     "TF",
                     "Formacja",
                     "Kierunek",
-                    "TrafnoÅ›Ä‡",
+                    "Trafność",
                     "Wiek",
-                    "WejÅ›cie / PRZ",
+                    "Wejście / PRZ",
                     "SL",
                     "TP1",
                     "TP2",

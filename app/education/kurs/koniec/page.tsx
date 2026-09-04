@@ -1,5 +1,6 @@
-﻿"use client";
+"use client";
 
+import { scopedStorageKey } from "@/lib/userScopedStorage";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import jsPDF from "jspdf";
@@ -11,9 +12,9 @@ function generateCertificateNumber() {
   const month = String(now.getMonth() + 1).padStart(2, "0");
 
   const savedCounter =
-    Number(localStorage.getItem("certificateCounter") || "0") + 1;
+    Number(localStorage.getItem(scopedStorageKey("certificateCounter")) || "0") + 1;
 
-  localStorage.setItem("certificateCounter", String(savedCounter));
+  localStorage.setItem(scopedStorageKey("certificateCounter"), String(savedCounter));
 
   const counter = String(savedCounter).padStart(6, "0");
 
@@ -27,22 +28,22 @@ export default function KursKoniecPage() {
   const [userName, setUserName] = useState("Trader");
 
   useEffect(() => {
-    const savedCertificateNumber = localStorage.getItem("certificateNumber");
+    const savedCertificateNumber = localStorage.getItem(scopedStorageKey("certificateNumber"));
 
     if (savedCertificateNumber) {
       setCertificateNumber(savedCertificateNumber);
     } else {
       const newCertificateNumber = generateCertificateNumber();
-      localStorage.setItem("certificateNumber", newCertificateNumber);
+      localStorage.setItem(scopedStorageKey("certificateNumber"), newCertificateNumber);
       setCertificateNumber(newCertificateNumber);
     }
   }, []);
 
   useEffect(() => {
     const savedName =
-      localStorage.getItem("userName") ||
-      localStorage.getItem("name") ||
-      localStorage.getItem("username");
+      localStorage.getItem(scopedStorageKey("userName")) ||
+      localStorage.getItem(scopedStorageKey("name")) ||
+      localStorage.getItem(scopedStorageKey("username"));
 
     if (savedName) {
       setUserName(savedName);
@@ -54,12 +55,12 @@ export default function KursKoniecPage() {
   }, []);
 
   const handleResetProgress = () => {
-    localStorage.removeItem("passedQuizzes");
-    localStorage.removeItem("completedLessons");
-    localStorage.removeItem("lastOpenedModule");
+    localStorage.removeItem(scopedStorageKey("passedQuizzes"));
+    localStorage.removeItem(scopedStorageKey("completedLessons"));
+    localStorage.removeItem(scopedStorageKey("lastOpenedModule"));
 
     for (let i = 0; i <= 18; i++) {
-      localStorage.removeItem(`module-${i}-activeLesson`);
+      localStorage.removeItem(scopedStorageKey(`module-${i}-activeLesson`));
     }
 
     setResetDone(true);
@@ -107,11 +108,11 @@ export default function KursKoniecPage() {
           </h1>
 
           <p className="text-gray-300 mb-2">
-            UkoÅ„czyÅ‚eÅ› kurs <span className="font-semibold text-white">FX Trade Academy</span>
+            Ukończyłeś kurs <span className="font-semibold text-white">Akademia FX Trade</span>
           </p>
 
           <p className="text-gray-400 mb-6">
-            MoÅ¼esz teraz pobraÄ‡ certyfikat ukoÅ„czenia.
+            Możesz teraz pobrać certyfikat ukończenia.
           </p>
 
           <div className="flex flex-wrap justify-center gap-4">
@@ -120,7 +121,7 @@ export default function KursKoniecPage() {
               href="/education/kurs"
               className="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white"
             >
-              WrÃ³Ä‡ do kursu
+              Wróć do kursu
             </Link>
 
             <button
@@ -137,14 +138,14 @@ export default function KursKoniecPage() {
               onClick={handleResetProgress}
               className="px-5 py-2 rounded-lg bg-white/5 border border-white/10 text-white hover:bg-white/10"
             >
-              PowtÃ³rz kurs
+              Powtórz kurs
             </button>
 
           </div>
 
           {resetDone && (
             <div className="mt-4 text-green-400">
-              Progres kursu zostaÅ‚ zresetowany.
+              Progres kursu został zresetowany.
             </div>
           )}
         </div>
@@ -166,9 +167,9 @@ export default function KursKoniecPage() {
                 <div className="flex justify-between mb-6 text-sm text-gray-400">
                   <div>
                     <p className="tracking-widest text-[#d6b06a] uppercase">
-                      Certyfikat ukoÅ„czenia
+                      Certyfikat ukończenia
                     </p>
-                    <p>FX Trade Academy</p>
+                    <p>Akademia FX Trade</p>
                   </div>
 
                   <div className="text-right">
@@ -192,17 +193,17 @@ export default function KursKoniecPage() {
                   </h2>
 
                   <p className="text-xl text-[#e8c679] tracking-widest">
-                    UKOÅƒCZENIA
+                    UKOŃCZENIA
                   </p>
 
                 </div>
 
-                {/* TREÅšÄ† */}
+                {/* TREŚĆ */}
 
                 <div className="text-center mb-6">
 
                   <p className="text-gray-300 mb-3">
-                    Niniejszym potwierdzamy, Å¼e
+                    Niniejszym potwierdzamy, że
                   </p>
 
                   <p className="text-4xl font-serif italic text-white mb-3">
@@ -210,8 +211,8 @@ export default function KursKoniecPage() {
                   </p>
 
                   <p className="text-gray-300 max-w-2xl mx-auto">
-                    ukoÅ„czyÅ‚ peÅ‚ny program edukacyjny FX Trade Academy obejmujÄ…cy
-                    19 moduÅ‚Ã³w szkoleniowych z zakresu tradingu, zarzÄ…dzania
+                    ukończył pełny program edukacyjny Akademia FX Trade obejmujący
+                    19 modułów szkoleniowych z zakresu tradingu, zarządzania
                     ryzykiem, psychologii oraz budowy systemu transakcyjnego.
                   </p>
 
@@ -223,12 +224,12 @@ export default function KursKoniecPage() {
 
                   <div className="border border-[#c9a45c]/30 rounded-lg p-3">
                     <p className="text-xs text-gray-400">Status</p>
-                    <p className="text-white font-semibold">UkoÅ„czono</p>
+                    <p className="text-white font-semibold">Ukończono</p>
                   </div>
 
                   <div className="border border-[#c9a45c]/30 rounded-lg p-3">
                     <p className="text-xs text-gray-400">Program</p>
-                    <p className="text-white font-semibold">19 moduÅ‚Ã³w</p>
+                    <p className="text-white font-semibold">19 modułów</p>
                   </div>
 
                   <div className="border border-[#c9a45c]/30 rounded-lg p-3">
@@ -253,14 +254,14 @@ export default function KursKoniecPage() {
                     </div>
 
                     <div>
-                      <p className="text-xs text-gray-400">PieczÄ™Ä‡ programu</p>
-                      <p className="text-white">FX Trade Academy</p>
+                      <p className="text-xs text-gray-400">Pieczęć programu</p>
+                      <p className="text-white">Akademia FX Trade</p>
                     </div>
                   </div>
 
                   <div className="text-right">
                     <p className="text-xl italic text-[#f0d18a]">
-                      FX Trade Academy
+                      Akademia FX Trade
                     </p>
                     <p className="text-xs text-gray-400">
                       Podpis programu
@@ -270,8 +271,8 @@ export default function KursKoniecPage() {
                 </div>
 
                 <p className="text-center text-xs text-gray-400 mt-4">
-                  Niniejszy certyfikat stanowi potwierdzenie ukoÅ„czenia programu
-                  edukacyjnego FX Trade Academy i ma charakter szkoleniowy.
+                  Niniejszy certyfikat stanowi potwierdzenie ukończenia programu
+                  edukacyjnego Akademia FX Trade i ma charakter szkoleniowy.
                 </p>
 
               </div>

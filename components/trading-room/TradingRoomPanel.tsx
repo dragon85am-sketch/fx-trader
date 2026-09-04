@@ -267,40 +267,40 @@ function formatTradeInputDate(year: number, month: number, day = 1) {
 }
 const cpiCalendarByYear: Record<string, any[]> = {
   "2026": [
-    ["15 Jul 2026", "14:30", "CPI YoY", "3.4%", "3.5%", "High"],
-    ["15 Jul 2026", "14:30", "Core CPI MoM", "0.3%", "0.4%", "High"],
-    ["12 Aug 2026", "14:30", "CPI YoY", "-", "-", "High"],
-    ["12 Aug 2026", "14:30", "Core CPI MoM", "-", "-", "High"],
-    ["16 Sep 2026", "14:30", "CPI YoY", "-", "-", "High"],
-    ["16 Sep 2026", "14:30", "Core CPI MoM", "-", "-", "High"],
-    ["14 Oct 2026", "14:30", "CPI YoY", "-", "-", "High"],
-    ["14 Oct 2026", "14:30", "Core CPI MoM", "-", "-", "High"],
-    ["12 Nov 2026", "14:30", "CPI YoY", "-", "-", "High"],
-    ["12 Nov 2026", "14:30", "Core CPI MoM", "-", "-", "High"],
-    ["10 Dec 2026", "14:30", "CPI YoY", "-", "-", "High"],
-    ["10 Dec 2026", "14:30", "Core CPI MoM", "-", "-", "High"],
+    ["13 sty 2026", "14:30", "CPI USA", "-", "-", "Wysoki"],
+    ["13 lut 2026", "14:30", "CPI USA", "-", "-", "Wysoki"],
+    ["11 mar 2026", "14:30", "CPI USA", "-", "-", "Wysoki"],
+    ["10 kwi 2026", "14:30", "CPI USA", "-", "-", "Wysoki"],
+    ["12 maj 2026", "14:30", "CPI USA", "-", "-", "Wysoki"],
+    ["10 cze 2026", "14:30", "CPI USA", "-", "-", "Wysoki"],
+    ["14 lip 2026", "14:30", "CPI USA", "-", "-", "Wysoki"],
+    ["12 sie 2026", "14:30", "CPI USA", "-", "-", "Wysoki"],
+    ["11 wrz 2026", "14:30", "CPI USA", "-", "-", "Wysoki"],
+    ["14 paź 2026", "14:30", "CPI USA", "-", "-", "Wysoki"],
+    ["10 lis 2026", "14:30", "CPI USA", "-", "-", "Wysoki"],
+    ["10 gru 2026", "14:30", "CPI USA", "-", "-", "Wysoki"],
   ],
-
-  "2027": [
-    ["13 Jan 2027", "14:30", "CPI YoY", "-", "-", "High"],
-    ["13 Jan 2027", "14:30", "Core CPI MoM", "-", "-", "High"],
-  ],
+  "2027": [],
 };
+
 const nfpCalendarByYear: Record<string, any[]> = {
   "2026": [
-    ["03 Jul 2026", "14:30", "Non-Farm Payrolls", "185K", "177K", "High"],
-    ["07 Aug 2026", "14:30", "Non-Farm Payrolls", "-", "-", "High"],
-    ["04 Sep 2026", "14:30", "Non-Farm Payrolls", "-", "-", "High"],
-    ["02 Oct 2026", "14:30", "Non-Farm Payrolls", "-", "-", "High"],
-    ["06 Nov 2026", "14:30", "Non-Farm Payrolls", "-", "-", "High"],
-    ["04 Dec 2026", "14:30", "Non-Farm Payrolls", "-", "-", "High"],
+    ["09 sty 2026", "14:30", "Non-Farm Payrolls", "-", "-", "Wysoki"],
+    ["11 lut 2026", "14:30", "Non-Farm Payrolls", "-", "-", "Wysoki"],
+    ["06 mar 2026", "14:30", "Non-Farm Payrolls", "-", "-", "Wysoki"],
+    ["03 kwi 2026", "14:30", "Non-Farm Payrolls", "-", "-", "Wysoki"],
+    ["08 maj 2026", "14:30", "Non-Farm Payrolls", "-", "-", "Wysoki"],
+    ["05 cze 2026", "14:30", "Non-Farm Payrolls", "-", "-", "Wysoki"],
+    ["02 lip 2026", "14:30", "Non-Farm Payrolls", "-", "-", "Wysoki"],
+    ["07 sie 2026", "14:30", "Non-Farm Payrolls", "-", "-", "Wysoki"],
+    ["04 wrz 2026", "14:30", "Non-Farm Payrolls", "-", "-", "Wysoki"],
+    ["02 paź 2026", "14:30", "Non-Farm Payrolls", "-", "-", "Wysoki"],
+    ["06 lis 2026", "14:30", "Non-Farm Payrolls", "-", "-", "Wysoki"],
+    ["04 gru 2026", "14:30", "Non-Farm Payrolls", "-", "-", "Wysoki"],
   ],
-
-  "2027": [
-    ["08 Jan 2027", "14:30", "Non-Farm Payrolls", "-", "-", "High"],
-    ["05 Feb 2027", "14:30", "Non-Farm Payrolls", "-", "-", "High"],
-  ],
+  "2027": [],
 };
+
 function getTimeUntil(date: string, time: string) {
   const eventDate = new Date(`${date}T${time}:00`);
   const now = new Date();
@@ -982,8 +982,9 @@ useEffect(() => {
     grossLossAbs > 0 ? grossProfit / grossLossAbs : grossProfit > 0 ? grossProfit : 0;
 
   const roomTabs = [
-    "Trading Room",
     "Economic Calendar",
+    "NFP Calendar",
+    "CPI Calendar",
     "Profit Calendar",
   ];
 
@@ -1956,7 +1957,7 @@ useEffect(() => {
   <>
     <section className="grid gap-4 xl:grid-cols-4">
       {[
-        ["Next NFP Release", "03 Jul 2026", "Friday · 14:30 CET", "text-blue-300"],
+        ["Najbliższy NFP", "04 wrz 2026", "Piątek · 14:30 (Warszawa)", "text-blue-300"],
         ["Forecast", "185K", "Expected jobs added", "text-white"],
         ["Previous", "177K", "Last release", "text-white"],
         ["Impact", "High", "USD / Gold / Indices", "text-red-300"],
@@ -1978,7 +1979,7 @@ useEffect(() => {
     </h3>
 
     <p className="text-sm text-white/50">
-      Non-Farm Payrolls release schedule
+      Oficjalny harmonogram publikacji Employment Situation (BLS)
     </p>
   </div>
 
@@ -2033,7 +2034,11 @@ useEffect(() => {
     
   </div>
 
-  {nfpCalendarByYear[selectedNfpYear].map(
+  {nfpCalendarByYear[selectedNfpYear].length === 0 ? (
+    <div className="border-t border-white/10 bg-[#0c426f] px-4 py-6 text-sm text-sky-100/70">
+      BLS nie opublikował jeszcze oficjalnego harmonogramu NFP na 2027. Nie pokazujemy przewidywanych dat jako oficjalnych.
+    </div>
+  ) : nfpCalendarByYear[selectedNfpYear].map(
     ([date, time, event, forecast, previous, impact]) => (
       <div
         key={`${date}-${event}`}
@@ -2082,7 +2087,7 @@ useEffect(() => {
   <>
     <section className="grid gap-4 xl:grid-cols-4">
       {[
-        ["Next CPI Release", "15 Jul 2026", "Wednesday · 14:30 CET", "text-blue-300"],
+        ["Najbliższy CPI", "11 wrz 2026", "Piątek · 14:30 (Warszawa)", "text-blue-300"],
         ["Forecast", "3.4%", "CPI YoY", "text-white"],
         ["Previous", "3.5%", "Last Release", "text-white"],
         ["Impact", "High", "USD · Gold · Indices", "text-red-300"],
@@ -2098,8 +2103,8 @@ useEffect(() => {
     <section className="mt-6 rounded-[26px] border border-cyan-300/25 bg-[linear-gradient(135deg,#176fab,#11588f)] p-5 shadow-[0_8px_24px_rgba(1,20,45,.14),0_0_20px_rgba(34,211,238,.08),inset_0_1px_0_rgba(255,255,255,.09)]">
       <div className="mb-5 flex items-center justify-between">
         <div>
-          <h3 className="text-xl font-semibold">CPI Calendar {selectedCpiYear}</h3>
-          <p className="text-sm text-white/50">Consumer Price Index release schedule</p>
+          <h3 className="text-xl font-semibold">Kalendarz CPI {selectedCpiYear}</h3>
+          <p className="text-sm text-white/50">Oficjalny harmonogram publikacji CPI (BLS)</p>
         </div>
 
         <select
@@ -2125,7 +2130,11 @@ useEffect(() => {
           <div>Impact</div>
         </div>
 
-        {cpiCalendarByYear[selectedCpiYear].map(
+        {cpiCalendarByYear[selectedCpiYear].length === 0 ? (
+          <div className="border-t border-white/10 bg-[#0c426f] px-4 py-6 text-sm text-sky-100/70">
+            BLS nie opublikował jeszcze oficjalnego harmonogramu CPI na 2027. Nie pokazujemy przewidywanych dat jako oficjalnych.
+          </div>
+        ) : cpiCalendarByYear[selectedCpiYear].map(
           ([date, time, event, forecast, previous, impact]) => (
             <div
               key={`${date}-${event}`}

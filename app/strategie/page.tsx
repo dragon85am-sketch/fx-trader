@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React from "react";
 import Link from "next/link";
@@ -269,7 +269,7 @@ function PremiumLock() {
   );
 }
 
-function StrategyCard({
+function StrategiaCard({
   strategy,
   locked,
 }: {
@@ -418,7 +418,7 @@ export default function StrategieDashboardPage() {
               </div>
 
               <h1 className="mt-1 text-[22px] font-semibold tracking-tight sm:text-[30px]">
-                Trading Strategies
+                Strategie tradingowe
               </h1>
 
               <p className="mt-1 max-w-[680px] text-[11px] leading-5 text-sky-100/50">
@@ -473,7 +473,7 @@ export default function StrategieDashboardPage() {
         <section className="grid min-w-0 grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_300px]">
           <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 2xl:grid-cols-4">
             {STRATEGIES.map((strategy) => (
-              <StrategyCard
+              <StrategiaCard
                 key={strategy.key}
                 strategy={strategy}
                 locked={strategy.badge === "PREMIUM" && !paid}
@@ -511,7 +511,7 @@ export default function StrategieDashboardPage() {
                 <Crown className="h-6 w-6 text-amber-300" />
                 <h3 className="mt-3 text-[15px] font-semibold">Odblokuj Premium</h3>
                 <p className="mt-2 text-[9px] leading-4 text-sky-100/45">
-                  Uzyskaj dostęp do Day Trading i Swing Trading oraz pełnych checklist.
+                  Uzyskaj dostęp do Day Trading, Swing Trading oraz pełnych checklist.
                 </p>
 
                 <Link

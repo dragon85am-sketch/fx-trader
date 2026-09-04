@@ -1,5 +1,6 @@
 "use client";
 
+import { scopedStorageKey } from "@/lib/userScopedStorage";
 import Link from "next/link";
 import { use, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -36,7 +37,7 @@ const COURSE_DATA: Record<string, ModuleData> = {
     lessons: [
       { title: "1. TradingView — podstawy", time: "8 min", contentKey: "m1-l1-tradingview-podstawy" },
       { title: "2. MT4 / MT5", time: "10 min", contentKey: "m1-l2-mt4-mt5" },
-      { title: "3. Jak otworzyć trade", time: "8 min", contentKey: "m1-l3-jak-otworzyc-trade" },
+      { title: "3. Jak otworzyć transakcję", time: "8 min", contentKey: "m1-l3-jak-otworzyc-trade" },
       { title: "4. Stop Loss i Take Profit", time: "8 min", contentKey: "m1-l4-stop-loss-take-profit" },
       { title: "5. Typy zleceń", time: "8 min", contentKey: "m1-l5-typy-zlecen" },
       { title: "6. Zarządzanie pozycją", time: "8 min", contentKey: "m1-l6-zarzadzanie-pozycja" },
@@ -48,7 +49,7 @@ const COURSE_DATA: Record<string, ModuleData> = {
     title: "Moduł 2 – Wykresy i timeframe",
     lessons: [
       { title: "1. Typy wykresów", time: "8 min", contentKey: "m2-l1-typy-wykresow" },
-      { title: "2. Timeframe", time: "8 min", contentKey: "m2-l2-timeframe" },
+      { title: "2. Interwał", time: "8 min", contentKey: "m2-l2-timeframe" },
       { title: "3. Świece japońskie", time: "8 min", contentKey: "m2-l3-swiece-japonskie" },
       { title: "4. Jak czytać świece", time: "8 min", contentKey: "m2-l4-jak-czytac-swiece" },
       { title: "5. Struktura świecy", time: "8 min", contentKey: "m2-l5-struktura-swiecy" },
@@ -78,7 +79,7 @@ const COURSE_DATA: Record<string, ModuleData> = {
       { title: "3. Jak określić bias", time: "8 min", contentKey: "m4-l3-jak-okreslic-bias" },
       { title: "4. Kiedy nie handlować", time: "8 min", contentKey: "m4-l4-kiedy-nie-handlowac" },
       { title: "5. Trend na różnych timeframe", time: "8 min", contentKey: "m4-l5-trend-na-roznych-timeframe" },
-      { title: "6. Multi Timeframe Analysis", time: "8 min", contentKey: "m4-l6-multi-timeframe-analysis" },
+      { title: "6. Multi Interwał Analysis", time: "8 min", contentKey: "m4-l6-multi-timeframe-analysis" },
       { title: "7. Quiz modułowy", time: "Quiz", quizKey: "m4-quiz-trend" },
     ],
   },
@@ -151,11 +152,11 @@ const COURSE_DATA: Record<string, ModuleData> = {
   "10": {
     title: "Moduł 10 – Zarządzanie pozycją",
     lessons: [
-      { title: "1. Zarządzanie trade", time: "8 min", contentKey: "m10-l1-zarzadzanie-trade" },
+      { title: "1. Zarządzanie transakcją", time: "8 min", contentKey: "m10-l1-zarzadzanie-trade" },
       { title: "2. Partial TP", time: "8 min", contentKey: "m10-l2-partial-tp" },
       { title: "3. Trailing stop", time: "8 min", contentKey: "m10-l3-trailing-stop" },
       { title: "4. Scaling pozycji", time: "8 min", contentKey: "m10-l4-scaling-pozycji" },
-      { title: "5. Kiedy zamknąć trade", time: "8 min", contentKey: "m10-l5-kiedy-zamknac-trade" },
+      { title: "5. Kiedy zamknąć transakcję", time: "8 min", contentKey: "m10-l5-kiedy-zamknac-trade" },
       { title: "6. Zarządzanie wygraną", time: "8 min", contentKey: "m10-l6-zarzadzanie-wygrana" },
       { title: "7. Quiz modułowy", time: "Quiz", quizKey: "m10-quiz-zarzadzanie-pozycja" },
     ],
@@ -188,7 +189,7 @@ const COURSE_DATA: Record<string, ModuleData> = {
   },
 
   "13": {
-    title: "Moduł 13 – Trading journal",
+    title: "Moduł 13 – Dziennik tradingowy",
     lessons: [
       { title: "1. Dlaczego journal jest ważny", time: "8 min", contentKey: "m13-l1-dlaczego-journal-jest-wazny" },
       { title: "2. Jak prowadzić journal", time: "8 min", contentKey: "m13-l2-jak-prowadzic-journal" },
@@ -203,12 +204,12 @@ const COURSE_DATA: Record<string, ModuleData> = {
   "14": {
     title: "Moduł 14 – Case study",
     lessons: [
-      { title: "1. Analiza realnego trade", time: "8 min", contentKey: "m14-l1-analiza-realnego-trade" },
+      { title: "1. Analiza realnej transakcji", time: "8 min", contentKey: "m14-l1-analiza-realnego-trade" },
       { title: "2. Analiza sesji tradingowej", time: "8 min", contentKey: "m14-l2-analiza-sesji-tradingowej" },
       { title: "3. Trade krok po kroku", time: "8 min", contentKey: "m14-l3-trade-krok-po-kroku" },
-      { title: "4. Błędy w trade", time: "8 min", contentKey: "m14-l4-bledy-w-trade" },
+      { title: "4. Błędy w transakcji", time: "8 min", contentKey: "m14-l4-bledy-w-trade" },
       { title: "5. Poprawna analiza", time: "8 min", contentKey: "m14-l5-poprawna-analiza" },
-      { title: "6. Wnioski z trade", time: "8 min", contentKey: "m14-l6-wnioski-z-trade" },
+      { title: "6. Wnioski z transakcji", time: "8 min", contentKey: "m14-l6-wnioski-z-trade" },
       { title: "7. Quiz modułowy", time: "Quiz", quizKey: "m14-quiz-case-study" },
     ],
   },
@@ -218,7 +219,7 @@ const COURSE_DATA: Record<string, ModuleData> = {
     lessons: [
       { title: "1. Czym jest system", time: "8 min", contentKey: "m15-l1-czym-jest-system" },
       { title: "2. Budowanie strategii", time: "8 min", contentKey: "m15-l2-budowanie-strategii" },
-      { title: "3. Checklist trade", time: "8 min", contentKey: "m15-l3-checklist-trade" },
+      { title: "3. Checklista transakcji", time: "8 min", contentKey: "m15-l3-checklist-trade" },
       { title: "4. Plan tradingowy", time: "8 min", contentKey: "m15-l4-plan-tradingowy" },
       { title: "5. Edge tradera", time: "8 min", contentKey: "m15-l5-edge-tradera" },
       { title: "6. Testowanie strategii", time: "8 min", contentKey: "m15-l6-testowanie-strategii" },
@@ -339,7 +340,7 @@ function renderLessonBlock(block: any, index: number) {
                   ? `https://www.youtube.com/embed/${block.id}`
                   : `https://player.vimeo.com/video/${block.id}`
               }
-              title={block.title || "Video lesson"}
+              title={block.title || "Lekcja wideo"}
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
               allowFullScreen
             />
@@ -374,20 +375,18 @@ export default function ModulPage({
 
   useEffect(() => {
     const savedCompleted = JSON.parse(
-      localStorage.getItem("completedLessons") || "{}"
+      localStorage.getItem(scopedStorageKey("completedLessons")) || "{}"
     );
     setCompletedLessons(savedCompleted);
   }, []);
 
   useEffect(() => {
-    const saved = JSON.parse(localStorage.getItem("passedQuizzes") || "{}");
+    const saved = JSON.parse(localStorage.getItem(scopedStorageKey("passedQuizzes")) || "{}");
     setPassedQuizzes(saved);
   }, []);
 
   useEffect(() => {
-    const savedIndex = localStorage.getItem(
-      `module-${modul}-activeLesson`
-    );
+    const savedIndex = localStorage.getItem(scopedStorageKey(`module-${modul}-activeLesson`));
 
     if (savedIndex !== null) {
       setActiveLesson(Number(savedIndex));
@@ -397,14 +396,11 @@ export default function ModulPage({
   }, [modul]);
 
   useEffect(() => {
-    localStorage.setItem(
-      `module-${modul}-activeLesson`,
-      String(activeLesson)
-    );
+    localStorage.setItem(scopedStorageKey(`module-${modul}-activeLesson`), String(activeLesson));
   }, [modul, activeLesson]);
 
   useEffect(() => {
-    localStorage.setItem("lastOpenedModule", modul);
+    localStorage.setItem(scopedStorageKey("lastOpenedModule"), modul);
   }, [modul]);
 
   if (!moduleData) {
@@ -452,7 +448,7 @@ export default function ModulPage({
     };
 
     setCompletedLessons(updated);
-    localStorage.setItem("completedLessons", JSON.stringify(updated));
+    localStorage.setItem(scopedStorageKey("completedLessons"), JSON.stringify(updated));
   };
 
   const goNext = () => {
@@ -463,7 +459,7 @@ export default function ModulPage({
           [activeLessonStorageKey]: true,
         };
         setCompletedLessons(updated);
-        localStorage.setItem("completedLessons", JSON.stringify(updated));
+        localStorage.setItem(scopedStorageKey("completedLessons"), JSON.stringify(updated));
       }
 
       setActiveLesson((prev) => prev + 1);
@@ -472,15 +468,9 @@ export default function ModulPage({
 
     if (isQuizLesson && quizPassed) {
       if (hasNextModule) {
-        localStorage.setItem(`module-${currentModuleNumber}-activeLesson`, "0");
-        localStorage.setItem(
-          "lastOpenedModule",
-          String(currentModuleNumber + 1)
-        );
-        localStorage.setItem(
-          `module-${currentModuleNumber + 1}-activeLesson`,
-          "0"
-        );
+        localStorage.setItem(scopedStorageKey(`module-${currentModuleNumber}-activeLesson`), "0");
+        localStorage.setItem(scopedStorageKey("lastOpenedModule"), String(currentModuleNumber + 1));
+        localStorage.setItem(scopedStorageKey(`module-${currentModuleNumber + 1}-activeLesson`), "0");
         router.push(nextModuleHref);
       } else {
         router.push("/education/kurs/koniec");
@@ -602,7 +592,7 @@ export default function ModulPage({
     ? "https://www.youtube.com/embed/kUR5Fgx67IY"
     : ""
 }
-      title="Video lekcji"
+      title="Wideo lekcji"
       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
       allowFullScreen
     />

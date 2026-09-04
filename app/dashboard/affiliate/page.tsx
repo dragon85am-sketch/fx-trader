@@ -322,9 +322,9 @@ stripeOnboardingDone = Boolean(
                 <div className="flex flex-wrap gap-2">
                   <CopyAffiliateLinkButton affiliateLink={affiliateLink} />
 
-                  <button className="rounded-[9px] border border-sky-400/30 bg-[#0a3b6d] shadow-[0_0_14px_rgba(14,165,233,.10)] px-4 py-2.5 text-[10px] font-semibold text-sky-100 transition hover:bg-[#0d4c87]">
-                    UtwÃ³rz kampanię
-                  </button>
+                  <Link href="/dashboard/affiliate/campaigns" className="rounded-[9px] border border-sky-400/30 bg-[#0a3b6d] shadow-[0_0_14px_rgba(14,165,233,.10)] px-4 py-2.5 text-[10px] font-semibold text-sky-100 transition hover:bg-[#0d4c87]">
+                    Utwórz kampanię
+                  </Link>
                 </div>
               </div>
             </div>
@@ -501,7 +501,7 @@ stripeOnboardingDone = Boolean(
                     ["Dostępne do wypłaty", `${availablePayout}€`, "text-emerald-300"],
                     ["Oczekujące prowizje", `${pendingCommission}€`, "text-white"],
                     ["Łączny zarobek", `${totalEarned}€`, "text-emerald-300"],
-                    ["Łącznie wypÅ‚acono", `${totalPaid}€`, "text-emerald-300"],
+                    ["Łącznie wypłacono", `${totalPaid}€`, "text-emerald-300"],
                     ["Ostatnia wypłata", latestPayout ? formatEuro(latestPayout.amount) : "Brak", "text-white"],
                   ].map(([label, value, tone]) => (
                     <div

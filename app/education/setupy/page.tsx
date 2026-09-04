@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import Image from "next/image";
 import {
   ArrowLeft,
@@ -74,6 +74,85 @@ const SETUPY = [
       "TP na kolejnym poziomie / RR 1:2+",
     ],
   },
+  {
+    title: "Liquidity Sweep",
+    desc: "Zebranie płynności nad/pod swingiem i wejście po szybkim odrzuceniu poziomu.",
+    href: "/education/setupy/liquidity-sweep",
+    badge: "PRO",
+    timeframe: "M1 - M5",
+    level: "Średni",
+    winRate: "74%",
+    rr: "2.0 : 1",
+    image: "/education/przyklady/material-6-trade-1.png",
+    accent: "violet",
+    checks: ["Wyraźny swing high/low", "Sweep płynności", "Powrót pod/nad poziom", "Potwierdzenie M1", "SL za sweepem", "TP do przeciwnej płynności"],
+  },
+  {
+    title: "Bollinger + Price Action",
+    desc: "Reakcja na zewnętrznym paśmie Bollingera połączona z potwierdzeniem świecowym.",
+    href: "/education/setupy/bollinger-price-action",
+    badge: "POPULARNY",
+    timeframe: "M5",
+    level: "Średni",
+    winRate: "76%",
+    rr: "1.8 : 1",
+    image: "/education/przyklady/material-3-trade-1.png",
+    accent: "cyan",
+    checks: ["Cena przy zewnętrznym paśmie", "Brak wejścia bez reakcji", "Pin bar/engulfing lub momentum", "Potwierdzenie kierunku", "SL za ekstremum", "TP przy środku/przeciwnej bandzie"],
+  },
+  {
+    title: "Trend Continuation",
+    desc: "Kontynuacja po korekcie zgodnie ze strukturą HH/HL albo LH/LL.",
+    href: "/education/setupy/trend-continuation",
+    badge: "PRO",
+    timeframe: "M5 - M15",
+    level: "Średni",
+    winRate: "78%",
+    rr: "2.0 : 1",
+    image: "/education/przyklady/material-2-trade-1.png",
+    accent: "sky",
+    checks: ["Czytelna struktura trendu", "Korekta bez złamania struktury", "Reakcja w strefie", "Momentum zgodne z trendem", "SL za swingiem", "TP przy kolejnym HH/LL"],
+  },
+  {
+    title: "Gold Price Action",
+    desc: "Szybki setup XAUUSD oparty na strefie reakcji, świecy potwierdzającej i momentum.",
+    href: "/education/setupy/gold-price-action",
+    badge: "GOLD",
+    timeframe: "M1 - M5",
+    level: "Średni",
+    winRate: "77%",
+    rr: "1.7 : 1",
+    image: "/education/przyklady/material-1-trade-1.png",
+    accent: "cyan",
+    checks: ["Bias M5", "Strefa reakcji", "Sweep lub test poziomu", "Świeca potwierdzająca M1", "Momentum po wejściu", "SL za strukturą"],
+  },
+  {
+    title: "EMA Pullback",
+    desc: "Cofnięcie do dynamicznego wsparcia/oporu EMA w zgodzie z dominującym trendem.",
+    href: "/education/setupy/ema-pullback",
+    badge: "NOWY",
+    timeframe: "M5 - M15",
+    level: "Łatwy",
+    winRate: "71%",
+    rr: "1.6 : 1",
+    image: "/education/przyklady/material-5-trade-1.png",
+    accent: "sky",
+    checks: ["EMA ułożone trendowo", "Cena wraca do EMA/strefy", "Brak złamania struktury", "Rejection lub engulfing", "SL za korektą", "TP do kolejnego impulsu"],
+  },
+  {
+    title: "Breakout Momentum",
+    desc: "Wejście po mocnym wybiciu konsolidacji, gdy wolumen/momentum potwierdza ruch.",
+    href: "/education/setupy/breakout-momentum",
+    badge: "NOWY",
+    timeframe: "M1 - M5",
+    level: "Średni",
+    winRate: "70%",
+    rr: "1.8 : 1",
+    image: "/education/przyklady/material-4-trade-1.png",
+    accent: "violet",
+    checks: ["Czytelna konsolidacja", "Wybicie zamknięciem świecy", "Silne momentum", "Nie gonić rozciągniętej ceny", "SL za strukturą", "TP do kolejnej strefy"],
+  },
+
 ];
 
 function AccentDot({ accent }: { accent: string }) {
@@ -112,7 +191,7 @@ export default function SetupyPage() {
             className="inline-flex items-center gap-2 rounded-[9px] border border-[#0d579e] bg-[#052348] px-3 py-2 text-[9px] font-semibold text-sky-100/75 transition hover:bg-[#0a3264] hover:text-white"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
-            Wróć do Education
+            Wróć do Edukacja
           </Link>
         </div>
 
@@ -128,20 +207,20 @@ export default function SetupyPage() {
 
               <div>
                 <div className="text-[9px] font-semibold uppercase tracking-[.18em] text-sky-200/55">
-                  FX TRADE / EDUCATION / SETUPY
+                  FX TRADE / EDUKACJA / SETUPY
                 </div>
                 <h1 className="mt-1 text-[28px] font-semibold tracking-tight">Setupy</h1>
                 <p className="mt-1 max-w-[620px] text-[11px] leading-5 text-sky-100/50">
                   Konkretne zasady, checklisty i przykłady dla każdego setupu.
-                  Na start 3 główne setupy do scalpingu i intraday.
+                  9 praktycznych setupów do scalpingu i intraday — każdy z checklistą, screenami i przykładami.
                 </p>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
               {[
-                [BookOpen, "3", "Setupy dostępne"],
-                [Clock3, "M1 - M15", "Timeframe"],
+                [BookOpen, "9", "Setupy dostępne"],
+                [Clock3, "M1 - M15", "Interwał"],
                 [Target, "1.8 : 1", "Średni RR"],
                 [Star, "78%", "Skuteczność"],
               ].map(([Icon, value, label], index) => {
@@ -217,7 +296,7 @@ export default function SetupyPage() {
 
                   <div className="mt-4 grid grid-cols-3 divide-x divide-[#0a417b] rounded-[10px] border border-[#0a417b] bg-[#0a3769]/90 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,.035)]">
                     <div className="px-3">
-                      <div className="text-[8px] text-sky-100/40">Timeframe</div>
+                      <div className="text-[8px] text-sky-100/40">Interwał</div>
                       <div className={`mt-1 text-[11px] font-semibold ${accentText}`}>
                         {setup.timeframe}
                       </div>
@@ -227,7 +306,7 @@ export default function SetupyPage() {
                       <div className="mt-1 text-[11px] font-semibold">{setup.level}</div>
                     </div>
                     <div className="px-3">
-                      <div className="text-[8px] text-sky-100/40">Win Rate</div>
+                      <div className="text-[8px] text-sky-100/40">Skuteczność</div>
                       <div className={`mt-1 text-[11px] font-semibold ${accentText}`}>
                         {setup.winRate}
                       </div>
@@ -281,6 +360,20 @@ export default function SetupyPage() {
               </article>
             );
           })}
+        </section>
+
+        <section className="rounded-[14px] border border-[#0d579e] bg-[linear-gradient(145deg,#0d477f,#082f5d_60%,#06284f)] p-5">
+          <div className="flex items-center justify-between gap-3"><div><h2 className="text-[16px] font-black">Więcej przykładów setupów</h2><p className="mt-1 text-[10px] text-sky-100/45">Dodatkowe przykłady wejść BUY / SELL z materiałów edukacyjnych.</p></div><Link href="/education/bonusy/przyklady" className="rounded-lg border border-sky-400/25 bg-sky-500/10 px-3 py-2 text-[10px] font-black text-sky-200">Zobacz wszystkie</Link></div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {[
+              ["XAUUSD • Price Action BUY", "/education/przyklady/material-1-trade-1.png"],
+              ["XAUUSD • Price Action SELL", "/education/przyklady/material-1-trade-2.png"],
+              ["EURUSD • Trend Continuation", "/education/przyklady/material-2-trade-1.png"],
+              ["Bollinger + Price Action", "/education/przyklady/material-3-trade-1.png"],
+              ["Breakout + Retest", "/education/przyklady/material-4-trade-1.png"],
+              ["Liquidity Sweep", "/education/przyklady/material-6-trade-1.png"],
+            ].map(([title,img])=><Link key={title} href="/education/bonusy/przyklady" className="group overflow-hidden rounded-xl border border-white/10 bg-black/15"><div className="aspect-video overflow-hidden"><img src={img} alt={title} className="h-full w-full object-contain transition duration-300 group-hover:scale-[1.03]"/></div><div className="p-3 text-[10px] font-black text-sky-100">{title}</div></Link>)}
+          </div>
         </section>
 
         {/* BOTTOM */}

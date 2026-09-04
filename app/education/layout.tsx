@@ -1,8 +1,8 @@
-﻿import type { ReactNode } from "react";
+import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { requirePremiumUser } from "@/lib/auth";
 
-export default async function EducationLayout({
+export default async function EdukacjaLayout({
   children,
 }: {
   children: ReactNode;

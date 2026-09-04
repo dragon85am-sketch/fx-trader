@@ -1,7 +1,9 @@
-﻿"use client";
+"use client";
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { setCurrentStorageUser } from "@/lib/userScopedStorage";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 import {
   ArrowRight,
   BarChart3,
@@ -85,6 +87,7 @@ export default function RegisterPage() {
       // Przechodzimy do checkoutu zamiast wpuszczać użytkownika do dashboardu.
       // /api/stripe/checkout wymaga aktywnej sesji przez requireAuth(),
       // więc endpoint /api/register powinien po rejestracji ustawić cookie "token".
+      if (data?.user?.id) setCurrentStorageUser(String(data.user.id));
       setMsg("Konto utworzone. Przekierowanie do płatności...");
 
       window.location.href = "/checkout";
@@ -111,6 +114,10 @@ export default function RegisterPage() {
       />
 
       <div className="relative z-10 mx-auto w-full max-w-[1780px] px-4 py-6 md:px-6 xl:px-8">
+        {/* BRAND + LANGUAGE */}
+        <div className="mb-4 flex justify-end">
+          <LanguageSwitcher />
+        </div>
         {/* BRAND */}
         <div className="mb-6 flex items-center justify-center xl:justify-start">
           <div>

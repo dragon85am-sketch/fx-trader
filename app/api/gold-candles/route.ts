@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -265,7 +265,7 @@ export async function GET(
       new URL(req.url);
 
     /*
-     * W aplikacji uÅ¼ywamy XAUUSD.
+     * W aplikacji używamy XAUUSD.
      * Twelve Data wymaga XAU/USD.
      */
     const requestedSymbol =
@@ -365,7 +365,7 @@ export async function GET(
 
           error:
             data?.message ||
-            "BÅ‚Ä…d Twelve Data",
+            "Błąd Twelve Data",
 
           code:
             data?.code ?? null,
@@ -388,7 +388,7 @@ export async function GET(
           interval,
 
           error:
-            "Twelve Data nie zwrÃ³ciÅ‚o tablicy values",
+            "Twelve Data nie zwróciło tablicy values",
         },
         {
           status: 500,
@@ -482,7 +482,7 @@ export async function GET(
         symbol,
 
         /*
-         * Symbol faktycznie wysÅ‚any
+         * Symbol faktycznie wysłany
          * do Twelve Data.
          */
         apiSymbol,
@@ -581,7 +581,7 @@ export async function GET(
         error:
           error instanceof Error
             ? error.message
-            : "Nieznany bÅ‚Ä…d serwera",
+            : "Nieznany błąd serwera",
       },
       {
         status: 500,

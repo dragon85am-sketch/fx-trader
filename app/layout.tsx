@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import LayoutShell from "@/components/LayoutShell";
 import { LanguageProvider } from "@/components/LanguageProvider";
 import LocalDictionaryTranslator from "@/components/LocalDictionaryTranslator";
+import UserStorageIdentity from "@/components/UserStorageIdentity";
 import { normalizeLanguage } from "@/lib/i18n/catalog";
 
 export default async function RootLayout({
@@ -20,6 +21,7 @@ export default async function RootLayout({
       <body className="text-white">
         <LanguageProvider initialLanguage={lang}>
           <LocalDictionaryTranslator />
+          {token ? <UserStorageIdentity /> : null}
         {token ? (
           <LayoutShell>{children}</LayoutShell>
         ) : (

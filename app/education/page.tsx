@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import {
@@ -23,7 +23,7 @@ import {
 
 const tiles = [
   {
-    title: "FX Trade Academy",
+    title: "Akademia FX Trade",
     description:
       "Kompleksowa akademia tradingu od podstaw po zaawansowane strategie.",
     icon: BookOpen,
@@ -35,7 +35,7 @@ const tiles = [
     image: "/education/academy-bull.png",
   },
   {
-    title: "Gotowe Setupy",
+    title: "Gotowe setupy",
     description:
       "Gotowe setupy wejścia, zarządzania pozycją i analizy na przykładach.",
     icon: TrendingUp,
@@ -152,7 +152,7 @@ function HeroArtwork() {
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(37,99,235,.25),transparent_65%)]" />
       <img
         src="/education/education-hero.png"
-        alt="FX Trade Education"
+        alt="FX Trade Edukacja"
         className="absolute inset-0 h-full w-full object-cover object-center drop-shadow-[0_0_28px_rgba(37,99,235,.35)]"
       />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#07325f]/20 via-transparent to-[#062b52]/15" />
@@ -187,7 +187,7 @@ function MaterialArtwork({ src, alt }: { src: string; alt: string }) {
   );
 }
 
-export default function EducationPage() {
+export default function EdukacjaPage() {
   return (
     <main className="relative isolate min-h-screen overflow-hidden bg-[#020817] text-white">
       <div

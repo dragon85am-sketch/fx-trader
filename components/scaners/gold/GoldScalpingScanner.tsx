@@ -40,7 +40,7 @@ const emptyResult: GoldScannerResult = {
 type MtfState = "BULL" | "BEAR" | "NEUTRAL";
 
 type MtfRow = {
-  tf: "M15" | "M5" | "M1";
+  tf: "H1" | "M30" | "M15" | "M5" | "M1";
   state: MtfState;
   wt1: number | null;
   mfi: number | null;
@@ -352,177 +352,171 @@ function GoldMtfConfirmation({
   m1,
   m5,
   m15,
-  result,
+  m30,
+  h1,
 }: {
   m1: Candle[];
   m5: Candle[];
   m15: Candle[];
-  result: GoldScannerResult;
+  m30: Candle[];
+  h1: Candle[];
 }) {
   const rows = useMemo(
     () => [
-      buildMtfRow("M15", m15),
-      buildMtfRow("M5", m5),
-      buildMtfRow("M1", m1),
+      buildGoldOverviewRow("M1", m1),
+      buildGoldOverviewRow("M5", m5),
+      buildGoldOverviewRow("M15", m15),
+      buildGoldOverviewRow("M30", m30),
+      buildGoldOverviewRow("H1", h1),
     ],
-    [m1, m5, m15]
+    [m1, m5, m15, m30, h1]
   );
-
-  const bullCount = rows.filter((r) => r.state === "BULL").length;
-  const bearCount = rows.filter((r) => r.state === "BEAR").length;
-  const adx = useMemo(() => mtfAdx(m1), [m1]);
-  const atr = useMemo(() => mtfAtr(m1), [m1]);
-  const fastDecision = useMemo(
-    () => getFastMtfDecision(m1, m5, m15, result),
-    [m1, m5, m15, result]
-  );
-
-  const emaState =
-    result.ema50 > 0 && result.ema200 > 0
-      ? result.ema50 > result.ema200
-        ? "BULLISH"
-        : "BEARISH"
-      : "NO DATA";
-
-  const total = Math.max(bullCount, bearCount);
 
   return (
-    <Panel className="overflow-hidden p-0">
-      <div className="border-b border-white/[0.07] px-3 py-2.5">
-        <div className="text-[10px] font-black uppercase tracking-[0.13em] text-amber-400">
-          GOLD MTF CONFIRMATION
-        </div>
-        <div className="mt-0.5 text-[9px] text-slate-500">
-          M15 Bias → M5 Setup → M1 Timing
-        </div>
-      </div>
+    <div className="relative overflow-hidden rounded-[18px] border border-slate-200/80 bg-[#061019] shadow-[0_0_0_1px_rgba(255,255,255,.16),0_16px_45px_rgba(0,0,0,.45),inset_0_1px_0_rgba(255,255,255,.18)]">
+      {/* srebrna rama */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 rounded-[18px] p-[2px]"
+        style={{
+          background:
+            "linear-gradient(135deg,#f8fafc 0%,#94a3b8 18%,#e2e8f0 38%,#64748b 58%,#f8fafc 80%,#94a3b8 100%)",
+          WebkitMask:
+            "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)",
+          WebkitMaskComposite: "xor",
+          maskComposite: "exclude",
+        }}
+      />
 
-      <div className="overflow-x-auto">
-        <div className="min-w-[500px]">
-          <div className="grid grid-cols-[52px_1.05fr_.72fr_.62fr_.72fr] bg-[linear-gradient(145deg,rgba(48,54,59,.94),rgba(22,28,33,.97))] text-center text-[10px] font-black text-slate-300">
-            {["TF", "STATE (BIAS)", "WT1", "MFI", "SIGNAL"].map((label) => (
-              <div key={label} className="border-r border-white/[0.07] px-1.5 py-2 last:border-r-0">
-                {label}
+      <div className="relative z-[1]">
+        <div className="flex items-center justify-between border-b border-white/[0.08] px-4 py-3">
+          <div className="flex items-center gap-2.5">
+            <span className="text-lg">🟨</span>
+            <div>
+              <div className="text-[12px] font-black tracking-[0.08em] text-slate-100">
+                GOLDSCALP
               </div>
-            ))}
+              <div className="text-[8px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                XAUUSD MARKET SCANNER
+              </div>
+            </div>
           </div>
 
-          {rows.map((row) => {
-            const bull = row.state === "BULL";
-            const bear = row.state === "BEAR";
+          <div className="flex items-center gap-2 text-[9px] font-black text-emerald-400">
+            <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,.85)]" />
+            LIVE
+          </div>
+        </div>
 
-            return (
+        <div className="overflow-x-auto">
+          <div className="min-w-[560px]">
+            <div className="grid grid-cols-[62px_1.05fr_1.2fr_.9fr_.85fr] border-b border-white/[0.08] bg-white/[0.015] px-1 text-[9px] font-black uppercase tracking-[0.08em] text-slate-400">
+              {['TIMEFRAME', 'TREND', 'MOMENTUM', 'VOLATILITY', 'SYGNAŁ'].map((label) => (
+                <div key={label} className="px-2 py-2.5">
+                  {label}
+                </div>
+              ))}
+            </div>
+
+            {rows.map((row) => (
               <div
                 key={row.tf}
-                className={`grid grid-cols-[52px_1.05fr_.72fr_.62fr_.72fr] border-t border-white/[0.06] text-center ${
-                  bull ? "bg-emerald-500/[0.075]" : bear ? "bg-red-500/[0.075]" : "bg-white/[0.015]"
-                }`}
+                className="grid grid-cols-[62px_1.05fr_1.2fr_.9fr_.85fr] items-center border-b border-white/[0.06] px-1 last:border-b-0"
               >
-                <div className="border-r border-white/[0.07] px-1.5 py-2 text-[10px] font-black">
+                <div className="px-2 py-3 text-[12px] font-black text-slate-100">
                   {row.tf}
                 </div>
 
-                <div className="flex items-center justify-center gap-2 border-r border-white/[0.07] px-1.5 py-2">
-                  <span className={`text-[10px] font-black ${
-                    bull ? "text-emerald-400" : bear ? "text-red-400" : "text-slate-400"
-                  }`}>
-                    {row.state}
+                <div className="flex items-center gap-2 px-2 py-3">
+                  <span
+                    className={`h-3 w-3 rounded-full border ${
+                      row.state === 'BULL'
+                        ? 'border-emerald-200/70 bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,.7)]'
+                        : row.state === 'BEAR'
+                          ? 'border-red-200/70 bg-red-500 shadow-[0_0_10px_rgba(239,68,68,.65)]'
+                          : 'border-violet-200/70 bg-violet-400 shadow-[0_0_10px_rgba(167,139,250,.55)]'
+                    }`}
+                  />
+                  <span className="text-[11px] font-semibold text-slate-200">
+                    {row.state === 'BULL' ? 'Bullish' : row.state === 'BEAR' ? 'Bearish' : 'Neutral'}
                   </span>
-                  <span className={`h-2 w-2 rounded-full ${
-                    bull
-                      ? "bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,.75)]"
-                      : bear
-                        ? "bg-red-500 shadow-[0_0_10px_rgba(239,68,68,.7)]"
-                        : "bg-slate-600"
-                  }`} />
                 </div>
 
-                <div className="border-r border-white/[0.07] px-1.5 py-2 font-mono text-[10px] font-black">
-                  {row.wt1 === null ? "—" : row.wt1.toFixed(1)}
+                <div className="flex items-center gap-1 px-2 py-3">
+                  {Array.from({ length: 5 }).map((_, index) => (
+                    <span
+                      key={index}
+                      className={`h-3.5 flex-1 max-w-[18px] rounded-[2px] border ${
+                        index < row.momentumBars
+                          ? 'border-emerald-300/30 bg-gradient-to-b from-emerald-300 to-emerald-500 shadow-[0_0_7px_rgba(34,197,94,.25)]'
+                          : 'border-slate-700/60 bg-slate-800/80'
+                      }`}
+                    />
+                  ))}
                 </div>
 
-                <div className="flex items-center justify-center border-r border-white/[0.07] px-1.5 py-2">
-                  <span className={`h-3 w-3 rounded-full border ${
-                    row.mfi === null
-                      ? "border-slate-600 bg-slate-700"
-                      : row.mfi >= 50
-                        ? "border-emerald-300/70 bg-emerald-400 shadow-[0_0_14px_rgba(52,211,153,.75)]"
-                        : "border-red-300/70 bg-red-500 shadow-[0_0_14px_rgba(239,68,68,.7)]"
-                  }`} />
+                <div
+                  className={`px-2 py-3 text-[10px] font-black ${
+                    row.volatility === 'HIGH'
+                      ? 'text-emerald-400'
+                      : row.volatility === 'MEDIUM'
+                        ? 'text-amber-300'
+                        : 'text-red-400'
+                  }`}
+                >
+                  {row.volatility}
                 </div>
 
-                <div className={`px-1.5 py-2 text-[10px] font-black ${
-                  row.signal === "BUY"
-                    ? "text-emerald-400"
-                    : row.signal === "SELL"
-                      ? "text-red-400"
-                      : "text-amber-300"
-                }`}>
-                  {row.signal}
+                <div className="px-2 py-3">
+                  <span
+                    className={`inline-flex min-w-[60px] justify-center rounded-md border px-2 py-1 text-[10px] font-black ${
+                      row.signal === 'BUY'
+                        ? 'border-emerald-400/35 bg-emerald-500/15 text-emerald-400'
+                        : row.signal === 'SELL'
+                          ? 'border-red-400/35 bg-red-500/15 text-red-400'
+                          : 'border-amber-400/30 bg-amber-400/10 text-amber-300'
+                    }`}
+                  >
+                    {row.signal === 'WAIT' ? 'WATCH' : row.signal}
+                  </span>
                 </div>
               </div>
-            );
-          })}
-
-          <div className="grid grid-cols-[52px_1.05fr_.72fr_.62fr_.72fr] border-t border-white/[0.08] bg-[linear-gradient(145deg,rgba(50,56,61,.94),rgba(24,30,35,.97))] text-center">
-            <div className="border-r border-white/[0.07] px-1.5 py-2 text-[10px] font-black">TOTAL</div>
-            <div className="border-r border-white/[0.07] px-1.5 py-2 text-[10px] font-black">
-              <span className="text-emerald-400">{bullCount}B</span>
-              <span className="text-slate-500"> / </span>
-              <span className="text-red-400">{bearCount}R</span>
-            </div>
-            <div className="border-r border-white/[0.07] px-1.5 py-2 text-slate-600">—</div>
-            <div className="flex items-center justify-center border-r border-white/[0.07] px-1.5 py-2">
-              <span className={`h-3 w-3 rounded-full ${
-                bullCount >= bearCount ? "bg-emerald-400" : "bg-red-500"
-              }`} />
-            </div>
-            <div
-              className={`px-1.5 py-2 text-[9px] font-black ${
-                fastDecision.side === "BUY"
-                  ? "text-emerald-400"
-                  : fastDecision.side === "SELL"
-                    ? "text-red-400"
-                    : "text-amber-300"
-              }`}
-            >
-              <div>{fastDecision.label}</div>
-              <div className="mt-0.5 text-[8px] text-slate-400">
-                {fastDecision.aligned}/3
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </div>
-
-      <div className="grid gap-px border-t border-white/[0.08] bg-white/[0.06] sm:grid-cols-2 xl:grid-cols-4">
-        <MtfMetric
-          label="ADX (14)"
-          value={adx === null ? "—" : adx.toFixed(1)}
-          state={(adx ?? 0) >= 25 ? "good" : "warn"}
-          note={(adx ?? 0) >= 25 ? "TREND STRONG" : "TREND WEAK"}
-        />
-        <MtfMetric
-          label="EMA 50 / 200"
-          value={emaState}
-          state={emaState === "BULLISH" ? "good" : emaState === "BEARISH" ? "bad" : "neutral"}
-          note="M5 TREND FILTER"
-        />
-        <MtfMetric
-          label="MOMENTUM"
-          value={`${Math.round(result.momentum)}/100`}
-          state={result.momentum >= 70 ? "good" : "warn"}
-          note="FAST 55 / STRONG 70"
-        />
-        <MtfMetric
-          label="ATR (14)"
-          value={atr === null ? "—" : atr.toFixed(2)}
-          state="info"
-          note="M1 VOLATILITY"
-        />
-      </div>
-    </Panel>
+    </div>
   );
+}
+
+type GoldOverviewRow = MtfRow & {
+  momentumBars: number;
+  volatility: "HIGH" | "MEDIUM" | "LOW";
+};
+
+function buildGoldOverviewRow(
+  tf: MtfRow["tf"],
+  candles: Candle[]
+): GoldOverviewRow {
+  const base = buildMtfRow(tf, candles);
+  const closes = candles.map((c) => c.close);
+  const last = closes.at(-1) ?? 0;
+  const atr = mtfAtr(candles);
+
+  const momentumRaw = Math.abs((base.wt1 ?? 0) * 0.55) + Math.abs((base.mfi ?? 50) - 50) * 1.35;
+  const momentumBars = candles.length < 32
+    ? 0
+    : Math.max(1, Math.min(5, Math.ceil(momentumRaw / 18)));
+
+  const atrPct = last > 0 && atr !== null ? (atr / last) * 100 : 0;
+  const volatility: GoldOverviewRow["volatility"] =
+    atrPct >= 0.18 ? "HIGH" : atrPct >= 0.08 ? "MEDIUM" : "LOW";
+
+  return {
+    ...base,
+    momentumBars,
+    volatility,
+  };
 }
 
 function MtfMetric({
@@ -565,6 +559,8 @@ export default function GoldScalpingScanner() {
   const [m1, setM1] = useState<Candle[]>([]);
   const [m5, setM5] = useState<Candle[]>([]);
   const [m15, setM15] = useState<Candle[]>([]);
+  const [m30, setM30] = useState<Candle[]>([]);
+  const [h1, setH1] = useState<Candle[]>([]);
   const [selectedTimeframe, setSelectedTimeframe] =
     useState<"M1" | "M5" | "M15">("M1");
 
@@ -579,26 +575,30 @@ export default function GoldScalpingScanner() {
     try {
       setLoading(true);
 
-      const [m1Response, m5Response, m15Response] = await Promise.all([
-        fetch("/api/gold-candles?interval=1min&symbol=XAUUSD", {
-          cache: "no-store",
-        }),
-        fetch("/api/gold-candles?interval=5min&symbol=XAUUSD", {
-          cache: "no-store",
-        }),
-        fetch("/api/gold-candles?interval=15min&symbol=XAUUSD", {
-          cache: "no-store",
-        }),
+      const [m1Response, m5Response, m15Response, m30Response, h1Response] = await Promise.all([
+        fetch("/api/gold-candles?interval=1min&symbol=XAUUSD", { cache: "no-store" }),
+        fetch("/api/gold-candles?interval=5min&symbol=XAUUSD", { cache: "no-store" }),
+        fetch("/api/gold-candles?interval=15min&symbol=XAUUSD", { cache: "no-store" }),
+        fetch("/api/gold-candles?interval=30min&symbol=XAUUSD", { cache: "no-store" }),
+        fetch("/api/gold-candles?interval=1h&symbol=XAUUSD", { cache: "no-store" }),
       ]);
 
-      if (!m1Response.ok || !m5Response.ok || !m15Response.ok) {
+      if (
+        !m1Response.ok ||
+        !m5Response.ok ||
+        !m15Response.ok ||
+        !m30Response.ok ||
+        !h1Response.ok
+      ) {
         throw new Error("Błąd pobierania danych XAUUSD");
       }
 
-      const [m1Data, m5Data, m15Data] = await Promise.all([
+      const [m1Data, m5Data, m15Data, m30Data, h1Data] = await Promise.all([
         m1Response.json(),
         m5Response.json(),
         m15Response.json(),
+        m30Response.json(),
+        h1Response.json(),
       ]);
 
       const candlesM1: Candle[] = Array.isArray(m1Data?.candles)
@@ -613,9 +613,19 @@ export default function GoldScalpingScanner() {
         ? m15Data.candles
         : [];
 
+      const candlesM30: Candle[] = Array.isArray(m30Data?.candles)
+        ? m30Data.candles
+        : [];
+
+      const candlesH1: Candle[] = Array.isArray(h1Data?.candles)
+        ? h1Data.candles
+        : [];
+
       setM1(candlesM1);
       setM5(candlesM5);
       setM15(candlesM15);
+      setM30(candlesM30);
+      setH1(candlesH1);
 
       const scanner = scanGoldScalping({
         m1: candlesM1,
@@ -733,369 +743,49 @@ export default function GoldScalpingScanner() {
 
   return (
     <main className="min-h-screen w-full overflow-x-hidden bg-[#03070d] text-white">
-      <div className="mx-auto w-[96%] max-w-[2400px] px-3 py-3 lg:px-4 lg:py-4 2xl:w-[94%]">
-        {/* HEADER */}
-        <section className="mb-3 flex flex-col gap-3 rounded-[16px] border border-[#1b2a3b] bg-[linear-gradient(145deg,rgba(43,49,54,.96),rgba(18,24,29,.98)_52%,rgba(35,41,46,.96))] px-5 py-4 shadow-[0_18px_55px_rgba(0,0,0,.35)] xl:flex-row xl:items-center xl:justify-between">
+      <div className="mx-auto w-[97%] max-w-[2500px] px-3 py-3 lg:px-5 lg:py-4">
+        <section className="mb-3 flex flex-col gap-3 rounded-[18px] border border-amber-400/20 bg-[linear-gradient(145deg,rgba(31,37,42,.98),rgba(10,15,20,.98))] px-5 py-4 shadow-[0_18px_55px_rgba(0,0,0,.35)] xl:flex-row xl:items-center xl:justify-between">
           <div>
-            <div className="text-[10px] font-black uppercase tracking-[0.22em] text-amber-400">
-              FXTRADE PREMIUM
-            </div>
-            <h1 className="mt-0.5 text-2xl font-black tracking-tight xl:text-[30px]">
-              GOLD SCALPING SCANNER
-            </h1>
-            <p className="mt-1 text-[12px] text-slate-400">
-              Momentum • Liquidity • Structure • M1 / M5 / M15
-            </p>
+            <div className="text-[10px] font-black uppercase tracking-[0.22em] text-amber-400">FXTRADE PREMIUM</div>
+            <h1 className="mt-0.5 text-2xl font-black tracking-tight xl:text-[30px]">GOLD SCALPING SCANNER</h1>
+            <p className="mt-1 text-[12px] text-slate-400">M5 = kierunek • M1 = wejście • płynność + struktura + momentum</p>
           </div>
-
           <div className="flex flex-wrap items-center gap-2">
-            <div className="rounded-xl border border-white/8 bg-black/20 px-4 py-2.5">
-              <div className="text-[9px] uppercase tracking-widest text-slate-500">
-                Market status
-              </div>
-              <div className="mt-1 flex items-center gap-2 text-[12px] font-bold">
-                <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                LIVE
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-white/8 bg-black/20 px-4 py-2.5">
-              <div className="text-[9px] uppercase tracking-widest text-slate-500">
-                Last scan
-              </div>
-              <div className="mt-1 text-[12px] font-bold text-slate-200">
-                {lastScan ? lastScan.toLocaleTimeString() : "--:--:--"}
-              </div>
-            </div>
-
-            <button
-              onClick={scan}
-              disabled={loading}
-              className="min-w-[190px] rounded-xl border border-amber-300/30 bg-gradient-to-b from-amber-300 to-amber-500 px-6 py-3 text-[12px] font-black text-black shadow-[0_0_30px_rgba(245,158,11,.16)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {loading ? "SCANNING..." : "◉  SCAN MARKET"}
-            </button>
+            <div className="rounded-xl border border-white/10 bg-black/20 px-4 py-2.5"><div className="text-[9px] uppercase tracking-widest text-slate-500">Status</div><div className="mt-1 flex items-center gap-2 text-[12px] font-bold"><span className="h-2 w-2 rounded-full bg-emerald-400"/>LIVE</div></div>
+            <div className="rounded-xl border border-white/10 bg-black/20 px-4 py-2.5"><div className="text-[9px] uppercase tracking-widest text-slate-500">Ostatni skan</div><div className="mt-1 text-[12px] font-bold text-slate-200">{lastScan ? lastScan.toLocaleTimeString() : "--:--:--"}</div></div>
+            <button onClick={scan} disabled={loading} className="min-w-[180px] rounded-xl border border-amber-300/30 bg-gradient-to-b from-amber-300 to-amber-500 px-6 py-3 text-[12px] font-black text-black transition hover:brightness-110 disabled:opacity-50">{loading ? "SKANOWANIE..." : "◉ SKANUJ GOLD"}</button>
           </div>
         </section>
 
-        {/* QUICK STATUS - przeniesione z dolu na gore */}
-        <section className="mb-3 grid gap-3 xl:grid-cols-[1.05fr_1.35fr_1.25fr]">
-          <Panel className="p-4">
-            <Label>SCANNER DECISION</Label>
-            <div className="mt-3 flex items-center gap-4">
-              <div
-                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full border text-lg ${
-                  ready
-                    ? "border-emerald-400 text-emerald-400"
-                    : "border-slate-600 text-slate-400"
-                }`}
-              >
-                {ready ? "✓" : "↗"}
-              </div>
-
-              <div className="min-w-0">
-                <div
-                  className={`truncate text-[21px] font-black ${
-                    ready ? "text-emerald-400" : "text-slate-300"
-                  }`}
-                >
-                  {ready ? `READY ${result.side}` : `${result.status} ${result.side}`}
-                </div>
-                <div className="mt-1 text-[11px] text-slate-500">
-                  {ready ? "High probability setup" : "No high probability setup"}
-                </div>
-              </div>
-            </div>
-          </Panel>
-
-          <Panel className="p-4">
-            <SectionTitle>DETECTED CONDITIONS</SectionTitle>
-            <div className="mt-3 grid gap-x-4 gap-y-2 sm:grid-cols-2">
-              {result.reasons.length ? (
-                result.reasons.slice(0, 6).map((reason) => (
-                  <div
-                    key={reason}
-                    className="truncate text-[11px] font-semibold text-emerald-400"
-                    title={reason}
-                  >
-                    ✓ {reason}
-                  </div>
-                ))
-              ) : (
-                <div className="text-[11px] text-slate-500">
-                  Brak pełnego setupu.
-                </div>
-              )}
-            </div>
-          </Panel>
-
-          <Panel className="p-4">
-            <SectionTitle>KEY LEVELS</SectionTitle>
-            <div className="mt-2 grid grid-cols-2 gap-x-5">
-              <Metric title="Entry" value={format(result.entry)} />
-              <Metric
-                title="Stop Loss"
-                value={format(result.stopLoss)}
-                valueClass="text-red-400"
-              />
-              <Metric
-                title="TP1"
-                value={format(result.tp1)}
-                valueClass="text-emerald-400"
-              />
-              <Metric
-                title="TP2"
-                value={format(result.tp2)}
-                valueClass="text-emerald-400"
-              />
-            </div>
-          </Panel>
+        <section className="mb-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <Panel className="p-4"><Label>SYGNAŁ</Label><div className={`mt-2 text-[25px] font-black ${ready ? result.side === "BUY" ? "text-emerald-400" : "text-red-400" : "text-slate-300"}`}>{ready ? result.side : "WAIT"}</div><div className="mt-1 text-[10px] text-slate-500">{ready ? "Warunki wejścia spełnione" : "Czekamy na potwierdzenie"}</div></Panel>
+          <Panel className="p-4"><Label>OCENA</Label><div className="mt-2 text-[25px] font-black text-amber-300">{result.score}<span className="text-xs text-slate-500">/100</span></div><Progress value={result.score}/></Panel>
+          <Panel className="p-4"><Label>MOMENTUM</Label><div className={`mt-2 text-[25px] font-black ${result.momentum >= 70 ? "text-emerald-400" : "text-amber-300"}`}>{result.momentum}<span className="text-xs text-slate-500">/100</span></div><div className="mt-1 text-[10px] text-slate-500">Minimum dla mocnego setupu: 70</div></Panel>
+          <Panel className="p-4"><Label>KIERUNEK M5</Label><div className={`mt-2 text-[20px] font-black ${result.m5Trend === "BULLISH" ? "text-emerald-400" : result.m5Trend === "BEARISH" ? "text-red-400" : "text-slate-300"}`}>{result.m5Trend}</div><div className="mt-1 text-[10px] text-slate-500">Struktura: {result.structure}</div></Panel>
+          <Panel className="p-4"><Label>PLAN</Label><div className="mt-2 grid grid-cols-2 gap-x-3 text-[10px]"><Metric title="Entry" value={format(result.entry)}/><Metric title="SL" value={format(result.stopLoss)} valueClass="text-red-400"/><Metric title="TP1" value={format(result.tp1)} valueClass="text-emerald-400"/><Metric title="TP2" value={format(result.tp2)} valueClass="text-emerald-400"/></div></Panel>
         </section>
 
-        {/* TOP SUMMARY */}
-        <section className="mb-3 grid gap-3 md:grid-cols-2 xl:grid-cols-[1.05fr_1.75fr_.9fr_.95fr_1.3fr]">
-          <Panel className="p-4">
-            <Label>INSTRUMENT</Label>
-            <div className="mt-2 flex items-center justify-between gap-3">
-              <div>
-                <div className="text-[22px] font-black leading-none">XAUUSD</div>
-                <div className="mt-1 text-[11px] text-slate-500">
-                  Gold Spot / U.S. Dollar
-                </div>
-              </div>
-              <Badge>M1 – M5</Badge>
-            </div>
-          </Panel>
-
-          <Panel className="p-4">
-            <SectionTitle>MARKET BIAS (M5)</SectionTitle>
-            <div className="mt-2 grid grid-cols-2 gap-x-5">
-              <Metric title="Trend" value={result.m5Trend} valueClass={result.m5Trend === "BULLISH" ? "text-emerald-400" : result.m5Trend === "BEARISH" ? "text-red-400" : "text-slate-300"} />
-              <Metric title="EMA 50" value={result.ema50.toFixed(2)} valueClass="text-sky-400" />
-              <Metric title="Structure" value={result.structure} valueClass={result.structure === "HH_HL" ? "text-emerald-400" : result.structure === "LH_LL" ? "text-red-400" : "text-slate-300"} />
-              <Metric title="EMA 200" value={result.ema200.toFixed(2)} valueClass="text-amber-400" />
-            </div>
-          </Panel>
-
-          <Panel className="p-4">
-            <Label>PRICE</Label>
-            <div className="mt-2 text-[30px] font-black leading-none text-emerald-400">
-              {currentPrice !== null ? currentPrice.toFixed(2) : "--"}
-            </div>
-            <div className="mt-2 text-[11px] text-slate-500">XAUUSD live</div>
-          </Panel>
-
-          <Panel className="p-4">
-            <Label>SETUP STATUS</Label>
-            <div className={`mt-2 text-[26px] font-black leading-none ${ready ? "text-emerald-400" : "text-slate-300"}`}>
-              {result.status}
-            </div>
-            <div className="mt-2 text-[11px] font-semibold text-slate-500">
-              {result.side}
-            </div>
-          </Panel>
-
-          <Panel className="p-4">
-            <div className="flex items-end justify-between gap-3">
-              <div>
-                <Label>SETUP SCORE</Label>
-                <div className="mt-2 text-[30px] font-black leading-none text-emerald-400">
-                  {result.score}
-                  <span className="text-sm text-emerald-400/70">/100</span>
-                </div>
-              </div>
-              <div className="text-[10px] text-slate-500">Min. 80</div>
-            </div>
-            <div className="mt-3">
-              <Progress value={result.score} />
-            </div>
-          </Panel>
-        </section>
-
-        {/* MAIN WORKSPACE */}
         <section className="grid grid-cols-12 gap-3">
-          {/* LEFT COLUMN */}
-          <aside className="col-span-12 space-y-3 xl:col-span-2">
-            <Panel className="p-4">
-              <SectionTitle>FILTERS</SectionTitle>
-              <div className="mt-3">
-                <Filter name="Minimum Score" value="80%" />
-                <Filter name="Momentum" value="≥ 70" />
-                <Filter name="Minimum RR" value="1 : 1.5" />
-                <Filter name="Timeframes" value="M1 / M5" />
-              </div>
-            </Panel>
-
-            <Panel className="p-4">
-              <SectionTitle>MARKET SNAPSHOT</SectionTitle>
-              <Metric
-                title="Current Price"
-                value={currentPrice !== null ? currentPrice.toFixed(2) : "--"}
-                valueClass="text-emerald-400"
-              />
-              <Metric title="M1 Candles" value={String(m1.length)} />
-              <Metric title="M5 Candles" value={String(m5.length)} />
-              <Metric title="M15 Candles" value={String(m15.length)} />
-              <Metric
-                title="Momentum"
-                value={`${result.momentum}/100`}
-                valueClass={result.momentum >= 70 ? "text-emerald-400" : "text-amber-400"}
-              />
-            </Panel>
-
-            <Panel className="p-4">
-              <SectionTitle>MARKET DATA (M5)</SectionTitle>
-              <Metric title="ATR (M1)" value={result.atr.toFixed(2)} />
-              <Metric title="RSI" value={result.rsi.toFixed(1)} />
-              <Metric title="EMA 50" value={result.ema50.toFixed(2)} valueClass="text-sky-400" />
-              <Metric title="EMA 200" value={result.ema200.toFixed(2)} valueClass="text-amber-400" />
-              <Metric title="Bias" value={result.m5Trend} />
-            </Panel>
-          </aside>
-
-          {/* CENTER COLUMN */}
-          <div className="col-span-12 space-y-3 xl:col-span-7">
-            <div
-              ref={chartFullscreenRef}
-              className={isChartFullscreen ? "h-screen w-screen overflow-auto bg-[#03070d] p-3" : ""}
-            >
+          <div className="col-span-12 xl:col-span-9">
+            <div ref={chartFullscreenRef} className={isChartFullscreen ? "h-screen w-screen overflow-auto bg-[#03070d] p-3" : ""}>
               <Panel className={`overflow-hidden p-0 ${isChartFullscreen ? "min-h-[calc(100vh-24px)]" : ""}`}>
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/6 px-5 py-3">
-                  <div className="flex items-center gap-3">
-                    <div>
-                      <div className="text-[20px] font-black">
-                        XAUUSD · {selectedTimeframe}
-                      </div>
-                      <div className="text-[11px] text-slate-500">
-                        Gold Spot / U.S. Dollar
-                      </div>
-                    </div>
-                    <span className="rounded-md border border-amber-400/20 bg-amber-400/10 px-2 py-1 text-[9px] font-black text-amber-400">
-                      GOLD
-                    </span>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2">
-                    {(["M1", "M5", "M15"] as const).map((tf) => {
-                      const active = selectedTimeframe === tf;
-
-                      return (
-                        <button
-                          key={tf}
-                          type="button"
-                          onClick={() => setSelectedTimeframe(tf)}
-                          className={`min-w-[58px] rounded-lg border px-4 py-2 text-[10px] font-black transition ${
-                            active
-                              ? "border-amber-400/50 bg-amber-400/15 text-amber-300 shadow-[0_0_18px_rgba(245,158,11,.12)]"
-                              : "border-white/8 bg-white/[0.025] text-slate-500 hover:border-white/15 hover:text-slate-200"
-                          }`}
-                        >
-                          {tf}
-                        </button>
-                      );
-                    })}
-
-                    <button
-                      type="button"
-                      onClick={toggleChartFullscreen}
-                      className="ml-1 inline-flex min-h-[36px] items-center gap-2 rounded-lg border border-sky-400/20 bg-sky-500/10 px-3 py-2 text-[10px] font-black uppercase tracking-[0.08em] text-sky-300 transition hover:border-sky-300/40 hover:bg-sky-500/15"
-                      title={isChartFullscreen ? "Wyłącz pełny ekran" : "Pełny ekran wykresu"}
-                    >
-                      <span className="text-base leading-none">{isChartFullscreen ? "↙" : "⛶"}</span>
-                      <span>{isChartFullscreen ? "ZAMKNIJ" : "PEŁNY EKRAN"}</span>
-                    </button>
-                  </div>
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-5 py-3">
+                  <div><div className="text-[20px] font-black">XAUUSD · {selectedTimeframe}</div><div className="text-[10px] text-slate-500">Duży wykres roboczy — szybki scalping</div></div>
+                  <div className="flex items-center gap-2">{(["M1","M5","M15"] as const).map(tf => <button key={tf} onClick={()=>setSelectedTimeframe(tf)} className={`min-w-[56px] rounded-lg border px-3 py-2 text-[10px] font-black ${selectedTimeframe===tf ? "border-amber-400/50 bg-amber-400/15 text-amber-300" : "border-white/10 text-slate-400"}`}>{tf}</button>)}<button type="button" onClick={toggleChartFullscreen} className="rounded-lg border border-sky-400/25 bg-sky-500/10 px-3 py-2 text-[10px] font-black text-sky-300">{isChartFullscreen ? "ZAMKNIJ" : "⛶ PEŁNY EKRAN"}</button></div>
                 </div>
-
-                <div className={isChartFullscreen ? "p-2" : "p-3"}>
-                  <div
-                    className={`[&>div]:border-0 [&>div]:bg-transparent ${
-                      isChartFullscreen
-                        ? "[&>div]:h-[calc(100vh-72px)] [&>div]:min-h-[calc(100vh-72px)]"
-                        : "[&>div]:min-h-[430px] 2xl:[&>div]:min-h-[500px]"
-                    }`}
-                  >
-                    <GoldChart
-                      candles={selectedCandles}
-                      entry={result.entry}
-                      stopLoss={result.stopLoss}
-                      tp1={result.tp1}
-                      tp2={result.tp2}
-                      timeframe={selectedTimeframe}
-                    />
-                  </div>
-                </div>
+                <div className={isChartFullscreen ? "p-2" : "p-3"}><div className={isChartFullscreen ? "[&>div]:h-[calc(100vh-78px)] [&>div]:min-h-[calc(100vh-78px)]" : "[&>div]:min-h-[650px] 2xl:[&>div]:min-h-[760px]"}><GoldChart candles={selectedCandles} entry={result.entry} stopLoss={result.stopLoss} tp1={result.tp1} tp2={result.tp2} timeframe={selectedTimeframe}/></div></div>
               </Panel>
             </div>
-
-            <MomentumPanel
-              value={result.momentum}
-              candles={selectedCandles}
-              timeframe={selectedTimeframe}
-            />
-
-            <Panel className="p-4">
-              <div className="mb-3 flex items-center justify-between">
-                <SectionTitle>SCANNER MODULES</SectionTitle>
-                <div className="text-[10px] text-slate-500">Live Scoring</div>
-              </div>
-
-              <div className="grid gap-2 md:grid-cols-3 xl:grid-cols-6">
-                {modules.map((module) => (
-                  <ModuleBar
-                    key={module.label}
-                    label={module.label}
-                    value={module.value}
-                    active={module.active}
-                  />
-                ))}
-              </div>
-            </Panel>
           </div>
 
-          {/* RIGHT COLUMN */}
           <aside className="col-span-12 space-y-3 xl:col-span-3">
-            <GoldMtfConfirmation m1={m1} m5={m5} m15={m15} result={result} />
-
-            <Panel className="p-4">
-              <SectionTitle>TRADE PLAN</SectionTitle>
-              <TradeRow name="Entry" value={format(result.entry)} />
-              <TradeRow name="Stop Loss" value={format(result.stopLoss)} danger />
-              <TradeRow name="TP1" value={format(result.tp1)} />
-              <TradeRow name="TP2" value={format(result.tp2)} />
-              <TradeRow
-                name="RR TP1"
-                value={result.rr1 ? `1 : ${result.rr1.toFixed(2)}` : "--"}
-              />
-              <TradeRow
-                name="RR TP2"
-                value={result.rr2 ? `1 : ${result.rr2.toFixed(2)}` : "--"}
-              />
-            </Panel>
-
-            <Panel className="p-4">
-              <SectionTitle>ENTRY RULE</SectionTitle>
-              <div className="mt-3 space-y-0">
-                <RuleStep label="M5 Bullish Bias" passed={result.m5Trend === "BULLISH"} />
-                <RuleStep label="SSL Sweep (M1)" passed={result.liquiditySweep && result.side === "BUY"} />
-                <RuleStep label="M1 BOS / CHOCH" passed={result.structureShift} />
-                <RuleStep label="Momentum ≥ 70" passed={result.momentum >= 70} />
-                <RuleStep label="Zamknięcie świecy" passed={result.displacement} last />
-              </div>
-            </Panel>
-
-            <Panel className="p-4">
-              <SectionTitle>LIVE CONDITIONS</SectionTitle>
-              <Condition label="M5 Trend" passed={result.m5Trend !== "NEUTRAL"} />
-              <Condition label="M5 Structure" passed={result.structure !== "NEUTRAL"} />
-              <Condition label="Liquidity Sweep" passed={result.liquiditySweep} />
-              <Condition label="BOS / CHOCH" passed={result.structureShift} />
-              <Condition label="Displacement" passed={result.displacement} />
-              <Condition label="Momentum ≥ 70" passed={result.momentum >= 70} />
-            </Panel>
+            <GoldMtfConfirmation m1={m1} m5={m5} m15={m15} m30={m30} h1={h1}/>
+            <Panel className="p-4"><SectionTitle>5 POTWIERDZEŃ WEJŚCIA</SectionTitle><div className="mt-3"><Condition label="Trend + struktura M5" passed={result.m5Trend !== "NEUTRAL" && result.structure !== "NEUTRAL"}/><Condition label="Sweep płynności M1" passed={result.liquiditySweep}/><Condition label="BOS / CHOCH M1" passed={result.structureShift}/><Condition label="Displacement świecy" passed={result.displacement}/><Condition label="Momentum ≥ 70" passed={result.momentum >= 70}/></div></Panel>
+            <Panel className="p-4"><SectionTitle>DLACZEGO SYGNAŁ?</SectionTitle><div className="mt-3 space-y-2">{result.reasons.length ? result.reasons.slice(0,5).map(reason=><div key={reason} className="text-[10px] leading-4 text-emerald-300">✓ {reason}</div>) : <div className="text-[10px] text-slate-500">Brak pełnego potwierdzenia. Skaner czeka.</div>}</div></Panel>
           </aside>
         </section>
 
+        <section className="mt-3"><MomentumPanel value={result.momentum} candles={selectedCandles} timeframe={selectedTimeframe}/></section>
       </div>
     </main>
   );

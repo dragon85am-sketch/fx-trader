@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import {
@@ -22,25 +22,25 @@ import {
 const webinars = [
   {
     date: "22 SIE",
-    title: "Price Action PRO â€“ Struktura Rynku",
+    title: "Price Action PRO – Struktura Rynku",
     time: "19:00",
     duration: "90 min",
     host: "Artur FX",
-    status: "NAJBLIÅ»SZY",
+    status: "NAJBLIŻSZY",
     tone: "sky",
     description:
-      "Praktyczna analiza HH/HL, LH/LL, stref reakcji i wejÅ›Ä‡ zgodnych z kierunkiem rynku.",
+      "Praktyczna analiza HH/HL, LH/LL, stref reakcji i wejść zgodnych z kierunkiem rynku.",
   },
   {
     date: "26 SIE",
-    title: "GOLD M5 â€“ Scalping Session",
+    title: "GOLD M5 – Scalping Session",
     time: "19:30",
     duration: "75 min",
     host: "Artur FX",
     status: "ZAPISY",
     tone: "amber",
     description:
-      "Scalping XAUUSD na M5 z timingiem M1, reakcjami ceny i zarzÄ…dzaniem pozycjÄ….",
+      "Scalping XAUUSD na M5 z timingiem M1, reakcjami ceny i zarządzaniem pozycją.",
   },
   {
     date: "29 SIE",
@@ -51,25 +51,25 @@ const webinars = [
     status: "ZAPISY",
     tone: "violet",
     description:
-      "Ryzyko, wielkoÅ›Ä‡ pozycji, R:R i plan transakcyjny bez przypadkowych decyzji.",
+      "Ryzyko, wielkość pozycji, R:R i plan transakcyjny bez przypadkowych decyzji.",
   },
   {
     date: "02 WRZ",
-    title: "Trading Psychology â€“ Q&A",
+    title: "Trading Psychology – Q&A",
     time: "19:00",
     duration: "90 min",
-    host: "GoÅ›Ä‡ specjalny",
+    host: "Gość specjalny",
     status: "ZAPISY",
     tone: "emerald",
     description:
-      "Sesja pytaÅ„ i odpowiedzi o dyscyplinie, bÅ‚Ä™dach tradera i pracy z planem.",
+      "Sesja pytań i odpowiedzi o dyscyplinie, błędach tradera i pracy z planem.",
   },
 ];
 
 const recordings = [
-  { title: "Scalping GOLD â€“ Momentum M5", date: "15 sierpnia 2026", duration: "01:18:42" },
-  { title: "Price Action â€“ Bias & Timing", date: "8 sierpnia 2026", duration: "01:34:11" },
-  { title: "Risk Management â€“ Masterclass", date: "1 sierpnia 2026", duration: "01:06:28" },
+  { title: "Scalping GOLD – Momentum M5", date: "15 sierpnia 2026", duration: "01:18:42" },
+  { title: "Price Action – Bias & Timing", date: "8 sierpnia 2026", duration: "01:34:11" },
+  { title: "Risk Management – Masterclass", date: "1 sierpnia 2026", duration: "01:06:28" },
 ];
 
 function toneClass(tone: string) {
@@ -108,7 +108,7 @@ export default function WebinaryPage() {
                   WEBINARY <span className="text-sky-400">LIVE</span>
                 </h1>
                 <p className="mt-1 max-w-[760px] text-[10px] leading-5 text-slate-400">
-                  Edukacyjne spotkania na Å¼ywo, analiza rynku, strategie i praktyczne warsztaty tradingowe.
+                  Edukacyjne spotkania na żywo, analiza rynku, strategie i praktyczne warsztaty tradingowe.
                 </p>
               </div>
             </div>
@@ -132,10 +132,10 @@ export default function WebinaryPage() {
         {/* KPI */}
         <section className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {[
-            [CalendarDays, "NAJBLIÅ»SZY WEBINAR", "22 SIE â€¢ 19:00", "Price Action PRO", "text-sky-300"],
-            [Video, "WEBINARY W MIESIÄ„CU", "4", "6h+ materiaÅ‚u LIVE", "text-violet-300"],
-            [Users, "MIEJSCA", "500", "Limit uczestnikÃ³w", "text-emerald-300"],
-            [PlayCircle, "NAGRANIA", "12+", "DostÄ™p po webinarze", "text-amber-300"],
+            [CalendarDays, "NAJBLIŻSZY WEBINAR", "22 SIE • 19:00", "Price Action PRO", "text-sky-300"],
+            [Video, "WEBINARY W MIESIĄCU", "4", "6h+ materiału LIVE", "text-violet-300"],
+            [Users, "MIEJSCA", "500", "Limit uczestników", "text-emerald-300"],
+            [PlayCircle, "NAGRANIA", "12+", "Dostęp po webinarze", "text-amber-300"],
           ].map(([Icon, label, value, hint, color]) => {
             const CardIcon = Icon as typeof CalendarDays;
             return (
@@ -167,7 +167,7 @@ export default function WebinaryPage() {
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="rounded-full border border-emerald-400/35 bg-emerald-500/10 px-3 py-1 text-[8px] font-black text-emerald-300">
-                    NAJBLIÅ»SZY WEBINAR
+                    NAJBLIŻSZY WEBINAR
                   </span>
                   <span className="inline-flex items-center gap-1.5 rounded-full border border-rose-400/25 bg-rose-500/10 px-3 py-1 text-[8px] font-black text-rose-300">
                     <span className="h-1.5 w-1.5 rounded-full bg-rose-400" /> LIVE SOON
@@ -180,8 +180,8 @@ export default function WebinaryPage() {
                 </h2>
 
                 <p className="mt-3 max-w-[760px] text-[10px] leading-5 text-slate-300/75">
-                  Kompletny webinar o trendzie, HH/HL, LH/LL, punktach reakcji, biasie oraz wejÅ›ciach
-                  zgodnych ze strukturÄ… rynku. Praktyka na realnych przykÅ‚adach z rynku.
+                  Kompletny webinar o trendzie, HH/HL, LH/LL, punktach reakcji, biasie oraz wejściach
+                  zgodnych ze strukturą rynku. Praktyka na realnych przykładach z rynku.
                 </p>
 
                 <div className="mt-5 flex flex-wrap gap-2">
@@ -192,13 +192,13 @@ export default function WebinaryPage() {
                     <Clock3 className="h-4 w-4 text-sky-300" /> 19:00 CET
                   </span>
                   <span className="inline-flex items-center gap-2 rounded-[9px] border border-slate-700/70 bg-[#06131b] px-3 py-2 text-[9px]">
-                    <Users className="h-4 w-4 text-sky-300" /> Max 500 osÃ³b
+                    <Users className="h-4 w-4 text-sky-300" /> Max 500 osób
                   </span>
                 </div>
 
                 <div className="mt-5 flex flex-wrap gap-2">
                   <button className="inline-flex items-center gap-2 rounded-[10px] border border-emerald-300/30 bg-[linear-gradient(90deg,#0ca45f,#16c773)] px-5 py-3 text-[10px] font-black text-white transition hover:brightness-110">
-                    ZAPISZ SIÄ˜ NA WEBINAR <ArrowRight className="h-4 w-4" />
+                    ZAPISZ SIĘ NA WEBINAR <ArrowRight className="h-4 w-4" />
                   </button>
                   <button className="inline-flex items-center gap-2 rounded-[10px] border border-slate-700 bg-[#071522] px-5 py-3 text-[10px] font-bold text-slate-300">
                     DODAJ DO KALENDARZA <CalendarDays className="h-4 w-4" />
@@ -232,9 +232,9 @@ export default function WebinaryPage() {
               {[
                 "Praktyczna analiza rynku LIVE",
                 "Strategia krok po kroku",
-                "Sesja pytaÅ„ i odpowiedzi",
-                "PrzykÅ‚ady wejÅ›Ä‡ i zarzÄ…dzania",
-                "DostÄ™p do nagrania po webinarze",
+                "Sesja pytań i odpowiedzi",
+                "Przykłady wejść i zarządzania",
+                "Dostęp do nagrania po webinarze",
               ].map((item) => (
                 <div key={item} className="flex items-center gap-3 rounded-[10px] border border-slate-700/60 bg-[#06121e] px-3 py-3">
                   <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-300" />
@@ -249,7 +249,7 @@ export default function WebinaryPage() {
                 <span className="text-[10px] font-black">FX TRADE PRO QUALITY</span>
               </div>
               <p className="mt-2 text-[9px] leading-5 text-slate-400">
-                MateriaÅ‚ edukacyjny przygotowany w spÃ³jnym formacie z platformÄ… FX Trade Professional.
+                Materiał edukacyjny przygotowany w spójnym formacie z platformą FX Trade Professional.
               </p>
             </div>
           </aside>
@@ -260,10 +260,10 @@ export default function WebinaryPage() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="text-[8px] font-black uppercase tracking-[.16em] text-sky-300/70">HARMONOGRAM</div>
-              <h2 className="mt-1 text-[17px] font-black">NADCHODZÄ„CE WEBINARY</h2>
+              <h2 className="mt-1 text-[17px] font-black">NADCHODZĄCE WEBINARY</h2>
             </div>
             <div className="rounded-[9px] border border-slate-700 bg-[#081522] px-3 py-2 text-[8px] font-semibold text-slate-400">
-              SIERPIEÅƒ / WRZESIEÅƒ 2026
+              SIERPIEŃ / WRZESIEŃ 2026
             </div>
           </div>
 
@@ -295,10 +295,10 @@ export default function WebinaryPage() {
                   </div>
                 </div>
 
-                <div className="mt-3 text-[8px] text-slate-500">ProwadzÄ…cy: <span className="font-bold text-slate-300">{w.host}</span></div>
+                <div className="mt-3 text-[8px] text-slate-500">Prowadzący: <span className="font-bold text-slate-300">{w.host}</span></div>
 
                 <button className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-[9px] border border-sky-400/25 bg-sky-500/10 px-3 py-2.5 text-[8px] font-black text-sky-300 transition group-hover:bg-sky-500/15">
-                  {w.status === "NAJBLIÅ»SZY" ? "ZAPISZ SIÄ˜" : "REZERWUJ MIEJSCE"}
+                  {w.status === "NAJBLIŻSZY" ? "ZAPISZ SIĘ" : "REZERWUJ MIEJSCE"}
                   <ArrowRight className="h-3.5 w-3.5" />
                 </button>
               </article>
@@ -315,7 +315,7 @@ export default function WebinaryPage() {
                 <h2 className="mt-1 text-[16px] font-black">OSTATNIE WEBINARY</h2>
               </div>
               <Link href="/sesje/nagrania" className="text-[8px] font-bold text-violet-300">
-                ZOBACZ NAGRANIA â†’
+                ZOBACZ NAGRANIA →
               </Link>
             </div>
 
@@ -349,20 +349,20 @@ export default function WebinaryPage() {
             </div>
 
             <p className="mt-4 text-[9px] leading-5 text-slate-400">
-              KaÅ¼dy webinar jest nastawiony na praktykÄ™: analiza rynku, setup, timing, zarzÄ…dzanie pozycjÄ…
-              i omÃ³wienie najczÄ™stszych bÅ‚Ä™dÃ³w.
+              Każdy webinar jest nastawiony na praktykę: analiza rynku, setup, timing, zarządzanie pozycją
+              i omówienie najczęstszych błędów.
             </p>
 
             <div className="mt-4 grid grid-cols-2 gap-2">
               <div className="rounded-[10px] border border-slate-700/60 bg-[#08131d] p-3">
                 <Zap className="h-5 w-5 text-emerald-300" />
                 <div className="mt-2 text-[9px] font-black">LIVE ANALYSIS</div>
-                <div className="mt-1 text-[7px] text-slate-500">Rynek na Å¼ywo</div>
+                <div className="mt-1 text-[7px] text-slate-500">Rynek na żywo</div>
               </div>
               <div className="rounded-[10px] border border-slate-700/60 bg-[#08131d] p-3">
                 <Radio className="h-5 w-5 text-rose-300" />
                 <div className="mt-2 text-[9px] font-black">Q&A</div>
-                <div className="mt-1 text-[7px] text-slate-500">Pytania na Å¼ywo</div>
+                <div className="mt-1 text-[7px] text-slate-500">Pytania na żywo</div>
               </div>
             </div>
           </div>
@@ -371,9 +371,9 @@ export default function WebinaryPage() {
         {/* FOOTER INFO */}
         <section className="mt-4 grid overflow-hidden rounded-[15px] border border-slate-700/70 bg-[#06111d] md:grid-cols-4">
           {[
-            [Clock3, "CZAS CET", "SprawdÅº godzinÄ™ przed webinarem", "text-sky-300"],
-            [Radio, "WEBINARY LIVE", "Spotkania edukacyjne na Å¼ywo", "text-rose-300"],
-            [Video, "NAGRANIA", "DostÄ™p do wybranych powtÃ³rek", "text-violet-300"],
+            [Clock3, "CZAS CET", "Sprawdź godzinę przed webinarem", "text-sky-300"],
+            [Radio, "WEBINARY LIVE", "Spotkania edukacyjne na żywo", "text-rose-300"],
+            [Video, "NAGRANIA", "Dostęp do wybranych powtórek", "text-violet-300"],
             [Bell, "POWIADOMIENIA", "Nie przegap kolejnego webinaru", "text-orange-300"],
           ].map(([Icon, title, text, color], index) => {
             const InfoIcon = Icon as typeof Clock3;
@@ -396,7 +396,7 @@ export default function WebinaryPage() {
 
         <div className="mt-4 flex items-center justify-center gap-4 py-2 text-[8px] font-semibold uppercase tracking-[.35em] text-slate-500">
           <span className="h-px w-24 bg-sky-500/30" />
-          FX TRADE PROFESSIONAL â€“ WEBINARY LIVE
+          FX TRADE PROFESSIONAL – WEBINARY LIVE
           <span className="h-px w-24 bg-sky-500/30" />
         </div>
       </div>

@@ -1,4 +1,4 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
@@ -28,7 +28,7 @@ export async function POST() {
 
     if (!user) {
       return NextResponse.json(
-        { error: "Nie znaleziono uÅ¼ytkownika" },
+        { error: "Nie znaleziono użytkownika" },
         { status: 404 }
       );
     }
@@ -85,7 +85,7 @@ export async function POST() {
 
     return NextResponse.json(
       {
-        error: "Nie udaÅ‚o siÄ™ rozpoczÄ…Ä‡ onboardingu Stripe Connect",
+        error: "Nie udało się rozpocząć onboardingu Stripe Connect",
         details:
           error instanceof Error
             ? error.message

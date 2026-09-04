@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
 
@@ -27,21 +27,21 @@ export async function POST(req: NextRequest) {
 
     if (!token) {
       return NextResponse.json(
-        { error: "Brak tokenu resetowania hasÅ‚a." },
+        { error: "Brak tokenu resetowania hasła." },
         { status: 400 }
       );
     }
 
     if (!password || !confirmPassword) {
       return NextResponse.json(
-        { error: "Wpisz nowe hasÅ‚o i jego potwierdzenie." },
+        { error: "Wpisz nowe hasło i jego potwierdzenie." },
         { status: 400 }
       );
     }
 
     if (password !== confirmPassword) {
       return NextResponse.json(
-        { error: "HasÅ‚a nie sÄ… identyczne." },
+        { error: "Hasła nie są identyczne." },
         { status: 400 }
       );
     }
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "HasÅ‚o musi mieÄ‡ minimum 8 znakÃ³w, co najmniej jednÄ… cyfrÄ™ i znak specjalny.",
+            "Hasło musi mieć minimum 8 znaków, co najmniej jedną cyfrę i znak specjalny.",
         },
         { status: 400 }
       );
@@ -80,21 +80,21 @@ export async function POST(req: NextRequest) {
 
     if (!resetToken) {
       return NextResponse.json(
-        { error: "Link resetujÄ…cy jest nieprawidÅ‚owy lub wygasÅ‚." },
+        { error: "Link resetujący jest nieprawidłowy lub wygasł." },
         { status: 400 }
       );
     }
 
     if (resetToken.usedAt) {
       return NextResponse.json(
-        { error: "Ten link resetujÄ…cy zostaÅ‚ juÅ¼ wykorzystany." },
+        { error: "Ten link resetujący został już wykorzystany." },
         { status: 400 }
       );
     }
 
     if (resetToken.expiresAt.getTime() < Date.now()) {
       return NextResponse.json(
-        { error: "Link resetujÄ…cy wygasÅ‚. PoproÅ› o nowy link." },
+        { error: "Link resetujący wygasł. Poproś o nowy link." },
         { status: 400 }
       );
     }
@@ -109,7 +109,7 @@ export async function POST(req: NextRequest) {
         data: {
           password: passwordHash,
 
-          // UniewaÅ¼nia wszystkie stare sesje JWT.
+          // Unieważnia wszystkie stare sesje JWT.
           tokenVersion: {
             increment: 1,
           },
@@ -126,7 +126,7 @@ export async function POST(req: NextRequest) {
       }),
     ]);
 
-    // Usuwamy pozostaÅ‚e tokeny resetu dla tego uÅ¼ytkownika.
+    // Usuwamy pozostałe tokeny resetu dla tego użytkownika.
     await prisma.passwordResetToken.deleteMany({
       where: {
         userId: resetToken.userId,
@@ -140,13 +140,13 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: "HasÅ‚o zostaÅ‚o zmienione. MoÅ¼esz siÄ™ teraz zalogowaÄ‡.",
+      message: "Hasło zostało zmienione. Możesz się teraz zalogować.",
     });
   } catch (error) {
     console.error("RESET PASSWORD ERROR:", error);
 
     return NextResponse.json(
-      { error: "Nie udaÅ‚o siÄ™ zmieniÄ‡ hasÅ‚a." },
+      { error: "Nie udało się zmienić hasła." },
       { status: 500 }
     );
   }

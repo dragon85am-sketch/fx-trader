@@ -2500,13 +2500,21 @@ kineticScroll: {
         lbls.push({ key: `${text}-${price}`, y, text, kind, price });
       };
 
+      // ENTRY must stay a narrow reaction band around the entry price.
+      // Some scanner payloads contain a broad zone; rendering it directly can
+      // cover the whole SL->TP area (the large green box visible in the chart).
+      const riskDistance = Math.max(1e-9, Math.abs(activeLevels.entry - activeLevels.sl));
+      const maxEntryHalf = riskDistance * 0.10;
       const entryZone = activeLevels.zones?.find((z) => z.label === "ENTRY");
+      let entryFrom = activeLevels.entry - maxEntryHalf;
+      let entryTo = activeLevels.entry + maxEntryHalf;
       if (entryZone && Number.isFinite(entryZone.from) && Number.isFinite(entryZone.to)) {
-        addBand(entryZone.from, entryZone.to, "ENTRY", "ENTRY");
-      } else {
-        const pad = Math.max(1, Math.abs(activeLevels.entry - activeLevels.sl) * 0.06);
-        addBand(activeLevels.entry - pad, activeLevels.entry + pad, "ENTRY", "ENTRY-FB");
+        const rawHalf = Math.abs(entryZone.to - entryZone.from) / 2;
+        const safeHalf = Math.min(Math.max(rawHalf, riskDistance * 0.025), maxEntryHalf);
+        entryFrom = activeLevels.entry - safeHalf;
+        entryTo = activeLevels.entry + safeHalf;
       }
+      addBand(entryFrom, entryTo, "ENTRY", "ENTRY");
 
       if (Number.isFinite(activeLevels.sl) && Number.isFinite(activeLevels.entry)) {
         addBand(activeLevels.sl, activeLevels.entry, "SL", "SL");
@@ -3537,11 +3545,9 @@ kineticScroll: {
             Drawing tools re-enable the drawing overlay.
           */}
           <div
-            className={`absolute inset-0 z-[20] ${
-              activeDrawTool === "SELECT" ? "pointer-events-none" : "pointer-events-auto"
-            }`}
+            className="absolute inset-0 z-[20] pointer-events-auto"
             style={{
-              cursor: activeDrawTool === "SELECT" ? undefined : "crosshair",
+              cursor: activeDrawTool === "SELECT" ? "default" : "crosshair",
             }}
           >
             <DrawingsLayer

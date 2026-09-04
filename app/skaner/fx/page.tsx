@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import type { DrawTool } from "@/components/DrawingsLayer";
 import React from "react";
@@ -3590,13 +3590,16 @@ if (closedNow.length) {
   
 
   return (
-    <main className="min-h-[100dvh] w-full max-w-full space-y-3 overflow-x-hidden bg-[radial-gradient(circle_at_top,#0d3d72_0%,#082b52_34%,#061a33_70%,#041325_100%)] px-2 py-2 text-sky-50 sm:space-y-4 sm:px-3 sm:py-3 xl:px-4 xl:py-4">
+    <main
+      className="min-h-[100dvh] w-full max-w-full space-y-3 overflow-x-hidden bg-[#041325] bg-cover bg-center bg-fixed bg-no-repeat px-2 py-2 text-sky-50 sm:space-y-4 sm:px-3 sm:py-3 xl:px-4 xl:py-4"
+      style={{
+        backgroundImage:
+          "linear-gradient(rgba(2, 14, 34, 0.48), rgba(2, 18, 42, 0.58)), url('/images/fx-scanner-bg.png')",
+      }}
+    >
       <div className="flex flex-wrap items-center justify-between gap-1.5 sm:gap-2">
         <div>
           <h1 className="text-lg font-extrabold tracking-tight text-white drop-shadow-[0_0_16px_rgba(56,189,248,.20)] sm:text-xl md:text-2xl xl:text-3xl">Skaner rynku</h1>
-          <p className="mt-0.5 max-w-[760px] text-[9px] leading-3.5 text-sky-100/55 sm:mt-1 sm:text-xs xl:mt-2 xl:text-sm">
-            Live: <span className="font-semibold">{source}</span> • Liquidity ≥ 70% + 4 potwierdzenia: Trend + SuperTrend + Sweep + Momentum
-          </p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -3837,19 +3840,6 @@ if (closedNow.length) {
                         {t}
                       </button>
                     ))}
-
-                    <button
-                      type="button"
-                      onClick={() => setToolsPanelOpen((v) => !v)}
-                      className={cn(
-                        "shrink-0 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[10px] font-semibold transition sm:ml-1 sm:gap-2 sm:px-3 sm:py-1 sm:text-sm",
-                        toolsPanelOpen
-                          ? "border-cyan-300/45 bg-[linear-gradient(135deg,#0ea5e9_0%,#2563eb_100%)] text-white shadow-[0_0_18px_rgba(14,165,233,.22)]"
-                          : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/75 hover:border-sky-300/30 hover:bg-[#12477f] hover:text-white"
-                      )}
-                    >
-                      TOOLS
-                    </button>
 
                     <button
                       type="button"

@@ -1,4 +1,4 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
@@ -17,14 +17,14 @@ export async function DELETE(req: Request) {
 
     if (!password || !confirmation) {
       return NextResponse.json(
-        { error: "HasÅ‚o i potwierdzenie sÄ… wymagane" },
+        { error: "Hasło i potwierdzenie są wymagane" },
         { status: 400 }
       );
     }
 
     if (confirmation !== "DELETE") {
       return NextResponse.json(
-        { error: 'Aby usunÄ…Ä‡ konto, wpisz dokÅ‚adnie: DELETE' },
+        { error: 'Aby usunąć konto, wpisz dokładnie: DELETE' },
         { status: 400 }
       );
     }
@@ -39,7 +39,7 @@ export async function DELETE(req: Request) {
 
     if (!user || !user.password) {
       return NextResponse.json(
-        { error: "Nie znaleziono uÅ¼ytkownika" },
+        { error: "Nie znaleziono użytkownika" },
         { status: 404 }
       );
     }
@@ -48,7 +48,7 @@ export async function DELETE(req: Request) {
 
     if (!passwordOk) {
       return NextResponse.json(
-        { error: "NieprawidÅ‚owe hasÅ‚o" },
+        { error: "Nieprawidłowe hasło" },
         { status: 400 }
       );
     }
@@ -59,7 +59,7 @@ export async function DELETE(req: Request) {
 
     const response = NextResponse.json({
       ok: true,
-      message: "Konto zostaÅ‚o usuniÄ™te",
+      message: "Konto zostało usunięte",
     });
 
     response.cookies.set("token", "", {
@@ -74,7 +74,7 @@ export async function DELETE(req: Request) {
   } catch (error) {
     console.error("DELETE /api/settings/delete-account error:", error);
     return NextResponse.json(
-      { error: "BÅ‚Ä…d serwera" },
+      { error: "Błąd serwera" },
       { status: 500 }
     );
   }

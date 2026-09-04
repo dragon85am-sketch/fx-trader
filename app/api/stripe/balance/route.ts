@@ -1,4 +1,4 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { requireAdmin } from "@/lib/auth";
 
@@ -30,7 +30,7 @@ export async function GET() {
 
     return NextResponse.json(
       {
-        error: "Nie udaÅ‚o siÄ™ pobraÄ‡ salda Stripe",
+        error: "Nie udało się pobrać salda Stripe",
         details: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 }

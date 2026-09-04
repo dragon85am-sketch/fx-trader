@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 const REF_COOKIE_NAME = "fx_ref";
+const CAMPAIGN_COOKIE_NAME = "fx_campaign";
 
 type RouteContext = {
   params: Promise<{
@@ -51,6 +52,15 @@ await prisma.dashboardStat.upsert({
   },
 });
 
+
+  const campaignSlug = req.nextUrl.searchParams.get("c")?.trim();
+  if (campaignSlug) {
+    const campaign = await prisma.affiliateCampaign.findFirst({ where: { userId: referrer.id, slug: campaignSlug }, select: { id: true } });
+    if (campaign) {
+      await prisma.affiliateCampaign.update({ where: { id: campaign.id }, data: { clicks: { increment: 1 } } });
+      response.cookies.set(CAMPAIGN_COOKIE_NAME, campaign.id, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 60 * 60 * 24 * 30 });
+    }
+  }
 
   response.cookies.set(REF_COOKIE_NAME, referrer.id, {
     httpOnly: true,

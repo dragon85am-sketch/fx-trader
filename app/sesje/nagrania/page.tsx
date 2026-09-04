@@ -1,14 +1,14 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { ArrowLeft, Clock3, Filter, Play, Search, Video } from "lucide-react";
 
 const recordings = [
-  { title: "Live Trading â€“ Scalping EURUSD", date: "14 maja 2026", duration: "01:35:42", category: "FOREX", tone: "emerald" },
-  { title: "GOLD Session Live â€“ New York", date: "13 maja 2026", duration: "01:18:16", category: "GOLD", tone: "amber" },
-  { title: "Analiza Rynku â€“ Week Ahead", date: "12 maja 2026", duration: "01:12:08", category: "ANALIZA", tone: "sky" },
-  { title: "DJ30 Session Live â€“ US Open", date: "9 maja 2026", duration: "01:26:51", category: "DJ30", tone: "blue" },
-  { title: "ZarzÄ…dzanie Ryzykiem â€“ Masterclass", date: "7 maja 2026", duration: "01:28:33", category: "EDUKACJA", tone: "violet" },
+  { title: "Live Trading – Scalping EURUSD", date: "14 maja 2026", duration: "01:35:42", category: "FOREX", tone: "emerald" },
+  { title: "GOLD Session Live – New York", date: "13 maja 2026", duration: "01:18:16", category: "GOLD", tone: "amber" },
+  { title: "Analiza Rynku – Week Ahead", date: "12 maja 2026", duration: "01:12:08", category: "ANALIZA", tone: "sky" },
+  { title: "DJ30 Session Live – US Open", date: "9 maja 2026", duration: "01:26:51", category: "DJ30", tone: "blue" },
+  { title: "Zarządzanie Ryzykiem – Masterclass", date: "7 maja 2026", duration: "01:28:33", category: "EDUKACJA", tone: "violet" },
   { title: "BTC Weekend Session", date: "4 maja 2026", duration: "01:44:09", category: "BTC", tone: "orange" },
 ];
 
@@ -37,12 +37,12 @@ export default function NagraniaSesjiPage() {
               <div>
                 <div className="text-[9px] font-bold uppercase tracking-[.22em] text-violet-300/70">FX TRADE PROFESSIONAL</div>
                 <h1 className="mt-1 text-3xl font-black">NAGRANIA <span className="text-violet-300">SESJI</span></h1>
-                <p className="mt-1 text-[11px] text-slate-400">Wszystkie nagrania sesji live, analiz i materiaÅ‚Ã³w edukacyjnych w jednym miejscu.</p>
+                <p className="mt-1 text-[11px] text-slate-400">Wszystkie nagrania sesji live, analiz i materiałów edukacyjnych w jednym miejscu.</p>
               </div>
             </div>
             <div className="flex gap-2">
               <div className="rounded-xl border border-slate-700 bg-[#07131f] px-4 py-3 text-center"><div className="text-xl font-black">24</div><div className="text-[8px] text-slate-500">NAGRANIA</div></div>
-              <div className="rounded-xl border border-slate-700 bg-[#07131f] px-4 py-3 text-center"><div className="text-xl font-black">31h+</div><div className="text-[8px] text-slate-500">MATERIAÅU</div></div>
+              <div className="rounded-xl border border-slate-700 bg-[#07131f] px-4 py-3 text-center"><div className="text-xl font-black">31h+</div><div className="text-[8px] text-slate-500">MATERIAŁU</div></div>
             </div>
           </div>
         </header>
@@ -61,7 +61,7 @@ export default function NagraniaSesjiPage() {
                 <span className={`absolute left-4 top-4 rounded-md border px-2 py-1 text-[8px] font-black ${toneMap[item.tone]}`}>{item.category}</span>
                 <span className="absolute bottom-3 right-3 rounded-md bg-black/70 px-2 py-1 text-[9px] font-bold">{item.duration}</span>
               </div>
-              <div className="p-4"><h2 className="text-[14px] font-bold">{item.title}</h2><div className="mt-3 flex items-center justify-between text-[9px] text-slate-500"><span>{item.date}</span><span className="inline-flex items-center gap-1"><Clock3 className="h-3.5 w-3.5" /> {item.duration}</span></div><button className="mt-4 w-full rounded-[10px] border border-violet-400/30 bg-violet-500/10 px-4 py-2.5 text-[10px] font-black text-violet-300 transition hover:bg-violet-500/20">ODTWÃ“RZ NAGRANIE</button></div>
+              <div className="p-4"><h2 className="text-[14px] font-bold">{item.title}</h2><div className="mt-3 flex items-center justify-between text-[9px] text-slate-500"><span>{item.date}</span><span className="inline-flex items-center gap-1"><Clock3 className="h-3.5 w-3.5" /> {item.duration}</span></div><button className="mt-4 w-full rounded-[10px] border border-violet-400/30 bg-violet-500/10 px-4 py-2.5 text-[10px] font-black text-violet-300 transition hover:bg-violet-500/20">ODTWÓRZ NAGRANIE</button></div>
             </article>
           ))}
         </section>

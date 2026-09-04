@@ -1,5 +1,6 @@
-﻿"use client";
+"use client";
 
+import { scopedStorageKey } from "@/lib/userScopedStorage";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -56,7 +57,7 @@ const modules: Module[] = [
   { id: 10, title: "Zarządzanie pozycją", icon: PieChart },
   { id: 11, title: "Psychologia tradingu", icon: Brain },
   { id: 12, title: "Rutyna tradera", icon: ClipboardCheck },
-  { id: 13, title: "Trading journal", icon: NotebookPen },
+  { id: 13, title: "Dziennik tradingowy", icon: NotebookPen },
   { id: 14, title: "Case study", icon: Search },
   { id: 15, title: "System tradingowy", icon: Settings },
   { id: 16, title: "Statystyka tradingowa", icon: BarChart3 },
@@ -116,13 +117,13 @@ export default function KursPage() {
   const [passedCount, setPassedCount] = useState(0);
 
   useEffect(() => {
-    const lastModule = localStorage.getItem("lastOpenedModule");
+    const lastModule = localStorage.getItem(scopedStorageKey("lastOpenedModule"));
     if (lastModule !== null) {
       setContinueHref(`/education/kurs/${lastModule}`);
     }
 
     const passedQuizzes = JSON.parse(
-      localStorage.getItem("passedQuizzes") || "{}"
+      localStorage.getItem(scopedStorageKey("passedQuizzes")) || "{}"
     ) as Record<string, boolean>;
 
     const passedModules = Object.keys(passedQuizzes).length;
@@ -135,12 +136,12 @@ export default function KursPage() {
     setProgress(progressPercent);
 
     const today = new Date().toDateString();
-    const lastStudyDay = localStorage.getItem("lastStudyDay");
-    const savedStreak = Number(localStorage.getItem("studyStreak") || "1");
+    const lastStudyDay = localStorage.getItem(scopedStorageKey("lastStudyDay"));
+    const savedStreak = Number(localStorage.getItem(scopedStorageKey("studyStreak")) || "1");
 
     if (lastStudyDay !== today) {
-      localStorage.setItem("lastStudyDay", today);
-      localStorage.setItem("studyStreak", String(savedStreak + 1));
+      localStorage.setItem(scopedStorageKey("lastStudyDay"), today);
+      localStorage.setItem(scopedStorageKey("studyStreak"), String(savedStreak + 1));
       setStreak(savedStreak + 1);
     } else {
       setStreak(savedStreak);
@@ -178,13 +179,13 @@ export default function KursPage() {
 
                 <div>
                   <div className="text-[9px] font-semibold uppercase tracking-[.18em] text-sky-200/55">
-                    FX TRADE / EDUCATION / ACADEMY
+                    FX TRADE / EDUKACJA / ACADEMY
                   </div>
                   <h1 className="mt-1 text-[30px] font-semibold tracking-tight">
-                    FX Trade Academy
+                    Akademia FX Trade
                   </h1>
                   <p className="mt-1 text-[11px] text-sky-100/50">
-                    Professional Trading Program
+                    Profesjonalny program tradingowy
                   </p>
 
                   <div className="mt-4 flex flex-wrap gap-2">

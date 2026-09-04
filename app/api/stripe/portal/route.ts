@@ -1,4 +1,4 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
@@ -7,7 +7,7 @@ const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const appUrl = process.env.NEXT_PUBLIC_APP_URL;
 
 if (!stripeSecretKey) {
-  throw new Error("Brak STRIPE_SECRET_KEY w zmiennych Å›rodowiskowych");
+  throw new Error("Brak STRIPE_SECRET_KEY w zmiennych środowiskowych");
 }
 
 const stripe = new Stripe(stripeSecretKey, {
@@ -41,7 +41,7 @@ export async function POST() {
 
     if (!user) {
       return NextResponse.json(
-        { error: "Nie znaleziono uÅ¼ytkownika" },
+        { error: "Nie znaleziono użytkownika" },
         { status: 404 }
       );
     }
@@ -69,7 +69,7 @@ export async function POST() {
 
     return NextResponse.json(
       {
-        error: "Nie udaÅ‚o siÄ™ otworzyÄ‡ zarzÄ…dzania subskrypcjÄ…",
+        error: "Nie udało się otworzyć zarządzania subskrypcją",
       },
       { status: 500 }
     );

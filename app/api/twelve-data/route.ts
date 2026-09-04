@@ -1,4 +1,4 @@
-﻿import {
+import {
   NextRequest,
   NextResponse,
 } from "next/server";
@@ -29,8 +29,8 @@ const ALLOWED_SYMBOLS = new Set([
   "USD/JPY",
 
   // Index
-  // Zostawiamy, chociaÅ¼ na Twoim obecnym
-  // planie DJI moÅ¼e byÄ‡ niedostÄ™pne.
+  // Zostawiamy, chociaż na Twoim obecnym
+  // planie DJI może być niedostępne.
   "DJI",
 
   // Crypto
@@ -55,12 +55,12 @@ type CacheEntry = {
 // GLOBAL CACHE
 // ======================================================
 
-// W development cache przeÅ¼yje kolejne requesty
-// dopÃ³ki proces Next.js dziaÅ‚a.
+// W development cache przeżyje kolejne requesty
+// dopóki proces Next.js działa.
 //
-// W produkcji / serverless instancja moÅ¼e zostaÄ‡
-// zrestartowana, wiÄ™c traktujemy to jako cache
-// optymalizacyjny, a nie trwaÅ‚Ä… bazÄ™ danych.
+// W produkcji / serverless instancja może zostać
+// zrestartowana, więc traktujemy to jako cache
+// optymalizacyjny, a nie trwałą bazę danych.
 
 const globalForTwelve =
   globalThis as typeof globalThis & {
@@ -152,7 +152,7 @@ function cleanExpiredCache() {
   }
 
   // dodatkowe zabezpieczenie,
-  // Å¼eby mapa nie rosÅ‚a w nieskoÅ„czonoÅ›Ä‡
+  // żeby mapa nie rosła w nieskończoność
   if (
     twelveDataCache.size > 200
   ) {
@@ -251,8 +251,8 @@ export async function GET(
         20,
       ),
 
-      // MoÅ¼esz pÃ³Åºniej zwiÄ™kszyÄ‡,
-      // jeÅ›li TwÃ³j plan pozwala.
+      // Możesz później zwiększyć,
+      // jeśli Twój plan pozwala.
       5000,
     );
 
@@ -281,7 +281,7 @@ export async function GET(
         status: "error",
 
         message:
-          `NieobsÅ‚ugiwany instrument: ${symbol}`,
+          `Nieobsługiwany instrument: ${symbol}`,
       },
       {
         status: 400,
@@ -299,7 +299,7 @@ export async function GET(
         status: "error",
 
         message:
-          `NieobsÅ‚ugiwany timeframe: ${interval}`,
+          `Nieobsługiwany timeframe: ${interval}`,
       },
       {
         status: 400,
@@ -403,7 +403,7 @@ export async function GET(
           message:
             error instanceof Error
               ? error.message
-              : "BÅ‚Ä…d Twelve Data",
+              : "Błąd Twelve Data",
         },
         {
           status: 500,
@@ -498,7 +498,7 @@ export async function GET(
           JSON.parse(raw);
       } catch {
         throw new Error(
-          "Twelve Data zwrÃ³ciÅ‚o nieprawidÅ‚owy JSON.",
+          "Twelve Data zwróciło nieprawidłowy JSON.",
         );
       }
 
@@ -587,7 +587,7 @@ export async function GET(
         message:
           error instanceof Error
             ? error.message
-            : "Nie udaÅ‚o siÄ™ poÅ‚Ä…czyÄ‡ z Twelve Data.",
+            : "Nie udało się połączyć z Twelve Data.",
       },
       {
         status: 500,

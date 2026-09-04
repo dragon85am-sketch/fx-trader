@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React from "react";
 import {
@@ -234,11 +234,11 @@ export default function HarmonicChart({
       <div className="flex items-center justify-between border-b border-[#0d579e] bg-[#061426] px-4 py-3">
         <div>
           <h2 className="text-[13px] font-bold text-white">
-            {symbol} Â· {tf}
-            {pattern ? ` Â· ${pattern.name} ${pattern.direction}` : ""}
+            {symbol} · {tf}
+            {pattern ? ` · ${pattern.name} ${pattern.direction}` : ""}
           </h2>
           <p className="mt-1 text-[8px] text-slate-500">
-            Candlestick chart Â· X-A-B-C-D zakotwiczone do czasu i ceny Å›wiec
+            Candlestick chart · X-A-B-C-D zakotwiczone do czasu i ceny świec
           </p>
         </div>
         {pattern ? (

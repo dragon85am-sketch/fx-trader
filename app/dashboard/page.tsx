@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requirePremiumUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import BillingPortalButton from "@/components/BillingPortalButton";
-import type { ComponentType, ReactNode } from "react";
+import type { ComponentType } from "react";
 import {
   Activity,
   ArrowUpRight,
@@ -11,18 +11,16 @@ import {
   BookOpen,
   BrainCircuit,
   CalendarDays,
-  Camera,
   CandlestickChart,
   GraduationCap,
-  PanelsTopLeft,
   PieChart,
   Radio,
   ScanSearch,
-  Search,
   Settings,
   ShoppingCart,
   TrendingUp,
   UserRound,
+  UsersRound,
   WalletCards,
 } from "lucide-react";
 
@@ -34,7 +32,7 @@ type DashboardCard = {
   title: string;
   description: string;
   href: string;
-  badge?: string;
+  badge?: "LIVE" | "PRO" | "NEW";
   stat?: string;
   icon: ComponentType<{ className?: string }>;
 };
@@ -59,12 +57,13 @@ const cards: DashboardCard[] = [
     title: "Profit Calendar",
     description: "Kalendarz wyników i podsumowań tradingu.",
     href: "/trading-room?tab=calendar",
+    badge: "NEW",
     stat: "MIESIĘCZNY VIEW",
     icon: CalendarDays,
   },
   {
     title: "Skaner rynku",
-    description: "FX Scanner, Harmonic Scanner i PRO FX Scanner Alpha Scanner.",
+    description: "FX Scanner, Harmonic Scanner, PRO FX Scanner i Alpha Scanner.",
     href: "/skaner",
     badge: "PRO",
     stat: "4 SKANERY",
@@ -82,8 +81,8 @@ const cards: DashboardCard[] = [
     description: "Panel partnera, kampanie, prowizje i wypłaty.",
     href: "/dashboard/affiliate",
     badge: "NEW",
-    stat: "385 AVG",
-    icon: WalletCards,
+    stat: "365 AVG",
+    icon: UsersRound,
   },
   {
     title: "Education",
@@ -109,29 +108,6 @@ const cards: DashboardCard[] = [
   },
 ];
 
-function TopIcon({
-  children,
-  badge,
-}: {
-  children: ReactNode;
-  badge?: string;
-}) {
-  return (
-    <button
-      type="button"
-      className="relative flex h-10 w-10 items-center justify-center rounded-[10px] border border-[#0d4e91] bg-[#1478bd] text-sky-100 shadow-[0_10px_28px_rgba(2,18,38,.20),0_0_20px_rgba(56,189,248,.24),0_0_38px_rgba(14,165,233,.12),inset_0_1px_0_rgba(255,255,255,.16)] transition hover:border-sky-300/70 hover:bg-[#1b8bd2]"
-    >
-      {children}
-
-      {badge ? (
-        <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#1689ff] px-1 text-[8px] font-bold text-white">
-          {badge}
-        </span>
-      ) : null}
-    </button>
-  );
-}
-
 function StatusCard({
   label,
   value,
@@ -144,22 +120,28 @@ function StatusCard({
   accent?: boolean;
 }) {
   return (
-    <div className="flex h-[60px] min-w-0 items-center justify-between rounded-[12px] border border-[#0d579e] bg-[linear-gradient(145deg,#2087c8_0%,#176fae_52%,#105b93_100%)] px-4 shadow-[0_8px_24px_rgba(2,18,38,.18),0_0_20px_rgba(34,211,238,.16),inset_0_1px_0_rgba(255,255,255,.12)]">
-      <div className="min-w-0">
-        <div className="text-[9px] font-semibold uppercase tracking-[.12em] text-sky-100/50">
-          {label}
-        </div>
-        <div
-          className={cn(
-            "mt-1 truncate text-[13px] font-semibold",
-            accent ? "text-emerald-300" : "text-white"
-          )}
-        >
-          {value}
+    <div className="group relative overflow-hidden rounded-[18px] border border-cyan-300/35 bg-[linear-gradient(145deg,rgba(10,84,137,.94),rgba(7,56,102,.96))] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,.04),0_12px_30px_rgba(0,0,0,.22)]">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_0%_0%,rgba(34,211,238,.08),transparent_42%)]" />
+      <div className="relative z-10 flex items-center gap-3">
+        {Icon ? (
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-cyan-300/45 bg-cyan-400/[0.06] text-cyan-300 shadow-[0_0_18px_rgba(34,211,238,.08)]">
+            <Icon className="h-5 w-5" />
+          </div>
+        ) : null}
+        <div className="min-w-0">
+          <div className="text-[9px] font-bold uppercase tracking-[.18em] text-sky-200/45">
+            {label}
+          </div>
+          <div
+            className={cn(
+              "mt-1 truncate text-[14px] font-semibold",
+              accent ? "text-emerald-300" : "text-white"
+            )}
+          >
+            {value}
+          </div>
         </div>
       </div>
-
-      {Icon ? <Icon className="h-5 w-5 shrink-0 text-sky-400/80" /> : null}
     </div>
   );
 }
@@ -176,22 +158,30 @@ function KpiCard({
   positive?: boolean;
 }) {
   return (
-    <div className="relative min-h-[74px] overflow-hidden rounded-[12px] border border-[#0d579e] bg-[linear-gradient(145deg,#228dce_0%,#1875b3_52%,#115f98_100%)] px-3 py-3 shadow-[0_8px_24px_rgba(2,18,38,.18),0_0_20px_rgba(34,211,238,.16),inset_0_1px_0_rgba(255,255,255,.12)] sm:px-5 sm:py-4">
-      <div className="text-[9px] font-semibold uppercase tracking-[.12em] text-sky-100/45">
-        {label}
+    <div className="relative min-h-[88px] overflow-hidden rounded-[18px] border border-cyan-300/35 bg-[linear-gradient(145deg,rgba(10,84,137,.96),rgba(7,56,102,.98))] px-5 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,.04),0_12px_30px_rgba(0,0,0,.22)]">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_100%_0%,rgba(37,99,235,.14),transparent_45%)]" />
+      <div className="relative z-10 flex items-center gap-4">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-cyan-300/45 bg-cyan-400/[0.06] text-cyan-300">
+          <Icon className="h-5 w-5" />
+        </div>
+        <div>
+          <div className="text-[9px] font-bold uppercase tracking-[.18em] text-sky-200/45">
+            {label}
+          </div>
+          <div
+            className={cn(
+              "mt-1 text-[20px] font-bold",
+              positive ? "text-emerald-300" : "text-white"
+            )}
+          >
+            {value}
+          </div>
+        </div>
       </div>
-
-      <div
-        className={cn(
-          "mt-1 text-[18px] font-semibold",
-          positive ? "text-emerald-300" : "text-white"
-        )}
-      >
-        {value}
-      </div>
-
-      <div className="absolute bottom-2 right-4 rounded-lg bg-sky-500/[0.05] p-1.5">
-        <Icon className="h-7 w-7 text-sky-400/80" />
+      <div className="pointer-events-none absolute bottom-2 right-4 flex items-end gap-1 opacity-50">
+        {[10, 16, 12, 24, 18, 32].map((h, i) => (
+          <span key={i} className="w-[2px] rounded-full bg-cyan-300" style={{ height: h }} />
+        ))}
       </div>
     </div>
   );
@@ -208,20 +198,16 @@ function ModuleCard({
   return (
     <Link
       href={href}
-      className="group relative flex min-h-[148px] flex-col overflow-hidden rounded-[14px] border border-[#0d579e] bg-[linear-gradient(145deg,#2491d1_0%,#1979b8_55%,#105b93_100%)] p-4 shadow-[0_14px_34px_rgba(2,18,38,.22),0_0_18px_rgba(34,211,238,.22),0_0_38px_rgba(14,165,233,.13),inset_0_1px_0_rgba(255,255,255,.16)] transition-all duration-200 hover:border-cyan-300/75 hover:shadow-[0_16px_38px_rgba(2,18,38,.24),0_0_28px_rgba(34,211,238,.34),0_0_52px_rgba(14,165,233,.20),inset_0_1px_0_rgba(255,255,255,.20)] sm:min-h-[154px] sm:p-[18px]"
+      className="group relative flex min-h-[170px] flex-col overflow-hidden rounded-[20px] border border-cyan-300/35 bg-[linear-gradient(145deg,rgba(10,88,145,.96),rgba(6,48,91,.98))] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,.04),0_14px_34px_rgba(0,0,0,.24)] transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-200/80 hover:shadow-[0_0_30px_rgba(34,211,238,.10),0_18px_40px_rgba(0,0,0,.28)]"
     >
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_0%_0%,rgba(56,189,248,.06),transparent_38%)]" />
-
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_0%_0%,rgba(34,211,238,.07),transparent_40%)] opacity-80" />
       <div className="relative z-10 flex h-full flex-col">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-[10px] border border-[#0d579e] bg-[#208bd0] text-cyan-300 shadow-[inset_0_1px_0_rgba(255,255,255,.04)]">
-              <Icon className="h-5 w-5" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-[14px] border border-cyan-300/45 bg-[linear-gradient(180deg,rgba(14,165,233,.34),rgba(6,182,212,.16))] text-cyan-300 shadow-[0_0_20px_rgba(34,211,238,.09)]">
+              <Icon className="h-6 w-6" />
             </div>
-
-            <h3 className="text-[16px] font-semibold text-slate-100">
-              {title}
-            </h3>
+            <h3 className="text-[17px] font-semibold text-white">{title}</h3>
           </div>
 
           {badge ? (
@@ -229,30 +215,29 @@ function ModuleCard({
               className={cn(
                 "rounded-full border px-2.5 py-1 text-[9px] font-bold tracking-[.08em]",
                 badge === "LIVE" &&
-                  "border-emerald-500/30 bg-emerald-500/15 text-emerald-300",
+                  "border-emerald-400/25 bg-emerald-500/10 text-emerald-300",
                 badge === "PRO" &&
-                  "border-sky-500/35 bg-sky-500/15 text-sky-300",
+                  "border-cyan-300/45 bg-cyan-500/10 text-cyan-300",
                 badge === "NEW" &&
-                  "border-violet-500/35 bg-violet-500/15 text-violet-300"
+                  "border-violet-400/25 bg-violet-500/10 text-violet-300"
               )}
             >
-              {badge}
+              {badge === "NEW" ? "NOWOŚĆ" : badge}
             </span>
           ) : null}
         </div>
 
-        <p className="mt-4 max-w-[94%] text-[12px] leading-5 text-sky-100/55">
+        <p className="mt-4 max-w-[92%] text-[12px] leading-5 text-sky-100/55">
           {description}
         </p>
 
         <div className="mt-auto flex items-center justify-between pt-5">
-          <span className="text-[9px] font-semibold uppercase tracking-[.17em] text-sky-200/45">
+          <span className="text-[9px] font-semibold uppercase tracking-[.18em] text-sky-200/45">
             {stat}
           </span>
-
-          <span className="inline-flex items-center gap-1 rounded-full border border-[#0d579e] bg-[#156ca9] px-3 py-1.5 text-[10px] font-medium text-sky-50/90 transition group-hover:border-sky-400/50 group-hover:bg-[#1b88ca]">
+          <span className="inline-flex items-center gap-1.5 rounded-[10px] border border-cyan-300/45 bg-cyan-400/[0.04] px-3 py-2 text-[10px] font-semibold text-white transition group-hover:border-cyan-200/80 group-hover:bg-cyan-400/[0.08]">
             Otwórz
-            <ArrowUpRight className="h-3 w-3" />
+            <ArrowUpRight className="h-3.5 w-3.5" />
           </span>
         </div>
       </div>
@@ -315,174 +300,92 @@ export default async function DashboardPage() {
   const roleLabel = userRole === "admin" ? "Administrator" : "Premium Member";
 
   return (
-    <section className="relative isolate min-h-[100dvh] w-full max-w-full overflow-x-hidden bg-[#020817] text-white">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed inset-0 z-0 bg-cover bg-center bg-no-repeat"
-        style={{
-          backgroundImage:
-            "linear-gradient(rgba(2,8,23,.42), rgba(2,8,23,.68)), url('/dashboard-clean-bg.png')",
-        }}
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed inset-0 z-[1] bg-[radial-gradient(circle_at_50%_8%,rgba(34,211,238,.14),transparent_46%)]"
-      />
-      <div className="relative z-10">
-      {/* TOPBAR 1:1 */}
-      <div className="border-b border-[#0a417b] bg-[#115d91] px-3 py-3 sm:px-4 sm:py-4 xl:px-5">
-        <div className="flex min-w-0 items-center justify-between gap-2 sm:gap-5">
-          <div>
-            <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[.16em] text-sky-100/65">
-              <span>FX TRADE</span>
-              <span className="text-sky-500/70">›</span>
-              <span>DASHBOARD</span>
-            </div>
+    <section className="relative isolate min-h-screen overflow-hidden rounded-[24px] bg-[#03162d] text-white">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_52%_0%,rgba(34,211,238,.20),transparent_40%),linear-gradient(180deg,#0b4f82_0%,#073864_46%,#05284c_100%)]" />
+      <div className="pointer-events-none absolute inset-0 opacity-[.13] [background-image:linear-gradient(rgba(103,232,249,.16)_1px,transparent_1px),linear-gradient(90deg,rgba(103,232,249,.16)_1px,transparent_1px)] [background-size:54px_54px]" />
 
-            <div className="mt-1 flex min-w-0 items-center gap-2 sm:gap-3">
-              <h1 className="truncate text-[18px] font-semibold tracking-tight text-white sm:text-[22px]">
-                Premium Panel
-              </h1>
-
-              <span className="rounded-full border border-sky-400/40 bg-sky-500/10 px-2.5 py-1 text-[9px] font-bold tracking-[.12em] text-cyan-300">
-                PRO
-              </span>
-            </div>
-          </div>
-
-          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-            <div className="hidden lg:block">
-              <TopIcon>
-                <Search className="h-5 w-5" />
-              </TopIcon>
-            </div>
-
-            <div className="hidden xl:block">
-              <TopIcon>
-                <Camera className="h-5 w-5" />
-              </TopIcon>
-            </div>
-
-            <div className="hidden xl:block">
-              <TopIcon>
-                <PanelsTopLeft className="h-5 w-5" />
-              </TopIcon>
-            </div>
-
-            <TopIcon badge="12">
-              <Bell className="h-5 w-5" />
-            </TopIcon>
-
-            <div className="hidden sm:block">
-              <TopIcon>
-                <Settings className="h-5 w-5" />
-              </TopIcon>
-            </div>
-
-            <div className="ml-1 flex items-center gap-1 sm:ml-2 sm:gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full border border-sky-400/50 bg-[#075ecb] text-xs font-semibold text-white sm:h-11 sm:w-11 sm:text-sm">
-                {userInitials}
+      <div className="relative z-10 space-y-4 p-3 sm:p-4 xl:p-5">
+        {/* CLEAN HEADER - profil jest tylko w głównym topbarze */}
+        <div className="rounded-[22px] border border-cyan-300/45 bg-[linear-gradient(135deg,rgba(12,98,158,.96),rgba(7,61,111,.98))] px-5 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,.04),0_14px_40px_rgba(0,0,0,.24)]">
+          <div className="flex items-center">
+            <div className="flex min-w-0 items-center gap-4">
+              <div className="hidden h-[62px] w-[118px] shrink-0 items-center justify-center border-r border-cyan-300/15 pr-4 md:flex">
+                <img
+                  src="/fx-trade-panel-logo.png"
+                  alt="FX Trade"
+                  className="max-h-[58px] max-w-[102px] object-contain mix-blend-lighten"
+                />
               </div>
-
-              <div className="hidden sm:block">
-                <div className="max-w-[140px] truncate text-[13px] font-semibold text-white">
-                  {userName}
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-[.22em] text-sky-300/70">
+                  FX TRADE • DASHBOARD
                 </div>
-                <div className="text-[10px] text-sky-100/55">
-                  {roleLabel}
+                <div className="mt-1 flex items-center gap-3">
+                  <h1 className="text-[24px] font-bold tracking-tight text-white md:text-[28px]">
+                    Premium Panel
+                  </h1>
+                  <span className="rounded-full border border-cyan-200/55 bg-cyan-400/[0.08] px-2.5 py-1 text-[9px] font-bold tracking-[.12em] text-cyan-300">
+                    PRO
+                  </span>
                 </div>
               </div>
-
-              <span className="text-sky-100/55">⌄</span>
             </div>
           </div>
         </div>
-      </div>
 
-      <div className="space-y-3 px-2 pb-4 pt-2 sm:px-4 sm:pb-5 sm:pt-3 xl:px-5">
         {/* STATUS */}
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 2xl:grid-cols-[1.65fr_repeat(4,.72fr)_1.15fr]">
-          <div className="col-span-2 flex h-[60px] min-w-0 items-center justify-between rounded-[12px] border border-[#0d579e] bg-[linear-gradient(145deg,#2087c8_0%,#176fae_52%,#105b93_100%)] px-3 sm:px-5 md:col-span-1">
-            <div>
-              <div className="text-[10px] text-sky-100/55">
-                Zalogowany użytkownik
-              </div>
-              <div className="mt-1 text-[12px] text-sky-100/70">
-                {userName}
-              </div>
-            </div>
-
-            <UserRound className="h-5 w-5 text-sky-300/80" />
-          </div>
-
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+          <StatusCard label="UŻYTKOWNIK" value={userName} icon={UserRound} />
           <StatusCard label="SYSTEM" value="Online" accent icon={Activity} />
-          <StatusCard label="SIGNALS" value="3 Active" icon={TrendingUp} />
-          <StatusCard label="SALDO" value="4,280€" accent icon={WalletCards} />
+          <StatusCard label="SYGNAŁY" value="3 Active" icon={TrendingUp} />
+          <StatusCard label="SALDO" value="4,280€" icon={WalletCards} />
           <StatusCard label="ALERTY" value="12" icon={Bell} />
-
-          <div className="col-span-2 flex h-[60px] min-w-0 items-center justify-between rounded-[12px] border border-[#0d579e] bg-[linear-gradient(145deg,#2087c8_0%,#176fae_52%,#105b93_100%)] px-3 sm:px-4 md:col-span-1">
+          <div className="relative overflow-hidden rounded-[18px] border border-cyan-300/35 bg-[linear-gradient(145deg,rgba(10,84,137,.94),rgba(7,56,102,.96))] px-4 py-3">
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full border border-sky-500/30 bg-[#1b82c4] text-xs font-semibold text-sky-100">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-blue-400/25 bg-cyan-500/20 text-xs font-bold text-white">
                 {userInitials}
               </div>
-
               <div className="min-w-0">
-                <div className="max-w-[150px] truncate text-[12px] font-semibold text-white">
-                  {userName}
-                </div>
-                <div className="max-w-[150px] truncate text-[9px] text-sky-100/50">
-                  {userEmail || roleLabel}
-                </div>
+                <div className="truncate text-[12px] font-semibold text-white">{userName}</div>
+                <div className="truncate text-[9px] text-sky-100/45">{userEmail || roleLabel}</div>
               </div>
             </div>
-
-            <span className="text-sky-200/45">⌄</span>
           </div>
         </div>
 
         {/* HERO */}
-        <div className="relative min-h-[176px] overflow-hidden rounded-[14px] border border-[#0c78c6] bg-[linear-gradient(118deg,#2695d5_0%,#1a7dbb_52%,#115f98_100%)] px-3 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,.035)] sm:px-5 sm:py-5">
-          <div className="pointer-events-none absolute left-[40%] top-0 h-full w-[38%] opacity-[.16] [background-image:radial-gradient(circle,#38bdf8_1px,transparent_1px)] [background-size:7px_7px] [mask-image:radial-gradient(ellipse_at_center,black_0%,transparent_73%)]" />
-
-          <div className="relative z-10 flex h-full min-w-0 flex-col justify-between gap-5 xl:flex-row xl:items-start">
-            <div>
-              <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-[11px] border border-[#0f66b7] bg-[#2089ca] font-bold text-white">
-                  FX
+        <div className="relative overflow-hidden rounded-[22px] border border-cyan-200/55 bg-[linear-gradient(118deg,rgba(12,111,176,.96),rgba(8,77,134,.97)_54%,rgba(6,56,106,.98))] p-5 shadow-[0_0_34px_rgba(34,211,238,.16),inset_0_1px_0_rgba(255,255,255,.08)] md:p-6">
+          <div className="pointer-events-none absolute left-[34%] top-0 h-full w-[45%] opacity-[.14] [background-image:radial-gradient(circle,#38bdf8_1px,transparent_1px)] [background-size:7px_7px] [mask-image:radial-gradient(ellipse_at_center,black_0%,transparent_76%)]" />
+          <div className="relative z-10 flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
+            <div className="max-w-[680px]">
+              <div className="flex items-center gap-4">
+                <div className="h-16 w-16 overflow-hidden rounded-[18px] border border-cyan-300/70 shadow-[0_0_24px_rgba(34,211,238,.32)] md:h-[72px] md:w-[72px]">
+                  <img
+                    src="/dashboard-icon.png"
+                    alt="FX Trade Dashboard"
+                    className="h-full w-full object-cover"
+                  />
                 </div>
-
                 <div>
-                  <div className="text-[9px] font-semibold uppercase tracking-[.18em] text-sky-200/60">
-                    FX TRADE
-                  </div>
-
-                  <div className="text-[22px] font-semibold text-white">
-                    Dashboard
-                  </div>
+                  <div className="text-[10px] font-bold uppercase tracking-[.22em] text-sky-300/65">FX TRADE</div>
+                  <div className="mt-1 text-[26px] font-bold text-white md:text-[32px]">Dashboard</div>
                 </div>
               </div>
-
-              <p className="mt-4 max-w-[570px] text-[12px] leading-5 text-sky-100/62">
-                Główny panel Twojej aplikacji. Szybki dostęp do trading room,
-                skanerów, strategii, afiliacji i materiałów edukacyjnych w jednym
-                miejscu.
+              <p className="mt-4 max-w-[620px] text-[12px] leading-6 text-sky-100/58 md:text-[13px]">
+                Główny panel Twojej aplikacji. Szybki dostęp do trading room, skanerów,
+                strategii, edukacji i materiałów w jednym miejscu.
               </p>
-
-              <div className="mt-4">
+              <div className="mt-5">
                 <BillingPortalButton />
               </div>
             </div>
 
-            <div className="grid w-full grid-cols-2 gap-2 sm:gap-3 sm:grid-cols-4 xl:w-auto">
-              <StatusCard label="ACCOUNT" value="Premium" />
-              <StatusCard label="SIGNALS" value="3 Active" accent />
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <StatusCard label="KONTO" value="Premium" />
+              <StatusCard label="SYGNAŁY" value="3 Active" accent />
+              <StatusCard label="AFFILIATE" value={`${affiliateTotal}€`} />
               <StatusCard
-                label="AFFILIATE"
-                value={`${affiliateTotal}€`}
-                accent
-              />
-              <StatusCard
-                label="THIS WEEK"
+                label="TEN TYDZIEŃ"
                 value={`${monthlyPnl >= 0 ? "+" : ""}${monthlyPnl}€`}
                 accent={monthlyPnl >= 0}
               />
@@ -491,8 +394,8 @@ export default async function DashboardPage() {
         </div>
 
         {/* KPI */}
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <KpiCard label="KLIKNIĘCIA" value={String(clicks)} icon={TrendingUp} />
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <KpiCard label="KLIENCI" value={String(clicks)} icon={UsersRound} />
           <KpiCard label="SPRZEDAŻE" value={String(sales)} icon={ShoppingCart} />
           <KpiCard label="KONWERSJA" value={`${conversion}%`} icon={PieChart} />
           <KpiCard
@@ -503,13 +406,12 @@ export default async function DashboardPage() {
           />
         </div>
 
-        {/* MODULES 3x3 */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {/* MODULES */}
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {cards.map((card) => (
             <ModuleCard key={card.title} {...card} />
           ))}
         </div>
-      </div>
       </div>
     </section>
   );

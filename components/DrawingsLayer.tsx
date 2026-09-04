@@ -98,6 +98,7 @@ timeframe,
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
 
 const [objs, setObjs] = React.useState<AnyObj[]>([]);
+  const storageReadyRef = React.useRef(false);
 
   const [draft, setDraft] = React.useState<Point | null>(null);
   const [preview, setPreview] = React.useState<Point | null>(null);
@@ -116,14 +117,15 @@ const [fiboLevels, setFiboLevels] =
   }
 });
 React.useEffect(() => {
+  storageReadyRef.current = false;
   try {
     const key = getStorageKey(symbol, timeframe);
-
     const raw = localStorage.getItem(key);
-
     setObjs(raw ? JSON.parse(raw) : []);
   } catch {
     setObjs([]);
+  } finally {
+    requestAnimationFrame(() => { storageReadyRef.current = true; });
   }
 }, [symbol, timeframe]);
   React.useEffect(() => {
@@ -163,13 +165,10 @@ React.useEffect(() => {
   });
 
   React.useEffect(() => {
+  if (!storageReadyRef.current) return;
   try {
     const key = getStorageKey(symbol, timeframe);
-
-    localStorage.setItem(
-      key,
-      JSON.stringify(objs)
-    );
+    localStorage.setItem(key, JSON.stringify(objs));
   } catch {}
 }, [objs, symbol, timeframe]);
 
@@ -478,13 +477,34 @@ if (o.type === "FIBO") {
 }
 
         if (selected) {
+          ctx.save();
+          ctx.strokeStyle = "#60a5fa";
           ctx.fillStyle = "#60a5fa";
+          ctx.lineWidth = 3;
+          ctx.setLineDash([6, 4]);
 
-          [a, b].forEach((pt) => {
-            ctx.beginPath();
-            ctx.arc(pt.x, pt.y, 5, 0, Math.PI * 2);
-            ctx.fill();
-          });
+          if (o.type === "RECT") {
+            const left = Math.min(a.x, b.x);
+            const right = Math.max(a.x, b.x);
+            const top = Math.min(a.y, b.y);
+            const bottom = Math.max(a.y, b.y);
+            ctx.strokeRect(left - 2, top - 2, right - left + 4, bottom - top + 4);
+            ctx.setLineDash([]);
+            [
+              { x: left, y: top }, { x: right, y: top },
+              { x: left, y: bottom }, { x: right, y: bottom },
+            ].forEach((pt) => {
+              ctx.fillRect(pt.x - 5, pt.y - 5, 10, 10);
+            });
+          } else {
+            ctx.setLineDash([]);
+            [a, b].forEach((pt) => {
+              ctx.beginPath();
+              ctx.arc(pt.x, pt.y, 5, 0, Math.PI * 2);
+              ctx.fill();
+            });
+          }
+          ctx.restore();
         }
       }
 

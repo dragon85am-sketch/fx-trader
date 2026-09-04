@@ -1,4 +1,4 @@
-﻿import { prisma } from "../../../lib/prisma";
+import { prisma } from "../../../lib/prisma";
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
@@ -27,14 +27,14 @@ export async function POST(req: Request) {
 
     if (!email || !password) {
       return Response.json(
-        { error: "Email i hasÅ‚o sÄ… wymagane" },
+        { error: "Email i hasło są wymagane" },
         { status: 400 }
       );
     }
 
     if (password.length < 8) {
       return Response.json(
-        { error: "HasÅ‚o musi mieÄ‡ minimum 8 znakÃ³w" },
+        { error: "Hasło musi mieć minimum 8 znaków" },
         { status: 400 }
       );
     }
@@ -43,7 +43,7 @@ export async function POST(req: Request) {
       console.error("Brak JWT_SECRET");
 
       return Response.json(
-        { error: "BÅ‚Ä…d konfiguracji serwera" },
+        { error: "Błąd konfiguracji serwera" },
         { status: 500 }
       );
     }
@@ -59,7 +59,7 @@ export async function POST(req: Request) {
 
     if (existingUser) {
       return Response.json(
-        { error: "UÅ¼ytkownik juÅ¼ istnieje" },
+        { error: "Użytkownik już istnieje" },
         { status: 409 }
       );
     }
@@ -72,6 +72,7 @@ export async function POST(req: Request) {
       cookieStore.get(REF_COOKIE_NAME)?.value?.trim();
 
     let referredByUserId: string | undefined;
+    let referredByCampaignId: string | undefined;
 
     if (referralCode) {
       const referrer = await prisma.user.findUnique({
@@ -85,12 +86,17 @@ export async function POST(req: Request) {
 
       if (referrer) {
         referredByUserId = referrer.id;
+        const campaignId = cookieStore.get("fx_campaign")?.value?.trim();
+        if (campaignId) {
+          const campaign = await prisma.affiliateCampaign.findFirst({ where: { id: campaignId, userId: referrer.id }, select: { id: true } });
+          if (campaign) referredByCampaignId = campaign.id;
+        }
       }
     }
 
     /*
-     * Nowy uÅ¼ytkownik powstaje bez Premium.
-     * DostÄ™p zostanie aktywowany dopiero przez Stripe webhook.
+     * Nowy użytkownik powstaje bez Premium.
+     * Dostęp zostanie aktywowany dopiero przez Stripe webhook.
      */
     const user = await prisma.user.create({
       data: {
@@ -98,6 +104,7 @@ export async function POST(req: Request) {
         name: name || null,
         password: hashedPassword,
         referredByUserId,
+        referredByCampaignId,
 
         isPremium: false,
       },
@@ -115,7 +122,7 @@ export async function POST(req: Request) {
 
     /*
      * Automatyczne logowanie po rejestracji.
-     * DziÄ™ki temu /api/stripe/checkout moÅ¼e od razu uÅ¼yÄ‡ requireAuth().
+     * Dzięki temu /api/stripe/checkout może od razu użyć requireAuth().
      */
     const token = jwt.sign(
       {
@@ -138,7 +145,7 @@ export async function POST(req: Request) {
     });
 
     /*
-     * Referral cookie nie jest juÅ¼ potrzebne po utworzeniu konta.
+     * Referral cookie nie jest już potrzebne po utworzeniu konta.
      */
     cookieStore.delete(REF_COOKIE_NAME);
 
@@ -156,7 +163,7 @@ export async function POST(req: Request) {
         },
 
         /*
-         * RegisterPage moÅ¼e po sukcesie przejÅ›Ä‡ bezpoÅ›rednio tutaj.
+         * RegisterPage może po sukcesie przejść bezpośrednio tutaj.
          */
         redirectTo: "/checkout",
       },
@@ -169,7 +176,7 @@ export async function POST(req: Request) {
 
     return Response.json(
       {
-        error: "BÅ‚Ä…d serwera",
+        error: "Błąd serwera",
       },
       {
         status: 500,

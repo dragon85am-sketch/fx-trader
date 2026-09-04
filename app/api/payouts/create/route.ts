@@ -1,4 +1,4 @@
-﻿import { cookies } from "next/headers";
+import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
@@ -24,7 +24,7 @@ export async function POST() {
 
     if (!stat || stat.availablePayout <= 0) {
       return NextResponse.json(
-        { error: "Brak Å›rodkÃ³w do wypÅ‚aty" },
+        { error: "Brak środków do wypłaty" },
         { status: 400 }
       );
     }
@@ -50,7 +50,7 @@ export async function POST() {
   } catch (e) {
     console.error("PAYOUT ERROR:", e);
     return NextResponse.json(
-      { error: "BÅ‚Ä…d serwera" },
+      { error: "Błąd serwera" },
       { status: 500 }
     );
   }

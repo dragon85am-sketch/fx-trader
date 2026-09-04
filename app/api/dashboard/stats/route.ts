@@ -1,4 +1,4 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
 import { prisma } from "@/lib/prisma";
@@ -31,6 +31,6 @@ export async function GET() {
     });
   } catch (error) {
     console.error(error);
-    return NextResponse.json({ error: "BÅ‚Ä…d serwera" }, { status: 500 });
+    return NextResponse.json({ error: "Błąd serwera" }, { status: 500 });
   }
 }

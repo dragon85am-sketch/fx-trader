@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import Image from "next/image";
@@ -22,6 +22,7 @@ import {
 const bonusCards = [
   {
     title: "Checklisty PDF",
+    href: "/education/bonusy/checklisty",
     description:
       "Gotowe checklisty do analizy rynku, wejść i zarządzania pozycją.",
     meta1: "6 plików",
@@ -32,7 +33,8 @@ const bonusCards = [
     icon: FileText,
   },
   {
-    title: "Przykłady trade",
+    title: "Przykłady transakcji",
+    href: "/education/bonusy/przyklady",
     description:
       "Rzeczywiste przykłady trade z opisem wejść, exita i zarządzania.",
     meta1: "8 materiałów",
@@ -43,18 +45,20 @@ const bonusCards = [
     icon: TrendingUp,
   },
   {
-    title: "Case studies",
+    title: "Analizy przypadków",
+    href: "/education/bonusy/case-studies",
     description:
       "Szczegółowe analizy przypadków i strategii w praktyce.",
     meta1: "5 materiałów",
     meta2: "2h 40m",
-    tag: "CASE STUDIES",
+    tag: "ANALIZY PRZYPADKÓW",
     accent: "violet",
     image: "/bonus-case-studies.png",
     icon: BarChart3,
   },
   {
     title: "Typowe błędy traderów",
+    href: "/education/bonusy/bledy",
     description:
       "Najczęstsze błędy oraz sposoby jak ich unikać i poprawiać wyniki.",
     meta1: "5 materiałów",
@@ -67,29 +71,32 @@ const bonusCards = [
 ];
 
 const popular = [
-  ["Checklista: Plan Tradingowy", "PDF • 12 stron", "892"],
-  ["Checklista: Zarządzanie Ryzykiem", "PDF • 8 stron", "756"],
-  ["Przykład trade: EURUSD Scalping", "PDF • 15 stron", "645"],
+  ["Checklista: Plan Tradingowy", "PDF • 12 stron", "892", "/education/bonusy/popularne/plan-tradingowy"],
+  ["Checklista: Zarządzanie Ryzykiem", "PDF • 8 stron", "756", "/education/bonusy/popularne/zarzadzanie-ryzykiem"],
+  ["Przykład transakcji: EURUSD Scalping", "PDF • 15 stron", "645", "/education/bonusy/popularne/eurusd-scalping"],
 ];
 
 const premium = [
   {
     icon: BookOpen,
-    title: "E-Book: Psychologia Tradingu",
+    title: "E-book: Psychologia Tradingu",
     desc: "Kompletny przewodnik po psychologii tradingu i dyscyplinie.",
     accent: "amber",
+    href: "/education/bonusy/premium/psychologia-tradingu",
   },
   {
     icon: PlaySquare,
-    title: "Kurs Video: Price Action Mastery",
+    title: "Kurs wideo: Mistrzostwo Price Action",
     desc: "Kompletny kurs video o Price Action od podstaw do zaawansowanych.",
     accent: "violet",
+    href: "/education/bonusy/premium/price-action-mastery",
   },
   {
     icon: Table2,
     title: "Szablony Excel",
     desc: "Gotowe szablony do dziennika tradingowego, analizy i zarządzania kapitałem.",
     accent: "emerald",
+    href: "/education/bonusy/premium/szablony-excel",
   },
 ];
 
@@ -159,7 +166,7 @@ export default function BonusyPage() {
 
               <div>
                 <div className="text-[9px] font-semibold uppercase tracking-[.18em] text-sky-200/55">
-                  FX TRADE / EDUCATION / BONUS
+                  FX TRADE / EDUKACJA / BONUSY
                 </div>
                 <h1 className="mt-1 text-[28px] font-semibold tracking-tight">
                   Materiały bonusowe
@@ -175,7 +182,7 @@ export default function BonusyPage() {
               className="inline-flex items-center justify-center gap-2 rounded-[9px] border border-[#1784cf] bg-[#0a3f73] px-4 py-2.5 text-[10px] font-semibold text-sky-100/75 transition hover:bg-[#1263a5] hover:text-white"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
-              Education
+              Edukacja
             </Link>
           </div>
         </section>
@@ -208,7 +215,7 @@ export default function BonusyPage() {
           })}
         </section>
 
-        {/* BONUS CARDS */}
+        {/* BONUSY CARDS */}
         <section className="grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
           {bonusCards.map((card) => {
             const a = accentClasses(card.accent);
@@ -265,13 +272,13 @@ export default function BonusyPage() {
                     </div>
                   </div>
 
-                  <button
-                    type="button"
+                  <Link
+                    href={card.href}
                     className={`mt-4 inline-flex w-full items-center justify-center gap-2 rounded-[9px] border ${a.border} bg-[#0a3f73] px-4 py-2.5 text-[10px] font-bold ${a.text} transition hover:bg-[#1263a5]`}
                   >
                     Otwórz materiały
                     <ArrowRight className="h-3.5 w-3.5" />
-                  </button>
+                  </Link>
                 </div>
               </article>
             );
@@ -287,8 +294,12 @@ export default function BonusyPage() {
             </div>
 
             <div className="mt-4 divide-y divide-[#1573b5]">
-              {popular.map(([title, desc, downloads], index) => (
-                <div key={title} className="flex items-center gap-3 py-3">
+              {popular.map(([title, desc, downloads, href], index) => (
+                <Link
+                  key={title}
+                  href={href}
+                  className="flex items-center gap-3 py-3 transition hover:bg-sky-400/5"
+                >
                   <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-sky-400/40 bg-sky-500/10 text-[10px] font-bold text-sky-300">
                     {index + 1}
                   </div>
@@ -303,14 +314,17 @@ export default function BonusyPage() {
                     <Download className="h-3.5 w-3.5 text-sky-300" />
                     {downloads}
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
 
-            <button className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-[9px] border border-[#1784cf] bg-[#0a3f73] px-4 py-2.5 text-[10px] font-semibold text-sky-300 transition hover:bg-[#1263a5]">
+            <Link
+              href="/education/bonusy/popularne"
+              className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-[9px] border border-[#1784cf] bg-[#0a3f73] px-4 py-2.5 text-[10px] font-semibold text-sky-300 transition hover:bg-[#1263a5]"
+            >
               Zobacz wszystkie
               <ArrowRight className="h-3.5 w-3.5" />
-            </button>
+            </Link>
           </div>
 
           <div className="rounded-[14px] border border-[#1784cf] bg-[linear-gradient(145deg,#105d9d_0%,#0b477e_55%,#073866_100%)] shadow-[0_0_24px_rgba(14,165,233,.12),inset_0_1px_0_rgba(255,255,255,.055)] p-5">
@@ -324,7 +338,11 @@ export default function BonusyPage() {
                 const a = accentClasses(item.accent);
                 const Icon = item.icon;
                 return (
-                  <div key={item.title} className="flex items-center gap-3 py-3">
+                  <Link
+                    key={item.title}
+                    href={item.href}
+                    className="flex items-center gap-3 py-3 transition hover:bg-sky-400/5"
+                  >
                     <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] border ${a.border} ${a.bg} ${a.text}`}>
                       <Icon className="h-4 w-4" />
                     </div>
@@ -337,15 +355,18 @@ export default function BonusyPage() {
                     <span className={`rounded-full border ${a.border} ${a.bg} px-2.5 py-1 text-[8px] font-bold ${a.text}`}>
                       PREMIUM
                     </span>
-                  </div>
+                  </Link>
                 );
               })}
             </div>
 
-            <button className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-[9px] border border-[#1784cf] bg-[#0a3f73] px-4 py-2.5 text-[10px] font-semibold text-sky-300 transition hover:bg-[#1263a5]">
+            <Link
+              href="/education/bonusy/premium"
+              className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-[9px] border border-[#1784cf] bg-[#0a3f73] px-4 py-2.5 text-[10px] font-semibold text-sky-300 transition hover:bg-[#1263a5]"
+            >
               Zobacz wszystkie premium
               <ArrowRight className="h-3.5 w-3.5" />
-            </button>
+            </Link>
           </div>
         </section>
       </div>

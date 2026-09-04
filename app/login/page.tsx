@@ -1,7 +1,8 @@
-﻿"use client";
+"use client";
 
 import { useState } from "react";
 import Link from "next/link";
+import { setCurrentStorageUser } from "@/lib/userScopedStorage";
 import {
   ArrowLeft,
   Eye,
@@ -62,6 +63,7 @@ export default function LoginPage() {
         return;
       }
 
+      if (data?.user?.id) setCurrentStorageUser(data.user.id);
       window.location.replace("/dashboard");
     } catch (err) {
       setError(

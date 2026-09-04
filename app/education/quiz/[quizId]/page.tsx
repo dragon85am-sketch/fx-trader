@@ -1,5 +1,6 @@
 "use client";
 
+import { scopedStorageKey } from "@/lib/userScopedStorage";
 import { use, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -107,40 +108,25 @@ export default function QuizPage({
     if (!score.passed) return;
 
     const passedQuizzes = JSON.parse(
-      localStorage.getItem("passedQuizzes") || "{}"
+      localStorage.getItem(scopedStorageKey("passedQuizzes")) || "{}"
     );
 
     passedQuizzes[quizId] = true;
 
-    localStorage.setItem(
-      "passedQuizzes",
-      JSON.stringify(passedQuizzes)
-    );
+    localStorage.setItem(scopedStorageKey("passedQuizzes"), JSON.stringify(passedQuizzes));
 
-    localStorage.setItem(
-      `module-${currentModule}-activeLesson`,
-      "0"
-    );
+    localStorage.setItem(scopedStorageKey(`module-${currentModule}-activeLesson`), "0");
 
     if (hasNextModule) {
-      localStorage.setItem(
-        "lastOpenedModule",
-        String(nextModule)
-      );
+      localStorage.setItem(scopedStorageKey("lastOpenedModule"), String(nextModule));
 
-      localStorage.setItem(
-        `module-${nextModule}-activeLesson`,
-        "0"
-      );
+      localStorage.setItem(scopedStorageKey(`module-${nextModule}-activeLesson`), "0");
 
       setTimeout(() => {
         router.push(`/education/kurs/${nextModule}`);
       }, 800);
     } else {
-      localStorage.setItem(
-        "lastOpenedModule",
-        String(currentModule)
-      );
+      localStorage.setItem(scopedStorageKey("lastOpenedModule"), String(currentModule));
 
       setTimeout(() => {
         router.push("/education/kurs/koniec");

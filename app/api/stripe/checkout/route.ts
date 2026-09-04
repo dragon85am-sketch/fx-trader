@@ -1,4 +1,4 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { requireAuth } from "@/lib/auth";
 
@@ -6,7 +6,7 @@ const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const appUrl = process.env.NEXT_PUBLIC_APP_URL;
 
 if (!stripeSecretKey) {
-  throw new Error("Brak STRIPE_SECRET_KEY w zmiennych Å›rodowiskowych");
+  throw new Error("Brak STRIPE_SECRET_KEY w zmiennych środowiskowych");
 }
 
 const stripe = new Stripe(stripeSecretKey);
@@ -55,7 +55,7 @@ export async function POST() {
             product_data: {
               name: "FX Trade Professional Trading",
               description:
-                "MiesiÄ™czny dostÄ™p Premium do platformy FX TRADE",
+                "Miesięczny dostęp Premium do platformy FX TRADE",
             },
           },
         },
@@ -80,7 +80,7 @@ export async function POST() {
     if (!session.url) {
       return NextResponse.json(
         {
-          error: "Stripe nie zwrÃ³ciÅ‚ adresu checkout",
+          error: "Stripe nie zwrócił adresu checkout",
         },
         {
           status: 500,
@@ -99,7 +99,7 @@ export async function POST() {
         error:
           error instanceof Error
             ? error.message
-            : "Nie udaÅ‚o siÄ™ utworzyÄ‡ checkout",
+            : "Nie udało się utworzyć checkout",
       },
       {
         status: 500,

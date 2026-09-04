@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React from "react";
 import Link from "next/link";
@@ -486,7 +486,7 @@ export default function SesjePage() {
               </div>
 
               <Link
-                href="/sesje/dolacz"
+                href="/sesje/live"
                 className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-[9px] border border-cyan-300/30 bg-[linear-gradient(90deg,#0798c6,#078fd8)] px-4 py-3 text-[11px] font-black text-white shadow-[0_0_20px_rgba(34,211,238,.16)] hover:brightness-110"
               >
                 <Radio className="h-4 w-4" />

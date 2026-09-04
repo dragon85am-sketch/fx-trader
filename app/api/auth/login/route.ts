@@ -1,4 +1,4 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -13,7 +13,7 @@ export async function POST(req: Request) {
 
     if (!user || !user.password) {
       return NextResponse.json(
-        { error: "NieprawidÅ‚owy email lub hasÅ‚o" },
+        { error: "Nieprawidłowy email lub hasło" },
         { status: 401 }
       );
     }
@@ -22,7 +22,7 @@ export async function POST(req: Request) {
 
     if (!isValid) {
       return NextResponse.json(
-        { error: "NieprawidÅ‚owy email lub hasÅ‚o" },
+        { error: "Nieprawidłowy email lub hasło" },
         { status: 401 }
       );
     }
@@ -48,7 +48,7 @@ export async function POST(req: Request) {
   } catch (error) {
     console.error("Login error:", error);
     return NextResponse.json(
-      { error: "BÅ‚Ä…d logowania" },
+      { error: "Błąd logowania" },
       { status: 500 }
     );
   }

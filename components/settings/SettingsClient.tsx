@@ -39,6 +39,7 @@ export default function SettingsClient() {
   // =====================================================
 
   const [name, setName] = React.useState("");
+  const [email, setEmail] = React.useState("");
   const [role, setRole] = React.useState("USER");
   const [loadingProfile, setLoadingProfile] =
     React.useState(false);
@@ -158,6 +159,7 @@ export default function SettingsClient() {
         }
 
         setName(user.name || "");
+        setEmail(user.email || "");
 
         setRole(
           (user.role || "user").toUpperCase()
@@ -251,6 +253,7 @@ export default function SettingsClient() {
 
           body: JSON.stringify({
             name,
+            email,
             theme,
             language,
           }),
@@ -792,6 +795,24 @@ export default function SettingsClient() {
                       e.target.value
                     )
                   }
+                  className="mt-2 w-full rounded-[9px] border border-sky-400/25 bg-[#062b52] px-3 py-3 text-[11px] text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/10"
+                />
+
+              </div>
+
+
+
+              <div className="mt-4">
+
+                <label className="text-[9px] font-semibold uppercase tracking-[.12em] text-sky-100/45">
+                  Email
+                </label>
+
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  autoComplete="email"
                   className="mt-2 w-full rounded-[9px] border border-sky-400/25 bg-[#062b52] px-3 py-3 text-[11px] text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/10"
                 />
 
