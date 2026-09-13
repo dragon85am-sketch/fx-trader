@@ -11,28 +11,31 @@ type MacroLanguage = "pl" | "en" | "de" | "nl" | "es";
 const MACRO_I18N: Record<MacroLanguage, Record<string, string>> = {
   pl: {
     nextNfp: "Najbliższy NFP", followingNfp: "Kolejny NFP", nextCpi: "Najbliższy CPI", followingCpi: "Kolejny CPI",
+    upcomingNfpDates: "Nadchodzące terminy NFP", upcomingCpiDates: "Nadchodzące terminy CPI", nextReleaseBadge: "NAJBLIŻSZY", officialScheduleLabel: "Oficjalny harmonogram BLS",
     forecast: "Prognoza", previous: "Poprzedni", impact: "Wpływ", actual: "Aktualny", date: "Data", time: "Czas", event: "Wydarzenie",
     consensusForecast: "Prognoza konsensusu", previousRelease: "Poprzedni odczyt", macroData: "Dane z kalendarza makro",
     nfpCalendar: "Kalendarz NFP", cpiCalendar: "Kalendarz CPI",
-    nfpSchedule: "{macroT.nfpSchedule}", cpiSchedule: "Oficjalny harmonogram publikacji CPI (BLS)",
-    loadingNfp: "{macroT.loadingNfp}", loadingCpi: "{macroT.loadingCpi}",
-    noNfp: "{macroT.noNfp}", noCpi: "{macroT.noCpi}",
+    nfpSchedule: "Oficjalny harmonogram publikacji Employment Situation (BLS)", cpiSchedule: "Oficjalny harmonogram publikacji CPI (BLS)",
+    loadingNfp: "Ładowanie danych NFP…", loadingCpi: "Ładowanie danych CPI…",
+    noNfp: "Brak danych NFP od aktywnego dostawcy dla wybranego roku.", noCpi: "Brak danych CPI od aktywnego dostawcy dla wybranego roku.",
     selectedEvent: "Wybrane wydarzenie", aiNfp: "Analiza NFP", affectedMarkets: "Rynki pod wpływem",
     aiNfpText: "NFP zwykle powoduje silną zmienność na parach z USD, złocie, US30 i NAS100. Unikaj nowych transakcji 15 minut przed publikacją i poczekaj na zamknięcie pierwszej świecy.",
   },
   en: {
     nextNfp: "Next NFP", followingNfp: "Following NFP", nextCpi: "Next CPI", followingCpi: "Following CPI",
+    upcomingNfpDates: "Upcoming NFP releases", upcomingCpiDates: "Upcoming CPI releases", nextReleaseBadge: "NEXT", officialScheduleLabel: "Official BLS schedule",
     forecast: "Forecast", previous: "Previous", impact: "Impact", actual: "Actual", date: "Date", time: "Time", event: "Event",
     consensusForecast: "Consensus forecast", previousRelease: "Previous release", macroData: "Macro calendar data",
     nfpCalendar: "NFP Calendar", cpiCalendar: "CPI Calendar",
     nfpSchedule: "Official Employment Situation release schedule (BLS)", cpiSchedule: "Official CPI release schedule (BLS)",
     loadingNfp: "Loading NFP data…", loadingCpi: "Loading CPI data…",
     noNfp: "No NFP data from the active provider for the selected year.", noCpi: "No CPI data from the active provider for the selected year.",
-    selectedEvent: "{macroT.selectedEvent}", aiNfp: "NFP Analysis", affectedMarkets: "Affected Markets",
+    selectedEvent: "Wybrane wydarzenie", aiNfp: "NFP Analysis", affectedMarkets: "Affected Markets",
     aiNfpText: "NFP usually creates strong volatility on USD pairs, Gold, US30 and NAS100. Avoid new trades 15 minutes before release and wait for the first candle close.",
   },
   de: {
     nextNfp: "Nächster NFP", followingNfp: "Darauffolgender NFP", nextCpi: "Nächster CPI", followingCpi: "Darauffolgender CPI",
+    upcomingNfpDates: "Kommende NFP-Termine", upcomingCpiDates: "Kommende CPI-Termine", nextReleaseBadge: "NÄCHSTER", officialScheduleLabel: "Offizieller BLS-Kalender",
     forecast: "Prognose", previous: "Vorheriger Wert", impact: "Auswirkung", actual: "Aktuell", date: "Datum", time: "Zeit", event: "Ereignis",
     consensusForecast: "Konsensprognose", previousRelease: "Vorherige Veröffentlichung", macroData: "Makrokalenderdaten",
     nfpCalendar: "NFP-Kalender", cpiCalendar: "CPI-Kalender",
@@ -44,6 +47,7 @@ const MACRO_I18N: Record<MacroLanguage, Record<string, string>> = {
   },
   nl: {
     nextNfp: "Volgende NFP", followingNfp: "Daaropvolgende NFP", nextCpi: "Volgende CPI", followingCpi: "Daaropvolgende CPI",
+    upcomingNfpDates: "Komende NFP-publicaties", upcomingCpiDates: "Komende CPI-publicaties", nextReleaseBadge: "VOLGENDE", officialScheduleLabel: "Officiële BLS-kalender",
     forecast: "Prognose", previous: "Vorige", impact: "Impact", actual: "Actueel", date: "Datum", time: "Tijd", event: "Gebeurtenis",
     consensusForecast: "Consensusprognose", previousRelease: "Vorige publicatie", macroData: "Macro-agendagegevens",
     nfpCalendar: "NFP-kalender", cpiCalendar: "CPI-kalender",
@@ -55,6 +59,7 @@ const MACRO_I18N: Record<MacroLanguage, Record<string, string>> = {
   },
   es: {
     nextNfp: "Próximo NFP", followingNfp: "Siguiente NFP", nextCpi: "Próximo CPI", followingCpi: "Siguiente CPI",
+    upcomingNfpDates: "Próximas publicaciones NFP", upcomingCpiDates: "Próximas publicaciones CPI", nextReleaseBadge: "PRÓXIMO", officialScheduleLabel: "Calendario oficial BLS",
     forecast: "Previsión", previous: "Anterior", impact: "Impacto", actual: "Actual", date: "Fecha", time: "Hora", event: "Evento",
     consensusForecast: "Previsión de consenso", previousRelease: "Publicación anterior", macroData: "Datos del calendario macro",
     nfpCalendar: "Calendario NFP", cpiCalendar: "Calendario CPI",
@@ -944,8 +949,10 @@ const nfpMergedEvents = mergeScheduleWithProvider(nfpOfficialEvents, nfpDynamicE
 const cpiMergedEvents = mergeScheduleWithProvider(cpiOfficialEvents, cpiDynamicEvents);
 const nfpRows = nfpMergedEvents.map((event) => macroEventToRow(event, macroLang));
 const cpiRows = cpiMergedEvents.map((event) => macroEventToRow(event, macroLang));
-const [nextNfpCalendarEvent, followingNfpCalendarEvent] = getUpcomingOfficialEvents("nfp", selectedNfpYear, 2);
-const [nextCpiCalendarEvent, followingCpiCalendarEvent] = getUpcomingOfficialEvents("cpi", selectedCpiYear, 2);
+const upcomingNfpSchedule = getUpcomingOfficialEvents("nfp", selectedNfpYear, 12);
+const upcomingCpiSchedule = getUpcomingOfficialEvents("cpi", selectedCpiYear, 12);
+const [nextNfpCalendarEvent, followingNfpCalendarEvent] = upcomingNfpSchedule;
+const [nextCpiCalendarEvent, followingCpiCalendarEvent] = upcomingCpiSchedule;
 const nfpProviderForNext = nfpDynamicEvents.find((event) => event?.date === nextNfpCalendarEvent?.date);
 const cpiProviderForNext = cpiDynamicEvents.find((event) => event?.date === nextCpiCalendarEvent?.date);
 
@@ -2171,10 +2178,9 @@ const cpiProviderForNext = cpiDynamicEvents.find((event) => event?.date === next
 ) : activeRoomTab === "NFP Calendar" ? (
 
   <>
-    <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+    <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       {[
         [macroT.nextNfp, nextNfpCalendarEvent ? formatMacroCalendarDate(nextNfpCalendarEvent.date, macroLang) : "-", nextNfpCalendarEvent ? `${nextNfpCalendarEvent.time} · ${nextNfpCalendarEvent.currency ?? "USD"}` : macroT.macroData, "text-blue-300"],
-        [macroT.followingNfp, followingNfpCalendarEvent ? formatMacroCalendarDate(followingNfpCalendarEvent.date, macroLang) : "-", followingNfpCalendarEvent ? `${followingNfpCalendarEvent.time} · ${followingNfpCalendarEvent.currency ?? "USD"}` : macroT.macroData, "text-cyan-200"],
         [macroT.forecast, nfpProviderForNext?.forecast ?? "-", macroT.consensusForecast, "text-white"],
         [macroT.previous, nfpProviderForNext?.previous ?? "-", macroT.previousRelease, "text-white"],
         [macroT.impact, nextNfpCalendarEvent?.impact ?? "HIGH", "USD / Gold / Indices", "text-red-300"],
@@ -2185,6 +2191,26 @@ const cpiProviderForNext = cpiDynamicEvents.find((event) => event?.date === next
           <div className="mt-2 text-sm text-[#8fb6ff]">{sub}</div>
         </div>
       ))}
+    </section>
+
+    <section className="mt-6 rounded-[26px] border border-cyan-300/25 bg-[linear-gradient(135deg,#176fab,#11588f)] p-5 shadow-[0_8px_24px_rgba(1,20,45,.14),0_0_20px_rgba(34,211,238,.08),inset_0_1px_0_rgba(255,255,255,.09)]">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <h3 className="text-lg font-semibold">{macroT.upcomingNfpDates}</h3>
+          <p className="mt-1 text-xs text-white/50">{macroT.officialScheduleLabel}</p>
+        </div>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {upcomingNfpSchedule.map((event, index) => (
+          <div key={event.date} className={`rounded-2xl border p-4 ${index === 0 ? "border-cyan-200/50 bg-cyan-300/10" : "border-white/10 bg-[#0c426f]"}`}>
+            <div className="flex items-center justify-between gap-3">
+              <div className="font-semibold text-white">{formatMacroCalendarDate(event.date, macroLang)}</div>
+              {index === 0 ? <span className="rounded-full bg-cyan-300/15 px-2 py-1 text-[10px] font-bold text-cyan-100">{macroT.nextReleaseBadge}</span> : null}
+            </div>
+            <div className="mt-2 text-sm text-sky-100/70">{event.time} · USD</div>
+          </div>
+        ))}
+      </div>
     </section>
 
     <section className="mt-6 grid gap-6 xl:grid-cols-[1.5fr_0.7fr]">
@@ -2307,10 +2333,9 @@ const cpiProviderForNext = cpiDynamicEvents.find((event) => event?.date === next
   </>
 ) : activeRoomTab === "CPI Calendar" ? (
   <>
-    <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+    <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       {[
         [macroT.nextCpi, nextCpiCalendarEvent ? formatMacroCalendarDate(nextCpiCalendarEvent.date, macroLang) : "-", nextCpiCalendarEvent ? `${nextCpiCalendarEvent.time} · ${nextCpiCalendarEvent.currency ?? "USD"}` : macroT.macroData, "text-blue-300"],
-        [macroT.followingCpi, followingCpiCalendarEvent ? formatMacroCalendarDate(followingCpiCalendarEvent.date, macroLang) : "-", followingCpiCalendarEvent ? `${followingCpiCalendarEvent.time} · ${followingCpiCalendarEvent.currency ?? "USD"}` : macroT.macroData, "text-cyan-200"],
         [macroT.forecast, cpiProviderForNext?.forecast ?? "-", cpiProviderForNext?.title ?? "CPI", "text-white"],
         [macroT.previous, cpiProviderForNext?.previous ?? "-", macroT.previousRelease, "text-white"],
         [macroT.impact, nextCpiCalendarEvent?.impact ?? "HIGH", "USD · Gold · Indices", "text-red-300"],
@@ -2321,6 +2346,26 @@ const cpiProviderForNext = cpiDynamicEvents.find((event) => event?.date === next
           <div className="mt-2 text-sm text-[#8fb6ff]">{sub}</div>
         </div>
       ))}
+    </section>
+
+    <section className="mt-6 rounded-[26px] border border-cyan-300/25 bg-[linear-gradient(135deg,#176fab,#11588f)] p-5 shadow-[0_8px_24px_rgba(1,20,45,.14),0_0_20px_rgba(34,211,238,.08),inset_0_1px_0_rgba(255,255,255,.09)]">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <h3 className="text-lg font-semibold">{macroT.upcomingCpiDates}</h3>
+          <p className="mt-1 text-xs text-white/50">{macroT.officialScheduleLabel}</p>
+        </div>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {upcomingCpiSchedule.map((event, index) => (
+          <div key={event.date} className={`rounded-2xl border p-4 ${index === 0 ? "border-cyan-200/50 bg-cyan-300/10" : "border-white/10 bg-[#0c426f]"}`}>
+            <div className="flex items-center justify-between gap-3">
+              <div className="font-semibold text-white">{formatMacroCalendarDate(event.date, macroLang)}</div>
+              {index === 0 ? <span className="rounded-full bg-cyan-300/15 px-2 py-1 text-[10px] font-bold text-cyan-100">{macroT.nextReleaseBadge}</span> : null}
+            </div>
+            <div className="mt-2 text-sm text-sky-100/70">{event.time} · USD</div>
+          </div>
+        ))}
+      </div>
     </section>
 
     <section className="mt-6 rounded-[26px] border border-cyan-300/25 bg-[linear-gradient(135deg,#176fab,#11588f)] p-5 shadow-[0_8px_24px_rgba(1,20,45,.14),0_0_20px_rgba(34,211,238,.08),inset_0_1px_0_rgba(255,255,255,.09)]">
