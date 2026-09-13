@@ -301,6 +301,36 @@ const nfpCalendarByYear: Record<string, any[]> = {
   "2027": [],
 };
 
+function formatMacroCalendarDate(date: string) {
+  if (!date) return "-";
+  const parsed = new Date(`${date}T12:00:00`);
+  if (Number.isNaN(parsed.getTime())) return date;
+  return parsed.toLocaleDateString("pl-PL", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function macroEventToRow(event: any) {
+  return [
+    formatMacroCalendarDate(String(event?.date ?? "")),
+    String(event?.time ?? "-") || "-",
+    String(event?.title ?? "-"),
+    String(event?.forecast ?? "-") || "-",
+    String(event?.previous ?? "-") || "-",
+    String(event?.impact ?? "HIGH").toUpperCase(),
+  ];
+}
+
+function getNextEvent(events: any[]) {
+  const today = new Date().toISOString().slice(0, 10);
+  const sorted = [...events].sort((a, b) =>
+    `${a?.date ?? ""} ${a?.time ?? ""}`.localeCompare(`${b?.date ?? ""} ${b?.time ?? ""}`)
+  );
+  return sorted.find((event) => String(event?.date ?? "") >= today) ?? sorted.at(-1) ?? null;
+}
+
 function getTimeUntil(date: string, time: string) {
   const eventDate = new Date(`${date}T${time}:00`);
   const now = new Date();
@@ -677,6 +707,10 @@ const router = useRouter();
   const [selectedMonth, setSelectedMonth] = useState(2);
   const [selectedYear, setSelectedYear] = useState(2025);
   const [selectedCpiYear, setSelectedCpiYear] = useState("2026");
+  const [nfpYearEvents, setNfpYearEvents] = useState<any[]>([]);
+  const [cpiYearEvents, setCpiYearEvents] = useState<any[]>([]);
+  const [nfpCalendarLoading, setNfpCalendarLoading] = useState(false);
+  const [cpiCalendarLoading, setCpiCalendarLoading] = useState(false);
   const [calendarTrades, setCalendarTrades] = useState<CalendarTrade[]>(() => {
     if (typeof window === "undefined") return traderCalendarTrades;
 
@@ -733,6 +767,54 @@ useEffect(() => {
     })
     .catch(console.error);
 }, [selectedMacroMonth]);
+
+useEffect(() => {
+  setNfpCalendarLoading(true);
+  fetch(`/api/economic-calendar-year?year=${selectedNfpYear}&t=${Date.now()}`)
+    .then((res) => res.json())
+    .then((data) => setNfpYearEvents(Array.isArray(data) ? data : []))
+    .catch((error) => {
+      console.error(error);
+      setNfpYearEvents([]);
+    })
+    .finally(() => setNfpCalendarLoading(false));
+}, [selectedNfpYear]);
+
+useEffect(() => {
+  setCpiCalendarLoading(true);
+  fetch(`/api/economic-calendar-year?year=${selectedCpiYear}&t=${Date.now()}`)
+    .then((res) => res.json())
+    .then((data) => setCpiYearEvents(Array.isArray(data) ? data : []))
+    .catch((error) => {
+      console.error(error);
+      setCpiYearEvents([]);
+    })
+    .finally(() => setCpiCalendarLoading(false));
+}, [selectedCpiYear]);
+
+const nfpDynamicEvents = nfpYearEvents.filter((event) => {
+  const title = String(event?.title ?? "").toLowerCase();
+  if (title.includes("adp")) return false;
+  return (
+    title.includes("non-farm payroll") ||
+    title.includes("nonfarm payroll") ||
+    title.includes("non farm payroll") ||
+    title === "nfp"
+  );
+});
+const cpiDynamicEvents = cpiYearEvents.filter((event) => {
+  const title = String(event?.title ?? "").toLowerCase();
+  return title.includes("cpi") && !title.includes("ppi");
+});
+const nfpRows = nfpDynamicEvents.length
+  ? nfpDynamicEvents.map(macroEventToRow)
+  : (nfpCalendarByYear[selectedNfpYear] ?? []);
+const cpiRows = cpiDynamicEvents.length
+  ? cpiDynamicEvents.map(macroEventToRow)
+  : (cpiCalendarByYear[selectedCpiYear] ?? []);
+const nextNfpCalendarEvent = getNextEvent(nfpDynamicEvents);
+const nextCpiCalendarEvent = getNextEvent(cpiDynamicEvents);
+
   useEffect(() => {
     switch (tabParam) {
       case "fxmarket":
@@ -1957,10 +2039,10 @@ useEffect(() => {
   <>
     <section className="grid gap-4 xl:grid-cols-4">
       {[
-        ["Najbliższy NFP", "04 wrz 2026", "Piątek · 14:30 (Warszawa)", "text-blue-300"],
-        ["Forecast", "185K", "Expected jobs added", "text-white"],
-        ["Previous", "177K", "Last release", "text-white"],
-        ["Impact", "High", "USD / Gold / Indices", "text-red-300"],
+        ["Najbliższy NFP", nextNfpCalendarEvent ? formatMacroCalendarDate(nextNfpCalendarEvent.date) : "-", nextNfpCalendarEvent ? `${nextNfpCalendarEvent.time} · ${nextNfpCalendarEvent.currency ?? "USD"}` : "Dane z kalendarza makro", "text-blue-300"],
+        ["Forecast", nextNfpCalendarEvent?.forecast ?? "-", "Consensus forecast", "text-white"],
+        ["Previous", nextNfpCalendarEvent?.previous ?? "-", "Previous release", "text-white"],
+        ["Impact", nextNfpCalendarEvent?.impact ?? "HIGH", "USD / Gold / Indices", "text-red-300"],
       ].map(([label, value, sub, color]) => (
         <div key={label} className="rounded-[26px] border border-cyan-300/25 bg-[linear-gradient(135deg,#176fab,#11588f)] p-5 shadow-[0_8px_24px_rgba(1,20,45,.14),0_0_20px_rgba(34,211,238,.08),inset_0_1px_0_rgba(255,255,255,.09)]">
           <div className="text-sm text-white/45">{label}</div>
@@ -1988,7 +2070,7 @@ useEffect(() => {
   onChange={(e) => setSelectedNfpYear(e.target.value)}
   className="rounded-xl border border-white/10 bg-[#0c426f] px-4 py-2 text-white"
 >
-  {Object.keys(nfpCalendarByYear).map((year) => (
+  {["2026", "2027"].map((year) => (
     <option key={year} value={year}>
       {year}
     </option>
@@ -2034,11 +2116,15 @@ useEffect(() => {
     
   </div>
 
-  {nfpCalendarByYear[selectedNfpYear].length === 0 ? (
+  {nfpCalendarLoading ? (
     <div className="border-t border-white/10 bg-[#0c426f] px-4 py-6 text-sm text-sky-100/70">
-      BLS nie opublikował jeszcze oficjalnego harmonogramu NFP na 2027. Nie pokazujemy przewidywanych dat jako oficjalnych.
+      Ładowanie danych NFP…
     </div>
-  ) : nfpCalendarByYear[selectedNfpYear].map(
+  ) : nfpRows.length === 0 ? (
+    <div className="border-t border-white/10 bg-[#0c426f] px-4 py-6 text-sm text-sky-100/70">
+      Brak danych NFP dla wybranego roku.
+    </div>
+  ) : nfpRows.map(
     ([date, time, event, forecast, previous, impact]) => (
       <div
         key={`${date}-${event}`}
@@ -2087,10 +2173,10 @@ useEffect(() => {
   <>
     <section className="grid gap-4 xl:grid-cols-4">
       {[
-        ["Najbliższy CPI", "11 wrz 2026", "Piątek · 14:30 (Warszawa)", "text-blue-300"],
-        ["Forecast", "3.4%", "CPI YoY", "text-white"],
-        ["Previous", "3.5%", "Last Release", "text-white"],
-        ["Impact", "High", "USD · Gold · Indices", "text-red-300"],
+        ["Najbliższy CPI", nextCpiCalendarEvent ? formatMacroCalendarDate(nextCpiCalendarEvent.date) : "-", nextCpiCalendarEvent ? `${nextCpiCalendarEvent.time} · ${nextCpiCalendarEvent.currency ?? "USD"}` : "Dane z kalendarza makro", "text-blue-300"],
+        ["Forecast", nextCpiCalendarEvent?.forecast ?? "-", nextCpiCalendarEvent?.title ?? "CPI", "text-white"],
+        ["Previous", nextCpiCalendarEvent?.previous ?? "-", "Previous release", "text-white"],
+        ["Impact", nextCpiCalendarEvent?.impact ?? "HIGH", "USD · Gold · Indices", "text-red-300"],
       ].map(([label, value, sub, color]) => (
         <div key={label} className="rounded-[26px] border border-cyan-300/25 bg-[linear-gradient(135deg,#176fab,#11588f)] p-5 shadow-[0_8px_24px_rgba(1,20,45,.14),0_0_20px_rgba(34,211,238,.08),inset_0_1px_0_rgba(255,255,255,.09)]">
           <div className="text-sm text-white/45">{label}</div>
@@ -2112,7 +2198,7 @@ useEffect(() => {
           onChange={(e) => setSelectedCpiYear(e.target.value)}
           className="rounded-xl border border-white/10 bg-[#0c426f] px-4 py-2 text-white outline-none"
         >
-          {Object.keys(cpiCalendarByYear).map((year) => (
+          {["2026", "2027"].map((year) => (
             <option key={year} value={year}>
               {year}
             </option>
@@ -2130,11 +2216,15 @@ useEffect(() => {
           <div>Impact</div>
         </div>
 
-        {cpiCalendarByYear[selectedCpiYear].length === 0 ? (
+        {cpiCalendarLoading ? (
           <div className="border-t border-white/10 bg-[#0c426f] px-4 py-6 text-sm text-sky-100/70">
-            BLS nie opublikował jeszcze oficjalnego harmonogramu CPI na 2027. Nie pokazujemy przewidywanych dat jako oficjalnych.
+            Ładowanie danych CPI…
           </div>
-        ) : cpiCalendarByYear[selectedCpiYear].map(
+        ) : cpiRows.length === 0 ? (
+          <div className="border-t border-white/10 bg-[#0c426f] px-4 py-6 text-sm text-sky-100/70">
+            Brak danych CPI dla wybranego roku.
+          </div>
+        ) : cpiRows.map(
           ([date, time, event, forecast, previous, impact]) => (
             <div
               key={`${date}-${event}`}

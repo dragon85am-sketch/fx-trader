@@ -1,12 +1,9 @@
 "use client";
 
 import {
-  Bell,
   ChevronRight,
-  CircleDollarSign,
   Search,
   ShieldCheck,
-  Sparkles,
 } from "lucide-react";
 
 function cn(...xs: Array<string | undefined | false>) {
@@ -50,57 +47,14 @@ export default function DashboardTopbar() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3">
             <TopStat
               icon={<ShieldCheck className="h-4 w-4" />}
               label="System"
               value="Online"
               tone="positive"
             />
-            <TopStat
-              icon={<Sparkles className="h-4 w-4" />}
-              label="Signals"
-              value="3 Active"
-              tone="default"
-            />
-            <TopStat
-              icon={<CircleDollarSign className="h-4 w-4" />}
-              label="Saldo"
-              value="4,280€"
-              tone="positive"
-            />
-
-            <button className="flex items-center justify-between rounded-2xl border border-[var(--line-soft)] bg-black/10 px-4 py-3 text-left transition hover:border-blue-400/25 hover:bg-blue-500/[0.05] dark:bg-white/[0.04]">
-              <div>
-                <div className="text-[11px] uppercase tracking-[0.16em] text-[var(--text)]/35">
-                  Alerty
-                </div>
-                <div className="mt-1 text-sm font-semibold text-[var(--text)]">
-                  12
-                </div>
-              </div>
-
-              <div className="relative ml-3 flex h-9 w-9 items-center justify-center rounded-xl border border-blue-400/20 bg-blue-500/10 text-blue-200 shadow-[0_0_14px_rgba(59,130,246,0.12)]">
-                <Bell className="h-4 w-4" />
-                <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.9)]" />
-              </div>
-            </button>
           </div>
-
-          <button className="flex items-center gap-3 rounded-2xl border border-[var(--line-soft)] bg-black/10 px-3 py-2.5 transition hover:border-blue-400/25 hover:bg-blue-500/[0.05] dark:bg-white/[0.04]">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-blue-400/20 bg-blue-500/10 text-sm font-semibold text-blue-100 shadow-[0_0_16px_rgba(59,130,246,0.16)]">
-              J
-            </div>
-
-            <div className="text-left">
-              <div className="text-sm font-medium text-[var(--text)]">
-                jan123
-              </div>
-              <div className="text-xs text-[var(--text)]/40">
-                Premium Member
-              </div>
-            </div>
-          </button>
         </div>
       </div>
     </div>

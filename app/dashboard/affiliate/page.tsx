@@ -1,4 +1,4 @@
-﻿
+
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -104,6 +104,7 @@ export default async function AffiliatePage() {
   let clicks = 0;
   let sales = 0;
   let conversion = 0;
+  let registrations = 0;
   let stripeConnected = false;
   let stripePayoutsEnabled = false;
   let stripeOnboardingDone = false;
@@ -139,6 +140,7 @@ export default async function AffiliatePage() {
       affiliateSales,
       payoutRequests,
       activePayoutRequest,
+      registrationCount,
     ] = await Promise.all([
       prisma.user.findUnique({
   where: { id: authUser.userId },
@@ -190,6 +192,9 @@ export default async function AffiliatePage() {
           createdAt: true,
         },
       }),
+      prisma.user.count({
+        where: { referredByUserId: authUser.userId },
+      }),
     ]);
 
     const typedPayoutRequests = payoutRequests as PayoutRequestRow[];
@@ -227,6 +232,7 @@ stripeOnboardingDone = Boolean(
     clicks = dashboardStat?.clicks ?? 0;
     sales = dashboardStat?.sales ?? 0;
     conversion = dashboardStat?.conversion ?? 0;
+    registrations = registrationCount ?? 0;
 
     salesData = typedAffiliateSales;
 
@@ -407,10 +413,10 @@ stripeOnboardingDone = Boolean(
           {/* KPI ROW */}
           <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             {[
-              ["Kliknięcia", String(clicks), "+12.4% vs 30 dni", "↗"],
-              ["Rejestracje", "132", "+8.1% vs 30 dni", "◎"],
-              ["Sprzedaże", String(sales), "+23% trend", "▣"],
-              ["Konwersja", `${conversion}%`, "realny performance", "◔"],
+              ["Kliknięcia", String(clicks), "Łączna liczba kliknięć", "↗"],
+              ["Rejestracje", String(registrations), "Z Twojego linku", "◎"],
+              ["Sprzedaże", String(sales), "Potwierdzone sprzedaże", "▣"],
+              ["Konwersja", `${conversion}%`, "Sprzedaże / kliknięcia", "◔"],
             ].map(([label, value, hint, icon]) => (
               <div
                 key={label}

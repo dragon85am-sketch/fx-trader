@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requirePremiumUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
@@ -7,7 +7,6 @@ import type { ComponentType } from "react";
 import {
   Activity,
   ArrowUpRight,
-  Bell,
   BookOpen,
   BrainCircuit,
   CalendarDays,
@@ -21,7 +20,6 @@ import {
   TrendingUp,
   UserRound,
   UsersRound,
-  WalletCards,
 } from "lucide-react";
 
 function cn(...xs: Array<string | undefined | false>) {
@@ -42,7 +40,7 @@ const cards: DashboardCard[] = [
     title: "Journal",
     description: "Dziennik tradingowy i analiza zagrań.",
     href: "/journal",
-    stat: "24 WPISY",
+    stat: "DZIENNIK TRANSAKCJI",
     icon: BookOpen,
   },
   {
@@ -50,7 +48,7 @@ const cards: DashboardCard[] = [
     description: "Live market, raporty i performance AI.",
     href: "/trading-room",
     badge: "LIVE",
-    stat: "6 MODUŁÓW",
+    stat: "ANALIZA I NARZĘDZIA",
     icon: CandlestickChart,
   },
   {
@@ -58,7 +56,7 @@ const cards: DashboardCard[] = [
     description: "Kalendarz wyników i podsumowań tradingu.",
     href: "/trading-room?tab=calendar",
     badge: "NEW",
-    stat: "MIESIĘCZNY VIEW",
+    stat: "WYNIKI I PODSUMOWANIA",
     icon: CalendarDays,
   },
   {
@@ -66,14 +64,14 @@ const cards: DashboardCard[] = [
     description: "FX Scanner, Harmonic Scanner, PRO FX Scanner i Alpha Scanner.",
     href: "/skaner",
     badge: "PRO",
-    stat: "4 SKANERY",
+    stat: "NARZĘDZIA PRO",
     icon: ScanSearch,
   },
   {
     title: "Strategie",
     description: "Scalping, day trading i swing trading.",
     href: "/strategie",
-    stat: "3 STRATEGIE",
+    stat: "BIBLIOTEKA STRATEGII",
     icon: BrainCircuit,
   },
   {
@@ -81,14 +79,14 @@ const cards: DashboardCard[] = [
     description: "Panel partnera, kampanie, prowizje i wypłaty.",
     href: "/dashboard/affiliate",
     badge: "NEW",
-    stat: "365 AVG",
+    stat: "PROGRAM PARTNERSKI",
     icon: UsersRound,
   },
   {
     title: "Education",
     description: "FX Trade Academy, setupy i bonusowe materiały.",
     href: "/education",
-    stat: "12 LEKCJI",
+    stat: "FX TRADE ACADEMY",
     icon: GraduationCap,
   },
   {
@@ -96,7 +94,7 @@ const cards: DashboardCard[] = [
     description: "Dołącz do sesji live i webinarów premium.",
     href: "/sesje",
     badge: "LIVE",
-    stat: "2 W TYM TYGODNIU",
+    stat: "SESJE LIVE I WEBINARY",
     icon: Radio,
   },
   {
@@ -334,12 +332,10 @@ export default async function DashboardPage() {
         </div>
 
         {/* STATUS */}
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <StatusCard label="UŻYTKOWNIK" value={userName} icon={UserRound} />
           <StatusCard label="SYSTEM" value="Online" accent icon={Activity} />
-          <StatusCard label="SYGNAŁY" value="3 Active" icon={TrendingUp} />
-          <StatusCard label="SALDO" value="4,280€" icon={WalletCards} />
-          <StatusCard label="ALERTY" value="12" icon={Bell} />
+          <StatusCard label="KONTO" value="Premium" icon={UserRound} />
           <div className="relative overflow-hidden rounded-[18px] border border-cyan-300/35 bg-[linear-gradient(145deg,rgba(10,84,137,.94),rgba(7,56,102,.96))] px-4 py-3">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-blue-400/25 bg-cyan-500/20 text-xs font-bold text-white">
@@ -380,12 +376,11 @@ export default async function DashboardPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <StatusCard label="KONTO" value="Premium" />
-              <StatusCard label="SYGNAŁY" value="3 Active" accent />
               <StatusCard label="AFFILIATE" value={`${affiliateTotal}€`} />
               <StatusCard
-                label="TEN TYDZIEŃ"
+                label="WYNIK MIESIĄCA"
                 value={`${monthlyPnl >= 0 ? "+" : ""}${monthlyPnl}€`}
                 accent={monthlyPnl >= 0}
               />
@@ -395,7 +390,7 @@ export default async function DashboardPage() {
 
         {/* KPI */}
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <KpiCard label="KLIENCI" value={String(clicks)} icon={UsersRound} />
+          <KpiCard label="KLIKNIĘCIA AFFILIATE" value={String(clicks)} icon={UsersRound} />
           <KpiCard label="SPRZEDAŻE" value={String(sales)} icon={ShoppingCart} />
           <KpiCard label="KONWERSJA" value={`${conversion}%`} icon={PieChart} />
           <KpiCard

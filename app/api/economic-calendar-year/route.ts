@@ -7,27 +7,31 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const selectedDate = searchParams.get("date") || new Date().toISOString().split("T")[0];
+    const year = searchParams.get("year") || String(new Date().getUTCFullYear());
+    if (!/^\d{4}$/.test(year)) return NextResponse.json([]);
 
-    // Primary source: live macro calendar. This fixes empty months without manual seeding.
-    const live = await fetchFinnhubEconomicCalendar(selectedDate, selectedDate);
+    const from = `${year}-01-01`;
+    const to = `${year}-12-31`;
+
+    const live = await fetchFinnhubEconomicCalendar(from, to);
     if (live.length) return NextResponse.json(live);
 
-    // Safe fallback: rows already stored in Supabase.
     const { data, error } = await supabaseAdmin
       .from("economic_events")
       .select("*")
-      .eq("date", selectedDate)
+      .gte("date", from)
+      .lte("date", to)
+      .order("date", { ascending: true })
       .order("time", { ascending: true });
 
     if (error) {
-      console.error("economic-calendar fallback:", error);
+      console.error("economic-calendar-year fallback:", error);
       return NextResponse.json([]);
     }
 
     return NextResponse.json(data ?? []);
-  } catch (err) {
-    console.error("economic-calendar:", err);
+  } catch (error) {
+    console.error("economic-calendar-year:", error);
     return NextResponse.json([]);
   }
 }
