@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { fetchFinnhubEconomicCalendar } from "@/lib/economicCalendar";
+import { fetchFinnhubEconomicCalendar, fetchTradingEconomicsCalendar } from "@/lib/economicCalendar";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +12,9 @@ export async function GET(req: Request) {
     // Primary source: live macro calendar. This fixes empty months without manual seeding.
     const live = await fetchFinnhubEconomicCalendar(selectedDate, selectedDate);
     if (live.length) return NextResponse.json(live);
+
+    const tradingEconomics = await fetchTradingEconomicsCalendar(selectedDate, selectedDate);
+    if (tradingEconomics.length) return NextResponse.json(tradingEconomics);
 
     // Safe fallback: rows already stored in Supabase.
     const { data, error } = await supabaseAdmin

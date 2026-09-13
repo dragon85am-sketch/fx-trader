@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { fetchFinnhubEconomicCalendar } from "@/lib/economicCalendar";
+import { fetchFinnhubEconomicCalendar, fetchTradingEconomicsCalendar } from "@/lib/economicCalendar";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +15,9 @@ export async function GET(req: Request) {
 
     const live = await fetchFinnhubEconomicCalendar(from, to);
     if (live.length) return NextResponse.json(live);
+
+    const tradingEconomics = await fetchTradingEconomicsCalendar(from, to);
+    if (tradingEconomics.length) return NextResponse.json(tradingEconomics);
 
     const { data, error } = await supabaseAdmin
       .from("economic_events")

@@ -317,6 +317,7 @@ function macroEventToRow(event: any) {
     formatMacroCalendarDate(String(event?.date ?? "")),
     String(event?.time ?? "-") || "-",
     String(event?.title ?? "-"),
+    String(event?.actual ?? "-") || "-",
     String(event?.forecast ?? "-") || "-",
     String(event?.previous ?? "-") || "-",
     String(event?.impact ?? "HIGH").toUpperCase(),
@@ -793,25 +794,27 @@ useEffect(() => {
 }, [selectedCpiYear]);
 
 const nfpDynamicEvents = nfpYearEvents.filter((event) => {
-  const title = String(event?.title ?? "").toLowerCase();
+  const title = String(event?.title ?? "").toLowerCase().replace(/[-_]/g, " " );
   if (title.includes("adp")) return false;
   return (
-    title.includes("non-farm payroll") ||
-    title.includes("nonfarm payroll") ||
     title.includes("non farm payroll") ||
+    title.includes("nonfarm payroll") ||
+    title.includes("non farm employment") ||
+    title.includes("nonfarm employment") ||
     title === "nfp"
   );
 });
 const cpiDynamicEvents = cpiYearEvents.filter((event) => {
   const title = String(event?.title ?? "").toLowerCase();
-  return title.includes("cpi") && !title.includes("ppi");
+  if (title.includes("ppi")) return false;
+  return (
+    title.includes("cpi") ||
+    title.includes("consumer price index") ||
+    title.includes("inflation rate")
+  );
 });
-const nfpRows = nfpDynamicEvents.length
-  ? nfpDynamicEvents.map(macroEventToRow)
-  : (nfpCalendarByYear[selectedNfpYear] ?? []);
-const cpiRows = cpiDynamicEvents.length
-  ? cpiDynamicEvents.map(macroEventToRow)
-  : (cpiCalendarByYear[selectedCpiYear] ?? []);
+const nfpRows = nfpDynamicEvents.map(macroEventToRow);
+const cpiRows = cpiDynamicEvents.map(macroEventToRow);
 const nextNfpCalendarEvent = getNextEvent(nfpDynamicEvents);
 const nextCpiCalendarEvent = getNextEvent(cpiDynamicEvents);
 
@@ -2106,10 +2109,11 @@ const nextCpiCalendarEvent = getNextEvent(cpiDynamicEvents);
   </div>
 )}
 <div className="overflow-x-auto rounded-2xl border border-white/10">
-  <div className="grid grid-cols-6 bg-white/5 px-4 py-3 text-xs uppercase tracking-wider text-white/45">
+  <div className="grid grid-cols-7 bg-white/5 px-4 py-3 text-xs uppercase tracking-wider text-white/45">
     <div>Date</div>
     <div>Time</div>
     <div>Event</div>
+    <div>Actual</div>
     <div>Forecast</div>
     <div>Previous</div>
     <div>Impact</div>
@@ -2122,17 +2126,18 @@ const nextCpiCalendarEvent = getNextEvent(cpiDynamicEvents);
     </div>
   ) : nfpRows.length === 0 ? (
     <div className="border-t border-white/10 bg-[#0c426f] px-4 py-6 text-sm text-sky-100/70">
-      Brak danych NFP dla wybranego roku.
+      Brak danych NFP od aktywnego dostawcy dla wybranego roku.
     </div>
   ) : nfpRows.map(
-    ([date, time, event, forecast, previous, impact]) => (
+    ([date, time, event, actual, forecast, previous, impact]) => (
       <div
         key={`${date}-${event}`}
-        className="grid grid-cols-6 items-center border-t border-white/10 bg-[#0c426f] px-4 py-4 text-sm hover:bg-white/5"
+        className="grid grid-cols-7 items-center border-t border-white/10 bg-[#0c426f] px-4 py-4 text-sm hover:bg-white/5"
       >
         <div>{date}</div>
         <div>{time}</div>
         <div className="font-medium">{event}</div>
+        <div>{actual}</div>
         <div>{forecast}</div>
         <div>{previous}</div>
 
@@ -2207,10 +2212,11 @@ const nextCpiCalendarEvent = getNextEvent(cpiDynamicEvents);
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-white/10">
-        <div className="grid grid-cols-6 bg-white/5 px-4 py-3 text-xs uppercase tracking-wider text-white/45">
+        <div className="grid grid-cols-7 bg-white/5 px-4 py-3 text-xs uppercase tracking-wider text-white/45">
           <div>Date</div>
           <div>Time</div>
           <div>Event</div>
+          <div>Actual</div>
           <div>Forecast</div>
           <div>Previous</div>
           <div>Impact</div>
@@ -2222,17 +2228,18 @@ const nextCpiCalendarEvent = getNextEvent(cpiDynamicEvents);
           </div>
         ) : cpiRows.length === 0 ? (
           <div className="border-t border-white/10 bg-[#0c426f] px-4 py-6 text-sm text-sky-100/70">
-            Brak danych CPI dla wybranego roku.
+            Brak danych CPI od aktywnego dostawcy dla wybranego roku.
           </div>
         ) : cpiRows.map(
-          ([date, time, event, forecast, previous, impact]) => (
+          ([date, time, event, actual, forecast, previous, impact]) => (
             <div
               key={`${date}-${event}`}
-              className="grid grid-cols-6 items-center border-t border-white/10 bg-[#0c426f] px-4 py-4 text-sm hover:bg-white/5"
+              className="grid grid-cols-7 items-center border-t border-white/10 bg-[#0c426f] px-4 py-4 text-sm hover:bg-white/5"
             >
               <div>{date}</div>
               <div>{time}</div>
               <div className="font-medium">{event}</div>
+              <div>{actual}</div>
               <div>{forecast}</div>
               <div>{previous}</div>
               <div>
