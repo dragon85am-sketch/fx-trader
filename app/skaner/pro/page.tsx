@@ -9,6 +9,8 @@ import {
   Clock3,
   Crosshair,
   Loader2,
+  Maximize2,
+  Minimize2,
   RefreshCw,
   Search,
   ShieldCheck,
@@ -967,6 +969,30 @@ export default function ProScanner() {
   const [scanning, setScanning] =
     React.useState(false);
 
+  const scannerRootRef = React.useRef<HTMLElement | null>(null);
+  const [isFullscreen, setIsFullscreen] = React.useState(false);
+
+  React.useEffect(() => {
+    const onFullscreenChange = () => {
+      setIsFullscreen(document.fullscreenElement === scannerRootRef.current);
+    };
+
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = React.useCallback(async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await scannerRootRef.current?.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    } catch (error) {
+      console.error("[PRO SCANNER FULLSCREEN]", error);
+    }
+  }, []);
+
   const current =
     selectedSymbol === "XAUUSD"
       ? gold
@@ -1181,7 +1207,7 @@ export default function ProScanner() {
   );
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,#0a2a52_0%,#061a33_34%,#041225_70%,#030b16_100%)] text-white">
+    <main ref={scannerRootRef} className="min-h-screen overflow-y-auto bg-[radial-gradient(circle_at_top,#0a2a52_0%,#061a33_34%,#041225_70%,#030b16_100%)] text-white fullscreen:h-screen fullscreen:w-screen">
       <div className="mx-auto max-w-[1760px] px-4 py-5 lg:px-6 xl:px-7">
         {/* ============================================ */}
         {/* HEADER */}
@@ -1241,6 +1267,20 @@ export default function ProScanner() {
                   LIVE-RATES US30 + TWELVE DATA
                 </span>
               </div>
+
+              <button
+                type="button"
+                onClick={() => void toggleFullscreen()}
+                className="flex h-11 items-center gap-2 rounded-xl border border-cyan-300/20 bg-[#0a2f5d]/90 px-4 text-[10px] font-black text-cyan-100 transition hover:border-cyan-300/40 hover:bg-[#0d3d73]"
+                title={isFullscreen ? "Wyjdź z pełnego ekranu" : "Pełny ekran"}
+              >
+                {isFullscreen ? (
+                  <Minimize2 className="h-4 w-4" />
+                ) : (
+                  <Maximize2 className="h-4 w-4" />
+                )}
+                {isFullscreen ? "WYJDŹ" : "PEŁNY EKRAN"}
+              </button>
 
               <button
                 type="button"
