@@ -873,6 +873,8 @@ export default function HarmonicScannerPage() {
   const [chartLoading, setChartLoading] = React.useState(true);
   const [chartError, setChartError] = React.useState<string | null>(null);
   const [lastLiveUpdate, setLastLiveUpdate] = React.useState<Date | null>(null);
+  const [liveStatus, setLiveStatus] = React.useState<"LIVE" | "RECONNECTING" | "OFFLINE">("LIVE");
+  const consecutiveFailuresRef = React.useRef(0);
 
   const loadCandles = React.useCallback(
     async (signal?: AbortSignal, silent = false) => {
@@ -886,17 +888,36 @@ export default function HarmonicScannerPage() {
         );
 
         if (!next.length) {
-          throw new Error("Brak Å›wiec dla wybranego instrumentu i interwaÅ‚u.");
+          throw new Error("Brak świec dla wybranego instrumentu i interwału.");
         }
 
+        consecutiveFailuresRef.current = 0;
         setCandles(next);
         setChartError(null);
+        setLiveStatus("LIVE");
         setLastLiveUpdate(new Date());
       } catch (error) {
         if ((error as Error)?.name === "AbortError") return;
-        setChartError(
-          error instanceof Error ? error.message : "BÅ‚Ä…d pobierania danych."
-        );
+
+        const message =
+          error instanceof Error ? error.message : "Błąd pobierania danych.";
+
+        consecutiveFailuresRef.current += 1;
+
+        if (!silent) {
+          // Pierwsze ładowanie nie ma jeszcze poprzednich świec do pokazania,
+          // więc błąd pokazujemy od razu.
+          setLiveStatus("OFFLINE");
+          setChartError(message);
+        } else if (consecutiveFailuresRef.current >= 3) {
+          // Dopiero 3 kolejne nieudane odświeżenia oznaczają realną utratę feedu.
+          setLiveStatus("OFFLINE");
+          setChartError(message);
+        } else {
+          // Pojedynczy timeout / limit API nie powinien straszyć użytkownika.
+          setLiveStatus("RECONNECTING");
+          setChartError(null);
+        }
       } finally {
         if (!silent) setChartLoading(false);
       }
@@ -1156,13 +1177,45 @@ export default function HarmonicScannerPage() {
           </aside>
 
           <div className="relative min-w-0">
-            <div className="pointer-events-none absolute left-4 top-3 z-20 flex items-center gap-2 rounded-lg border border-emerald-400/20 bg-[#03172f]/85 px-2.5 py-1.5 backdrop-blur">
+            <div
+              className={`pointer-events-none absolute left-4 top-3 z-20 flex items-center gap-2 rounded-lg border bg-[#03172f]/85 px-2.5 py-1.5 backdrop-blur ${
+                liveStatus === "LIVE"
+                  ? "border-emerald-400/20"
+                  : liveStatus === "RECONNECTING"
+                    ? "border-amber-400/25"
+                    : "border-rose-400/25"
+              }`}
+            >
               <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+                {liveStatus === "LIVE" ? (
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
+                ) : null}
+                <span
+                  className={`relative inline-flex h-2 w-2 rounded-full ${
+                    liveStatus === "LIVE"
+                      ? "bg-emerald-400"
+                      : liveStatus === "RECONNECTING"
+                        ? "bg-amber-400"
+                        : "bg-rose-400"
+                  }`}
+                />
               </span>
-              <span className="text-[8px] font-bold uppercase tracking-[.12em] text-emerald-300">
-                {activeSetup.symbol === "US30" ? "FX Trade / Live-Rates" : "Twelve Data Live"}
+              <span
+                className={`text-[8px] font-bold uppercase tracking-[.12em] ${
+                  liveStatus === "LIVE"
+                    ? "text-emerald-300"
+                    : liveStatus === "RECONNECTING"
+                      ? "text-amber-300"
+                      : "text-rose-300"
+                }`}
+              >
+                {liveStatus === "LIVE"
+                  ? activeSetup.symbol === "US30"
+                    ? "FX Trade / Live-Rates · LIVE"
+                    : "Twelve Data · LIVE"
+                  : liveStatus === "RECONNECTING"
+                    ? "RECONNECTING..."
+                    : "FEED OFFLINE"}
               </span>
               {lastLiveUpdate ? (
                 <span className="text-[7px] text-sky-100/35">
@@ -1205,9 +1258,9 @@ export default function HarmonicScannerPage() {
               />
             )}
 
-            {chartError && candles.length > 0 ? (
-              <div className="absolute bottom-3 right-3 z-20 rounded-lg border border-amber-400/20 bg-[#03172f]/90 px-2.5 py-1.5 text-[7px] text-amber-200 backdrop-blur">
-                LIVE chwilowo niedostÄ™pne â€” pokazujÄ™ ostatnie poprawne Å›wiece.
+            {chartError && candles.length > 0 && liveStatus === "OFFLINE" ? (
+              <div className="absolute bottom-3 right-3 z-20 rounded-lg border border-rose-400/25 bg-[#03172f]/90 px-2.5 py-1.5 text-[7px] text-rose-200 backdrop-blur">
+                Feed niedostępny po 3 próbach — pokazuję ostatnie poprawne świece.
               </div>
             ) : null}
           </div>
