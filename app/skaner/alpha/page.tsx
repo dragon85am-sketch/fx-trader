@@ -726,7 +726,7 @@ export default function AlphaScannerPage() {
   );
 
   return (
-    <main className="min-h-screen bg-[#061a33] px-3 py-4 text-white md:px-5">
+    <main className="min-h-screen bg-[#061a33] bg-[linear-gradient(rgba(3,18,38,0.58),rgba(3,18,38,0.58)),url('/alpha-scanner-bg.png')] bg-cover bg-center bg-fixed bg-no-repeat px-3 py-4 text-white md:px-5">
       <div className="mx-auto max-w-[1950px] space-y-4">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
