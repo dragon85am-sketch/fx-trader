@@ -519,6 +519,7 @@ export default function AlphaScannerPage() {
   const [error, setError] = React.useState("");
   const [fullChart, setFullChart] = React.useState(false);
   const [lastScanAt, setLastScanAt] = React.useState<Date | null>(null);
+  const [autoScan, setAutoScan] = React.useState(true);
 
   const filtered = React.useMemo(() => {
     return liveSetups.filter((s) => {
@@ -590,7 +591,7 @@ export default function AlphaScannerPage() {
     setSelected(setup);
   };
 
-  const runScan = async () => {
+  const runScan = React.useCallback(async () => {
     if (scanLoading) return;
     setScanLoading(true);
     setError("");
@@ -644,7 +645,17 @@ export default function AlphaScannerPage() {
     } finally {
       setScanLoading(false);
     }
-  };
+  }, [liveSetups, selected.instrument, selected.tf, scanLoading]);
+
+  React.useEffect(() => {
+    if (!autoScan) return;
+
+    const timer = window.setInterval(() => {
+      void runScan();
+    }, 60_000);
+
+    return () => window.clearInterval(timer);
+  }, [autoScan, runScan]);
 
   const reset = () => {
     setTf("All");
@@ -734,23 +745,40 @@ export default function AlphaScannerPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-2 text-[11px] font-bold text-emerald-300">
-              ● LIVE{lastScanAt ? ` · ${lastScanAt.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" })}` : ""}
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <div className="rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-2.5 text-[11px] font-bold text-emerald-300">
+              ● LIVE
+            </div>
+
+            <div className="rounded-xl border border-sky-300/15 bg-[#0d3158] px-4 py-2.5 text-[10px] text-white/55">
+              LAST SCAN <span className="ml-1 font-bold text-white">{lastScanAt ? lastScanAt.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" }) : "—"}</span>
             </div>
 
             <button
               type="button"
-              onClick={runScan}
+              onClick={() => setAutoScan((value) => !value)}
+              className={`inline-flex min-w-[145px] items-center justify-center gap-2 rounded-xl border px-5 py-3 text-[12px] font-bold transition ${
+                autoScan
+                  ? "border-emerald-400/35 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/20"
+                  : "border-sky-300/15 bg-[#0d3158] text-white/65 hover:bg-sky-300/[0.10]"
+              }`}
+            >
+              <RefreshCw className={`h-4 w-4 ${autoScan ? "animate-spin [animation-duration:3s]" : ""}`} />
+              AUTO SCAN {autoScan ? "ON" : "OFF"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void runScan()}
               disabled={scanLoading}
-              className="inline-flex min-w-[145px] items-center justify-center gap-2 rounded-xl bg-sky-500 px-5 py-3 text-[12px] font-bold shadow-lg shadow-sky-500/20 hover:bg-sky-400 disabled:opacity-60"
+              className="inline-flex min-w-[175px] items-center justify-center gap-2 rounded-xl bg-sky-500 px-6 py-3 text-[13px] font-extrabold shadow-lg shadow-sky-500/25 transition hover:bg-sky-400 disabled:opacity-60"
             >
               {scanLoading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <Search className="h-4 w-4" />
+                <Zap className="h-4 w-4" />
               )}
-              {scanLoading ? "Scanning..." : "Scan Now"}
+              {scanLoading ? "SCANNING..." : "SCAN NOW"}
             </button>
           </div>
         </header>
