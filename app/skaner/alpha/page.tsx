@@ -771,7 +771,7 @@ export default function AlphaScannerPage() {
               type="button"
               onClick={() => void runScan()}
               disabled={scanLoading}
-              className="inline-flex min-w-[175px] items-center justify-center gap-2 rounded-xl bg-sky-500 px-6 py-3 text-[13px] font-extrabold shadow-lg shadow-sky-500/25 transition hover:bg-sky-400 disabled:opacity-60"
+              className="inline-flex min-w-[175px] items-center justify-center gap-2 rounded-xl border border-cyan-200/30 bg-sky-500 px-6 py-3 text-[13px] font-extrabold shadow-[0_0_22px_rgba(14,165,233,0.38)] transition hover:bg-sky-400 hover:shadow-[0_0_30px_rgba(56,189,248,0.50)] disabled:opacity-60"
             >
               {scanLoading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -792,7 +792,7 @@ export default function AlphaScannerPage() {
           ].map(([title, value, sub, color, icon]) => (
             <div
               key={String(title)}
-              className="flex items-center justify-between rounded-[20px] border border-sky-300/15 bg-[#0d3158] p-5"
+              className="flex items-center justify-between rounded-[20px] border border-sky-300/30 bg-[#0b2a4b]/95 p-5 shadow-[0_0_22px_rgba(14,165,233,0.16),inset_0_0_22px_rgba(56,189,248,0.05)] backdrop-blur-sm"
             >
               <div>
                 <div className="text-[10px] text-white/40">{title}</div>
@@ -808,7 +808,7 @@ export default function AlphaScannerPage() {
           ))}
         </section>
 
-        <section className="grid gap-4 rounded-[20px] border border-sky-300/15 bg-[#0d3158] p-4 xl:grid-cols-[1fr_1fr_1.15fr_auto]">
+        <section className="grid gap-4 rounded-[20px] border border-sky-300/30 bg-[#0b2a4b]/95 p-4 shadow-[0_0_24px_rgba(14,165,233,0.14),inset_0_0_24px_rgba(56,189,248,0.04)] backdrop-blur-sm xl:grid-cols-[1fr_1fr_1.15fr_auto]">
           <div>
             <div className="mb-2 text-[9px] uppercase text-white/35">
               Timeframe
@@ -892,13 +892,13 @@ export default function AlphaScannerPage() {
         </section>
 
         {/* Cleaner layout: no internal Signal panel. Chart gets all available center space. */}
-        <section className="grid gap-3 xl:grid-cols-[335px_minmax(0,1fr)_260px]">
-          <aside className="overflow-hidden rounded-[20px] border border-sky-300/15 bg-[#0d3158]">
+        <section className="grid gap-3 xl:grid-cols-[455px_minmax(0,1fr)_285px]">
+          <aside className="min-w-0 overflow-hidden rounded-[20px] border border-cyan-300/35 bg-[#0b2a4b]/95 shadow-[0_0_28px_rgba(14,165,233,0.20),0_0_8px_rgba(34,211,238,0.14),inset_0_0_28px_rgba(56,189,248,0.05)] backdrop-blur-sm">
             <div className="border-b border-sky-300/15 px-4 py-3 text-[11px] font-bold">
               SETUPS ({filtered.length})
             </div>
 
-            <div className="grid grid-cols-[minmax(145px,1fr)_48px_52px_48px_64px] border-b border-sky-300/15 bg-sky-300/[0.035] px-3 py-2.5 text-[8px] uppercase text-white/30">
+            <div className="grid grid-cols-[minmax(190px,1fr)_48px_58px_56px_68px] border-b border-sky-300/15 bg-sky-300/[0.035] px-3 py-2.5 text-[8px] uppercase text-white/30">
               <div>Instrument</div>
               <div>TF</div>
               <div>AI</div>
@@ -914,10 +914,10 @@ export default function AlphaScannerPage() {
                 <button
                   key={`${s.instrument}-${s.tf}`}
                   onClick={() => selectSetup(s)}
-                  className={`grid w-full grid-cols-[minmax(145px,1fr)_48px_52px_48px_64px] items-center border-b border-white/[0.07] px-3 py-3.5 text-left transition ${
+                  className={`grid w-full grid-cols-[minmax(190px,1fr)_48px_58px_56px_68px] items-center border-b border-white/[0.07] px-3 py-3.5 text-left transition ${
                     active
-                      ? "bg-sky-400/15 ring-1 ring-inset ring-sky-400/60"
-                      : "hover:bg-sky-300/[0.07]"
+                      ? "bg-sky-400/18 ring-1 ring-inset ring-cyan-300/70 shadow-[inset_0_0_18px_rgba(34,211,238,0.10)]"
+                      : "hover:bg-sky-300/[0.08] hover:shadow-[inset_0_0_14px_rgba(56,189,248,0.06)]"
                   }`}
                 >
                   <div className="flex min-w-0 items-center gap-2">
@@ -930,7 +930,7 @@ export default function AlphaScannerPage() {
                       <div className="text-[12px] font-bold leading-tight">
                         {s.instrument}
                       </div>
-                      <div className="mt-0.5 text-[8px] leading-tight text-white/40">
+                      <div className="mt-0.5 truncate text-[8px] leading-tight text-white/40">
                         {s.name}
                       </div>
                     </div>
@@ -994,7 +994,7 @@ export default function AlphaScannerPage() {
             ) : null}
           </div>
 
-          <aside className="rounded-[20px] border border-sky-300/15 bg-[#0d3158] p-4">
+          <aside className="rounded-[20px] border border-cyan-300/35 bg-[#0b2a4b]/95 p-4 shadow-[0_0_28px_rgba(14,165,233,0.20),0_0_8px_rgba(34,211,238,0.14),inset_0_0_28px_rgba(56,189,248,0.05)] backdrop-blur-sm">
             <div className="text-[24px] font-bold">{selected.instrument}</div>
             <div className="text-[10px] text-white/40">{selected.name}</div>
 
@@ -1035,7 +1035,7 @@ export default function AlphaScannerPage() {
               </div>
             </div>
 
-            <div className="mt-5 rounded-2xl bg-[#082746] p-5 text-center">
+            <div className="mt-5 rounded-2xl border border-cyan-300/20 bg-[#082746]/95 p-5 text-center shadow-[0_0_18px_rgba(34,211,238,0.12),inset_0_0_18px_rgba(56,189,248,0.05)]">
               <div className="text-[10px] text-white/40">AI Confidence</div>
               <div className="mt-2 text-5xl font-bold text-emerald-300">
                 {selected.confidence}%
@@ -1063,7 +1063,7 @@ export default function AlphaScannerPage() {
             <button
               type="button"
               onClick={() => setFullChart(true)}
-              className="mt-5 w-full rounded-xl bg-sky-500 py-3 text-[11px] font-bold transition hover:bg-sky-400"
+              className="mt-5 w-full rounded-xl border border-cyan-200/30 bg-sky-500 py-3 text-[11px] font-bold shadow-[0_0_18px_rgba(14,165,233,0.35)] transition hover:bg-sky-400 hover:shadow-[0_0_24px_rgba(56,189,248,0.45)]"
             >
               View Full Chart
             </button>
