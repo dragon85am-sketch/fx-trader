@@ -9,8 +9,6 @@ import {
   Clock3,
   Crosshair,
   Loader2,
-  Maximize2,
-  Minimize2,
   RefreshCw,
   Search,
   ShieldCheck,
@@ -35,7 +33,7 @@ import {
 } from "@/lib/scanners/goldUs30Scanner";
 
 // ======================================================
-// TWELVE DATA TYPES
+// LIVE-RATES US30 + TWELVE DATA TYPES
 // ======================================================
 
 type TwelveValue = {
@@ -77,41 +75,16 @@ type MarketState = {
 };
 
 // ======================================================
-// TWELVE DATA SYMBOLS
+// LIVE-RATES US30 + TWELVE DATA SYMBOLS
 // ======================================================
 
 const TWELVE_SYMBOLS: Record<ScannerSymbol, string> = {
   XAUUSD: "XAU/USD",
+
+  // Jeśli Twelve Data nie zaakceptuje DJI,
+  // zmienimy później tylko ten ticker.
   US30: "DJI",
 };
-
-let resolvedUs30Symbol: string | null = null;
-
-async function resolveProviderSymbol(symbol: ScannerSymbol): Promise<string> {
-  if (symbol !== "US30") return TWELVE_SYMBOLS[symbol];
-  if (resolvedUs30Symbol) return resolvedUs30Symbol;
-
-  // Index tickers can differ between Twelve Data plans/feeds. Resolve the
-  // Dow dynamically instead of leaving the scanner with an invalid symbol.
-  const queries = ["Dow Jones Industrial Average", "Dow Jones", "DJI"];
-  for (const query of queries) {
-    try {
-      const params = new URLSearchParams({ path: "/symbol_search", symbol: query, outputsize: "20" });
-      const response = await fetch(`/api/twelve-data?${params.toString()}`, { cache: "no-store" });
-      if (!response.ok) continue;
-      const json = await response.json();
-      const rows = Array.isArray(json?.data) ? json.data : Array.isArray(json?.values) ? json.values : [];
-      const match = rows.find((row: any) => {
-        const name = String(row?.instrument_name ?? row?.name ?? "").toLowerCase();
-        const type = String(row?.instrument_type ?? row?.type ?? "").toLowerCase();
-        return (name.includes("dow jones industrial") || String(row?.symbol ?? "").toUpperCase() === "DJI") && (type.includes("index") || !type);
-      }) ?? rows.find((row: any) => String(row?.instrument_name ?? row?.name ?? "").toLowerCase().includes("dow jones"));
-      const candidate = String(match?.symbol ?? "").trim();
-      if (candidate) { resolvedUs30Symbol = candidate; return candidate; }
-    } catch {}
-  }
-  return TWELVE_SYMBOLS.US30;
-}
 
 // ======================================================
 // INITIAL STATE
@@ -139,7 +112,7 @@ function createEmptyMarket(
 }
 
 // ======================================================
-// TWELVE DATA -> SCANNER
+// LIVE-RATES US30 + TWELVE DATA -> SCANNER
 // ======================================================
 
 function toScannerCandles(
@@ -202,7 +175,7 @@ function toTimestamp(
 }
 
 // ======================================================
-// TWELVE DATA -> CHART
+// LIVE-RATES US30 + TWELVE DATA -> CHART
 // ======================================================
 
 function toChartCandles(
@@ -234,7 +207,7 @@ function toChartCandles(
 }
 
 // ======================================================
-// FETCH TWELVE DATA
+// FETCH LIVE-RATES US30 + TWELVE DATA
 // ======================================================
 
 async function fetchCandles(
@@ -242,41 +215,54 @@ async function fetchCandles(
   interval: "1min" | "5min",
   outputsize: number,
 ): Promise<TwelveValue[]> {
-  const providerSymbol =
-    await resolveProviderSymbol(symbol);
+  // US30 uses our shared FX Trade candle engine fed by Live-Rates.
+  // XAUUSD remains on Twelve Data for now.
+  if (symbol === "US30") {
+    const params = new URLSearchParams({
+      interval,
+      limit: String(outputsize),
+    });
+
+    const response = await fetch(`/api/us30/candles?${params.toString()}`, {
+      method: "GET",
+      cache: "no-store",
+      headers: { Accept: "application/json" },
+    });
+
+    const data = (await response.json()) as TwelveResponse & { warmup?: boolean };
+
+    if (!response.ok || data?.status === "error" || !Array.isArray(data?.values)) {
+      throw new Error(
+        data?.message ||
+          data?.error ||
+          `US30 ${interval}: FX Trade candle engine nie ma jeszcze danych`,
+      );
+    }
+
+    if (data.values.length === 0) {
+      throw new Error(`US30 ${interval}: candle engine rozgrzewa historię`);
+    }
+
+    return data.values;
+  }
+
+  const providerSymbol = TWELVE_SYMBOLS[symbol];
 
   const params = new URLSearchParams({
     path: "/time_series",
-
     symbol: providerSymbol,
-
     interval,
-
-    outputsize:
-      String(outputsize),
-
+    outputsize: String(outputsize),
     format: "JSON",
-
-    // Scanner liczy sesje w czasie New York.
-    timezone:
-      "America/New_York",
-
+    timezone: "America/New_York",
     order: "asc",
   });
 
-  const response = await fetch(
-    `/api/twelve-data?${params.toString()}`,
-    {
-      method: "GET",
-
-      cache: "no-store",
-
-      headers: {
-        Accept:
-          "application/json",
-      },
-    },
-  );
+  const response = await fetch(`/api/twelve-data?${params.toString()}`, {
+    method: "GET",
+    cache: "no-store",
+    headers: { Accept: "application/json" },
+  });
 
   let data: TwelveResponse;
 
@@ -517,6 +503,440 @@ function LevelBox({
   );
 }
 
+
+// ======================================================
+// MTF TECHNICAL MATRIX
+// ======================================================
+
+type MatrixState = "BULL" | "BEAR" | "NEUTRAL";
+
+type MatrixRow = {
+  tf: string;
+  state: MatrixState;
+  wt1: number | null;
+  mfi: number | null;
+  signal: "BUY" | "SELL" | "WAIT";
+};
+
+type TechMatrix = {
+  rows: MatrixRow[];
+  bullCount: number;
+  bearCount: number;
+  adx: number | null;
+  emaBullish: boolean | null;
+  momentum: number | null;
+  atr: number | null;
+};
+
+function ema(values: number[], period: number): number | null {
+  if (values.length < period) return null;
+
+  const k = 2 / (period + 1);
+  let value = values.slice(0, period).reduce((sum, item) => sum + item, 0) / period;
+
+  for (let i = period; i < values.length; i += 1) {
+    value = values[i] * k + value * (1 - k);
+  }
+
+  return value;
+}
+
+function aggregateCandles(
+  candles: ScannerCandle[],
+  groupSize: number,
+): ScannerCandle[] {
+  if (groupSize <= 1) return candles;
+
+  const result: ScannerCandle[] = [];
+
+  for (let i = 0; i + groupSize <= candles.length; i += groupSize) {
+    const group = candles.slice(i, i + groupSize);
+    const first = group[0];
+    const last = group[group.length - 1];
+
+    result.push({
+      datetime: last.datetime,
+      open: first.open,
+      high: Math.max(...group.map((item) => item.high)),
+      low: Math.min(...group.map((item) => item.low)),
+      close: last.close,
+      volume: group.reduce(
+        (sum, item) => sum + (Number.isFinite(item.volume) ? Number(item.volume) : 0),
+        0,
+      ),
+    });
+  }
+
+  return result;
+}
+
+function calcAtr(candles: ScannerCandle[], period = 14): number | null {
+  if (candles.length < period + 1) return null;
+
+  const trs: number[] = [];
+
+  for (let i = 1; i < candles.length; i += 1) {
+    const current = candles[i];
+    const previous = candles[i - 1];
+    trs.push(
+      Math.max(
+        current.high - current.low,
+        Math.abs(current.high - previous.close),
+        Math.abs(current.low - previous.close),
+      ),
+    );
+  }
+
+  const recent = trs.slice(-period);
+  return recent.reduce((sum, value) => sum + value, 0) / recent.length;
+}
+
+function calcRsi(values: number[], period = 14): number | null {
+  if (values.length < period + 1) return null;
+
+  let gains = 0;
+  let losses = 0;
+
+  for (let i = values.length - period; i < values.length; i += 1) {
+    const change = values[i] - values[i - 1];
+    if (change >= 0) gains += change;
+    else losses += Math.abs(change);
+  }
+
+  if (losses === 0) return 100;
+  const rs = gains / losses;
+  return 100 - 100 / (1 + rs);
+}
+
+function calcMfi(candles: ScannerCandle[], period = 14): number | null {
+  if (candles.length < period + 1) return null;
+
+  let positive = 0;
+  let negative = 0;
+
+  for (let i = candles.length - period; i < candles.length; i += 1) {
+    const current = candles[i];
+    const previous = candles[i - 1];
+    const currentTypical = (current.high + current.low + current.close) / 3;
+    const previousTypical = (previous.high + previous.low + previous.close) / 3;
+    const volume =
+      Number.isFinite(current.volume) && Number(current.volume) > 0
+        ? Number(current.volume)
+        : 1;
+    const flow = currentTypical * volume;
+
+    if (currentTypical >= previousTypical) positive += flow;
+    else negative += flow;
+  }
+
+  if (negative === 0) return 100;
+  const ratio = positive / negative;
+  return 100 - 100 / (1 + ratio);
+}
+
+function calcWaveTrend(candles: ScannerCandle[]): number | null {
+  if (candles.length < 30) return null;
+
+  const typical = candles.map((item) => (item.high + item.low + item.close) / 3);
+  const esa = ema(typical, 10);
+  if (esa === null) return null;
+
+  const deviations = typical.map((value) => Math.abs(value - esa));
+  const d = ema(deviations, 10);
+  if (d === null || d === 0) return null;
+
+  const ci = typical.map((value) => (value - esa) / (0.015 * d));
+  return ema(ci, 21);
+}
+
+function calcAdx(candles: ScannerCandle[], period = 14): number | null {
+  if (candles.length < period * 2 + 1) return null;
+
+  const tr: number[] = [];
+  const plusDm: number[] = [];
+  const minusDm: number[] = [];
+
+  for (let i = 1; i < candles.length; i += 1) {
+    const current = candles[i];
+    const previous = candles[i - 1];
+
+    tr.push(
+      Math.max(
+        current.high - current.low,
+        Math.abs(current.high - previous.close),
+        Math.abs(current.low - previous.close),
+      ),
+    );
+
+    const upMove = current.high - previous.high;
+    const downMove = previous.low - current.low;
+
+    plusDm.push(upMove > downMove && upMove > 0 ? upMove : 0);
+    minusDm.push(downMove > upMove && downMove > 0 ? downMove : 0);
+  }
+
+  const dxValues: number[] = [];
+
+  for (let end = period; end <= tr.length; end += 1) {
+    const trSum = tr.slice(end - period, end).reduce((sum, value) => sum + value, 0);
+    if (trSum === 0) continue;
+
+    const plusSum = plusDm.slice(end - period, end).reduce((sum, value) => sum + value, 0);
+    const minusSum = minusDm.slice(end - period, end).reduce((sum, value) => sum + value, 0);
+
+    const plusDi = (plusSum / trSum) * 100;
+    const minusDi = (minusSum / trSum) * 100;
+    const denominator = plusDi + minusDi;
+
+    if (denominator === 0) continue;
+    dxValues.push((Math.abs(plusDi - minusDi) / denominator) * 100);
+  }
+
+  if (dxValues.length < period) return null;
+  const recent = dxValues.slice(-period);
+  return recent.reduce((sum, value) => sum + value, 0) / recent.length;
+}
+
+function buildMatrixRow(tf: string, candles: ScannerCandle[]): MatrixRow {
+  const closes = candles.map((item) => item.close);
+  const fast = ema(closes, 8);
+  const slow = ema(closes, 21);
+  const last = closes.at(-1) ?? null;
+  const wt1 = calcWaveTrend(candles);
+  const mfi = calcMfi(candles);
+
+  let state: MatrixState = "NEUTRAL";
+
+  if (last !== null && fast !== null && slow !== null) {
+    if (fast > slow && last >= fast) state = "BULL";
+    else if (fast < slow && last <= fast) state = "BEAR";
+  }
+
+  let signal: MatrixRow["signal"] = "WAIT";
+  if (state === "BULL" && (mfi ?? 50) >= 50 && (wt1 ?? 0) >= -15) signal = "BUY";
+  if (state === "BEAR" && (mfi ?? 50) <= 50 && (wt1 ?? 0) <= 15) signal = "SELL";
+
+  return { tf, state, wt1, mfi, signal };
+}
+
+function buildTechMatrix(m1: ScannerCandle[], m5: ScannerCandle[]): TechMatrix {
+  const m15 = aggregateCandles(m5, 3);
+  const h1 = aggregateCandles(m5, 12);
+  const h4 = aggregateCandles(m5, 48);
+
+  const rows = [
+    buildMatrixRow("4H", h4),
+    buildMatrixRow("1H", h1),
+    buildMatrixRow("15m", m15),
+    buildMatrixRow("5m", m5),
+  ];
+
+  const bullCount = rows.filter((row) => row.state === "BULL").length;
+  const bearCount = rows.filter((row) => row.state === "BEAR").length;
+
+  const closes = m1.map((item) => item.close);
+  const ema50 = ema(closes, 50);
+  const ema200 = ema(closes, 200);
+  const last = closes.at(-1) ?? null;
+
+  return {
+    rows,
+    bullCount,
+    bearCount,
+    adx: calcAdx(m1),
+    emaBullish:
+      ema50 !== null && ema200 !== null && last !== null
+        ? ema50 > ema200 && last > ema50
+        : ema50 !== null && ema200 !== null && last !== null
+          ? false
+          : null,
+    momentum:
+      closes.length >= 11 && last !== null
+        ? ((last - closes[closes.length - 11]) / closes[closes.length - 11]) * 100
+        : null,
+    atr: calcAtr(m1),
+  };
+}
+
+function MatrixLight({ value }: { value: number | null }) {
+  const bullish = value !== null && value >= 50;
+
+  return (
+    <span
+      className={`inline-flex h-4 w-4 rounded-full border ${
+        value === null
+          ? "border-slate-500/30 bg-slate-500/20"
+          : bullish
+            ? "border-emerald-300/70 bg-emerald-400 shadow-[0_0_14px_rgba(52,211,153,.72)]"
+            : "border-rose-300/70 bg-rose-500 shadow-[0_0_14px_rgba(244,63,94,.65)]"
+      }`}
+    />
+  );
+}
+
+function TechnicalMatrix({ matrix }: { matrix: TechMatrix }) {
+  const totalSignal = Math.max(matrix.bullCount, matrix.bearCount);
+
+  return (
+    <section className="overflow-hidden rounded-[22px] border border-cyan-400/25 bg-[linear-gradient(145deg,#07192f_0%,#061426_58%,#04101f_100%)] shadow-[0_16px_40px_rgba(2,132,199,.12),0_0_30px_rgba(34,211,238,.08)]">
+      <div className="overflow-x-auto">
+        <div className="min-w-[680px]">
+          <div className="grid grid-cols-[100px_1.15fr_.9fr_.8fr_.9fr] border-b border-sky-400/20 bg-[#071a31] text-center text-[10px] font-black text-sky-100/85">
+            {["TF", "STATE", "WT1", "MFI", "SIGNAL"].map((label) => (
+              <div key={label} className="border-r border-sky-400/15 px-3 py-3 last:border-r-0">
+                {label}
+              </div>
+            ))}
+          </div>
+
+          {matrix.rows.map((row) => {
+            const bull = row.state === "BULL";
+            const bear = row.state === "BEAR";
+
+            return (
+              <div
+                key={row.tf}
+                className={`grid grid-cols-[100px_1.15fr_.9fr_.8fr_.9fr] border-b border-sky-400/12 text-center ${
+                  bull
+                    ? "bg-emerald-500/[0.075]"
+                    : bear
+                      ? "bg-rose-500/[0.075]"
+                      : "bg-slate-500/[0.035]"
+                }`}
+              >
+                <div className="border-r border-sky-400/12 px-3 py-3 text-[12px] font-black">
+                  {row.tf}
+                </div>
+
+                <div className="flex items-center justify-center gap-2 border-r border-sky-400/12 px-3 py-3">
+                  <span
+                    className={`text-[11px] font-black ${
+                      bull ? "text-emerald-300" : bear ? "text-rose-300" : "text-slate-300"
+                    }`}
+                  >
+                    {row.state}
+                  </span>
+                  <span
+                    className={`h-2 w-2 rounded-full ${
+                      bull ? "bg-emerald-400" : bear ? "bg-rose-500" : "bg-slate-500"
+                    }`}
+                  />
+                </div>
+
+                <div className="border-r border-sky-400/12 px-3 py-3 font-mono text-[12px] font-black text-white/90">
+                  {row.wt1 === null ? "—" : row.wt1.toFixed(1)}
+                </div>
+
+                <div className="flex items-center justify-center border-r border-sky-400/12 px-3 py-3">
+                  <MatrixLight value={row.mfi} />
+                </div>
+
+                <div
+                  className={`px-3 py-3 text-[10px] font-black ${
+                    row.signal === "BUY"
+                      ? "text-emerald-300"
+                      : row.signal === "SELL"
+                        ? "text-rose-300"
+                        : "text-slate-500"
+                  }`}
+                >
+                  {row.signal === "WAIT" ? "•••" : row.signal}
+                </div>
+              </div>
+            );
+          })}
+
+          <div className="grid grid-cols-[100px_1.15fr_.9fr_.8fr_.9fr] bg-[#08203b] text-center">
+            <div className="border-r border-sky-400/15 px-3 py-3 text-[11px] font-black">
+              TOTAL
+            </div>
+            <div className="border-r border-sky-400/15 px-3 py-3 text-[11px] font-black">
+              <span className="text-emerald-300">{matrix.bullCount}B</span>
+              <span className="text-slate-400"> / </span>
+              <span className="text-rose-300">{matrix.bearCount}R</span>
+            </div>
+            <div className="border-r border-sky-400/15 px-3 py-3 text-slate-500">—</div>
+            <div className="flex items-center justify-center border-r border-sky-400/15 px-3 py-3">
+              <MatrixLight value={matrix.bullCount >= matrix.bearCount ? 60 : 40} />
+            </div>
+            <div className="px-3 py-3 text-[12px] font-black text-white">{totalSignal}/4</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-px border-t border-sky-400/20 bg-sky-400/10 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="bg-[#061426] p-4">
+          <div className="flex items-center gap-2 text-[9px] font-black text-sky-100/65">
+            <TrendingUp className="h-4 w-4 text-sky-300" />
+            ADX
+          </div>
+          <div className={`mt-2 text-[22px] font-black ${
+            (matrix.adx ?? 0) >= 25 ? "text-emerald-300" : "text-amber-300"
+          }`}>
+            {matrix.adx === null ? "—" : matrix.adx.toFixed(1)}
+          </div>
+          <div className="mt-1 text-[8px] font-bold uppercase tracking-wider text-sky-200/40">
+            {(matrix.adx ?? 0) >= 25 ? "TREND STRONG" : "TREND WEAK"}
+          </div>
+        </div>
+
+        <div className="bg-[#061426] p-4">
+          <div className="flex items-center gap-2 text-[9px] font-black text-sky-100/65">
+            <BarChart3 className="h-4 w-4 text-cyan-300" />
+            EMA 50 / 200
+          </div>
+          <div className={`mt-2 text-[16px] font-black ${
+            matrix.emaBullish === null
+              ? "text-slate-400"
+              : matrix.emaBullish
+                ? "text-emerald-300"
+                : "text-rose-300"
+          }`}>
+            {matrix.emaBullish === null ? "NO DATA" : matrix.emaBullish ? "BULLISH" : "BEARISH"}
+          </div>
+          <div className="mt-1 text-[8px] font-bold uppercase tracking-wider text-sky-200/40">
+            M1 trend filter
+          </div>
+        </div>
+
+        <div className="bg-[#061426] p-4">
+          <div className="flex items-center gap-2 text-[9px] font-black text-sky-100/65">
+            <Zap className="h-4 w-4 text-cyan-300" />
+            MOMENTUM
+          </div>
+          <div className={`mt-2 text-[16px] font-black ${
+            (matrix.momentum ?? 0) > 0
+              ? "text-emerald-300"
+              : (matrix.momentum ?? 0) < 0
+                ? "text-rose-300"
+                : "text-slate-400"
+          }`}>
+            {matrix.momentum === null
+              ? "—"
+              : `${matrix.momentum > 0 ? "+" : ""}${matrix.momentum.toFixed(2)}%`}
+          </div>
+          <div className="mt-1 text-[8px] font-bold uppercase tracking-wider text-sky-200/40">
+            10 candles M1
+          </div>
+        </div>
+
+        <div className="bg-[#061426] p-4">
+          <div className="flex items-center gap-2 text-[9px] font-black text-sky-100/65">
+            <Activity className="h-4 w-4 text-sky-300" />
+            ATR (14)
+          </div>
+          <div className="mt-2 text-[18px] font-black text-sky-300">
+            {matrix.atr === null ? "—" : matrix.atr.toFixed(2)}
+          </div>
+          <div className="mt-1 text-[8px] font-bold uppercase tracking-wider text-sky-200/40">
+            M1 volatility
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 // ======================================================
 // MAIN
 // ======================================================
@@ -546,22 +966,6 @@ export default function ProScanner() {
 
   const [scanning, setScanning] =
     React.useState(false);
-
-  const [chartFullscreen, setChartFullscreen] = React.useState(false);
-
-  React.useEffect(() => {
-    if (!chartFullscreen) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setChartFullscreen(false);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [chartFullscreen]);
 
   const current =
     selectedSymbol === "XAUUSD"
@@ -771,6 +1175,11 @@ export default function ProScanner() {
       ? "SELL"
       : "BUY";
 
+  const technicalMatrix = React.useMemo(
+    () => buildTechMatrix(current.m1, current.m5),
+    [current.m1, current.m5],
+  );
+
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,#0a2a52_0%,#061a33_34%,#041225_70%,#030b16_100%)] text-white">
       <div className="mx-auto max-w-[1760px] px-4 py-5 lg:px-6 xl:px-7">
@@ -808,7 +1217,7 @@ export default function ProScanner() {
                   <span>·</span>
 
                   <span>
-                    Sesja Nowy Jork
+                    New York Session
                   </span>
 
                   <span>·</span>
@@ -821,14 +1230,6 @@ export default function ProScanner() {
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setChartFullscreen(true)}
-                className="flex h-11 items-center gap-2 rounded-xl border border-sky-300/25 bg-sky-500/10 px-4 text-[10px] font-black text-sky-100 transition hover:bg-sky-500/20"
-              >
-                <Maximize2 className="h-4 w-4" />
-                PEŁNY EKRAN WYKRESU
-              </button>
               <div className="flex h-11 items-center gap-2 rounded-xl border border-emerald-300/20 bg-emerald-400/[0.08] px-4">
                 <span className="relative flex h-2 w-2">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-40" />
@@ -837,7 +1238,7 @@ export default function ProScanner() {
                 </span>
 
                 <span className="text-[9px] font-black text-emerald-300">
-                  TWELVE DATA
+                  LIVE-RATES US30 + TWELVE DATA
                 </span>
               </div>
 
@@ -858,8 +1259,8 @@ export default function ProScanner() {
                 )}
 
                 {scanning
-                  ? "SKANOWANIE..."
-                  : "SKANUJ SETUPY"}
+                  ? "SCANNING..."
+                  : "SCAN SETUPS"}
               </button>
             </div>
           </div>
@@ -1101,12 +1502,12 @@ export default function ProScanner() {
                       </h2>
 
                       <span className="rounded-md border border-sky-300/15 bg-[#0b2b52]/80 px-2 py-1 text-[8px] font-bold text-sky-100/55">
-                        M5 â†’ M1
+                        M5 → M1
                       </span>
                     </div>
 
                     <div className="mt-1 text-[9px] text-sky-200/45">
-                      Sesja Nowy Jork
+                      New York Session
                     </div>
                   </div>
                 </div>
@@ -1145,6 +1546,12 @@ export default function ProScanner() {
               </div>
             </div>
 
+            {/* MULTI-TIMEFRAME TECHNICAL MATRIX */}
+
+            {!current.loading && current.m1.length > 0 && current.m5.length > 0 ? (
+              <TechnicalMatrix matrix={technicalMatrix} />
+            ) : null}
+
             {/* ERROR */}
 
             {current.error ? (
@@ -1172,18 +1579,6 @@ export default function ProScanner() {
                 ) : null}
               </div>
             ) : null}
-
-            <div className={chartFullscreen ? "fixed inset-0 z-[150] overflow-auto bg-[#020914] p-3 md:p-5" : ""}>
-              <div className="mb-3 flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => setChartFullscreen((value) => !value)}
-                  className="inline-flex items-center gap-2 rounded-xl border border-cyan-300/25 bg-cyan-500/10 px-4 py-2 text-[11px] font-black text-cyan-200 transition hover:bg-cyan-500/20"
-                >
-                  {chartFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-                  {chartFullscreen ? "ZAMKNIJ PEŁNY EKRAN" : "PEŁNY EKRAN WYKRESU"}
-                </button>
-              </div>
 
             {/* LOADING */}
 
@@ -1278,11 +1673,9 @@ export default function ProScanner() {
                 chochPrice={
                   scanner.chochPrice
                 }
-                height={chartFullscreen ? Math.max(620, typeof window !== "undefined" ? window.innerHeight - 110 : 760) : 620}
+                height={620}
               />
             ) : null}
-
-            </div>
 
             {/* CONFIRMATIONS */}
 
@@ -1336,11 +1729,11 @@ export default function ProScanner() {
                   }
                   description={`VWAP ${
                     scanner.vwapConfirmed
-                      ? "âœ“"
+                      ? "✓"
                       : "—"
                   } · Momentum ${
                     scanner.momentumConfirmed
-                      ? "âœ“"
+                      ? "✓"
                       : "—"
                   }`}
                 />
@@ -1664,7 +2057,7 @@ export default function ProScanner() {
                   </div>
 
                   <div className="mt-2 text-[9px] text-sky-200/45">
-                    Kliknij SKANUJ SETUPY
+                    Kliknij SCAN SETUPS
                   </div>
                 </div>
               </div>
@@ -1682,7 +2075,7 @@ export default function ProScanner() {
 
               <span>
                 GOLD / US30 · M5
-                Bias â†’ M1 Timing
+                Bias → M1 Timing
               </span>
             </div>
           </section>

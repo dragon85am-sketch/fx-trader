@@ -40,22 +40,6 @@ type Setup = {
   rr: string;
 };
 
-
-type CandleCacheEntry = {
-  fetchedAt: number;
-  candles: CandlestickData[];
-};
-
-const CACHE_TTL_MS: Record<TF, number> = {
-  M5: 5 * 60_000,
-  M15: 15 * 60_000,
-  H1: 60 * 60_000,
-  H4: 4 * 60 * 60_000,
-  D1: 12 * 60 * 60_000,
-};
-
-const AUTO_CHECK_MS = 60_000;
-
 const SETUPS: Setup[] = [
   {
     instrument: "XAUUSD",
@@ -267,13 +251,6 @@ export default function AlphaScannerPage() {
   const [scanLoading, setScanLoading] = React.useState(false);
   const [error, setError] = React.useState("");
   const [fullChart, setFullChart] = React.useState(false);
-  const [lastUpdated, setLastUpdated] = React.useState<Date | null>(null);
-  const [dataSource, setDataSource] = React.useState<"API" | "CACHE" | null>(null);
-
-  const candleCacheRef = React.useRef<Record<string, CandleCacheEntry>>({});
-  const inFlightRef = React.useRef<
-    Record<string, Promise<CandlestickData[]> | undefined>
-  >({});
 
   const filtered = React.useMemo(() => {
     return SETUPS.filter((s) => {
@@ -290,180 +267,129 @@ export default function AlphaScannerPage() {
     });
   }, [tf, trend, liquidity]);
 
-  const loadCandles = React.useCallback(
-    async (
-      setup: Setup,
-      options?: {
-        force?: boolean;
-        silent?: boolean;
-      }
-    ) => {
-      const force = options?.force ?? false;
-      const silent = options?.silent ?? false;
+  const loadCandles = React.useCallback(async (setup: Setup) => {
+    setLoading(true);
+    setError("");
 
-      if (!silent) setLoading(true);
-      setError("");
+    const intervalMap: Record<TF, string> = {
+      M5: "5min",
+      M15: "15min",
+      H1: "1h",
+      H4: "4h",
+      D1: "1day",
+    };
 
-      const intervalMap: Record<TF, string> = {
-        M5: "5min",
-        M15: "15min",
-        H1: "1h",
-        H4: "4h",
-        D1: "1day",
-      };
+    const symbolMap: Record<string, string> = {
+      XAUUSD: "XAU/USD",
+      EURUSD: "EUR/USD",
+      GBPUSD: "GBP/USD",
+      USDJPY: "USD/JPY",
+      US30: "DJI",
+      BTCUSD: "BTC/USD",
+      ETHUSD: "ETH/USD",
+      SOLUSD: "SOL/USD",
+    };
 
-      const symbolMap: Record<string, string> = {
-        XAUUSD: "XAU/USD",
-        EURUSD: "EUR/USD",
-        GBPUSD: "GBP/USD",
-        USDJPY: "USD/JPY",
-        US30: "DJI",
-        BTCUSD: "BTC/USD",
-        ETHUSD: "ETH/USD",
-        SOLUSD: "SOL/USD",
-      };
-
-      const cacheKey = `${setup.instrument}|${setup.tf}`;
-      const ttl = CACHE_TTL_MS[setup.tf];
-      const cached = candleCacheRef.current[cacheKey];
-
-      if (!force && cached && Date.now() - cached.fetchedAt < ttl) {
-        setCandles(cached.candles);
-        setLastUpdated(new Date(cached.fetchedAt));
-        setDataSource("CACHE");
-        if (!silent) setLoading(false);
-        return cached.candles;
-      }
-
-      const existingRequest = inFlightRef.current[cacheKey];
-
-      if (existingRequest) {
-        try {
-          const shared = await existingRequest;
-          setCandles(shared);
-          setDataSource("CACHE");
-          return shared;
-        } finally {
-          if (!silent) setLoading(false);
-        }
-      }
-
-      const requestPromise = (async (): Promise<CandlestickData[]> => {
-        const qs = new URLSearchParams({
-          path: "/time_series",
-          symbol: symbolMap[setup.instrument] ?? setup.instrument,
-          interval: intervalMap[setup.tf],
-          outputsize: "220",
-          format: "JSON",
-        });
-
-        const response = await fetch(`/api/twelve-data?${qs.toString()}`, {
-          method: "GET",
-          cache: "no-store",
-        });
-
-        const raw = await response.text();
-        let data: any;
-
-        try {
-          data = JSON.parse(raw);
-        } catch {
-          const looksLikeHtml = raw.trim().startsWith("<");
-          throw new Error(
-            looksLikeHtml
-              ? "Endpoint /api/twelve-data zwrócił HTML zamiast JSON. Sprawdź route.ts."
-              : `Nieprawidłowa odpowiedź API: ${raw.slice(0, 140)}`
-          );
-        }
-
-        if (!response.ok || data?.status === "error" || data?.error) {
-          throw new Error(
-            data?.message || data?.error || "Nie udało się pobrać świec z Twelve Data."
-          );
-        }
-
-        const values = Array.isArray(data?.values) ? data.values : [];
-
-        const next: CandlestickData[] = values
-          .map((c: any) => {
-            const rawDate = String(c.datetime ?? "");
-            const normalized = rawDate.includes("T") ? rawDate : rawDate.replace(" ", "T");
-            const parsed = Date.parse(
-              /Z$|[+-]\d\d:\d\d$/.test(normalized) ? normalized : `${normalized}Z`
-            );
-
-            return {
-              time: Math.floor(parsed / 1000) as UTCTimestamp,
-              open: Number(c.open),
-              high: Number(c.high),
-              low: Number(c.low),
-              close: Number(c.close),
-            };
+    try {
+      const isUs30 = setup.instrument === "US30";
+      const qs = isUs30
+        ? new URLSearchParams({
+            interval: intervalMap[setup.tf],
+            limit: "220",
           })
-          .filter(
-            (c: any) =>
-              Number.isFinite(Number(c.time)) &&
-              Number.isFinite(c.open) &&
-              Number.isFinite(c.high) &&
-              Number.isFinite(c.low) &&
-              Number.isFinite(c.close)
-          )
-          .sort((a: any, b: any) => Number(a.time) - Number(b.time));
+        : new URLSearchParams({
+            path: "/time_series",
+            symbol: symbolMap[setup.instrument] ?? setup.instrument,
+            interval: intervalMap[setup.tf],
+            outputsize: "220",
+            format: "JSON",
+          });
 
-        if (!next.length) {
-          throw new Error(
-            data?.message || `Twelve Data nie zwróciło świec dla ${setup.instrument} ${setup.tf}.`
-          );
-        }
+      const response = await fetch(
+        isUs30
+          ? `/api/us30/candles?${qs.toString()}`
+          : `/api/twelve-data?${qs.toString()}`,
+        { method: "GET", cache: "no-store" }
+      );
 
-        const fetchedAt = Date.now();
-        candleCacheRef.current[cacheKey] = { fetchedAt, candles: next };
-        setLastUpdated(new Date(fetchedAt));
-        setDataSource("API");
-        return next;
-      })();
-
-      inFlightRef.current[cacheKey] = requestPromise;
+      const raw = await response.text();
+      let data: any;
 
       try {
-        const next = await requestPromise;
-        setCandles(next);
-        return next;
-      } catch (e) {
-        if (cached?.candles?.length) {
-          setCandles(cached.candles);
-          setLastUpdated(new Date(cached.fetchedAt));
-          setDataSource("CACHE");
-          setError(
-            `${e instanceof Error ? e.message : "Błąd Twelve Data"} · pokazuję ostatnie dane z cache`
-          );
-          return cached.candles;
-        }
-
-        setCandles([]);
-        setDataSource(null);
-        setError(e instanceof Error ? e.message : "Błąd pobierania Twelve Data");
-        return [];
-      } finally {
-        delete inFlightRef.current[cacheKey];
-        if (!silent) setLoading(false);
+        data = JSON.parse(raw);
+      } catch {
+        const looksLikeHtml = raw.trim().startsWith("<");
+        throw new Error(
+          looksLikeHtml
+            ? "Endpoint /api/twelve-data zwrócił HTML zamiast JSON. Sprawdź, czy route.ts jest dokładnie pod app/api/twelve-data/route.ts."
+            : `Nieprawidłowa odpowiedź API: ${raw.slice(0, 140)}`
+        );
       }
-    },
-    []
-  );
 
+      if (!response.ok || data?.status === "error" || data?.error) {
+        throw new Error(
+          data?.message ||
+            data?.error ||
+            (isUs30
+              ? "US30: FX Trade candle engine nie ma jeszcze wystarczającej historii."
+              : "Nie udało się pobrać świec z Twelve Data.")
+        );
+      }
+
+      const values = Array.isArray(data?.values) ? data.values : [];
+
+      const next: CandlestickData[] = values
+        .map((c: any) => {
+          const raw = String(c.datetime ?? "");
+          const normalized = raw.includes("T")
+            ? raw
+            : raw.replace(" ", "T");
+
+          const parsed = Date.parse(
+            /Z$|[+-]\d\d:\d\d$/.test(normalized)
+              ? normalized
+              : `${normalized}Z`
+          );
+
+          return {
+            time: Math.floor(parsed / 1000) as UTCTimestamp,
+            open: Number(c.open),
+            high: Number(c.high),
+            low: Number(c.low),
+            close: Number(c.close),
+          };
+        })
+        .filter(
+          (c: any) =>
+            Number.isFinite(Number(c.time)) &&
+            Number.isFinite(c.open) &&
+            Number.isFinite(c.high) &&
+            Number.isFinite(c.low) &&
+            Number.isFinite(c.close)
+        )
+        .sort((a: any, b: any) => Number(a.time) - Number(b.time));
+
+      if (!next.length) {
+        throw new Error(
+          data?.message ||
+            `Twelve Data nie zwróciło świec dla ${setup.instrument} ${setup.tf}.`
+        );
+      }
+
+      setCandles(next);
+    } catch (e) {
+      setCandles([]);
+      setError(
+        e instanceof Error ? e.message : "Błąd pobierania Twelve Data"
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   React.useEffect(() => {
-    void loadCandles(selected);
+    loadCandles(selected);
   }, [selected.instrument, selected.tf, loadCandles]);
-
-  React.useEffect(() => {
-    const timer = window.setInterval(() => {
-      void loadCandles(selected, { silent: true });
-    }, AUTO_CHECK_MS);
-
-    return () => window.clearInterval(timer);
-  }, [selected, loadCandles]);
 
   React.useEffect(() => {
     if (!fullChart) return;
@@ -488,22 +414,15 @@ export default function AlphaScannerPage() {
     setSelected(setup);
   };
 
-  const runScan = async () => {
-    if (scanLoading) return;
-
+  const runScan = () => {
     setScanLoading(true);
 
-    try {
-      const target = filtered[0] ?? selected;
-
-      if (target.instrument !== selected.instrument || target.tf !== selected.tf) {
-        setSelected(target);
-      }
-
-      await loadCandles(target);
-    } finally {
+    window.setTimeout(async () => {
+      const first = filtered[0] ?? selected;
+      setSelected(first);
+      await loadCandles(first);
       setScanLoading(false);
-    }
+    }, 350);
   };
 
   const reset = () => {
@@ -574,8 +493,8 @@ export default function AlphaScannerPage() {
   );
 
   return (
-    <main className="min-h-screen w-full bg-[#061a31] px-2 py-3 text-white md:px-3 xl:px-4">
-      <div className="mx-auto w-full max-w-none space-y-4">
+    <main className="min-h-screen bg-[#061a33] px-3 py-4 text-white md:px-5">
+      <div className="mx-auto max-w-[1950px] space-y-4">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <Link
@@ -595,7 +514,7 @@ export default function AlphaScannerPage() {
 
           <div className="flex items-center gap-3">
             <div className="rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-2 text-[11px] font-bold text-emerald-300">
-              â— SMART CACHE
+              ● LIVE
             </div>
 
             <button
@@ -723,7 +642,7 @@ export default function AlphaScannerPage() {
         </section>
 
         {/* Cleaner layout: no internal Signal panel. Chart gets all available center space. */}
-        <section className="grid w-full gap-3 xl:grid-cols-[390px_minmax(0,1fr)_285px]">
+        <section className="grid gap-3 xl:grid-cols-[335px_minmax(0,1fr)_260px]">
           <aside className="overflow-hidden rounded-[20px] border border-sky-300/15 bg-[#0d3158]">
             <div className="border-b border-sky-300/15 px-4 py-3 text-[11px] font-bold">
               SETUPS ({filtered.length})
@@ -815,7 +734,7 @@ export default function AlphaScannerPage() {
               sl={liveLevels.sl}
               tp1={liveLevels.tp1}
               tp2={liveLevels.tp2}
-              height={840}
+              height={760}
             />
 
             {error ? (
@@ -823,17 +742,6 @@ export default function AlphaScannerPage() {
                 Twelve Data: {error}
               </div>
             ) : null}
-
-            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 px-1 text-[9px] text-white/35">
-              <span>
-                Dane: {dataSource === "CACHE" ? "cache" : dataSource === "API" ? "Twelve Data API" : "—"}
-              </span>
-              <span>
-                {lastUpdated
-                  ? `Aktualizacja: ${lastUpdated.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`
-                  : "Brak aktualizacji"}
-              </span>
-            </div>
           </div>
 
           <aside className="rounded-[20px] border border-sky-300/15 bg-[#0d3158] p-4">
@@ -939,7 +847,7 @@ export default function AlphaScannerPage() {
                     onClick={() => setFullChart(false)}
                     className="rounded-xl border border-sky-300/15 bg-sky-300/[0.06] px-4 py-2 text-[11px] font-semibold text-white/80 transition hover:bg-sky-300/[0.12]"
                   >
-                    Zamknij âœ•
+                    Zamknij ✕
                   </button>
                 </div>
               </div>
@@ -967,4 +875,3 @@ export default function AlphaScannerPage() {
     </main>
   );
 }
-

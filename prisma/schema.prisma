@@ -30,7 +30,7 @@ model User {
 
   tokenVersion Int @default(0)
 
-  referredByUserId String?
+  referredByUserId     String?
   referredByCampaignId String?
 
   stripeCustomerId     String? @unique
@@ -48,9 +48,9 @@ model User {
   payoutRequests PayoutRequest[]
 
   passwordResetTokens PasswordResetToken[]
-  sessionMessages SessionMessage[]
-  sessionPresence SessionPresence?
-  affiliateCampaigns AffiliateCampaign[]
+  sessionMessages     SessionMessage[]
+  sessionPresence     SessionPresence?
+  affiliateCampaigns  AffiliateCampaign[]
 }
 
 model PasswordResetToken {
@@ -142,7 +142,6 @@ model SessionMessage {
   @@index([userId])
 }
 
-
 model SessionPresence {
   id       String   @id @default(cuid())
   userId   String   @unique
@@ -155,14 +154,15 @@ model SessionPresence {
 }
 
 model AffiliateCampaign {
-  id String @id @default(cuid())
-  userId String
-  name String
-  slug String
-  clicks Int @default(0)
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  slug      String
+  clicks    Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@unique([userId, slug])
   @@index([userId])
 }
