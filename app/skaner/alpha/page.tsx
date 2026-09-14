@@ -25,6 +25,7 @@ type Setup = {
   name: string;
   tf: TF;
   trend: boolean;
+  trendDirection?: "UP" | "DOWN" | "NEUTRAL";
   sweep: boolean;
   momentum: boolean;
   liquidityPct: number;
@@ -241,22 +242,289 @@ function Pass({ value }: { value: boolean }) {
   );
 }
 
+
+const INTERVAL_MAP: Record<TF, string> = {
+  M5: "5min",
+  M15: "15min",
+  H1: "1h",
+  H4: "4h",
+  D1: "1day",
+};
+
+const SYMBOL_MAP: Record<string, string> = {
+  XAUUSD: "XAU/USD",
+  EURUSD: "EUR/USD",
+  GBPUSD: "GBP/USD",
+  USDJPY: "USD/JPY",
+  US30: "DJI",
+  BTCUSD: "BTC/USD",
+  ETHUSD: "ETH/USD",
+  SOLUSD: "SOL/USD",
+};
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function emaValue(values: number[], period: number): number | null {
+  if (values.length < period) return null;
+  const k = 2 / (period + 1);
+  let ema = values.slice(0, period).reduce((sum, value) => sum + value, 0) / period;
+  for (let i = period; i < values.length; i += 1) {
+    ema = values[i] * k + ema * (1 - k);
+  }
+  return ema;
+}
+
+function formatSetupNumber(instrument: string, value: number) {
+  if (instrument === "EURUSD" || instrument === "GBPUSD") return value.toFixed(5);
+  if (instrument === "USDJPY") return value.toFixed(3);
+  if (instrument === "SOLUSD") return value.toFixed(3);
+  return value.toFixed(2);
+}
+
+function analyzeSetup(base: Setup, candles: CandlestickData[]): Setup {
+  const data = candles as any[];
+  if (data.length < 30) return base;
+
+  const closes = data.map((c) => Number(c.close));
+  const ema20 = emaValue(closes, 20);
+  const ema50 = emaValue(closes, 50) ?? emaValue(closes, Math.min(30, closes.length));
+  const last = data[data.length - 1];
+  const prev = data[data.length - 2];
+  const lastClose = Number(last.close);
+
+  const upTrend = ema20 !== null && ema50 !== null && ema20 > ema50 && lastClose >= ema20;
+  const downTrend = ema20 !== null && ema50 !== null && ema20 < ema50 && lastClose <= ema20;
+  const trendDirection: Setup["trendDirection"] = upTrend ? "UP" : downTrend ? "DOWN" : "NEUTRAL";
+
+  const recentBodySource = data.slice(-16, -1);
+  const avgBody =
+    recentBodySource.reduce(
+      (sum, c) => sum + Math.abs(Number(c.close) - Number(c.open)),
+      0
+    ) / Math.max(1, recentBodySource.length);
+
+  const lastBody = Math.abs(Number(last.close) - Number(last.open));
+  const lastBull = Number(last.close) > Number(last.open);
+  const lastBear = Number(last.close) < Number(last.open);
+  const momentumBull = lastBull && lastBody >= avgBody * 1.15 && lastClose > Number(data[data.length - 4]?.close ?? lastClose);
+  const momentumBear = lastBear && lastBody >= avgBody * 1.15 && lastClose < Number(data[data.length - 4]?.close ?? lastClose);
+
+  const rangeWindow = data.slice(-24, -3);
+  const priorHigh = Math.max(...rangeWindow.map((c) => Number(c.high)));
+  const priorLow = Math.min(...rangeWindow.map((c) => Number(c.low)));
+  const sweepWindow = data.slice(-3);
+  const bullishSweep = sweepWindow.some(
+    (c) => Number(c.low) < priorLow && Number(c.close) > priorLow
+  );
+  const bearishSweep = sweepWindow.some(
+    (c) => Number(c.high) > priorHigh && Number(c.close) < priorHigh
+  );
+
+  const prevOpen = Number(prev.open);
+  const prevClose = Number(prev.close);
+  const lastOpen = Number(last.open);
+  const lastHigh = Number(last.high);
+  const lastLow = Number(last.low);
+  const lastRange = Math.max(1e-12, lastHigh - lastLow);
+  const upperWick = lastHigh - Math.max(lastOpen, lastClose);
+  const lowerWick = Math.min(lastOpen, lastClose) - lastLow;
+
+  const bullishEngulfing =
+    prevClose < prevOpen && lastClose > lastOpen && lastOpen <= prevClose && lastClose >= prevOpen;
+  const bearishEngulfing =
+    prevClose > prevOpen && lastClose < lastOpen && lastOpen >= prevClose && lastClose <= prevOpen;
+  const bullishPin = lowerWick / lastRange >= 0.55 && lastClose >= lastLow + lastRange * 0.6;
+  const bearishPin = upperWick / lastRange >= 0.55 && lastClose <= lastLow + lastRange * 0.4;
+  const insideBar = lastHigh < Number(prev.high) && lastLow > Number(prev.low);
+
+  let priceAction = "Neutral Price Action";
+  let paDirection: "BUY" | "SELL" | null = null;
+  if (bullishEngulfing) {
+    priceAction = "Bullish Engulfing";
+    paDirection = "BUY";
+  } else if (bearishEngulfing) {
+    priceAction = "Bearish Engulfing";
+    paDirection = "SELL";
+  } else if (bullishPin) {
+    priceAction = "Bullish Pin Bar";
+    paDirection = "BUY";
+  } else if (bearishPin) {
+    priceAction = "Bearish Pin Bar";
+    paDirection = "SELL";
+  } else if (insideBar) {
+    priceAction = "Inside Bar";
+  } else if (momentumBull) {
+    priceAction = "Strong Bullish";
+    paDirection = "BUY";
+  } else if (momentumBear) {
+    priceAction = "Strong Bearish";
+    paDirection = "SELL";
+  }
+
+  let bullScore = 0;
+  let bearScore = 0;
+  if (upTrend) bullScore += 3;
+  if (downTrend) bearScore += 3;
+  if (bullishSweep) bullScore += 2;
+  if (bearishSweep) bearScore += 2;
+  if (momentumBull) bullScore += 2;
+  if (momentumBear) bearScore += 2;
+  if (paDirection === "BUY") bullScore += 2;
+  if (paDirection === "SELL") bearScore += 2;
+
+  if (bullScore === bearScore) {
+    const shortMove = lastClose - Number(data[data.length - 6]?.close ?? lastClose);
+    if (shortMove >= 0) bullScore += 1;
+    else bearScore += 1;
+  }
+
+  const direction: Setup["direction"] = bullScore >= bearScore ? "BUY" : "SELL";
+  const trendConfirmed = direction === "BUY" ? upTrend : downTrend;
+  const sweepConfirmed = direction === "BUY" ? bullishSweep : bearishSweep;
+  const momentumConfirmed = direction === "BUY" ? momentumBull : momentumBear;
+  const paConfirmed = paDirection === direction;
+
+  const recentRanges = data.slice(-20).map((c) => Math.abs(Number(c.high) - Number(c.low)));
+  const avgRange = recentRanges.reduce((sum, value) => sum + value, 0) / Math.max(1, recentRanges.length);
+  const currentRange = Math.abs(lastHigh - lastLow);
+  const activityRatio = avgRange > 0 ? currentRange / avgRange : 1;
+  const liquidityPct = Math.round(
+    clamp(48 + Math.min(22, activityRatio * 12) + (sweepConfirmed ? 24 : 0), 40, 96)
+  );
+
+  let confidence = 45;
+  if (trendConfirmed) confidence += 22;
+  if (sweepConfirmed) confidence += 16;
+  if (momentumConfirmed) confidence += 14;
+  if (paConfirmed) confidence += 10;
+  if (liquidityPct >= 70) confidence += 5;
+  if (Math.max(bullScore, bearScore) >= 7) confidence += 4;
+  confidence = Math.round(clamp(confidence, 45, 98));
+
+  const risk = Math.max(avgRange * 1.6, Math.abs(lastClose) * 0.001);
+  const sl = direction === "BUY" ? lastClose - risk : lastClose + risk;
+  const tp1 = direction === "BUY" ? lastClose + risk * 1.5 : lastClose - risk * 1.5;
+  const tp2 = direction === "BUY" ? lastClose + risk * 2.5 : lastClose - risk * 2.5;
+
+  return {
+    ...base,
+    trend: trendConfirmed,
+    trendDirection,
+    sweep: sweepConfirmed,
+    momentum: momentumConfirmed,
+    liquidityPct,
+    priceAction,
+    confidence,
+    direction,
+    status: confidence >= 78 ? "READY" : "WATCH",
+    entry: formatSetupNumber(base.instrument, lastClose),
+    sl: formatSetupNumber(base.instrument, sl),
+    tp1: formatSetupNumber(base.instrument, tp1),
+    tp2: formatSetupNumber(base.instrument, tp2),
+    rr: "1 : 2.5",
+  };
+}
+
+async function fetchSetupCandles(setup: Setup): Promise<CandlestickData[]> {
+  const isUs30 = setup.instrument === "US30";
+  const qs = isUs30
+    ? new URLSearchParams({
+        interval: INTERVAL_MAP[setup.tf],
+        limit: "220",
+      })
+    : new URLSearchParams({
+        path: "/time_series",
+        symbol: SYMBOL_MAP[setup.instrument] ?? setup.instrument,
+        interval: INTERVAL_MAP[setup.tf],
+        outputsize: "220",
+        format: "JSON",
+      });
+
+  const response = await fetch(
+    isUs30
+      ? `/api/us30/candles?${qs.toString()}`
+      : `/api/twelve-data?${qs.toString()}`,
+    { method: "GET", cache: "no-store" }
+  );
+
+  const rawResponse = await response.text();
+  let data: any;
+
+  try {
+    data = JSON.parse(rawResponse);
+  } catch {
+    const looksLikeHtml = rawResponse.trim().startsWith("<");
+    throw new Error(
+      looksLikeHtml
+        ? "Endpoint danych zwrócił HTML zamiast JSON. Sprawdź route API."
+        : `Nieprawidłowa odpowiedź API: ${rawResponse.slice(0, 140)}`
+    );
+  }
+
+  if (!response.ok || data?.status === "error" || data?.error) {
+    throw new Error(
+      data?.message ||
+        data?.error ||
+        (isUs30
+          ? "US30: FX Trade Candle Engine nie ma jeszcze wystarczającej historii."
+          : "Nie udało się pobrać świec z Twelve Data.")
+    );
+  }
+
+  const values = Array.isArray(data?.values) ? data.values : [];
+  const next: CandlestickData[] = values
+    .map((c: any) => {
+      const raw = String(c.datetime ?? "");
+      const normalized = raw.includes("T") ? raw : raw.replace(" ", "T");
+      const parsed = Date.parse(
+        /Z$|[+-]\d\d:\d\d$/.test(normalized) ? normalized : `${normalized}Z`
+      );
+
+      return {
+        time: Math.floor(parsed / 1000) as UTCTimestamp,
+        open: Number(c.open),
+        high: Number(c.high),
+        low: Number(c.low),
+        close: Number(c.close),
+      };
+    })
+    .filter(
+      (c: any) =>
+        Number.isFinite(Number(c.time)) &&
+        Number.isFinite(c.open) &&
+        Number.isFinite(c.high) &&
+        Number.isFinite(c.low) &&
+        Number.isFinite(c.close)
+    )
+    .sort((a: any, b: any) => Number(a.time) - Number(b.time));
+
+  if (!next.length) {
+    throw new Error(`Brak świec dla ${setup.instrument} ${setup.tf}.`);
+  }
+
+  return next;
+}
+
 export default function AlphaScannerPage() {
   const [tf, setTf] = React.useState<"All" | TF>("All");
   const [trend, setTrend] = React.useState<TrendFilter>("All");
   const [liquidity, setLiquidity] = React.useState<LiquidityFilter>("All");
+  const [liveSetups, setLiveSetups] = React.useState<Setup[]>(SETUPS);
   const [selected, setSelected] = React.useState<Setup>(SETUPS[0]);
   const [candles, setCandles] = React.useState<CandlestickData[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [scanLoading, setScanLoading] = React.useState(false);
   const [error, setError] = React.useState("");
   const [fullChart, setFullChart] = React.useState(false);
+  const [lastScanAt, setLastScanAt] = React.useState<Date | null>(null);
 
   const filtered = React.useMemo(() => {
-    return SETUPS.filter((s) => {
+    return liveSetups.filter((s) => {
       if (tf !== "All" && s.tf !== tf) return false;
-      if (trend === "Uptrend" && !s.trend) return false;
-      if (trend === "Downtrend" && s.trend) return false;
+      if (trend === "Uptrend" && (s.trendDirection ?? (s.direction === "BUY" ? "UP" : "DOWN")) !== "UP") return false;
+      if (trend === "Downtrend" && (s.trendDirection ?? (s.direction === "SELL" ? "DOWN" : "UP")) !== "DOWN") return false;
       if (liquidity === "High" && s.liquidityPct < 70) return false;
       if (
         liquidity === "Medium" &&
@@ -265,130 +533,38 @@ export default function AlphaScannerPage() {
         return false;
       return true;
     });
-  }, [tf, trend, liquidity]);
+  }, [liveSetups, tf, trend, liquidity]);
 
   const loadCandles = React.useCallback(async (setup: Setup) => {
     setLoading(true);
     setError("");
 
-    const intervalMap: Record<TF, string> = {
-      M5: "5min",
-      M15: "15min",
-      H1: "1h",
-      H4: "4h",
-      D1: "1day",
-    };
-
-    const symbolMap: Record<string, string> = {
-      XAUUSD: "XAU/USD",
-      EURUSD: "EUR/USD",
-      GBPUSD: "GBP/USD",
-      USDJPY: "USD/JPY",
-      US30: "DJI",
-      BTCUSD: "BTC/USD",
-      ETHUSD: "ETH/USD",
-      SOLUSD: "SOL/USD",
-    };
-
     try {
-      const isUs30 = setup.instrument === "US30";
-      const qs = isUs30
-        ? new URLSearchParams({
-            interval: intervalMap[setup.tf],
-            limit: "220",
-          })
-        : new URLSearchParams({
-            path: "/time_series",
-            symbol: symbolMap[setup.instrument] ?? setup.instrument,
-            interval: intervalMap[setup.tf],
-            outputsize: "220",
-            format: "JSON",
-          });
-
-      const response = await fetch(
-        isUs30
-          ? `/api/us30/candles?${qs.toString()}`
-          : `/api/twelve-data?${qs.toString()}`,
-        { method: "GET", cache: "no-store" }
-      );
-
-      const raw = await response.text();
-      let data: any;
-
-      try {
-        data = JSON.parse(raw);
-      } catch {
-        const looksLikeHtml = raw.trim().startsWith("<");
-        throw new Error(
-          looksLikeHtml
-            ? "Endpoint /api/twelve-data zwrócił HTML zamiast JSON. Sprawdź, czy route.ts jest dokładnie pod app/api/twelve-data/route.ts."
-            : `Nieprawidłowa odpowiedź API: ${raw.slice(0, 140)}`
-        );
-      }
-
-      if (!response.ok || data?.status === "error" || data?.error) {
-        throw new Error(
-          data?.message ||
-            data?.error ||
-            (isUs30
-              ? "US30: FX Trade candle engine nie ma jeszcze wystarczającej historii."
-              : "Nie udało się pobrać świec z Twelve Data.")
-        );
-      }
-
-      const values = Array.isArray(data?.values) ? data.values : [];
-
-      const next: CandlestickData[] = values
-        .map((c: any) => {
-          const raw = String(c.datetime ?? "");
-          const normalized = raw.includes("T")
-            ? raw
-            : raw.replace(" ", "T");
-
-          const parsed = Date.parse(
-            /Z$|[+-]\d\d:\d\d$/.test(normalized)
-              ? normalized
-              : `${normalized}Z`
-          );
-
-          return {
-            time: Math.floor(parsed / 1000) as UTCTimestamp,
-            open: Number(c.open),
-            high: Number(c.high),
-            low: Number(c.low),
-            close: Number(c.close),
-          };
-        })
-        .filter(
-          (c: any) =>
-            Number.isFinite(Number(c.time)) &&
-            Number.isFinite(c.open) &&
-            Number.isFinite(c.high) &&
-            Number.isFinite(c.low) &&
-            Number.isFinite(c.close)
-        )
-        .sort((a: any, b: any) => Number(a.time) - Number(b.time));
-
-      if (!next.length) {
-        throw new Error(
-          data?.message ||
-            `Twelve Data nie zwróciło świec dla ${setup.instrument} ${setup.tf}.`
-        );
-      }
-
+      const next = await fetchSetupCandles(setup);
+      const analyzed = analyzeSetup(setup, next);
       setCandles(next);
+      setLiveSetups((previous) =>
+        previous.map((item) =>
+          item.instrument === analyzed.instrument && item.tf === analyzed.tf
+            ? analyzed
+            : item
+        )
+      );
+      setSelected((current) =>
+        current.instrument === analyzed.instrument && current.tf === analyzed.tf
+          ? analyzed
+          : current
+      );
     } catch (e) {
       setCandles([]);
-      setError(
-        e instanceof Error ? e.message : "Błąd pobierania Twelve Data"
-      );
+      setError(e instanceof Error ? e.message : "Błąd pobierania danych rynkowych");
     } finally {
       setLoading(false);
     }
   }, []);
 
   React.useEffect(() => {
-    loadCandles(selected);
+    void loadCandles(selected);
   }, [selected.instrument, selected.tf, loadCandles]);
 
   React.useEffect(() => {
@@ -414,22 +590,68 @@ export default function AlphaScannerPage() {
     setSelected(setup);
   };
 
-  const runScan = () => {
+  const runScan = async () => {
+    if (scanLoading) return;
     setScanLoading(true);
+    setError("");
 
-    window.setTimeout(async () => {
-      const first = filtered[0] ?? selected;
-      setSelected(first);
-      await loadCandles(first);
+    try {
+      const results = await Promise.allSettled(
+        liveSetups.map(async (setup) => {
+          const nextCandles = await fetchSetupCandles(setup);
+          return {
+            setup: analyzeSetup(setup, nextCandles),
+            candles: nextCandles,
+          };
+        })
+      );
+
+      const successful = results
+        .filter((result): result is PromiseFulfilledResult<{ setup: Setup; candles: CandlestickData[] }> => result.status === "fulfilled")
+        .map((result) => result.value);
+
+      if (!successful.length) {
+        throw new Error("Skaner nie otrzymał poprawnych danych dla żadnego instrumentu.");
+      }
+
+      const nextSetups = liveSetups.map((oldSetup) => {
+        const updated = successful.find(
+          (item) =>
+            item.setup.instrument === oldSetup.instrument && item.setup.tf === oldSetup.tf
+        );
+        return updated?.setup ?? oldSetup;
+      });
+
+      setLiveSetups(nextSetups);
+      setLastScanAt(new Date());
+
+      const selectedResult = successful.find(
+        (item) =>
+          item.setup.instrument === selected.instrument && item.setup.tf === selected.tf
+      );
+
+      const best = [...successful].sort((a, b) => b.setup.confidence - a.setup.confidence)[0];
+      const active = selectedResult ?? best;
+      setSelected(active.setup);
+      setCandles(active.candles);
+
+      const failedCount = results.length - successful.length;
+      if (failedCount > 0) {
+        setError(`Skan zakończony. ${successful.length}/${results.length} rynków zaktualizowano; ${failedCount} bez świeżych danych.`);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Błąd skanowania rynku");
+    } finally {
       setScanLoading(false);
-    }, 350);
+    }
   };
 
   const reset = () => {
     setTf("All");
     setTrend("All");
     setLiquidity("All");
-    setSelected(SETUPS[0]);
+    const first = liveSetups[0] ?? SETUPS[0];
+    setSelected(first);
   };
 
   const liveLevels = React.useMemo(() => {
@@ -485,11 +707,11 @@ export default function AlphaScannerPage() {
     return value.toFixed(2);
   };
 
-  const ready = SETUPS.filter((x) => x.status === "READY").length;
-  const buys = SETUPS.filter((x) => x.direction === "BUY").length;
-  const sells = SETUPS.filter((x) => x.direction === "SELL").length;
+  const ready = liveSetups.filter((x) => x.status === "READY").length;
+  const buys = liveSetups.filter((x) => x.direction === "BUY").length;
+  const sells = liveSetups.filter((x) => x.direction === "SELL").length;
   const avg = Math.round(
-    SETUPS.reduce((sum, x) => sum + x.confidence, 0) / SETUPS.length
+    liveSetups.reduce((sum, x) => sum + x.confidence, 0) / Math.max(1, liveSetups.length)
   );
 
   return (
@@ -508,13 +730,13 @@ export default function AlphaScannerPage() {
               Alpha Scanner
             </h1>
             <p className="text-[12px] text-white/45">
-              AI market scanner with Price Action confirmations
+              Live market scanner · Trend · Liquidity Sweep · Momentum · Price Action
             </p>
           </div>
 
           <div className="flex items-center gap-3">
             <div className="rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-2 text-[11px] font-bold text-emerald-300">
-              ● LIVE
+              ● LIVE{lastScanAt ? ` · ${lastScanAt.toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" })}` : ""}
             </div>
 
             <button
@@ -642,13 +864,13 @@ export default function AlphaScannerPage() {
         </section>
 
         {/* Cleaner layout: no internal Signal panel. Chart gets all available center space. */}
-        <section className="grid gap-3 xl:grid-cols-[380px_minmax(0,1fr)_260px]">
-          <aside className="min-w-0 overflow-hidden rounded-[20px] border border-sky-300/15 bg-[#0d3158]">
+        <section className="grid gap-3 xl:grid-cols-[335px_minmax(0,1fr)_260px]">
+          <aside className="overflow-hidden rounded-[20px] border border-sky-300/15 bg-[#0d3158]">
             <div className="border-b border-sky-300/15 px-4 py-3 text-[11px] font-bold">
               SETUPS ({filtered.length})
             </div>
 
-            <div className="grid grid-cols-[minmax(0,1fr)_42px_46px_46px_58px] border-b border-sky-300/15 bg-sky-300/[0.035] px-3 py-2.5 text-[8px] uppercase text-white/30">
+            <div className="grid grid-cols-[minmax(145px,1fr)_48px_52px_48px_64px] border-b border-sky-300/15 bg-sky-300/[0.035] px-3 py-2.5 text-[8px] uppercase text-white/30">
               <div>Instrument</div>
               <div>TF</div>
               <div>AI</div>
@@ -664,13 +886,13 @@ export default function AlphaScannerPage() {
                 <button
                   key={`${s.instrument}-${s.tf}`}
                   onClick={() => selectSetup(s)}
-                  className={`grid w-full grid-cols-[minmax(0,1fr)_42px_46px_46px_58px] items-center border-b border-white/[0.07] px-3 py-3.5 text-left transition ${
+                  className={`grid w-full grid-cols-[minmax(145px,1fr)_48px_52px_48px_64px] items-center border-b border-white/[0.07] px-3 py-3.5 text-left transition ${
                     active
                       ? "bg-sky-400/15 ring-1 ring-inset ring-sky-400/60"
                       : "hover:bg-sky-300/[0.07]"
                   }`}
                 >
-                  <div className="flex min-w-0 items-center gap-2 overflow-hidden">
+                  <div className="flex min-w-0 items-center gap-2">
                     <Star
                       className={`h-3.5 w-3.5 shrink-0 ${
                         active ? "fill-amber-300 text-amber-300" : "text-white/25"
@@ -680,7 +902,7 @@ export default function AlphaScannerPage() {
                       <div className="text-[12px] font-bold leading-tight">
                         {s.instrument}
                       </div>
-                      <div className="mt-0.5 truncate text-[8px] leading-tight text-white/40">
+                      <div className="mt-0.5 text-[8px] leading-tight text-white/40">
                         {s.name}
                       </div>
                     </div>
@@ -739,7 +961,7 @@ export default function AlphaScannerPage() {
 
             {error ? (
               <div className="mt-2 rounded-xl border border-rose-400/20 bg-rose-500/10 px-3 py-2 text-[10px] text-rose-200">
-                Twelve Data: {error}
+                {selected.instrument === "US30" ? "FX Trade Candle Engine" : "Market Data"}: {error}
               </div>
             ) : null}
           </div>
@@ -834,7 +1056,7 @@ export default function AlphaScannerPage() {
                     {selected.instrument} · {selected.tf}
                   </div>
                   <div className="mt-1 text-[9px] text-white/40">
-                    Full Chart · Twelve Data · {selected.priceAction}
+                    Full Chart · {selected.instrument === "US30" ? "Live-Rates / FX Trade Candle Engine" : "Twelve Data"} · {selected.priceAction}
                   </div>
                 </div>
 
