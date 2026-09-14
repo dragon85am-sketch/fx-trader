@@ -180,6 +180,76 @@ function NavIcon({ name, className }: { name: IconName; className?: string }) {
   }
 }
 
+function ChildNavIcon({ href, className = "h-4 w-4" }: { href: string; className?: string }) {
+  const common = { width: 18, height: 18, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, className, "aria-hidden": true };
+  if (href.includes("tab=technical")) return <svg {...common}><path d="M4 19V9M9 19V5M14 19v-7M19 19V3" /><path d="M3 19h18" /></svg>;
+  if (href === "/journal") return <svg {...common}><rect x="5" y="3" width="15" height="18" rx="2" /><path d="M9 7h7M9 11h7M9 15h5M5 7H3M5 11H3M5 15H3" /></svg>;
+  if (href.includes("tab=live")) return <svg {...common}><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M8 3v4M16 3v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01" /></svg>;
+  if (href.includes("tab=calendar")) return <svg {...common}><ellipse cx="12" cy="5" rx="7" ry="3" /><path d="M5 5v5c0 1.7 3.1 3 7 3s7-1.3 7-3V5M5 10v5c0 1.7 3.1 3 7 3s7-1.3 7-3v-5M5 15v4c0 1.7 3.1 3 7 3s7-1.3 7-3v-4" /></svg>;
+  return null;
+}
+
+
+function iconGlowClasses(href: string, active: boolean) {
+  const activeBoost = active
+    ? " ring-1 ring-white/15 scale-[1.03]"
+    : " group-hover:scale-[1.06]";
+
+  // Dashboard + Trading Room — neon blue
+  if (href === "/dashboard" || href.startsWith("/trading-room") || href === "/journal") {
+    return cn(
+      "border-cyan-300/55 bg-[linear-gradient(145deg,rgba(14,165,233,.22),rgba(37,99,235,.18))] text-cyan-100 shadow-[0_0_10px_rgba(34,211,238,.45),0_0_24px_rgba(37,99,235,.28),inset_0_1px_0_rgba(255,255,255,.16)] group-hover:border-cyan-200/80 group-hover:text-white group-hover:shadow-[0_0_14px_rgba(34,211,238,.70),0_0_34px_rgba(37,99,235,.40),inset_0_1px_0_rgba(255,255,255,.22)]",
+      activeBoost
+    );
+  }
+
+  // Scanner — turquoise / cyan
+  if (href.startsWith("/skaner")) {
+    return cn(
+      "border-teal-300/55 bg-[linear-gradient(145deg,rgba(20,184,166,.20),rgba(6,182,212,.14))] text-teal-200 shadow-[0_0_10px_rgba(45,212,191,.48),0_0_25px_rgba(6,182,212,.25),inset_0_1px_0_rgba(255,255,255,.12)] group-hover:border-teal-200/85 group-hover:text-teal-50 group-hover:shadow-[0_0_16px_rgba(45,212,191,.78),0_0_36px_rgba(6,182,212,.38),inset_0_1px_0_rgba(255,255,255,.18)]",
+      activeBoost
+    );
+  }
+
+  // Strategies — violet
+  if (href.startsWith("/strategie")) {
+    return cn(
+      "border-violet-400/55 bg-[linear-gradient(145deg,rgba(124,58,237,.24),rgba(79,70,229,.15))] text-violet-200 shadow-[0_0_10px_rgba(139,92,246,.50),0_0_25px_rgba(109,40,217,.28),inset_0_1px_0_rgba(255,255,255,.12)] group-hover:border-violet-300/85 group-hover:text-violet-50 group-hover:shadow-[0_0_16px_rgba(167,139,250,.80),0_0_38px_rgba(124,58,237,.42),inset_0_1px_0_rgba(255,255,255,.18)]",
+      activeBoost
+    );
+  }
+
+  // Affiliate — magenta / pink
+  if (href.startsWith("/dashboard/affiliate")) {
+    return cn(
+      "border-fuchsia-400/55 bg-[linear-gradient(145deg,rgba(192,38,211,.22),rgba(147,51,234,.15))] text-fuchsia-200 shadow-[0_0_10px_rgba(217,70,239,.48),0_0_25px_rgba(168,85,247,.26),inset_0_1px_0_rgba(255,255,255,.12)] group-hover:border-fuchsia-300/85 group-hover:text-fuchsia-50 group-hover:shadow-[0_0_16px_rgba(232,121,249,.78),0_0_38px_rgba(192,38,211,.40),inset_0_1px_0_rgba(255,255,255,.18)]",
+      activeBoost
+    );
+  }
+
+  // Education — gold / amber
+  if (href.startsWith("/education")) {
+    return cn(
+      "border-amber-300/60 bg-[linear-gradient(145deg,rgba(245,158,11,.20),rgba(234,179,8,.12))] text-amber-200 shadow-[0_0_10px_rgba(251,191,36,.52),0_0_25px_rgba(245,158,11,.24),inset_0_1px_0_rgba(255,255,255,.12)] group-hover:border-amber-200/90 group-hover:text-amber-50 group-hover:shadow-[0_0_16px_rgba(252,211,77,.82),0_0_38px_rgba(245,158,11,.40),inset_0_1px_0_rgba(255,255,255,.18)]",
+      activeBoost
+    );
+  }
+
+  // Live sessions — pink / red
+  if (href.startsWith("/sesje")) {
+    return cn(
+      "border-rose-400/55 bg-[linear-gradient(145deg,rgba(244,63,94,.20),rgba(219,39,119,.13))] text-rose-200 shadow-[0_0_10px_rgba(251,113,133,.50),0_0_25px_rgba(236,72,153,.25),inset_0_1px_0_rgba(255,255,255,.12)] group-hover:border-rose-300/85 group-hover:text-rose-50 group-hover:shadow-[0_0_16px_rgba(253,164,175,.80),0_0_38px_rgba(244,63,94,.40),inset_0_1px_0_rgba(255,255,255,.18)]",
+      activeBoost
+    );
+  }
+
+  // Settings / Admin — cool electric blue
+  return cn(
+    "border-sky-300/55 bg-[linear-gradient(145deg,rgba(14,165,233,.20),rgba(59,130,246,.13))] text-sky-200 shadow-[0_0_10px_rgba(56,189,248,.48),0_0_25px_rgba(59,130,246,.24),inset_0_1px_0_rgba(255,255,255,.12)] group-hover:border-sky-200/85 group-hover:text-sky-50 group-hover:shadow-[0_0_16px_rgba(125,211,252,.80),0_0_38px_rgba(14,165,233,.38),inset_0_1px_0_rgba(255,255,255,.18)]",
+    activeBoost
+  );
+}
+
 function iconForHref(href: string): IconName {
   if (href === "/dashboard") return "dashboard";
   if (href.startsWith("/trading-room") || href === "/journal") return "trading";
@@ -549,7 +619,7 @@ export default function AppSidebar() {
                           : undefined
                       }
                       className={cn(
-                        "group relative flex min-h-[46px] items-center justify-between overflow-hidden rounded-2xl border px-3.5 py-2.5 text-sm font-medium transition-all duration-200",
+                        "group relative flex min-h-[58px] items-center justify-between overflow-hidden rounded-2xl border px-3.5 py-2.5 text-sm font-medium transition-all duration-200",
                         locked
                           ? "border-amber-300/15 bg-amber-300/[0.035] text-sky-100/45 hover:border-amber-300/25 hover:bg-amber-300/[0.07] hover:text-sky-50/75"
                           : active
@@ -564,21 +634,19 @@ export default function AppSidebar() {
                       <span className="flex min-w-0 items-center gap-3">
                         <span
                           className={cn(
-                            "flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition-all duration-200",
+                            "flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] border transition-all duration-200",
                             locked
-                              ? "bg-white/[0.025] text-sky-100/30"
-                              : active
-                                ? "bg-white/10 text-white"
-                                : "bg-sky-300/[0.04] text-sky-300 group-hover:bg-cyan-300/10 group-hover:text-cyan-200"
+                              ? "border-white/[0.03] bg-white/[0.025] text-sky-100/30"
+                              : iconGlowClasses(it.href, active)
                           )}
                         >
                           <NavIcon
                             name={iconForHref(it.href)}
-                            className="h-[19px] w-[19px]"
+                            className="h-[23px] w-[23px] drop-shadow-[0_0_7px_currentColor]"
                           />
                         </span>
 
-                        <span className="truncate">{it.label}</span>
+                        <span className="truncate font-semibold">{it.label}</span>
                       </span>
 
                       {locked ? (
@@ -618,7 +686,7 @@ export default function AppSidebar() {
                               key={ch.href}
                               href={childLocked ? paywallHref : ch.href}
                               className={cn(
-                                "flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-[13px] transition-all duration-200",
+                                "flex items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-[13px] transition-all duration-200",
                                 childLocked
                                   ? "border-transparent text-sky-100/35 hover:border-amber-300/15 hover:bg-amber-300/[0.05] hover:text-sky-50/70"
                                   : chActive
@@ -626,7 +694,10 @@ export default function AppSidebar() {
                                     : "border-transparent text-sky-100/65 hover:border-cyan-300/15 hover:bg-cyan-300/[0.06] hover:text-white"
                               )}
                             >
-                              <span className="truncate">{ch.label}</span>
+                              <span className="flex min-w-0 items-center gap-2.5">
+                                <span className={cn("shrink-0 text-sky-300/80", chActive && "text-cyan-200")}><ChildNavIcon href={ch.href} /></span>
+                                <span className="truncate">{ch.label}</span>
+                              </span>
 
                               {childLocked && (
                                 <LockIcon className="h-3.5 w-3.5 shrink-0 text-amber-200/60" />
@@ -642,7 +713,7 @@ export default function AppSidebar() {
             </nav>
 
             {/* FX TRADE PREMIUM COMMUNITY — pełny byk z /public */}
-            <div className="mt-5 overflow-hidden rounded-[18px] border border-[#0d579e] bg-[#041f40] shadow-[0_0_26px_rgba(14,165,233,.12),inset_0_1px_0_rgba(255,255,255,.04)]">
+            <div className="mt-5 overflow-hidden rounded-[20px] border border-[#0d579e] bg-[#041f40] shadow-[0_0_26px_rgba(14,165,233,.12),inset_0_1px_0_rgba(255,255,255,.04)]">
               <div
                 className="relative aspect-[208/280] w-full overflow-hidden bg-cover bg-center bg-no-repeat"
                 style={{
@@ -659,7 +730,7 @@ export default function AppSidebar() {
               </div>
             </div>
 
-            <div className="mt-4 grid grid-cols-3 gap-2 rounded-[14px] border border-cyan-300/15 bg-[#052348] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,.04)]">
+            <div className="mt-4 grid grid-cols-3 gap-2 rounded-[16px] border border-cyan-300/15 bg-[#052348] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,.04)]">
               <button
                 type="button"
                 onClick={() => changeTheme("light")}
@@ -707,22 +778,12 @@ export default function AppSidebar() {
             </div>
 
             <div className="mt-4 space-y-1.5 border-t border-cyan-200/12 pt-4">
-              <Link
-                href="/"
-                className="group flex items-center gap-3 rounded-2xl border border-transparent px-3 py-2.5 text-sm text-sky-100/78 transition-all hover:border-cyan-300/15 hover:bg-cyan-300/[0.06] hover:text-white"
-              >
-                <span className="text-sky-300 transition-colors group-hover:text-cyan-200">
-                  <NavIcon name="home" className="h-[18px] w-[18px]" />
-                </span>
-                {lang === "en" ? "Home page" : "Strona główna"}
-              </Link>
-
               <button
                 onClick={handleLogout}
                 disabled={loggingOut}
-                className="group flex w-full items-center gap-3 rounded-2xl border border-transparent px-3 py-2.5 text-left text-sm text-sky-100/78 transition-all hover:border-cyan-300/15 hover:bg-cyan-300/[0.06] hover:text-white disabled:opacity-60"
+                className="group flex w-full items-center gap-3 rounded-2xl border border-rose-400/20 bg-[#041b36]/65 px-3 py-3 text-left text-sm font-semibold text-sky-50/88 transition-all hover:border-rose-400/35 hover:bg-rose-500/[0.07] hover:text-white disabled:opacity-60"
               >
-                <span className="text-sky-300 transition-colors group-hover:text-cyan-200">
+                <span className="text-rose-400 transition-colors group-hover:text-rose-300">
                   <NavIcon name="logout" className="h-[18px] w-[18px]" />
                 </span>
                 {loggingOut
