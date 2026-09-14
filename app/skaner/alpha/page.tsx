@@ -642,13 +642,13 @@ export default function AlphaScannerPage() {
         </section>
 
         {/* Cleaner layout: no internal Signal panel. Chart gets all available center space. */}
-        <section className="grid gap-3 xl:grid-cols-[335px_minmax(0,1fr)_260px]">
-          <aside className="overflow-hidden rounded-[20px] border border-sky-300/15 bg-[#0d3158]">
+        <section className="grid gap-3 xl:grid-cols-[380px_minmax(0,1fr)_260px]">
+          <aside className="min-w-0 overflow-hidden rounded-[20px] border border-sky-300/15 bg-[#0d3158]">
             <div className="border-b border-sky-300/15 px-4 py-3 text-[11px] font-bold">
               SETUPS ({filtered.length})
             </div>
 
-            <div className="grid grid-cols-[minmax(145px,1fr)_48px_52px_48px_64px] border-b border-sky-300/15 bg-sky-300/[0.035] px-3 py-2.5 text-[8px] uppercase text-white/30">
+            <div className="grid grid-cols-[minmax(0,1fr)_42px_46px_46px_58px] border-b border-sky-300/15 bg-sky-300/[0.035] px-3 py-2.5 text-[8px] uppercase text-white/30">
               <div>Instrument</div>
               <div>TF</div>
               <div>AI</div>
@@ -664,13 +664,13 @@ export default function AlphaScannerPage() {
                 <button
                   key={`${s.instrument}-${s.tf}`}
                   onClick={() => selectSetup(s)}
-                  className={`grid w-full grid-cols-[minmax(145px,1fr)_48px_52px_48px_64px] items-center border-b border-white/[0.07] px-3 py-3.5 text-left transition ${
+                  className={`grid w-full grid-cols-[minmax(0,1fr)_42px_46px_46px_58px] items-center border-b border-white/[0.07] px-3 py-3.5 text-left transition ${
                     active
                       ? "bg-sky-400/15 ring-1 ring-inset ring-sky-400/60"
                       : "hover:bg-sky-300/[0.07]"
                   }`}
                 >
-                  <div className="flex min-w-0 items-center gap-2">
+                  <div className="flex min-w-0 items-center gap-2 overflow-hidden">
                     <Star
                       className={`h-3.5 w-3.5 shrink-0 ${
                         active ? "fill-amber-300 text-amber-300" : "text-white/25"
@@ -680,7 +680,7 @@ export default function AlphaScannerPage() {
                       <div className="text-[12px] font-bold leading-tight">
                         {s.instrument}
                       </div>
-                      <div className="mt-0.5 text-[8px] leading-tight text-white/40">
+                      <div className="mt-0.5 truncate text-[8px] leading-tight text-white/40">
                         {s.name}
                       </div>
                     </div>
