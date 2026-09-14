@@ -200,8 +200,13 @@ export default function TechnicalAnalysisLiveCard({ onOpen }: { onOpen: () => vo
       onClick={onOpen}
       className="group flex h-full min-h-[500px] flex-col overflow-hidden rounded-[20px] border border-blue-400/50 bg-[#06182a] text-left shadow-[0_12px_34px_rgba(0,0,0,.28)] transition hover:-translate-y-0.5 hover:border-cyan-300/70 hover:shadow-[0_0_36px_rgba(14,165,233,.24)] xl:min-h-[560px]"
     >
-      <div ref={wrapRef} className="relative h-[235px] shrink-0 overflow-hidden bg-[#041426] sm:h-[245px] xl:h-[270px]">
-        <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" aria-label="Live BTCUSD candlestick chart" />
+      <div ref={wrapRef} className="relative h-[235px] shrink-0 overflow-hidden rounded-t-[24px] bg-[#041426] sm:h-[245px] xl:h-[270px]">
+        <img
+          src="/trading-room/technical-analysis-preview-v2.png"
+          alt="Technical Analysis"
+          className="absolute inset-0 h-full w-full object-contain object-center p-2"
+        />
+        <canvas ref={canvasRef} className="hidden" aria-label="Live BTCUSD candlestick chart" />
         <div className="absolute left-4 top-4 z-10 flex h-12 w-12 items-center justify-center rounded-xl border border-blue-300/25 bg-blue-600/90 text-white shadow-[0_0_24px_rgba(37,99,235,.45)]">
           <span className="text-[22px] font-black leading-none">▥</span>
         </div>

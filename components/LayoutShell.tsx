@@ -25,7 +25,7 @@ const TOPBAR_LANGUAGES: LanguageItem[] = [
 
 function LanguageFlag({ code }: { code: LanguageCode }) {
   const base =
-    "relative h-[18px] w-[29px] shrink-0 overflow-hidden rounded-[3px] shadow-[0_0_0_1px_rgba(255,255,255,.24),0_0_10px_rgba(56,189,248,.12)]";
+    "relative h-[18px] w-[29px] shrink-0 overflow-hidden rounded-[3px] shadow-[0_0_0_1px_rgba(255,255,255,.42),0_0_8px_rgba(103,232,249,.55),0_0_16px_rgba(34,211,238,.32)]";
 
   if (code === "pl") {
     return (
@@ -113,7 +113,7 @@ function TopbarLanguageMenu() {
         onClick={() => setOpen((value) => !value)}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="flex h-[42px] min-w-[94px] items-center gap-2 rounded-xl border border-cyan-300/35 bg-transparent px-3 text-[12px] font-black text-white shadow-[0_0_18px_rgba(34,211,238,.08)] backdrop-blur-sm transition hover:border-cyan-200/70 hover:shadow-[0_0_26px_rgba(34,211,238,.18)]"
+        className="flex h-[42px] min-w-[94px] items-center gap-2 rounded-xl border border-cyan-200/75 bg-[linear-gradient(145deg,rgba(8,62,105,.72),rgba(4,33,64,.82))] px-3 text-[12px] font-black text-white shadow-[0_0_9px_rgba(103,232,249,.72),0_0_22px_rgba(34,211,238,.42),0_0_34px_rgba(14,165,233,.22),inset_0_1px_0_rgba(255,255,255,.12)] backdrop-blur-sm transition hover:border-cyan-100 hover:shadow-[0_0_12px_rgba(103,232,249,.90),0_0_28px_rgba(34,211,238,.56),0_0_42px_rgba(14,165,233,.30)]"
       >
         <LanguageFlag code={current.code} />
         <span>{current.short}</span>
@@ -240,7 +240,7 @@ function WelcomeTopbarInfo() {
           border border-cyan-300/30
           bg-gradient-to-r from-[#06345d]/55 via-[#082f55]/45 to-[#061d39]/30
           px-2 py-2
-          shadow-[inset_0_1px_0_rgba(255,255,255,.08),0_0_24px_rgba(34,211,238,.10)]
+          shadow-[inset_0_1px_0_rgba(255,255,255,.10),0_0_28px_rgba(34,211,238,.15)]
           backdrop-blur-md
           sm:max-w-[590px]
           sm:gap-3.5
@@ -302,8 +302,8 @@ function WelcomeTopbarInfo() {
       </div>
 
       {/* CLOCK - DESKTOP */}
-      <div className="hidden min-w-[245px] items-center gap-3.5 rounded-[20px] border border-cyan-300/30 bg-gradient-to-r from-[#06345d]/55 via-[#082f55]/45 to-[#061d39]/30 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,.08),0_0_24px_rgba(34,211,238,.10)] backdrop-blur-md lg:flex">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-cyan-300/35 bg-cyan-300/[0.07] text-cyan-200 shadow-[0_0_20px_rgba(34,211,238,.14)]">
+      <div className="hidden min-w-[245px] items-center gap-3.5 rounded-[20px] border border-cyan-300/30 bg-gradient-to-r from-[#06345d]/55 via-[#082f55]/45 to-[#061d39]/30 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,.10),0_0_28px_rgba(34,211,238,.15)] backdrop-blur-md lg:flex">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-cyan-200/75 bg-[radial-gradient(circle_at_50%_35%,rgba(56,189,248,.28),rgba(8,47,83,.78)_72%)] text-cyan-100 shadow-[0_0_10px_rgba(34,211,238,.65),0_0_24px_rgba(14,165,233,.42),inset_0_0_12px_rgba(125,211,252,.18)]">
           <svg
             viewBox="0 0 24 24"
             className="h-5 w-5"

@@ -1,7 +1,8 @@
-"use client";
+﻿"use client";
 
 import type { DrawTool } from "@/components/DrawingsLayer";
 import React from "react";
+import * as XLSX from "xlsx-js-style";
 import { createPortal } from "react-dom";
 import { Card, CardContent, Pill, cn, Button } from "@/components/ui";
 import MarketChart, {
@@ -23,6 +24,7 @@ import {
   Brush,
   Waves,
   ChartNoAxesCombined,
+  FileSpreadsheet,
 } from "lucide-react";
 const EMA_FAST = 14;
 const WMA_SLOW = 40;
@@ -3587,6 +3589,436 @@ if (closedNow.length) {
   const highlightTime: UTCTimestamp | null = selected.tradeActive ? selected.hammerTime ?? null : null;
   const hasTrade = !!selected.tradeActive && !!selected.levels;
 
+  const exportClosedTradesToXlsx = React.useCallback(() => {
+    if (!closedTrades.length) return;
+
+    const reportDate = new Intl.DateTimeFormat("pl-PL", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    }).format(new Date());
+
+    const sortedTrades = [...closedTrades].sort((a, b) =>
+      String(b.date).localeCompare(String(a.date))
+    );
+
+    const getStatus = (t: any) =>
+      typeof t.status === "object" ? t.status?.status : t.status;
+
+    const totalTrades = sortedTrades.length;
+
+    // Target reach stats (cumulative):
+    const tp1Reached = sortedTrades.filter((t) => {
+      const s = getStatus(t);
+      return Boolean(t.tp1Hit) || s === "TP1_BE" || s === "TP3";
+    }).length;
+
+    const tp2Reached = sortedTrades.filter((t) => {
+      const s = getStatus(t);
+      return Boolean(t.tp2Hit) || s === "TP3";
+    }).length;
+
+    const tp3Reached = sortedTrades.filter((t) => getStatus(t) === "TP3").length;
+    const beCount = sortedTrades.filter((t) => getStatus(t) === "TP1_BE").length;
+    const slCount = sortedTrades.filter((t) => getStatus(t) === "SL").length;
+
+    // "Zyskowny trade" = trade, który osiągnął co najmniej TP1.
+    // Każdy trade liczymy tylko raz, więc TP2/TP3 nie dublują wyniku.
+    const profitableTrades = tp1Reached;
+    const successRate = totalTrades ? profitableTrades / totalTrades : 0;
+    const beRate = totalTrades ? beCount / totalTrades : 0;
+    const slRate = totalTrades ? slCount / totalTrades : 0;
+    const tp1Rate = totalTrades ? tp1Reached / totalTrades : 0;
+    const tp2Rate = totalTrades ? tp2Reached / totalTrades : 0;
+    const tp3Rate = totalTrades ? tp3Reached / totalTrades : 0;
+
+    // Ocena końcowa: profitowy, jeśli zyskowne > stratne.
+    const isProfitable = profitableTrades > slCount;
+    const assessment = isProfitable ? "PROFITOWY" : "NIEPROFITOWY";
+
+    const tradeRows = sortedTrades.map((t) => {
+      const status = getStatus(t);
+      const reachedTp1 =
+        Boolean(t.tp1Hit) || status === "TP1_BE" || status === "TP3";
+
+      const result =
+        status === "SL" && !reachedTp1
+          ? "STRATA"
+          : status === "TP1_BE"
+            ? "BE"
+            : reachedTp1
+              ? "ZYSK"
+              : "STRATA";
+
+      const dateValue = (() => {
+        try {
+          return new Date(t.date).toISOString().slice(0, 16).replace("T", " ");
+        } catch {
+          return String(t.date ?? "");
+        }
+      })();
+
+      return [
+        dateValue,
+        t.instrument,
+        t.direction,
+        Number(t.entry),
+        t.tp1 ?? "",
+        t.tp2 ?? "",
+        t.tp3 ?? "",
+        Number(t.sl),
+        result,
+      ];
+    });
+
+    const rows: (string | number)[][] = [
+      ["FX TRADE", "", "", "", "TRADE LOG", "", "", "", ""],
+      ["PROFESSIONAL TRADING", "", "", "", "CLOSED TRADES PERFORMANCE REPORT", "", "", "", ""],
+      ["Data raportu", reportDate, "", "", "", "", "", "", ""],
+      [],
+      ["PODSUMOWANIE", "", "", "", "", "", "", "", ""],
+      ["WSZYSTKIE TRADE'Y", totalTrades, "", "TP1 OSIĄGNIĘTE", tp1Reached, "", "TP1 %", tp1Rate, ""],
+      ["ZYSKOWNE TRADE'Y", profitableTrades, "", "TP2 OSIĄGNIĘTE", tp2Reached, "", "TP2 %", tp2Rate, ""],
+      ["BREAK EVEN", beCount, "", "TP3 OSIĄGNIĘTE", tp3Reached, "", "TP3 %", tp3Rate, ""],
+      ["STRATNE / SL", slCount, "", "SKUTECZNOŚĆ", successRate, "", "SL %", slRate, ""],
+      ["OCENA WYNIKU", assessment, "", "DEFINICJA", "Zyskowny = min. TP1", "", "BE %", beRate, ""],
+      [],
+      ["CLOSED TRADES", "", "", "", "", "", "", "", ""],
+      ["Data", "Instrument", "Kierunek", "Wejście", "TP1", "TP2", "TP3", "SL", "Wynik"],
+      ...tradeRows,
+    ];
+
+    const summaryStart = rows.length + 1;
+
+    rows.push(
+      [],
+      ["STATYSTYKI KOŃCOWE", "", "", "", "", "", "", "", ""],
+      ["Metryka", "Ilość", "Procent", "", "Metryka", "Ilość", "Procent", "", ""],
+      ["TP1 osiągnięte", tp1Reached, tp1Rate, "", "Zyskowne trady", profitableTrades, successRate, "", ""],
+      ["TP2 osiągnięte", tp2Reached, tp2Rate, "", "Break Even", beCount, beRate, "", ""],
+      ["TP3 osiągnięte", tp3Reached, tp3Rate, "", "SL / Strata", slCount, slRate, "", ""],
+      ["Skuteczność", profitableTrades, successRate, "", "Ocena", assessment, "", "", ""],
+      [],
+      ["Jak liczymy skuteczność?", "", "", "", "", "", "", "", ""],
+      [
+        "Każdy trade liczymy tylko raz. Trade jest zyskowny, jeśli osiągnął co najmniej TP1. Skuteczność = zyskowne trady / wszystkie trady × 100%.",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+      ]
+    );
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+
+    ws["!cols"] = [
+      { wch: 22 },
+      { wch: 16 },
+      { wch: 15 },
+      { wch: 16 },
+      { wch: 18 },
+      { wch: 16 },
+      { wch: 16 },
+      { wch: 16 },
+      { wch: 18 },
+    ];
+
+    ws["!merges"] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: 3 } },
+      { s: { r: 0, c: 4 }, e: { r: 0, c: 8 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: 3 } },
+      { s: { r: 1, c: 4 }, e: { r: 1, c: 8 } },
+      { s: { r: 4, c: 0 }, e: { r: 4, c: 8 } },
+      { s: { r: 11, c: 0 }, e: { r: 11, c: 8 } },
+      { s: { r: summaryStart, c: 0 }, e: { r: summaryStart, c: 8 } },
+      { s: { r: summaryStart + 7, c: 0 }, e: { r: summaryStart + 7, c: 8 } },
+      { s: { r: summaryStart + 8, c: 0 }, e: { r: summaryStart + 8, c: 8 } },
+    ];
+
+    const BG = "06192E";
+    const PANEL = "0B315C";
+    const PANEL2 = "0A2749";
+    const PANEL3 = "0D3159";
+    const CYAN = "22D3EE";
+    const WHITE = "FFFFFF";
+    const TEXT = "E0F2FE";
+    const MUTED = "94A3B8";
+    const GREEN = "34D399";
+    const BLUE = "60A5FA";
+    const YELLOW = "FACC15";
+    const RED = "FB7185";
+    const BORDER = "1E5A87";
+
+    const border = {
+      top: { style: "thin", color: { rgb: BORDER } },
+      bottom: { style: "thin", color: { rgb: BORDER } },
+      left: { style: "thin", color: { rgb: BORDER } },
+      right: { style: "thin", color: { rgb: BORDER } },
+    };
+
+    for (let r = 0; r < rows.length; r += 1) {
+      for (let c = 0; c < 9; c += 1) {
+        const ref = XLSX.utils.encode_cell({ r, c });
+        if (!ws[ref]) ws[ref] = { t: "s", v: "" };
+        ws[ref].s = {
+          fill: { fgColor: { rgb: BG } },
+          font: { color: { rgb: TEXT }, sz: 10 },
+          alignment: { vertical: "center" },
+        };
+      }
+    }
+
+    ws["A1"].s = {
+      fill: { fgColor: { rgb: BG } },
+      font: { color: { rgb: CYAN }, bold: true, sz: 24 },
+      alignment: { horizontal: "left", vertical: "center" },
+    };
+
+    ws["E1"].s = {
+      fill: { fgColor: { rgb: BG } },
+      font: { color: { rgb: WHITE }, bold: true, sz: 22 },
+      alignment: { horizontal: "center", vertical: "center" },
+    };
+
+    ws["A2"].s = {
+      fill: { fgColor: { rgb: BG } },
+      font: { color: { rgb: MUTED }, bold: true, sz: 9 },
+      alignment: { horizontal: "left" },
+    };
+
+    ws["E2"].s = {
+      fill: { fgColor: { rgb: BG } },
+      font: { color: { rgb: CYAN }, italic: true, sz: 10 },
+      alignment: { horizontal: "center" },
+    };
+
+    for (const ref of ["A3", "B3"]) {
+      ws[ref].s = {
+        fill: { fgColor: { rgb: PANEL2 } },
+        font: { color: { rgb: ref === "B3" ? WHITE : MUTED }, bold: true },
+        alignment: { horizontal: "center", vertical: "center" },
+        border,
+      };
+    }
+
+    for (const ref of ["A5", "A12"]) {
+      ws[ref].s = {
+        fill: { fgColor: { rgb: PANEL } },
+        font: { color: { rgb: WHITE }, bold: true, sz: 13 },
+        alignment: { horizontal: "center", vertical: "center" },
+        border: {
+          bottom: { style: "medium", color: { rgb: CYAN } },
+        },
+      };
+    }
+
+    // Top summary blocks.
+    for (let r = 5; r <= 9; r += 1) {
+      for (let c = 0; c < 9; c += 1) {
+        const ref = XLSX.utils.encode_cell({ r, c });
+        ws[ref].s = {
+          fill: { fgColor: { rgb: r % 2 === 0 ? PANEL2 : PANEL3 } },
+          font: { color: { rgb: TEXT }, bold: true, sz: 10 },
+          alignment: { horizontal: "center", vertical: "center" },
+          border,
+        };
+      }
+    }
+
+    const topValueColors: Record<string, string> = {
+      B6: WHITE,
+      B7: GREEN,
+      B8: YELLOW,
+      B9: RED,
+      B10: isProfitable ? GREEN : RED,
+      E6: GREEN,
+      E7: BLUE,
+      E8: GREEN,
+      E9: GREEN,
+      E10: CYAN,
+      H6: GREEN,
+      H7: BLUE,
+      H8: GREEN,
+      H9: RED,
+      H10: YELLOW,
+    };
+
+    Object.entries(topValueColors).forEach(([ref, color]) => {
+      if (!ws[ref]) return;
+      ws[ref].s = {
+        ...ws[ref].s,
+        font: { color: { rgb: color }, bold: true, sz: 12 },
+      };
+    });
+
+    for (const ref of ["H6", "H7", "H8", "E9", "H9", "H10"]) {
+      if (ws[ref] && typeof ws[ref].v === "number") {
+        ws[ref].z = "0.0%";
+      }
+    }
+
+    // Table header.
+    for (let c = 0; c < 9; c += 1) {
+      const ref = XLSX.utils.encode_cell({ r: 12, c });
+      ws[ref].s = {
+        fill: { fgColor: { rgb: PANEL } },
+        font: { color: { rgb: WHITE }, bold: true, sz: 10 },
+        alignment: { horizontal: "center", vertical: "center" },
+        border,
+      };
+    }
+
+    const firstTradeRow = 13;
+    const lastTradeRow = firstTradeRow + sortedTrades.length - 1;
+
+    for (let r = firstTradeRow; r <= lastTradeRow; r += 1) {
+      for (let c = 0; c < 9; c += 1) {
+        const ref = XLSX.utils.encode_cell({ r, c });
+        ws[ref].s = {
+          fill: { fgColor: { rgb: r % 2 === 0 ? PANEL2 : PANEL3 } },
+          font: { color: { rgb: TEXT }, sz: 9 },
+          alignment: {
+            horizontal: c <= 2 || c === 8 ? "center" : "right",
+            vertical: "center",
+          },
+          border: {
+            bottom: { style: "thin", color: { rgb: BORDER } },
+          },
+        };
+      }
+
+      const sideRef = XLSX.utils.encode_cell({ r, c: 2 });
+      const side = String(ws[sideRef]?.v ?? "");
+      ws[sideRef].s = {
+        ...ws[sideRef].s,
+        font: {
+          color: { rgb: side === "BUY" ? GREEN : RED },
+          bold: true,
+        },
+      };
+
+      const resultRef = XLSX.utils.encode_cell({ r, c: 8 });
+      const result = String(ws[resultRef]?.v ?? "");
+      ws[resultRef].s = {
+        ...ws[resultRef].s,
+        font: {
+          bold: true,
+          color: {
+            rgb:
+              result === "ZYSK"
+                ? GREEN
+                : result === "BE"
+                  ? YELLOW
+                  : RED,
+          },
+        },
+      };
+    }
+
+    // Bottom stats.
+    const summaryTitleRow = summaryStart;
+    const summaryHeaderRow = summaryStart + 1;
+    const summaryDataStart = summaryStart + 2;
+    const summaryDataEnd = summaryStart + 5;
+
+    for (let c = 0; c < 9; c += 1) {
+      const ref = XLSX.utils.encode_cell({ r: summaryTitleRow, c });
+      ws[ref].s = {
+        fill: { fgColor: { rgb: PANEL } },
+        font: { color: { rgb: WHITE }, bold: true, sz: 13 },
+        alignment: { horizontal: "center", vertical: "center" },
+        border: {
+          top: { style: "medium", color: { rgb: CYAN } },
+          bottom: { style: "medium", color: { rgb: CYAN } },
+        },
+      };
+    }
+
+    for (let c = 0; c < 9; c += 1) {
+      const ref = XLSX.utils.encode_cell({ r: summaryHeaderRow, c });
+      ws[ref].s = {
+        fill: { fgColor: { rgb: PANEL2 } },
+        font: { color: { rgb: MUTED }, bold: true, sz: 9 },
+        alignment: { horizontal: "center", vertical: "center" },
+        border,
+      };
+    }
+
+    for (let r = summaryDataStart; r <= summaryDataEnd; r += 1) {
+      for (let c = 0; c < 9; c += 1) {
+        const ref = XLSX.utils.encode_cell({ r, c });
+        ws[ref].s = {
+          fill: { fgColor: { rgb: r % 2 === 0 ? PANEL3 : PANEL2 } },
+          font: { color: { rgb: TEXT }, bold: true, sz: 10 },
+          alignment: { horizontal: "center", vertical: "center" },
+          border,
+        };
+      }
+
+      for (const c of [2, 6]) {
+        const ref = XLSX.utils.encode_cell({ r, c });
+        if (typeof ws[ref]?.v === "number") ws[ref].z = "0.0%";
+      }
+    }
+
+    // Final assessment.
+    const ratingRow = summaryStart + 5;
+    const ratingRef = XLSX.utils.encode_cell({ r: ratingRow, c: 5 });
+    if (ws[ratingRef]) {
+      ws[ratingRef].s = {
+        ...ws[ratingRef].s,
+        fill: { fgColor: { rgb: isProfitable ? "073B32" : "4A1522" } },
+        font: {
+          color: { rgb: isProfitable ? GREEN : RED },
+          bold: true,
+          sz: 13,
+        },
+      };
+    }
+
+    const infoTitleRow = summaryStart + 7;
+    const infoTextRow = summaryStart + 8;
+
+    for (const rr of [infoTitleRow, infoTextRow]) {
+      for (let c = 0; c < 9; c += 1) {
+        const ref = XLSX.utils.encode_cell({ r: rr, c });
+        ws[ref].s = {
+          fill: { fgColor: { rgb: BG } },
+          font: {
+            color: { rgb: rr === infoTitleRow ? CYAN : MUTED },
+            bold: rr === infoTitleRow,
+            sz: 9,
+          },
+          alignment: { horizontal: "left", vertical: "center", wrapText: true },
+        };
+      }
+    }
+
+    ws["!rows"] = Array.from({ length: rows.length }, (_, idx) => {
+      if (idx === 0) return { hpt: 30 };
+      if (idx === 1) return { hpt: 20 };
+      if (idx === 4 || idx === 11 || idx === summaryTitleRow) return { hpt: 24 };
+      if (idx >= 5 && idx <= 9) return { hpt: 26 };
+      if (idx === 12 || idx === summaryHeaderRow) return { hpt: 22 };
+      if (idx === infoTextRow) return { hpt: 36 };
+      return { hpt: 18 };
+    });
+
+    ws["!freeze"] = { xSplit: 0, ySplit: 13 };
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, ws, "Trade Log");
+
+    const filenameDate = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(workbook, `FX-TRADE-Trade-Log-${filenameDate}.xlsx`);
+  }, [closedTrades]);
+
+
+
   
 
   return (
@@ -4547,9 +4979,20 @@ closedTrades.map((t) => (
               </div>
 
               <div className={cn(
-                "flex justify-end border-t border-sky-300/10 px-4 py-3",
+                "flex items-center justify-end gap-2 border-t border-sky-300/10 px-4 py-3",
                 landscapeFullscreen && "hidden"
               )}>
+                <Button
+                  variant="outline"
+                  onClick={exportClosedTradesToXlsx}
+                  disabled={!closedTrades.length}
+                  className="gap-2 border-cyan-300/35 bg-cyan-500/10 text-cyan-100 shadow-[0_0_18px_rgba(34,211,238,.12)] hover:border-cyan-300/65 hover:bg-cyan-500/15 disabled:cursor-not-allowed disabled:opacity-40"
+                  title="Eksportuj Closed Trades do pliku XLSX"
+                >
+                  <FileSpreadsheet className="h-4 w-4" />
+                  Trade log
+                </Button>
+
                 <Button
                   variant="outline"
                   onClick={() => {

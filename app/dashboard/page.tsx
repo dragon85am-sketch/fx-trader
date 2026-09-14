@@ -1,9 +1,9 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requirePremiumUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import BillingPortalButton from "@/components/BillingPortalButton";
-import type { ComponentType } from "react";
+import type { ComponentType, ReactNode } from "react";
 import {
   Activity,
   ArrowUpRight,
@@ -26,6 +26,43 @@ function cn(...xs: Array<string | undefined | false>) {
   return xs.filter(Boolean).join(" ");
 }
 
+function GlowIconBox({
+  children,
+  size = "md",
+  tone = "cyan",
+  round = false,
+}: {
+  children: ReactNode;
+  size?: "sm" | "md" | "lg";
+  tone?: "cyan" | "violet" | "pink" | "teal" | "gold";
+  round?: boolean;
+}) {
+  const sizeClass =
+    size === "sm" ? "h-10 w-10" : size === "lg" ? "h-14 w-14" : "h-11 w-11";
+
+  const toneClass = {
+    cyan: "border-cyan-200/95 bg-[linear-gradient(145deg,rgba(8,62,105,.82),rgba(4,33,64,.92))] text-cyan-100 shadow-[0_0_8px_rgba(103,232,249,.95),0_0_20px_rgba(34,211,238,.72),0_0_38px_rgba(14,165,233,.42),inset_0_0_18px_rgba(56,189,248,.20),inset_0_1px_0_rgba(255,255,255,.26)]",
+    violet: "border-violet-300/95 bg-[linear-gradient(145deg,rgba(69,38,112,.82),rgba(30,20,67,.92))] text-violet-100 shadow-[0_0_8px_rgba(196,181,253,.95),0_0_20px_rgba(167,139,250,.72),0_0_38px_rgba(124,58,237,.42),inset_0_0_18px_rgba(167,139,250,.18),inset_0_1px_0_rgba(255,255,255,.24)]",
+    pink: "border-pink-300/95 bg-[linear-gradient(145deg,rgba(98,34,78,.82),rgba(54,19,54,.92))] text-pink-100 shadow-[0_0_8px_rgba(249,168,212,.95),0_0_20px_rgba(244,114,182,.72),0_0_38px_rgba(219,39,119,.42),inset_0_0_18px_rgba(244,114,182,.18),inset_0_1px_0_rgba(255,255,255,.24)]",
+    teal: "border-teal-200/95 bg-[linear-gradient(145deg,rgba(14,74,77,.84),rgba(4,39,50,.92))] text-teal-100 shadow-[0_0_8px_rgba(153,246,228,.95),0_0_20px_rgba(45,212,191,.72),0_0_38px_rgba(13,148,136,.42),inset_0_0_18px_rgba(45,212,191,.18),inset_0_1px_0_rgba(255,255,255,.24)]",
+    gold: "border-amber-200/95 bg-[linear-gradient(145deg,rgba(91,65,15,.84),rgba(48,34,8,.92))] text-amber-100 shadow-[0_0_8px_rgba(254,240,138,.95),0_0_20px_rgba(252,211,77,.72),0_0_38px_rgba(245,158,11,.42),inset_0_0_18px_rgba(252,211,77,.18),inset_0_1px_0_rgba(255,255,255,.24)]",
+  }[tone];
+
+  return (
+    <div
+      className={cn(
+        "relative flex shrink-0 items-center justify-center border backdrop-blur-sm",
+        round ? "rounded-full" : "rounded-[14px]",
+        sizeClass,
+        toneClass
+      )}
+    >
+      <span className={cn("pointer-events-none absolute inset-[4px] border border-white/10", round ? "rounded-full" : "rounded-[10px]")} />
+      <span className="relative z-10 drop-shadow-[0_0_8px_currentColor]">{children}</span>
+    </div>
+  );
+}
+
 type DashboardCard = {
   title: string;
   description: string;
@@ -33,6 +70,7 @@ type DashboardCard = {
   badge?: "LIVE" | "PRO" | "NEW";
   stat?: string;
   icon: ComponentType<{ className?: string }>;
+  glow?: "cyan" | "violet" | "pink" | "gold" | "teal";
 };
 
 const cards: DashboardCard[] = [
@@ -42,6 +80,7 @@ const cards: DashboardCard[] = [
     href: "/journal",
     stat: "DZIENNIK TRANSAKCJI",
     icon: BookOpen,
+    glow: "cyan",
   },
   {
     title: "Trading Room",
@@ -50,6 +89,7 @@ const cards: DashboardCard[] = [
     badge: "LIVE",
     stat: "ANALIZA I NARZĘDZIA",
     icon: CandlestickChart,
+    glow: "cyan",
   },
   {
     title: "Profit Calendar",
@@ -58,6 +98,7 @@ const cards: DashboardCard[] = [
     badge: "NEW",
     stat: "WYNIKI I PODSUMOWANIA",
     icon: CalendarDays,
+    glow: "cyan",
   },
   {
     title: "Skaner rynku",
@@ -66,6 +107,7 @@ const cards: DashboardCard[] = [
     badge: "PRO",
     stat: "NARZĘDZIA PRO",
     icon: ScanSearch,
+    glow: "cyan",
   },
   {
     title: "Strategie",
@@ -73,6 +115,7 @@ const cards: DashboardCard[] = [
     href: "/strategie",
     stat: "BIBLIOTEKA STRATEGII",
     icon: BrainCircuit,
+    glow: "violet",
   },
   {
     title: "Affiliate Hub",
@@ -81,6 +124,7 @@ const cards: DashboardCard[] = [
     badge: "NEW",
     stat: "PROGRAM PARTNERSKI",
     icon: UsersRound,
+    glow: "teal",
   },
   {
     title: "Education",
@@ -88,6 +132,7 @@ const cards: DashboardCard[] = [
     href: "/education",
     stat: "FX TRADE ACADEMY",
     icon: GraduationCap,
+    glow: "cyan",
   },
   {
     title: "Sesje / Webinary",
@@ -96,6 +141,7 @@ const cards: DashboardCard[] = [
     badge: "LIVE",
     stat: "SESJE LIVE I WEBINARY",
     icon: Radio,
+    glow: "pink",
   },
   {
     title: "Ustawienia",
@@ -103,6 +149,7 @@ const cards: DashboardCard[] = [
     href: "/settings",
     stat: "SYSTEM",
     icon: Settings,
+    glow: "cyan",
   },
 ];
 
@@ -122,9 +169,9 @@ function StatusCard({
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_0%_0%,rgba(34,211,238,.08),transparent_42%)]" />
       <div className="relative z-10 flex items-center gap-3">
         {Icon ? (
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-cyan-300/45 bg-cyan-400/[0.06] text-cyan-300 shadow-[0_0_18px_rgba(34,211,238,.08)]">
+          <GlowIconBox size="sm" tone="cyan">
             <Icon className="h-5 w-5" />
-          </div>
+          </GlowIconBox>
         ) : null}
         <div className="min-w-0">
           <div className="text-[9px] font-bold uppercase tracking-[.18em] text-sky-200/45">
@@ -159,9 +206,9 @@ function KpiCard({
     <div className="relative min-h-[88px] overflow-hidden rounded-[18px] border border-cyan-300/35 bg-[linear-gradient(145deg,rgba(10,84,137,.96),rgba(7,56,102,.98))] px-5 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,.04),0_12px_30px_rgba(0,0,0,.22)]">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_100%_0%,rgba(37,99,235,.14),transparent_45%)]" />
       <div className="relative z-10 flex items-center gap-4">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-cyan-300/45 bg-cyan-400/[0.06] text-cyan-300">
+        <GlowIconBox size="md" tone="cyan">
           <Icon className="h-5 w-5" />
-        </div>
+        </GlowIconBox>
         <div>
           <div className="text-[9px] font-bold uppercase tracking-[.18em] text-sky-200/45">
             {label}
@@ -192,6 +239,7 @@ function ModuleCard({
   badge,
   stat,
   icon: Icon,
+  glow = "cyan",
 }: DashboardCard) {
   return (
     <Link
@@ -202,8 +250,10 @@ function ModuleCard({
       <div className="relative z-10 flex h-full flex-col">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-[14px] border border-cyan-300/45 bg-[linear-gradient(180deg,rgba(14,165,233,.34),rgba(6,182,212,.16))] text-cyan-300 shadow-[0_0_20px_rgba(34,211,238,.09)]">
-              <Icon className="h-6 w-6" />
+            <div className="transition-transform duration-200 group-hover:scale-[1.05]">
+              <GlowIconBox size="lg" tone={glow}>
+                <Icon className="h-7 w-7" />
+              </GlowIconBox>
             </div>
             <h3 className="text-[17px] font-semibold text-white">{title}</h3>
           </div>
@@ -338,9 +388,9 @@ export default async function DashboardPage() {
           <StatusCard label="KONTO" value="Premium" icon={UserRound} />
           <div className="relative overflow-hidden rounded-[18px] border border-cyan-300/35 bg-[linear-gradient(145deg,rgba(10,84,137,.94),rgba(7,56,102,.96))] px-4 py-3">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-blue-400/25 bg-cyan-500/20 text-xs font-bold text-white">
-                {userInitials}
-              </div>
+              <GlowIconBox size="sm" tone="cyan" round>
+                <span className="text-xs font-black text-white">{userInitials}</span>
+              </GlowIconBox>
               <div className="min-w-0">
                 <div className="truncate text-[12px] font-semibold text-white">{userName}</div>
                 <div className="truncate text-[9px] text-sky-100/45">{userEmail || roleLabel}</div>
@@ -355,11 +405,11 @@ export default async function DashboardPage() {
           <div className="relative z-10 flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
             <div className="max-w-[680px]">
               <div className="flex items-center gap-4">
-                <div className="h-16 w-16 overflow-hidden rounded-[18px] border border-cyan-300/70 shadow-[0_0_24px_rgba(34,211,238,.32)] md:h-[72px] md:w-[72px]">
+                <div className="h-16 w-16 overflow-hidden rounded-[18px] border border-cyan-100/95 bg-[#073764] shadow-[0_0_10px_rgba(103,232,249,.95),0_0_26px_rgba(34,211,238,.70),0_0_48px_rgba(14,165,233,.40),inset_0_0_18px_rgba(56,189,248,.18)] md:h-[72px] md:w-[72px]">
                   <img
                     src="/dashboard-icon.png"
                     alt="FX Trade Dashboard"
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-cover mix-blend-screen"
                   />
                 </div>
                 <div>

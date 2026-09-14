@@ -64,6 +64,37 @@ type Item = {
   children?: Item[];
 };
 
+const NAV_IMAGE_BY_HREF: Record<string, string> = {
+  "/trading-room": "/nav-icons/trading-room.png",
+  "/skaner": "/nav-icons/skaner-rynku.png",
+  "/dashboard/affiliate": "/nav-icons/affiliate-hub.png",
+  "/education": "/nav-icons/akademia.png",
+  "/trading-room?tab=technical": "/nav-icons/analiza-techniczna.png",
+  "/journal": "/nav-icons/journal.png",
+  "/trading-room?tab=live": "/nav-icons/economic-calendar.png",
+  "/education/kurs": "/nav-icons/akademia.png",
+  "/education/setupy": "/nav-icons/setupy.png",
+  "/education/bonusy": "/nav-icons/materialy-bonusowe.png",
+};
+
+function NavImageIcon({ href, className }: { href: string; className?: string }) {
+  const src = NAV_IMAGE_BY_HREF[href];
+  if (!src) return null;
+
+  return (
+    <img
+      src={src}
+      alt=""
+      aria-hidden="true"
+      draggable={false}
+      className={cn(
+        "block shrink-0 object-contain select-none mix-blend-screen [filter:brightness(1.08)_contrast(1.05)]",
+        className
+      )}
+    />
+  );
+}
+
 type IconName =
   | "dashboard"
   | "trading"
@@ -181,6 +212,10 @@ function NavIcon({ name, className }: { name: IconName; className?: string }) {
 }
 
 function ChildNavIcon({ href, className = "h-4 w-4" }: { href: string; className?: string }) {
+  if (NAV_IMAGE_BY_HREF[href]) {
+    return <NavImageIcon href={href} className={className} />;
+  }
+
   const common = { width: 18, height: 18, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, className, "aria-hidden": true };
   if (href.includes("tab=technical")) return <svg {...common}><path d="M4 19V9M9 19V5M14 19v-7M19 19V3" /><path d="M3 19h18" /></svg>;
   if (href === "/journal") return <svg {...common}><rect x="5" y="3" width="15" height="18" rx="2" /><path d="M9 7h7M9 11h7M9 15h5M5 7H3M5 11H3M5 15H3" /></svg>;
@@ -634,16 +669,28 @@ export default function AppSidebar() {
                       <span className="flex min-w-0 items-center gap-3">
                         <span
                           className={cn(
-                            "flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] border transition-all duration-200",
+                            "flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[13px] border transition-all duration-200",
                             locked
                               ? "border-white/[0.03] bg-white/[0.025] text-sky-100/30"
-                              : iconGlowClasses(it.href, active)
+                              : NAV_IMAGE_BY_HREF[it.href]
+                                ? cn(
+                                    "border-sky-300/55 bg-[linear-gradient(145deg,rgba(14,165,233,.20),rgba(59,130,246,.13))] text-sky-100 shadow-[0_0_10px_rgba(56,189,248,.48),0_0_25px_rgba(59,130,246,.24),inset_0_1px_0_rgba(255,255,255,.12)] group-hover:border-sky-200/85 group-hover:shadow-[0_0_16px_rgba(125,211,252,.80),0_0_38px_rgba(14,165,233,.38),inset_0_1px_0_rgba(255,255,255,.18)]",
+                                    active && "border-sky-100/90 shadow-[0_0_18px_rgba(125,211,252,.88),0_0_38px_rgba(14,165,233,.48),inset_0_1px_0_rgba(255,255,255,.18)]"
+                                  )
+                                : iconGlowClasses(it.href, active)
                           )}
                         >
-                          <NavIcon
-                            name={iconForHref(it.href)}
-                            className="h-[23px] w-[23px] drop-shadow-[0_0_7px_currentColor]"
-                          />
+                          {NAV_IMAGE_BY_HREF[it.href] ? (
+                            <NavImageIcon
+                              href={it.href}
+                              className="h-[34px] w-[34px] drop-shadow-[0_0_7px_rgba(125,211,252,.92)]"
+                            />
+                          ) : (
+                            <NavIcon
+                              name={iconForHref(it.href)}
+                              className="h-[23px] w-[23px] drop-shadow-[0_0_7px_currentColor]"
+                            />
+                          )}
                         </span>
 
                         <span className="truncate font-semibold">{it.label}</span>
@@ -695,7 +742,21 @@ export default function AppSidebar() {
                               )}
                             >
                               <span className="flex min-w-0 items-center gap-2.5">
-                                <span className={cn("shrink-0 text-sky-300/80", chActive && "text-cyan-200")}><ChildNavIcon href={ch.href} /></span>
+                                <span
+                                  className={cn(
+                                    "shrink-0 text-sky-300/80",
+                                    chActive && "text-cyan-200",
+                                    NAV_IMAGE_BY_HREF[ch.href] &&
+                                      "flex h-8 w-8 items-center justify-center overflow-hidden rounded-[9px] border border-sky-300/45 bg-[linear-gradient(145deg,rgba(14,165,233,.16),rgba(59,130,246,.10))] shadow-[0_0_8px_rgba(56,189,248,.38),0_0_16px_rgba(14,165,233,.20),inset_0_1px_0_rgba(255,255,255,.08)]",
+                                    NAV_IMAGE_BY_HREF[ch.href] && chActive &&
+                                      "border-sky-100/75 shadow-[0_0_12px_rgba(125,211,252,.70),0_0_24px_rgba(14,165,233,.32),inset_0_1px_0_rgba(255,255,255,.12)]"
+                                  )}
+                                >
+                                  <ChildNavIcon
+                                    href={ch.href}
+                                    className={NAV_IMAGE_BY_HREF[ch.href] ? "h-7 w-7 drop-shadow-[0_0_5px_rgba(125,211,252,.85)]" : "h-4 w-4"}
+                                  />
+                                </span>
                                 <span className="truncate">{ch.label}</span>
                               </span>
 

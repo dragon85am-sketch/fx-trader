@@ -1,135 +1,9 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useLanguage } from "@/components/LanguageProvider";
+import Image from "next/image";
+import { useSearchParams } from "next/navigation";
 export const dynamic = "force-dynamic";
-
-
-type MacroLanguage = "pl" | "en" | "de" | "nl" | "es";
-
-const MACRO_I18N: Record<MacroLanguage, Record<string, string>> = {
-  pl: {
-    nextNfp: "Najbliższy NFP", followingNfp: "Kolejny NFP", nextCpi: "Najbliższy CPI", followingCpi: "Kolejny CPI",
-    upcomingNfpDates: "Nadchodzące terminy NFP", upcomingCpiDates: "Nadchodzące terminy CPI", nextReleaseBadge: "NAJBLIŻSZY", officialScheduleLabel: "Oficjalny harmonogram BLS",
-    forecast: "Prognoza", previous: "Poprzedni", impact: "Wpływ", actual: "Aktualny", date: "Data", time: "Czas", event: "Wydarzenie",
-    consensusForecast: "Prognoza konsensusu", previousRelease: "Poprzedni odczyt", macroData: "Dane z kalendarza makro",
-    nfpCalendar: "Kalendarz NFP", cpiCalendar: "Kalendarz CPI",
-    nfpSchedule: "Oficjalny harmonogram publikacji Employment Situation (BLS)", cpiSchedule: "Oficjalny harmonogram publikacji CPI (BLS)",
-    loadingNfp: "Ładowanie danych NFP…", loadingCpi: "Ładowanie danych CPI…",
-    noNfp: "Brak danych NFP od aktywnego dostawcy dla wybranego roku.", noCpi: "Brak danych CPI od aktywnego dostawcy dla wybranego roku.",
-    selectedEvent: "Wybrane wydarzenie", aiNfp: "Analiza NFP", affectedMarkets: "Rynki pod wpływem",
-    aiNfpText: "NFP zwykle powoduje silną zmienność na parach z USD, złocie, US30 i NAS100. Unikaj nowych transakcji 15 minut przed publikacją i poczekaj na zamknięcie pierwszej świecy.",
-  },
-  en: {
-    nextNfp: "Next NFP", followingNfp: "Following NFP", nextCpi: "Next CPI", followingCpi: "Following CPI",
-    upcomingNfpDates: "Upcoming NFP releases", upcomingCpiDates: "Upcoming CPI releases", nextReleaseBadge: "NEXT", officialScheduleLabel: "Official BLS schedule",
-    forecast: "Forecast", previous: "Previous", impact: "Impact", actual: "Actual", date: "Date", time: "Time", event: "Event",
-    consensusForecast: "Consensus forecast", previousRelease: "Previous release", macroData: "Macro calendar data",
-    nfpCalendar: "NFP Calendar", cpiCalendar: "CPI Calendar",
-    nfpSchedule: "Official Employment Situation release schedule (BLS)", cpiSchedule: "Official CPI release schedule (BLS)",
-    loadingNfp: "Loading NFP data…", loadingCpi: "Loading CPI data…",
-    noNfp: "No NFP data from the active provider for the selected year.", noCpi: "No CPI data from the active provider for the selected year.",
-    selectedEvent: "Wybrane wydarzenie", aiNfp: "NFP Analysis", affectedMarkets: "Affected Markets",
-    aiNfpText: "NFP usually creates strong volatility on USD pairs, Gold, US30 and NAS100. Avoid new trades 15 minutes before release and wait for the first candle close.",
-  },
-  de: {
-    nextNfp: "Nächster NFP", followingNfp: "Darauffolgender NFP", nextCpi: "Nächster CPI", followingCpi: "Darauffolgender CPI",
-    upcomingNfpDates: "Kommende NFP-Termine", upcomingCpiDates: "Kommende CPI-Termine", nextReleaseBadge: "NÄCHSTER", officialScheduleLabel: "Offizieller BLS-Kalender",
-    forecast: "Prognose", previous: "Vorheriger Wert", impact: "Auswirkung", actual: "Aktuell", date: "Datum", time: "Zeit", event: "Ereignis",
-    consensusForecast: "Konsensprognose", previousRelease: "Vorherige Veröffentlichung", macroData: "Makrokalenderdaten",
-    nfpCalendar: "NFP-Kalender", cpiCalendar: "CPI-Kalender",
-    nfpSchedule: "Offizieller Veröffentlichungsplan Employment Situation (BLS)", cpiSchedule: "Offizieller CPI-Veröffentlichungsplan (BLS)",
-    loadingNfp: "NFP-Daten werden geladen…", loadingCpi: "CPI-Daten werden geladen…",
-    noNfp: "Keine NFP-Daten vom aktiven Anbieter für das ausgewählte Jahr.", noCpi: "Keine CPI-Daten vom aktiven Anbieter für das ausgewählte Jahr.",
-    selectedEvent: "Ausgewähltes Ereignis", aiNfp: "NFP-Analyse", affectedMarkets: "Betroffene Märkte",
-    aiNfpText: "NFP sorgt häufig für starke Volatilität bei USD-Paaren, Gold, US30 und NAS100. Vermeide neue Trades 15 Minuten vor der Veröffentlichung und warte auf den Schluss der ersten Kerze.",
-  },
-  nl: {
-    nextNfp: "Volgende NFP", followingNfp: "Daaropvolgende NFP", nextCpi: "Volgende CPI", followingCpi: "Daaropvolgende CPI",
-    upcomingNfpDates: "Komende NFP-publicaties", upcomingCpiDates: "Komende CPI-publicaties", nextReleaseBadge: "VOLGENDE", officialScheduleLabel: "Officiële BLS-kalender",
-    forecast: "Prognose", previous: "Vorige", impact: "Impact", actual: "Actueel", date: "Datum", time: "Tijd", event: "Gebeurtenis",
-    consensusForecast: "Consensusprognose", previousRelease: "Vorige publicatie", macroData: "Macro-agendagegevens",
-    nfpCalendar: "NFP-kalender", cpiCalendar: "CPI-kalender",
-    nfpSchedule: "Officieel publicatieschema Employment Situation (BLS)", cpiSchedule: "Officieel CPI-publicatieschema (BLS)",
-    loadingNfp: "NFP-gegevens laden…", loadingCpi: "CPI-gegevens laden…",
-    noNfp: "Geen NFP-gegevens van de actieve provider voor het geselecteerde jaar.", noCpi: "Geen CPI-gegevens van de actieve provider voor het geselecteerde jaar.",
-    selectedEvent: "Geselecteerde gebeurtenis", aiNfp: "NFP-analyse", affectedMarkets: "Beïnvloede markten",
-    aiNfpText: "NFP veroorzaakt meestal sterke volatiliteit in USD-paren, goud, US30 en NAS100. Vermijd nieuwe trades 15 minuten vóór de publicatie en wacht op het sluiten van de eerste candle.",
-  },
-  es: {
-    nextNfp: "Próximo NFP", followingNfp: "Siguiente NFP", nextCpi: "Próximo CPI", followingCpi: "Siguiente CPI",
-    upcomingNfpDates: "Próximas publicaciones NFP", upcomingCpiDates: "Próximas publicaciones CPI", nextReleaseBadge: "PRÓXIMO", officialScheduleLabel: "Calendario oficial BLS",
-    forecast: "Previsión", previous: "Anterior", impact: "Impacto", actual: "Actual", date: "Fecha", time: "Hora", event: "Evento",
-    consensusForecast: "Previsión de consenso", previousRelease: "Publicación anterior", macroData: "Datos del calendario macro",
-    nfpCalendar: "Calendario NFP", cpiCalendar: "Calendario CPI",
-    nfpSchedule: "Calendario oficial de Employment Situation (BLS)", cpiSchedule: "Calendario oficial de CPI (BLS)",
-    loadingNfp: "Cargando datos NFP…", loadingCpi: "Cargando datos CPI…",
-    noNfp: "No hay datos NFP del proveedor activo para el año seleccionado.", noCpi: "No hay datos CPI del proveedor activo para el año seleccionado.",
-    selectedEvent: "Evento seleccionado", aiNfp: "Análisis NFP", affectedMarkets: "Mercados afectados",
-    aiNfpText: "El NFP suele generar una fuerte volatilidad en pares USD, oro, US30 y NAS100. Evita nuevas operaciones 15 minutos antes de la publicación y espera al cierre de la primera vela.",
-  },
-};
-
-const DATE_LOCALES: Record<MacroLanguage, string> = { pl: "pl-PL", en: "en-GB", de: "de-DE", nl: "nl-NL", es: "es-ES" };
-
-const OFFICIAL_RELEASES: Record<"nfp" | "cpi", Record<string, string[]>> = {
-  nfp: {
-    "2026": ["2026-01-09","2026-02-11","2026-03-06","2026-04-03","2026-05-08","2026-06-05","2026-07-02","2026-08-07","2026-09-04","2026-10-02","2026-11-06","2026-12-04"],
-    "2027": [],
-  },
-  cpi: {
-    "2026": ["2026-01-13","2026-02-13","2026-03-11","2026-04-10","2026-05-12","2026-06-10","2026-07-14","2026-08-12","2026-09-11","2026-10-14","2026-11-10","2026-12-10"],
-    "2027": [],
-  },
-};
-
-function officialScheduleEvents(kind: "nfp" | "cpi", year: string) {
-  return (OFFICIAL_RELEASES[kind][year] ?? []).map((date) => ({
-    date,
-    time: "14:30",
-    currency: "USD",
-    country: "US",
-    impact: "HIGH",
-    title: kind === "nfp" ? "Non-Farm Payrolls" : "Consumer Price Index",
-    actual: "-",
-    forecast: "-",
-    previous: "-",
-    source: "BLS schedule",
-  }));
-}
-
-function mergeScheduleWithProvider(schedule: any[], providerEvents: any[]) {
-  const providerByDate = new Map<string, any[]>();
-  for (const event of providerEvents) {
-    const date = String(event?.date ?? "");
-    if (!date) continue;
-    const list = providerByDate.get(date) ?? [];
-    list.push(event);
-    providerByDate.set(date, list);
-  }
-
-  const merged: any[] = [];
-  for (const scheduled of schedule) {
-    const sameDay = providerByDate.get(scheduled.date) ?? [];
-    if (sameDay.length > 0) merged.push(...sameDay);
-    else merged.push(scheduled);
-  }
-
-  // Keep provider events outside the known schedule too, but do not let them drive the official next-release cards.
-  const scheduleDates = new Set(schedule.map((event) => event.date));
-  for (const event of providerEvents) {
-    if (!scheduleDates.has(String(event?.date ?? ""))) merged.push(event);
-  }
-
-  return merged.sort((a, b) => `${a?.date ?? ""} ${a?.time ?? ""}`.localeCompare(`${b?.date ?? ""} ${b?.time ?? ""}`));
-}
-
-function getUpcomingOfficialEvents(kind: "nfp" | "cpi", year: string, count = 2) {
-  const today = new Date().toISOString().slice(0, 10);
-  return officialScheduleEvents(kind, year).filter((event) => event.date >= today).slice(0, count);
-}
-
 type Trade = {
   id: string;
   pair: string;
@@ -394,71 +268,40 @@ function formatTradeInputDate(year: number, month: number, day = 1) {
 }
 const cpiCalendarByYear: Record<string, any[]> = {
   "2026": [
-    ["13 sty 2026", "14:30", "CPI USA", "-", "-", "Wysoki"],
-    ["13 lut 2026", "14:30", "CPI USA", "-", "-", "Wysoki"],
-    ["11 mar 2026", "14:30", "CPI USA", "-", "-", "Wysoki"],
-    ["10 kwi 2026", "14:30", "CPI USA", "-", "-", "Wysoki"],
-    ["12 maj 2026", "14:30", "CPI USA", "-", "-", "Wysoki"],
-    ["10 cze 2026", "14:30", "CPI USA", "-", "-", "Wysoki"],
-    ["14 lip 2026", "14:30", "CPI USA", "-", "-", "Wysoki"],
-    ["12 sie 2026", "14:30", "CPI USA", "-", "-", "Wysoki"],
-    ["11 wrz 2026", "14:30", "CPI USA", "-", "-", "Wysoki"],
-    ["14 paź 2026", "14:30", "CPI USA", "-", "-", "Wysoki"],
-    ["10 lis 2026", "14:30", "CPI USA", "-", "-", "Wysoki"],
-    ["10 gru 2026", "14:30", "CPI USA", "-", "-", "Wysoki"],
+    ["15 Jul 2026", "14:30", "CPI YoY", "3.4%", "3.5%", "High"],
+    ["15 Jul 2026", "14:30", "Core CPI MoM", "0.3%", "0.4%", "High"],
+    ["12 Aug 2026", "14:30", "CPI YoY", "-", "-", "High"],
+    ["12 Aug 2026", "14:30", "Core CPI MoM", "-", "-", "High"],
+    ["16 Sep 2026", "14:30", "CPI YoY", "-", "-", "High"],
+    ["16 Sep 2026", "14:30", "Core CPI MoM", "-", "-", "High"],
+    ["14 Oct 2026", "14:30", "CPI YoY", "-", "-", "High"],
+    ["14 Oct 2026", "14:30", "Core CPI MoM", "-", "-", "High"],
+    ["12 Nov 2026", "14:30", "CPI YoY", "-", "-", "High"],
+    ["12 Nov 2026", "14:30", "Core CPI MoM", "-", "-", "High"],
+    ["10 Dec 2026", "14:30", "CPI YoY", "-", "-", "High"],
+    ["10 Dec 2026", "14:30", "Core CPI MoM", "-", "-", "High"],
   ],
-  "2027": [],
-};
 
+  "2027": [
+    ["13 Jan 2027", "14:30", "CPI YoY", "-", "-", "High"],
+    ["13 Jan 2027", "14:30", "Core CPI MoM", "-", "-", "High"],
+  ],
+};
 const nfpCalendarByYear: Record<string, any[]> = {
   "2026": [
-    ["09 sty 2026", "14:30", "Non-Farm Payrolls", "-", "-", "Wysoki"],
-    ["11 lut 2026", "14:30", "Non-Farm Payrolls", "-", "-", "Wysoki"],
-    ["06 mar 2026", "14:30", "Non-Farm Payrolls", "-", "-", "Wysoki"],
-    ["03 kwi 2026", "14:30", "Non-Farm Payrolls", "-", "-", "Wysoki"],
-    ["08 maj 2026", "14:30", "Non-Farm Payrolls", "-", "-", "Wysoki"],
-    ["05 cze 2026", "14:30", "Non-Farm Payrolls", "-", "-", "Wysoki"],
-    ["02 lip 2026", "14:30", "Non-Farm Payrolls", "-", "-", "Wysoki"],
-    ["07 sie 2026", "14:30", "Non-Farm Payrolls", "-", "-", "Wysoki"],
-    ["04 wrz 2026", "14:30", "Non-Farm Payrolls", "-", "-", "Wysoki"],
-    ["02 paź 2026", "14:30", "Non-Farm Payrolls", "-", "-", "Wysoki"],
-    ["06 lis 2026", "14:30", "Non-Farm Payrolls", "-", "-", "Wysoki"],
-    ["04 gru 2026", "14:30", "Non-Farm Payrolls", "-", "-", "Wysoki"],
+    ["03 Jul 2026", "14:30", "Non-Farm Payrolls", "185K", "177K", "High"],
+    ["07 Aug 2026", "14:30", "Non-Farm Payrolls", "-", "-", "High"],
+    ["04 Sep 2026", "14:30", "Non-Farm Payrolls", "-", "-", "High"],
+    ["02 Oct 2026", "14:30", "Non-Farm Payrolls", "-", "-", "High"],
+    ["06 Nov 2026", "14:30", "Non-Farm Payrolls", "-", "-", "High"],
+    ["04 Dec 2026", "14:30", "Non-Farm Payrolls", "-", "-", "High"],
   ],
-  "2027": [],
+
+  "2027": [
+    ["08 Jan 2027", "14:30", "Non-Farm Payrolls", "-", "-", "High"],
+    ["05 Feb 2027", "14:30", "Non-Farm Payrolls", "-", "-", "High"],
+  ],
 };
-
-function formatMacroCalendarDate(date: string, lang: MacroLanguage = "pl") {
-  if (!date) return "-";
-  const parsed = new Date(`${date}T12:00:00`);
-  if (Number.isNaN(parsed.getTime())) return date;
-  return parsed.toLocaleDateString(DATE_LOCALES[lang], {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
-
-function macroEventToRow(event: any, lang: MacroLanguage = "pl") {
-  return [
-    formatMacroCalendarDate(String(event?.date ?? ""), lang),
-    String(event?.time ?? "-") || "-",
-    String(event?.title ?? "-"),
-    String(event?.actual ?? "-") || "-",
-    String(event?.forecast ?? "-") || "-",
-    String(event?.previous ?? "-") || "-",
-    String(event?.impact ?? "HIGH").toUpperCase(),
-  ];
-}
-
-function getNextEvent(events: any[]) {
-  const today = new Date().toISOString().slice(0, 10);
-  const sorted = [...events].sort((a, b) =>
-    `${a?.date ?? ""} ${a?.time ?? ""}`.localeCompare(`${b?.date ?? ""} ${b?.time ?? ""}`)
-  );
-  return sorted.find((event) => String(event?.date ?? "") >= today) ?? sorted.at(-1) ?? null;
-}
-
 function getTimeUntil(date: string, time: string) {
   const eventDate = new Date(`${date}T${time}:00`);
   const now = new Date();
@@ -534,9 +377,6 @@ function getAffectedMarkets(title: string) {
 }
 
 export default function TradingRoomPanel() {
-  const { lang } = useLanguage();
-  const macroLang: MacroLanguage = (["pl", "en", "de", "nl", "es"] as string[]).includes(String(lang)) ? (lang as MacroLanguage) : "en";
-  const macroT = MACRO_I18N[macroLang];
   const [showMacroFilters, setShowMacroFilters] = useState(true);
 
 const [selectedMacroDate, setSelectedMacroDate] = useState(() => {
@@ -801,8 +641,7 @@ const getDaysUntil = (date: string) => {
 
   return `In ${days} days`;
 };
-const router = useRouter();
-  const searchParams = useSearchParams();
+const searchParams = useSearchParams();
   const tabParam = searchParams.get("tab");
   const [selectedNfpYear, setSelectedNfpYear] = useState("2026");
   const getInitialTab = () => {
@@ -838,10 +677,6 @@ const router = useRouter();
   const [selectedMonth, setSelectedMonth] = useState(2);
   const [selectedYear, setSelectedYear] = useState(2025);
   const [selectedCpiYear, setSelectedCpiYear] = useState("2026");
-  const [nfpYearEvents, setNfpYearEvents] = useState<any[]>([]);
-  const [cpiYearEvents, setCpiYearEvents] = useState<any[]>([]);
-  const [nfpCalendarLoading, setNfpCalendarLoading] = useState(false);
-  const [cpiCalendarLoading, setCpiCalendarLoading] = useState(false);
   const [calendarTrades, setCalendarTrades] = useState<CalendarTrade[]>(() => {
     if (typeof window === "undefined") return traderCalendarTrades;
 
@@ -898,64 +733,6 @@ useEffect(() => {
     })
     .catch(console.error);
 }, [selectedMacroMonth]);
-
-useEffect(() => {
-  setNfpCalendarLoading(true);
-  fetch(`/api/economic-calendar-year?year=${selectedNfpYear}&t=${Date.now()}`)
-    .then((res) => res.json())
-    .then((data) => setNfpYearEvents(Array.isArray(data) ? data : []))
-    .catch((error) => {
-      console.error(error);
-      setNfpYearEvents([]);
-    })
-    .finally(() => setNfpCalendarLoading(false));
-}, [selectedNfpYear]);
-
-useEffect(() => {
-  setCpiCalendarLoading(true);
-  fetch(`/api/economic-calendar-year?year=${selectedCpiYear}&t=${Date.now()}`)
-    .then((res) => res.json())
-    .then((data) => setCpiYearEvents(Array.isArray(data) ? data : []))
-    .catch((error) => {
-      console.error(error);
-      setCpiYearEvents([]);
-    })
-    .finally(() => setCpiCalendarLoading(false));
-}, [selectedCpiYear]);
-
-const nfpDynamicEvents = nfpYearEvents.filter((event) => {
-  const title = String(event?.title ?? "").toLowerCase().replace(/[-_]/g, " " );
-  if (title.includes("adp")) return false;
-  return (
-    title.includes("non farm payroll") ||
-    title.includes("nonfarm payroll") ||
-    title.includes("non farm employment") ||
-    title.includes("nonfarm employment") ||
-    title === "nfp"
-  );
-});
-const cpiDynamicEvents = cpiYearEvents.filter((event) => {
-  const title = String(event?.title ?? "").toLowerCase();
-  if (title.includes("ppi")) return false;
-  return (
-    title.includes("cpi") ||
-    title.includes("consumer price index") ||
-    title.includes("inflation rate")
-  );
-});
-const nfpOfficialEvents = officialScheduleEvents("nfp", selectedNfpYear);
-const cpiOfficialEvents = officialScheduleEvents("cpi", selectedCpiYear);
-const nfpMergedEvents = mergeScheduleWithProvider(nfpOfficialEvents, nfpDynamicEvents);
-const cpiMergedEvents = mergeScheduleWithProvider(cpiOfficialEvents, cpiDynamicEvents);
-const nfpRows = nfpMergedEvents.map((event) => macroEventToRow(event, macroLang));
-const cpiRows = cpiMergedEvents.map((event) => macroEventToRow(event, macroLang));
-const upcomingNfpSchedule = getUpcomingOfficialEvents("nfp", selectedNfpYear, 12);
-const upcomingCpiSchedule = getUpcomingOfficialEvents("cpi", selectedCpiYear, 12);
-const [nextNfpCalendarEvent, followingNfpCalendarEvent] = upcomingNfpSchedule;
-const [nextCpiCalendarEvent, followingCpiCalendarEvent] = upcomingCpiSchedule;
-const nfpProviderForNext = nfpDynamicEvents.find((event) => event?.date === nextNfpCalendarEvent?.date);
-const cpiProviderForNext = cpiDynamicEvents.find((event) => event?.date === nextCpiCalendarEvent?.date);
-
   useEffect(() => {
     switch (tabParam) {
       case "fxmarket":
@@ -1205,9 +982,8 @@ const cpiProviderForNext = cpiDynamicEvents.find((event) => event?.date === next
     grossLossAbs > 0 ? grossProfit / grossLossAbs : grossProfit > 0 ? grossProfit : 0;
 
   const roomTabs = [
+    "Trading Room",
     "Economic Calendar",
-    "NFP Calendar",
-    "CPI Calendar",
     "Profit Calendar",
   ];
 
@@ -1234,27 +1010,15 @@ const cpiProviderForNext = cpiDynamicEvents.find((event) => event?.date === next
   const categories = ["Forex", "Surowce", "Kryptowaluty"];
 
   return (
-    <div className="relative isolate min-h-[100dvh] w-full max-w-full overflow-x-hidden bg-[#020817] px-2 pb-5 pt-3 text-white sm:px-4 sm:pb-6 sm:pt-5">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed inset-0 z-0 bg-cover bg-center bg-no-repeat"
-        style={{
-          backgroundImage:
-            "linear-gradient(rgba(2,8,23,.52), rgba(2,8,23,.72)), url('/trading-room-market-bg.png')",
-        }}
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed inset-0 z-[1] bg-[radial-gradient(circle_at_50%_15%,rgba(14,165,233,.06),transparent_45%)]"
-      />
-      <section className="relative z-10 mx-auto w-full min-w-0 max-w-[1600px] [&_*]:max-w-full">
+    <div className="min-h-screen bg-[#061424] px-4 pb-6 pt-5 text-white">
+      <section className="mx-auto max-w-[1600px]">
         <div className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <div className="text-[10px] font-semibold uppercase tracking-[.20em] text-cyan-300/70">
               FX Trade
             </div>
             <div className="mt-1 flex flex-wrap items-center gap-3">
-              <h1 className="text-[22px] font-black tracking-tight sm:text-3xl">TRADING ROOM</h1>
+              <h1 className="text-3xl font-black tracking-tight">TRADING ROOM</h1>
               <span className="inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-500/10 px-3 py-1 text-[10px] font-bold text-emerald-300">
                 <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,.8)]" />
                 RYNEK OTWARTY
@@ -1278,7 +1042,7 @@ const cpiProviderForNext = cpiDynamicEvents.find((event) => event?.date === next
         </div>
 
         {activeRoomTab !== "Trading Room" ? (
-          <div className="mb-4 flex max-w-full gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible">
+          <div className="mb-4 flex flex-wrap gap-2">
             <button
               onClick={() => setActiveRoomTab("Trading Room")}
               className="rounded-xl border border-cyan-300/20 bg-[#0d3b63] px-4 py-2 text-[11px] font-semibold text-white transition hover:bg-[#12517f]"
@@ -1310,17 +1074,79 @@ const cpiProviderForNext = cpiDynamicEvents.find((event) => event?.date === next
 
         {activeRoomTab === "Trading Room" ? (
           <>
-            <section className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.href = "/trading-room?tab=technical";
+                }}
+                className="group overflow-hidden rounded-[18px] border border-sky-400/35 bg-[#061a2c] text-left shadow-[0_10px_28px_rgba(0,0,0,.20)] transition hover:-translate-y-0.5 hover:border-sky-300/70 hover:shadow-[0_0_34px_rgba(14,165,233,.18)]"
+              >
+                <div className="relative h-[190px] overflow-hidden bg-[#041322]">
+                  <Image
+                    src="/trading-room/technical-analysis-preview-v2.png"
+                    alt="Technical Analysis"
+                    fill
+                    className="object-contain object-center transition duration-500 group-hover:scale-[1.02]"
+                    priority
+                    unoptimized
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#061a2c] via-transparent to-transparent" />
+                  <div className="absolute left-3 top-3 flex h-10 w-10 items-center justify-center rounded-xl border border-sky-300/35 bg-blue-600/75 text-white shadow-[0_0_20px_rgba(56,189,248,.32)]">
+                    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+                      <path d="M5 19V9M10 19V5M15 19v-7M20 19V3" />
+                    </svg>
+                  </div>
+                  <span className="absolute right-3 top-3 rounded-full border border-emerald-300/25 bg-emerald-500/10 px-2.5 py-1 text-[9px] font-bold text-emerald-300">
+                    • LIVE
+                  </span>
+                </div>
+
+                <div className="p-4">
+                  <div className="text-[10px] font-bold uppercase tracking-[.18em] text-sky-300/70">
+                    TECHNICAL ANALYSIS
+                  </div>
+                  <h2 className="mt-1 text-[18px] font-bold">Technical Analysis</h2>
+                  <p className="mt-1 text-[11px] leading-5 text-sky-100/50">
+                    Real-time technical data and trading signals.
+                    <br />
+                    EMA, RSI, ADX, Pivot Points and more.
+                  </p>
+
+                  <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+                    <div className="rounded-lg border border-sky-400/10 bg-sky-500/5 px-2 py-2">
+                      <div className="text-[10px] text-sky-100/40">TA SCORE</div>
+                      <div className="mt-1 text-[11px] font-bold text-emerald-300">LIVE</div>
+                    </div>
+                    <div className="rounded-lg border border-sky-400/10 bg-sky-500/5 px-2 py-2">
+                      <div className="text-[10px] text-sky-100/40">Trend</div>
+                      <div className="mt-1 text-[11px] font-bold text-slate-200">NEUTRAL</div>
+                    </div>
+                    <div className="rounded-lg border border-sky-400/10 bg-sky-500/5 px-2 py-2">
+                      <div className="text-[10px] text-sky-100/40">STRENGTH</div>
+                      <div className="mt-1 text-[11px] font-bold text-slate-300">WEAK</div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex items-center justify-between rounded-xl border border-sky-300/20 bg-gradient-to-r from-blue-600 to-sky-500 px-3 py-2.5 shadow-[0_0_20px_rgba(14,165,233,.15)]">
+                    <span className="text-[11px] font-semibold text-white">Otwórz analizę</span>
+                    <span className="text-white">→</span>
+                  </div>
+                </div>
+              </button>
+
               <button
                 type="button"
                 onClick={() => setActiveRoomTab("Economic Calendar")}
                 className="group overflow-hidden rounded-[18px] border border-cyan-400/25 bg-[#07192b] text-left shadow-[0_10px_28px_rgba(0,0,0,.18)] transition hover:-translate-y-0.5 hover:border-cyan-300/55 hover:shadow-[0_0_30px_rgba(34,211,238,.12)]"
               >
-                <div className="relative h-[150px] overflow-hidden sm:h-[190px]">
-                  <img
+                <div className="relative h-[190px] overflow-hidden">
+                  <Image
                     src="/trading-room/economic-calendar-trading.png"
                     alt="Economic Calendar"
-                    className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
+                    fill
+                    className="object-cover transition duration-500 group-hover:scale-[1.04]"
+                    priority
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-[#07192b] via-transparent to-transparent" />
                 </div>
@@ -1344,11 +1170,13 @@ const cpiProviderForNext = cpiDynamicEvents.find((event) => event?.date === next
                 onClick={() => setActiveRoomTab("Profit Calendar")}
                 className="group overflow-hidden rounded-[18px] border border-emerald-400/25 bg-[#071b19] text-left shadow-[0_10px_28px_rgba(0,0,0,.18)] transition hover:-translate-y-0.5 hover:border-emerald-300/55 hover:shadow-[0_0_30px_rgba(16,185,129,.12)]"
               >
-                <div className="relative h-[150px] overflow-hidden sm:h-[190px]">
-                  <img
+                <div className="relative h-[190px] overflow-hidden">
+                  <Image
                     src="/trading-room/calendar-profit-bull.png"
                     alt="Calendar Profit"
-                    className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
+                    fill
+                    className="object-cover transition duration-500 group-hover:scale-[1.04]"
+                    priority
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-[#071b19] via-transparent to-transparent" />
                 </div>
@@ -1385,14 +1213,16 @@ const cpiProviderForNext = cpiDynamicEvents.find((event) => event?.date === next
 
               <button
                 type="button"
-                onClick={() => router.push("/journal")}
+                onClick={() => setActiveRoomTab("Profit Calendar")}
                 className="group overflow-hidden rounded-[18px] border border-violet-400/25 bg-[#15102a] text-left shadow-[0_10px_28px_rgba(0,0,0,.18)] transition hover:-translate-y-0.5 hover:border-violet-300/55 hover:shadow-[0_0_30px_rgba(139,92,246,.14)]"
               >
-                <div className="relative h-[150px] overflow-hidden sm:h-[190px]">
-                  <img
+                <div className="relative h-[190px] overflow-hidden">
+                  <Image
                     src="/trading-room/journal-trading.png"
                     alt="Journal"
-                    className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
+                    fill
+                    className="object-cover transition duration-500 group-hover:scale-[1.04]"
+                    priority
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-[#15102a] via-transparent to-transparent" />
                 </div>
@@ -1431,10 +1261,13 @@ const cpiProviderForNext = cpiDynamicEvents.find((event) => event?.date === next
                 <div>
                   <div className="text-[13px] font-semibold">Trading Room Premium</div>
                   <p className="mt-1 text-[10px] text-sky-100/45">
-                    Economic Calendar, Calendar Profit i Journal w jednym miejscu.
+                    Technical Analysis, Economic Calendar, Calendar Profit i Journal w jednym miejscu.
                   </p>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex gap-2">
+                  <span className="rounded-full border border-sky-300/20 bg-sky-400/5 px-3 py-1.5 text-[9px] text-sky-200">
+                    Technical
+                  </span>
                   <span className="rounded-full border border-cyan-300/15 bg-cyan-400/5 px-3 py-1.5 text-[9px] text-cyan-200">
                     Economic
                   </span>
@@ -1453,13 +1286,13 @@ const cpiProviderForNext = cpiDynamicEvents.find((event) => event?.date === next
     {/* =========================================================
         FX TRADE PREMIUM — ECONOMIC CALENDAR
        ========================================================= */}
-    <section className="overflow-x-auto rounded-[16px] border border-cyan-300/30 bg-[linear-gradient(145deg,#1d82c3_0%,#1466a3_58%,#0d4f84_100%)] shadow-[0_12px_32px_rgba(1,20,45,.18),0_0_28px_rgba(34,211,238,.13),inset_0_1px_0_rgba(255,255,255,.12)]">
-      <div className="flex flex-col gap-4 px-3 py-4 sm:px-5 sm:py-5 xl:flex-row xl:items-center xl:justify-between">
+    <section className="overflow-hidden rounded-[16px] border border-cyan-300/30 bg-[linear-gradient(145deg,#1d82c3_0%,#1466a3_58%,#0d4f84_100%)] shadow-[0_12px_32px_rgba(1,20,45,.18),0_0_28px_rgba(34,211,238,.13),inset_0_1px_0_rgba(255,255,255,.12)]">
+      <div className="flex flex-col gap-5 px-5 py-5 xl:flex-row xl:items-center xl:justify-between">
         <div>
           <div className="text-[9px] font-semibold uppercase tracking-[.18em] text-sky-300/65">
             Trading Room
           </div>
-          <h2 className="mt-1 text-[21px] font-semibold tracking-tight text-white sm:text-[26px]">
+          <h2 className="mt-1 text-[26px] font-semibold tracking-tight text-white">
             Economic Calendar
           </h2>
           <p className="mt-1 text-[11px] text-sky-100/50">
@@ -1478,7 +1311,7 @@ const cpiProviderForNext = cpiDynamicEvents.find((event) => event?.date === next
         </div>
       </div>
 
-      <div className="border-t border-[#0a417b] px-3 py-3 sm:px-5">
+      <div className="border-t border-[#0a417b] px-5 py-3">
         <div className="flex flex-wrap gap-2">
           {roomTabs.map((tab) => (
             <button
@@ -1502,7 +1335,7 @@ const cpiProviderForNext = cpiDynamicEvents.find((event) => event?.date === next
       <div className="rounded-[14px] border border-cyan-300/30 bg-[linear-gradient(145deg,#1a79b9_0%,#135f9b_52%,#0d4e82_100%)] p-4 shadow-[0_10px_28px_rgba(1,20,45,.16),0_0_24px_rgba(34,211,238,.11),inset_0_1px_0_rgba(255,255,255,.10)]">
         <h3 className="text-[14px] font-semibold text-white">Nadchodzące wydarzenia</h3>
 
-        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="mt-3 grid grid-cols-4 gap-2">
           {[
             ["HIGH", highImpactCount, "border-rose-500/25 bg-rose-500/10 text-rose-300"],
             ["MEDIUM", mediumImpactCount, "border-amber-400/25 bg-amber-400/10 text-amber-300"],
@@ -1967,7 +1800,7 @@ const cpiProviderForNext = cpiDynamicEvents.find((event) => event?.date === next
                       previous: event.previous ?? "-",
                     });
                   }}
-                  className="min-w-0 w-full rounded-[9px] border border-[#0a417b] bg-[#0c4b7d] p-3 text-left transition hover:border-sky-400/50 hover:bg-[#115f99]"
+                  className="w-full rounded-[9px] border border-[#0a417b] bg-[#0c4b7d] p-3 text-left transition hover:border-sky-400/50 hover:bg-[#115f99]"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex gap-3">
@@ -2060,7 +1893,7 @@ const cpiProviderForNext = cpiDynamicEvents.find((event) => event?.date === next
         {!showMacroFilters && (
           <button
             onClick={() => setShowMacroFilters(true)}
-            className="min-w-0 w-full rounded-[10px] border border-[#0d579e] bg-[#0f5b96] px-4 py-3 text-[10px] font-semibold text-sky-300 hover:bg-[#1674b5]"
+            className="w-full rounded-[10px] border border-[#0d579e] bg-[#0f5b96] px-4 py-3 text-[10px] font-semibold text-sky-300 hover:bg-[#1674b5]"
           >
             Pokaż Event Filters
           </button>
@@ -2178,12 +2011,12 @@ const cpiProviderForNext = cpiDynamicEvents.find((event) => event?.date === next
 ) : activeRoomTab === "NFP Calendar" ? (
 
   <>
-    <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <section className="grid gap-4 xl:grid-cols-4">
       {[
-        [macroT.nextNfp, nextNfpCalendarEvent ? formatMacroCalendarDate(nextNfpCalendarEvent.date, macroLang) : "-", nextNfpCalendarEvent ? `${nextNfpCalendarEvent.time} · ${nextNfpCalendarEvent.currency ?? "USD"}` : macroT.macroData, "text-blue-300"],
-        [macroT.forecast, nfpProviderForNext?.forecast ?? "-", macroT.consensusForecast, "text-white"],
-        [macroT.previous, nfpProviderForNext?.previous ?? "-", macroT.previousRelease, "text-white"],
-        [macroT.impact, nextNfpCalendarEvent?.impact ?? "HIGH", "USD / Gold / Indices", "text-red-300"],
+        ["Next NFP Release", "03 Jul 2026", "Friday · 14:30 CET", "text-blue-300"],
+        ["Forecast", "185K", "Expected jobs added", "text-white"],
+        ["Previous", "177K", "Last release", "text-white"],
+        ["Impact", "High", "USD / Gold / Indices", "text-red-300"],
       ].map(([label, value, sub, color]) => (
         <div key={label} className="rounded-[26px] border border-cyan-300/25 bg-[linear-gradient(135deg,#176fab,#11588f)] p-5 shadow-[0_8px_24px_rgba(1,20,45,.14),0_0_20px_rgba(34,211,238,.08),inset_0_1px_0_rgba(255,255,255,.09)]">
           <div className="text-sm text-white/45">{label}</div>
@@ -2193,36 +2026,16 @@ const cpiProviderForNext = cpiDynamicEvents.find((event) => event?.date === next
       ))}
     </section>
 
-    <section className="mt-6 rounded-[26px] border border-cyan-300/25 bg-[linear-gradient(135deg,#176fab,#11588f)] p-5 shadow-[0_8px_24px_rgba(1,20,45,.14),0_0_20px_rgba(34,211,238,.08),inset_0_1px_0_rgba(255,255,255,.09)]">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div>
-          <h3 className="text-lg font-semibold">{macroT.upcomingNfpDates}</h3>
-          <p className="mt-1 text-xs text-white/50">{macroT.officialScheduleLabel}</p>
-        </div>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {upcomingNfpSchedule.map((event, index) => (
-          <div key={event.date} className={`rounded-2xl border p-4 ${index === 0 ? "border-cyan-200/50 bg-cyan-300/10" : "border-white/10 bg-[#0c426f]"}`}>
-            <div className="flex items-center justify-between gap-3">
-              <div className="font-semibold text-white">{formatMacroCalendarDate(event.date, macroLang)}</div>
-              {index === 0 ? <span className="rounded-full bg-cyan-300/15 px-2 py-1 text-[10px] font-bold text-cyan-100">{macroT.nextReleaseBadge}</span> : null}
-            </div>
-            <div className="mt-2 text-sm text-sky-100/70">{event.time} · USD</div>
-          </div>
-        ))}
-      </div>
-    </section>
-
     <section className="mt-6 grid gap-6 xl:grid-cols-[1.5fr_0.7fr]">
       <div className="rounded-[26px] border border-cyan-300/25 bg-[linear-gradient(135deg,#176fab,#11588f)] p-5 shadow-[0_8px_24px_rgba(1,20,45,.14),0_0_20px_rgba(34,211,238,.08),inset_0_1px_0_rgba(255,255,255,.09)]">
         <div className="mb-5 flex items-center justify-between">
   <div>
     <h3 className="text-xl font-semibold">
-      {macroT.nfpCalendar} {selectedNfpYear}
+      NFP Calendar {selectedNfpYear}
     </h3>
 
     <p className="text-sm text-white/50">
-      {macroT.nfpSchedule}
+      Non-Farm Payrolls release schedule
     </p>
   </div>
 
@@ -2231,7 +2044,7 @@ const cpiProviderForNext = cpiDynamicEvents.find((event) => event?.date === next
   onChange={(e) => setSelectedNfpYear(e.target.value)}
   className="rounded-xl border border-white/10 bg-[#0c426f] px-4 py-2 text-white"
 >
-  {["2026", "2027"].map((year) => (
+  {Object.keys(nfpCalendarByYear).map((year) => (
     <option key={year} value={year}>
       {year}
     </option>
@@ -2241,7 +2054,7 @@ const cpiProviderForNext = cpiDynamicEvents.find((event) => event?.date === next
 {selectedMacroEvent && (
   <div className="mb-5 rounded-2xl border border-blue-400/30 bg-blue-500/10 p-4">
     <div className="text-xs uppercase tracking-widest text-blue-300">
-      {macroT.selectedEvent}
+      Selected Event
     </div>
 
     <div className="mt-2 text-xl font-semibold">
@@ -2266,36 +2079,26 @@ const cpiProviderForNext = cpiDynamicEvents.find((event) => event?.date === next
     </div>
   </div>
 )}
-<div className="overflow-x-auto rounded-2xl border border-white/10">
-  <div className="grid grid-cols-7 bg-white/5 px-4 py-3 text-xs uppercase tracking-wider text-white/45">
-    <div>{macroT.date}</div>
-    <div>{macroT.time}</div>
-    <div>{macroT.event}</div>
-    <div>{macroT.actual}</div>
-    <div>{macroT.forecast}</div>
-    <div>{macroT.previous}</div>
-    <div>{macroT.impact}</div>
+<div className="overflow-hidden rounded-2xl border border-white/10">
+  <div className="grid grid-cols-6 bg-white/5 px-4 py-3 text-xs uppercase tracking-wider text-white/45">
+    <div>Date</div>
+    <div>Time</div>
+    <div>Event</div>
+    <div>Forecast</div>
+    <div>Previous</div>
+    <div>Impact</div>
     
   </div>
 
-  {nfpCalendarLoading ? (
-    <div className="border-t border-white/10 bg-[#0c426f] px-4 py-6 text-sm text-sky-100/70">
-      {macroT.loadingNfp}
-    </div>
-  ) : nfpRows.length === 0 ? (
-    <div className="border-t border-white/10 bg-[#0c426f] px-4 py-6 text-sm text-sky-100/70">
-      {macroT.noNfp}
-    </div>
-  ) : nfpRows.map(
-    ([date, time, event, actual, forecast, previous, impact]) => (
+  {nfpCalendarByYear[selectedNfpYear].map(
+    ([date, time, event, forecast, previous, impact]) => (
       <div
         key={`${date}-${event}`}
-        className="grid grid-cols-7 items-center border-t border-white/10 bg-[#0c426f] px-4 py-4 text-sm hover:bg-white/5"
+        className="grid grid-cols-6 items-center border-t border-white/10 bg-[#0c426f] px-4 py-4 text-sm hover:bg-white/5"
       >
         <div>{date}</div>
         <div>{time}</div>
         <div className="font-medium">{event}</div>
-        <div>{actual}</div>
         <div>{forecast}</div>
         <div>{previous}</div>
 
@@ -2312,14 +2115,15 @@ const cpiProviderForNext = cpiDynamicEvents.find((event) => event?.date === next
 
 <div className="space-y-6">
         <div className="rounded-[26px] border border-cyan-300/25 bg-[linear-gradient(135deg,#176fab,#11588f)] p-5 shadow-[0_8px_24px_rgba(1,20,45,.14),0_0_20px_rgba(34,211,238,.08),inset_0_1px_0_rgba(255,255,255,.09)]">
-          <SectionTitle title={macroT.aiNfp} />
+          <SectionTitle title="AI NFP Analysis" />
           <div className="rounded-xl bg-[#0c426f] p-4 text-sm leading-6 text-white/70">
-            {macroT.aiNfpText}
+            NFP usually creates strong volatility on USD pairs, Gold, US30 and NAS100.
+            Avoid new trades 15 minutes before release and wait for the first candle close.
           </div>
         </div>
 
         <div className="rounded-[26px] border border-cyan-300/25 bg-[linear-gradient(135deg,#176fab,#11588f)] p-5 shadow-[0_8px_24px_rgba(1,20,45,.14),0_0_20px_rgba(34,211,238,.08),inset_0_1px_0_rgba(255,255,255,.09)]">
-          <SectionTitle title={macroT.affectedMarkets} />
+          <SectionTitle title="Affected Markets" />
           <div className="flex flex-wrap gap-2">
             {["EUR/USD", "GBP/USD", "XAU/USD", "US30", "NAS100", "DXY"].map((item) => (
               <span key={item} className="rounded-full bg-blue-500/15 px-3 py-1 text-sm text-blue-200">
@@ -2333,12 +2137,12 @@ const cpiProviderForNext = cpiDynamicEvents.find((event) => event?.date === next
   </>
 ) : activeRoomTab === "CPI Calendar" ? (
   <>
-    <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <section className="grid gap-4 xl:grid-cols-4">
       {[
-        [macroT.nextCpi, nextCpiCalendarEvent ? formatMacroCalendarDate(nextCpiCalendarEvent.date, macroLang) : "-", nextCpiCalendarEvent ? `${nextCpiCalendarEvent.time} · ${nextCpiCalendarEvent.currency ?? "USD"}` : macroT.macroData, "text-blue-300"],
-        [macroT.forecast, cpiProviderForNext?.forecast ?? "-", cpiProviderForNext?.title ?? "CPI", "text-white"],
-        [macroT.previous, cpiProviderForNext?.previous ?? "-", macroT.previousRelease, "text-white"],
-        [macroT.impact, nextCpiCalendarEvent?.impact ?? "HIGH", "USD · Gold · Indices", "text-red-300"],
+        ["Next CPI Release", "15 Jul 2026", "Wednesday · 14:30 CET", "text-blue-300"],
+        ["Forecast", "3.4%", "CPI YoY", "text-white"],
+        ["Previous", "3.5%", "Last Release", "text-white"],
+        ["Impact", "High", "USD · Gold · Indices", "text-red-300"],
       ].map(([label, value, sub, color]) => (
         <div key={label} className="rounded-[26px] border border-cyan-300/25 bg-[linear-gradient(135deg,#176fab,#11588f)] p-5 shadow-[0_8px_24px_rgba(1,20,45,.14),0_0_20px_rgba(34,211,238,.08),inset_0_1px_0_rgba(255,255,255,.09)]">
           <div className="text-sm text-white/45">{label}</div>
@@ -2349,30 +2153,10 @@ const cpiProviderForNext = cpiDynamicEvents.find((event) => event?.date === next
     </section>
 
     <section className="mt-6 rounded-[26px] border border-cyan-300/25 bg-[linear-gradient(135deg,#176fab,#11588f)] p-5 shadow-[0_8px_24px_rgba(1,20,45,.14),0_0_20px_rgba(34,211,238,.08),inset_0_1px_0_rgba(255,255,255,.09)]">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div>
-          <h3 className="text-lg font-semibold">{macroT.upcomingCpiDates}</h3>
-          <p className="mt-1 text-xs text-white/50">{macroT.officialScheduleLabel}</p>
-        </div>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {upcomingCpiSchedule.map((event, index) => (
-          <div key={event.date} className={`rounded-2xl border p-4 ${index === 0 ? "border-cyan-200/50 bg-cyan-300/10" : "border-white/10 bg-[#0c426f]"}`}>
-            <div className="flex items-center justify-between gap-3">
-              <div className="font-semibold text-white">{formatMacroCalendarDate(event.date, macroLang)}</div>
-              {index === 0 ? <span className="rounded-full bg-cyan-300/15 px-2 py-1 text-[10px] font-bold text-cyan-100">{macroT.nextReleaseBadge}</span> : null}
-            </div>
-            <div className="mt-2 text-sm text-sky-100/70">{event.time} · USD</div>
-          </div>
-        ))}
-      </div>
-    </section>
-
-    <section className="mt-6 rounded-[26px] border border-cyan-300/25 bg-[linear-gradient(135deg,#176fab,#11588f)] p-5 shadow-[0_8px_24px_rgba(1,20,45,.14),0_0_20px_rgba(34,211,238,.08),inset_0_1px_0_rgba(255,255,255,.09)]">
       <div className="mb-5 flex items-center justify-between">
         <div>
-          <h3 className="text-xl font-semibold">{macroT.cpiCalendar} {selectedCpiYear}</h3>
-          <p className="text-sm text-white/50">{macroT.cpiSchedule}</p>
+          <h3 className="text-xl font-semibold">CPI Calendar {selectedCpiYear}</h3>
+          <p className="text-sm text-white/50">Consumer Price Index release schedule</p>
         </div>
 
         <select
@@ -2380,7 +2164,7 @@ const cpiProviderForNext = cpiDynamicEvents.find((event) => event?.date === next
           onChange={(e) => setSelectedCpiYear(e.target.value)}
           className="rounded-xl border border-white/10 bg-[#0c426f] px-4 py-2 text-white outline-none"
         >
-          {["2026", "2027"].map((year) => (
+          {Object.keys(cpiCalendarByYear).map((year) => (
             <option key={year} value={year}>
               {year}
             </option>
@@ -2388,35 +2172,25 @@ const cpiProviderForNext = cpiDynamicEvents.find((event) => event?.date === next
         </select>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-white/10">
-        <div className="grid grid-cols-7 bg-white/5 px-4 py-3 text-xs uppercase tracking-wider text-white/45">
-          <div>{macroT.date}</div>
-          <div>{macroT.time}</div>
-          <div>{macroT.event}</div>
-          <div>{macroT.actual}</div>
-          <div>{macroT.forecast}</div>
-          <div>{macroT.previous}</div>
-          <div>{macroT.impact}</div>
+      <div className="overflow-hidden rounded-xl border border-white/10">
+        <div className="grid grid-cols-6 bg-white/5 px-4 py-3 text-xs uppercase tracking-wider text-white/45">
+          <div>Date</div>
+          <div>Time</div>
+          <div>Event</div>
+          <div>Forecast</div>
+          <div>Previous</div>
+          <div>Impact</div>
         </div>
 
-        {cpiCalendarLoading ? (
-          <div className="border-t border-white/10 bg-[#0c426f] px-4 py-6 text-sm text-sky-100/70">
-            {macroT.loadingCpi}
-          </div>
-        ) : cpiRows.length === 0 ? (
-          <div className="border-t border-white/10 bg-[#0c426f] px-4 py-6 text-sm text-sky-100/70">
-            {macroT.noCpi}
-          </div>
-        ) : cpiRows.map(
-          ([date, time, event, actual, forecast, previous, impact]) => (
+        {cpiCalendarByYear[selectedCpiYear].map(
+          ([date, time, event, forecast, previous, impact]) => (
             <div
               key={`${date}-${event}`}
-              className="grid grid-cols-7 items-center border-t border-white/10 bg-[#0c426f] px-4 py-4 text-sm hover:bg-white/5"
+              className="grid grid-cols-6 items-center border-t border-white/10 bg-[#0c426f] px-4 py-4 text-sm hover:bg-white/5"
             >
               <div>{date}</div>
               <div>{time}</div>
               <div className="font-medium">{event}</div>
-              <div>{actual}</div>
               <div>{forecast}</div>
               <div>{previous}</div>
               <div>
@@ -2435,7 +2209,7 @@ const cpiProviderForNext = cpiDynamicEvents.find((event) => event?.date === next
           {/* =========================================================
               FX TRADE PREMIUM — PROFIT CALENDAR
              ========================================================= */}
-          <section className="overflow-x-auto rounded-[16px] border border-cyan-300/30 bg-[linear-gradient(145deg,#1d82c3_0%,#1466a3_58%,#0d4f84_100%)] shadow-[0_12px_32px_rgba(1,20,45,.18),0_0_28px_rgba(34,211,238,.13),inset_0_1px_0_rgba(255,255,255,.12)]">
+          <section className="overflow-hidden rounded-[16px] border border-cyan-300/30 bg-[linear-gradient(145deg,#1d82c3_0%,#1466a3_58%,#0d4f84_100%)] shadow-[0_12px_32px_rgba(1,20,45,.18),0_0_28px_rgba(34,211,238,.13),inset_0_1px_0_rgba(255,255,255,.12)]">
             <div className="flex flex-col gap-4 px-5 py-5 xl:flex-row xl:items-center xl:justify-between">
               <div>
                 <div className="text-[9px] font-semibold uppercase tracking-[.18em] text-sky-300/65">
@@ -2679,7 +2453,7 @@ const cpiProviderForNext = cpiDynamicEvents.find((event) => event?.date === next
                 <select
                   value={newTrade.pair}
                   onChange={(e) => setNewTrade({ ...newTrade, pair: e.target.value })}
-                  className="min-w-0 w-full rounded-[8px] border border-[#0d579e] bg-[#0c4b7d] px-3 py-2.5 text-[10px] text-white outline-none"
+                  className="w-full rounded-[8px] border border-[#0d579e] bg-[#0c4b7d] px-3 py-2.5 text-[10px] text-white outline-none"
                 >
                   {Object.values(instrumentOptions).flat().map((symbol) => (
                     <option key={symbol} value={symbol}>{symbol}</option>
@@ -2728,7 +2502,7 @@ const cpiProviderForNext = cpiDynamicEvents.find((event) => event?.date === next
                             [key]: e.target.value,
                           })
                         }
-                        className="min-w-0 w-full rounded-[8px] border border-[#0d579e] bg-[#0c4b7d] px-2.5 py-2.5 text-[10px] text-white outline-none"
+                        className="w-full rounded-[8px] border border-[#0d579e] bg-[#0c4b7d] px-2.5 py-2.5 text-[10px] text-white outline-none"
                       />
                     </label>
                   ))}
@@ -2740,7 +2514,7 @@ const cpiProviderForNext = cpiDynamicEvents.find((event) => event?.date === next
                     <input
                       value={newTrade.size}
                       onChange={(e) => setNewTrade({ ...newTrade, size: e.target.value })}
-                      className="min-w-0 w-full rounded-[8px] border border-[#0d579e] bg-[#0c4b7d] px-3 py-2.5 text-[10px] text-white outline-none"
+                      className="w-full rounded-[8px] border border-[#0d579e] bg-[#0c4b7d] px-3 py-2.5 text-[10px] text-white outline-none"
                     />
                   </label>
 
@@ -2750,7 +2524,7 @@ const cpiProviderForNext = cpiDynamicEvents.find((event) => event?.date === next
                       type="number"
                       value={newTrade.result}
                       onChange={(e) => setNewTrade({ ...newTrade, result: e.target.value })}
-                      className="min-w-0 w-full rounded-[8px] border border-[#0d579e] bg-[#0c4b7d] px-3 py-2.5 text-[10px] text-emerald-300 outline-none"
+                      className="w-full rounded-[8px] border border-[#0d579e] bg-[#0c4b7d] px-3 py-2.5 text-[10px] text-emerald-300 outline-none"
                     />
                   </label>
                 </div>
@@ -2761,7 +2535,7 @@ const cpiProviderForNext = cpiDynamicEvents.find((event) => event?.date === next
                     type="date"
                     value={newTrade.date}
                     onChange={(e) => setNewTrade({ ...newTrade, date: e.target.value })}
-                    className="min-w-0 w-full rounded-[8px] border border-[#0d579e] bg-[#0c4b7d] px-3 py-2.5 text-[10px] text-white outline-none"
+                    className="w-full rounded-[8px] border border-[#0d579e] bg-[#0c4b7d] px-3 py-2.5 text-[10px] text-white outline-none"
                   />
                 </label>
 
@@ -2771,7 +2545,7 @@ const cpiProviderForNext = cpiDynamicEvents.find((event) => event?.date === next
                     value={newTrade.setup}
                     onChange={(e) => setNewTrade({ ...newTrade, setup: e.target.value })}
                     placeholder="np. London Breakout"
-                    className="min-w-0 w-full rounded-[8px] border border-[#0d579e] bg-[#0c4b7d] px-3 py-2.5 text-[10px] text-white outline-none placeholder:text-sky-100/25"
+                    className="w-full rounded-[8px] border border-[#0d579e] bg-[#0c4b7d] px-3 py-2.5 text-[10px] text-white outline-none placeholder:text-sky-100/25"
                   />
                 </label>
 
@@ -2780,7 +2554,7 @@ const cpiProviderForNext = cpiDynamicEvents.find((event) => event?.date === next
                   <select
                     value={newTrade.session}
                     onChange={(e) => setNewTrade({ ...newTrade, session: e.target.value })}
-                    className="min-w-0 w-full rounded-[8px] border border-[#0d579e] bg-[#0c4b7d] px-3 py-2.5 text-[10px] text-white outline-none"
+                    className="w-full rounded-[8px] border border-[#0d579e] bg-[#0c4b7d] px-3 py-2.5 text-[10px] text-white outline-none"
                   >
                     <option value="Asia">Asia</option>
                     <option value="London">London</option>
@@ -2802,7 +2576,7 @@ const cpiProviderForNext = cpiDynamicEvents.find((event) => event?.date === next
 
                 <button
                   onClick={editingTradeId ? handleUpdateTrade : handleAddTrade}
-                  className="min-w-0 w-full rounded-[9px] border border-sky-300/30 bg-[linear-gradient(90deg,#0b9ee8,#1269e8)] px-4 py-3 text-[10px] font-bold text-white shadow-[0_0_18px_rgba(14,165,233,.18)] transition hover:brightness-110"
+                  className="w-full rounded-[9px] border border-sky-300/30 bg-[linear-gradient(90deg,#0b9ee8,#1269e8)] px-4 py-3 text-[10px] font-bold text-white shadow-[0_0_18px_rgba(14,165,233,.18)] transition hover:brightness-110"
                 >
                   {editingTradeId ? "✓ Zapisz zmiany" : "＋ Add Trade to Calendar"}
                 </button>
