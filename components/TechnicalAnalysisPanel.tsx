@@ -48,6 +48,7 @@ const INSTRUMENTS = [
   { symbol: "US30", api: "DJI", name: "Dow Jones Industrial Average", flag: "🇺🇸" },
   { symbol: "USDCAD", api: "USD/CAD", name: "US Dollar / Canadian Dollar", flag: "🇺🇸 🇨🇦" },
   { symbol: "AUDUSD", api: "AUD/USD", name: "Australian Dollar / US Dollar", flag: "🇦🇺 🇺🇸" },
+  { symbol: "BTCUSD", api: "BTC/USD", name: "Bitcoin / US Dollar", flag: "₿ 🇺🇸" },
 ] as const;
 
 const TF_MAP: Record<string, string> = {

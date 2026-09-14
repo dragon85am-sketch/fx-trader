@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import TechnicalAnalysisPanel from "@/components/TechnicalAnalysisPanel";
+import TechnicalAnalysisLiveCard from "./TechnicalAnalysisLiveCard";
 export const dynamic = "force-dynamic";
 type Trade = {
   id: string;
@@ -1324,61 +1325,7 @@ const nextCpiCalendarEvent = officialNextCpi
         {activeRoomTab === "Trading Room" ? (
           <>
             <section className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <button
-                type="button"
-                onClick={() => setActiveRoomTab("Technical Analysis")}
-                className="group flex h-full min-h-[500px] flex-col overflow-hidden rounded-[20px] border border-blue-400/45 bg-[#06182a] text-left shadow-[0_12px_34px_rgba(0,0,0,.24)] transition hover:-translate-y-0.5 hover:border-blue-300/70 hover:shadow-[0_0_34px_rgba(59,130,246,.22)] xl:min-h-[560px]"
-              >
-                <div className="relative h-[220px] shrink-0 overflow-hidden bg-[#041426] sm:h-[230px] xl:h-[245px]">
-                  <div className="absolute left-4 top-4 z-10 flex h-12 w-12 items-center justify-center rounded-xl border border-blue-300/20 bg-blue-600/80 shadow-[0_0_24px_rgba(37,99,235,.35)]">
-                    <svg viewBox="0 0 24 24" className="h-6 w-6 text-white" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M4 19V9M9 19V5M14 19v-7M19 19V3" />
-                      <path d="m3 14 5-4 4 2 8-7" />
-                    </svg>
-                  </div>
-                  <svg viewBox="0 0 420 245" className="h-full w-full" preserveAspectRatio="none" aria-hidden="true">
-                    <defs>
-                      <linearGradient id="taBg" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#071d36" />
-                        <stop offset="100%" stopColor="#03101f" />
-                      </linearGradient>
-                      <linearGradient id="taGlow" x1="0" y1="0" x2="1" y2="0">
-                        <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.2" />
-                        <stop offset="100%" stopColor="#2563eb" stopOpacity="0.02" />
-                      </linearGradient>
-                    </defs>
-                    <rect width="420" height="245" fill="url(#taBg)" />
-                    <rect width="420" height="245" fill="url(#taGlow)" />
-                    {Array.from({ length: 9 }).map((_, i) => <line key={`vg-${i}`} x1={i * 52.5} y1="0" x2={i * 52.5} y2="245" stroke="#38bdf8" strokeOpacity="0.08" />)}
-                    {Array.from({ length: 6 }).map((_, i) => <line key={`hg-${i}`} x1="0" y1={i * 49} x2="420" y2={i * 49} stroke="#38bdf8" strokeOpacity="0.08" />)}
-                    <path d="M0 176 C35 168 52 180 80 154 S128 136 157 143 S206 112 235 121 S282 93 312 103 S358 70 420 56" fill="none" stroke="#38bdf8" strokeWidth="2" strokeOpacity="0.9" />
-                    <path d="M0 191 C38 188 66 176 96 169 S150 164 183 147 S237 145 270 128 S332 113 420 93" fill="none" stroke="#22c55e" strokeWidth="1.8" strokeOpacity="0.9" />
-                    <path d="M0 205 C50 201 87 194 125 184 S190 173 224 162 S282 151 317 136 S370 126 420 117" fill="none" stroke="#ef4444" strokeWidth="1.8" strokeOpacity="0.85" />
-                    {[
-                      [30,166,140,185,155,1],[58,153,132,172,143,1],[86,145,123,165,134,0],[114,134,115,153,124,1],
-                      [142,125,108,146,116,1],[170,137,116,151,143,0],[198,126,101,144,132,1],[226,112,90,133,104,1],
-                      [254,118,97,138,126,0],[282,104,79,126,91,1],[310,93,69,114,83,1],[338,86,58,101,72,1],
-                      [366,75,45,91,60,1],[394,65,34,82,48,1]
-                    ].map(([x,bodyY,wickY,bottomY,closeY,up],i)=>{
-                      const color=up ? '#22d3ee' : '#ef4444';
-                      const y=Math.min(bodyY, closeY), h=Math.max(10, Math.abs(bodyY-closeY));
-                      return <g key={`c-${i}`}><line x1={x} y1={wickY} x2={x} y2={bottomY} stroke={color} strokeWidth="2"/><rect x={x-6} y={y} width="12" height={h} rx="1" fill={color} fillOpacity="0.95"/></g>
-                    })}
-                  </svg>
-                  <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#06182a] via-[#06182a]/55 to-transparent" />
-                </div>
-                <div className="flex flex-1 flex-col p-5">
-                  <div className="text-[10px] font-bold uppercase tracking-[.18em] text-blue-300/80">TECHNICAL ANALYSIS</div>
-                  <h2 className="mt-1 text-[21px] font-black uppercase tracking-tight">Technical Analysis</h2>
-                  <p className="mt-1 text-[11px] leading-5 text-sky-100/60">Real-time technical data and trading signals.<br />EMA, RSI, ADX, Pivot Points and more.</p>
-                  <div className="mt-5 grid grid-cols-3 gap-2 text-center">
-                    <div className="rounded-lg border border-cyan-300/10 bg-emerald-500/5 px-2 py-3"><div className="text-[9px] text-sky-100/45">TA SCORE</div><div className="mt-1 text-[18px] font-black text-emerald-300">LIVE</div></div>
-                    <div className="rounded-lg border border-cyan-300/10 bg-emerald-500/5 px-2 py-3"><div className="text-[9px] text-sky-100/45">TREND</div><div className="mt-1 text-[13px] font-black text-emerald-300">AUTO</div></div>
-                    <div className="rounded-lg border border-cyan-300/10 bg-amber-500/5 px-2 py-3"><div className="text-[9px] text-sky-100/45">STRENGTH</div><div className="mt-1 text-[13px] font-black text-amber-300">ADX</div></div>
-                  </div>
-                  <div className="mt-auto flex items-center justify-between rounded-xl border border-blue-300/20 bg-blue-600 px-4 py-3 shadow-[0_10px_28px_rgba(37,99,235,.24)] transition group-hover:bg-blue-500"><span className="text-[12px] font-bold">Otwórz analizę</span><span className="text-blue-100">→</span></div>
-                </div>
-              </button>
+              <TechnicalAnalysisLiveCard onOpen={() => setActiveRoomTab("Technical Analysis")} />
 
               <button
                 type="button"
