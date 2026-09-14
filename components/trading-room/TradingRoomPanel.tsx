@@ -311,12 +311,30 @@ type ReleaseScheduleItem = {
 };
 
 const OFFICIAL_NFP_2026: ReleaseScheduleItem[] = [
+  { date: "2026-01-09", time: "14:30", event: "NFP" },
+  { date: "2026-02-11", time: "14:30", event: "NFP" },
+  { date: "2026-03-06", time: "14:30", event: "NFP" },
+  { date: "2026-04-03", time: "14:30", event: "NFP" },
+  { date: "2026-05-08", time: "14:30", event: "NFP" },
+  { date: "2026-06-05", time: "14:30", event: "NFP" },
+  { date: "2026-07-02", time: "14:30", event: "NFP" },
+  { date: "2026-08-07", time: "14:30", event: "NFP" },
+  { date: "2026-09-04", time: "14:30", event: "NFP" },
   { date: "2026-10-02", time: "14:30", event: "NFP" },
   { date: "2026-11-06", time: "14:30", event: "NFP" },
   { date: "2026-12-04", time: "14:30", event: "NFP" },
 ];
 
 const OFFICIAL_CPI_2026: ReleaseScheduleItem[] = [
+  { date: "2026-01-13", time: "14:30", event: "CPI" },
+  { date: "2026-02-13", time: "14:30", event: "CPI" },
+  { date: "2026-03-11", time: "13:30", event: "CPI" },
+  { date: "2026-04-10", time: "14:30", event: "CPI" },
+  { date: "2026-05-12", time: "14:30", event: "CPI" },
+  { date: "2026-06-10", time: "14:30", event: "CPI" },
+  { date: "2026-07-14", time: "14:30", event: "CPI" },
+  { date: "2026-08-12", time: "14:30", event: "CPI" },
+  { date: "2026-09-11", time: "14:30", event: "CPI" },
   { date: "2026-10-14", time: "14:30", event: "CPI" },
   { date: "2026-11-10", time: "14:30", event: "CPI" },
   { date: "2026-12-10", time: "14:30", event: "CPI" },
@@ -326,10 +344,10 @@ const MACRO_I18N = {
   pl: {
     nextNfp: "Najbliższy NFP", nextCpi: "Najbliższy CPI", forecast: "Prognoza", previous: "Poprzedni", impact: "Wpływ", high: "WYSOKI",
     macroData: "Dane z kalendarza makro", consensus: "Prognoza konsensusu", previousRelease: "Poprzedni odczyt",
-    nfpCalendar: "Kalendarz NFP", cpiCalendar: "Kalendarz CPI", nfpSubtitle: "{macroT.nfpSubtitle}", cpiSubtitle: "Oficjalny harmonogram publikacji CPI (BLS)",
-    date: "Data", time: "Czas", event: "Wydarzenie", loadingNfp: "{macroT.loadingNfp}", loadingCpi: "Ładowanie danych CPI…",
-    noNfp: "{macroT.noNfp}", noCpi: "Brak danych CPI dla wybranego roku.",
-    upcomingNfp: "Nadchodzące terminy NFP", upcomingCpi: "Nadchodzące terminy CPI", nextBadge: "NAJBLIŻSZY", officialSchedule: "Oficjalny harmonogram BLS",
+    nfpCalendar: "Kalendarz NFP", cpiCalendar: "Kalendarz CPI", nfpSubtitle: "Oficjalny harmonogram publikacji Employment Situation (BLS)", cpiSubtitle: "Oficjalny harmonogram publikacji CPI (BLS)",
+    date: "Data", time: "Czas", event: "Wydarzenie", loadingNfp: "Ładowanie danych NFP…", loadingCpi: "Ładowanie danych CPI…",
+    noNfp: "Brak danych NFP dla wybranego roku.", noCpi: "Brak danych CPI dla wybranego roku.",
+    upcomingNfp: "Nadchodzące terminy NFP", upcomingCpi: "Nadchodzące terminy CPI", nextBadge: "NAJBLIŻSZY", officialSchedule: "Oficjalny harmonogram BLS", fullYear: "Pełny harmonogram 2026", released: "ODBYŁO SIĘ", upcoming: "NADCHODZI",
     aiNfp: "Analiza AI NFP", affected: "Rynki pod wpływem", aiNfpText: "NFP zwykle powoduje silną zmienność na parach USD, złocie, US30 i NAS100. Unikaj nowych transakcji 15 minut przed publikacją i poczekaj na zamknięcie pierwszej świecy.",
   },
   en: {
@@ -338,7 +356,7 @@ const MACRO_I18N = {
     nfpCalendar: "NFP Calendar", cpiCalendar: "CPI Calendar", nfpSubtitle: "Official Employment Situation release schedule (BLS)", cpiSubtitle: "Official CPI release schedule (BLS)",
     date: "Date", time: "Time", event: "Event", loadingNfp: "Loading NFP data…", loadingCpi: "Loading CPI data…",
     noNfp: "No NFP data for the selected year.", noCpi: "No CPI data for the selected year.",
-    upcomingNfp: "Upcoming NFP releases", upcomingCpi: "Upcoming CPI releases", nextBadge: "NEXT", officialSchedule: "Official BLS schedule",
+    upcomingNfp: "Upcoming NFP releases", upcomingCpi: "Upcoming CPI releases", nextBadge: "NEXT", officialSchedule: "Official BLS schedule", fullYear: "Full 2026 schedule", released: "RELEASED", upcoming: "UPCOMING",
     aiNfp: "AI NFP Analysis", affected: "Affected Markets", aiNfpText: "NFP usually creates strong volatility on USD pairs, Gold, US30 and NAS100. Avoid new trades 15 minutes before release and wait for the first candle close.",
   },
   de: {
@@ -347,7 +365,7 @@ const MACRO_I18N = {
     nfpCalendar: "NFP-Kalender", cpiCalendar: "CPI-Kalender", nfpSubtitle: "Offizieller Veröffentlichungsplan der Employment Situation (BLS)", cpiSubtitle: "Offizieller CPI-Veröffentlichungsplan (BLS)",
     date: "Datum", time: "Zeit", event: "Ereignis", loadingNfp: "NFP-Daten werden geladen…", loadingCpi: "CPI-Daten werden geladen…",
     noNfp: "Keine NFP-Daten für das gewählte Jahr.", noCpi: "Keine CPI-Daten für das gewählte Jahr.",
-    upcomingNfp: "Kommende NFP-Termine", upcomingCpi: "Kommende CPI-Termine", nextBadge: "NÄCHSTER", officialSchedule: "Offizieller BLS-Terminplan",
+    upcomingNfp: "Kommende NFP-Termine", upcomingCpi: "Kommende CPI-Termine", nextBadge: "NÄCHSTER", officialSchedule: "Offizieller BLS-Terminplan", fullYear: "Vollständiger Terminplan 2026", released: "VERÖFFENTLICHT", upcoming: "KOMMT",
     aiNfp: "KI-NFP-Analyse", affected: "Betroffene Märkte", aiNfpText: "NFP verursacht meist starke Volatilität bei USD-Paaren, Gold, US30 und NAS100. 15 Minuten vor der Veröffentlichung keine neuen Trades eröffnen und auf den Schluss der ersten Kerze warten.",
   },
   nl: {
@@ -356,7 +374,7 @@ const MACRO_I18N = {
     nfpCalendar: "NFP-kalender", cpiCalendar: "CPI-kalender", nfpSubtitle: "Officieel publicatieschema Employment Situation (BLS)", cpiSubtitle: "Officieel CPI-publicatieschema (BLS)",
     date: "Datum", time: "Tijd", event: "Gebeurtenis", loadingNfp: "NFP-data laden…", loadingCpi: "CPI-data laden…",
     noNfp: "Geen NFP-data voor het geselecteerde jaar.", noCpi: "Geen CPI-data voor het geselecteerde jaar.",
-    upcomingNfp: "Komende NFP-publicaties", upcomingCpi: "Komende CPI-publicaties", nextBadge: "VOLGENDE", officialSchedule: "Officieel BLS-schema",
+    upcomingNfp: "Komende NFP-publicaties", upcomingCpi: "Komende CPI-publicaties", nextBadge: "VOLGENDE", officialSchedule: "Officieel BLS-schema", fullYear: "Volledig schema 2026", released: "GEWEEST", upcoming: "KOMEND",
     aiNfp: "AI NFP-analyse", affected: "Beïnvloede markten", aiNfpText: "NFP veroorzaakt meestal sterke volatiliteit in USD-paren, goud, US30 en NAS100. Open 15 minuten voor de publicatie geen nieuwe trades en wacht op het sluiten van de eerste candle.",
   },
   es: {
@@ -365,7 +383,7 @@ const MACRO_I18N = {
     nfpCalendar: "Calendario NFP", cpiCalendar: "Calendario CPI", nfpSubtitle: "Calendario oficial de Employment Situation (BLS)", cpiSubtitle: "Calendario oficial de publicaciones CPI (BLS)",
     date: "Fecha", time: "Hora", event: "Evento", loadingNfp: "Cargando datos NFP…", loadingCpi: "Cargando datos CPI…",
     noNfp: "No hay datos NFP para el año seleccionado.", noCpi: "No hay datos CPI para el año seleccionado.",
-    upcomingNfp: "Próximas publicaciones NFP", upcomingCpi: "Próximas publicaciones CPI", nextBadge: "PRÓXIMO", officialSchedule: "Calendario oficial BLS",
+    upcomingNfp: "Próximas publicaciones NFP", upcomingCpi: "Próximas publicaciones CPI", nextBadge: "PRÓXIMO", officialSchedule: "Calendario oficial BLS", fullYear: "Calendario completo 2026", released: "PUBLICADO", upcoming: "PRÓXIMO",
     aiNfp: "Análisis AI de NFP", affected: "Mercados afectados", aiNfpText: "NFP suele generar una fuerte volatilidad en pares USD, oro, US30 y NAS100. Evita nuevas operaciones 15 minutos antes de la publicación y espera al cierre de la primera vela.",
   },
 } as const;
@@ -378,6 +396,11 @@ function formatOfficialReleaseDate(date: string, lang: MacroLanguage) {
 function upcomingOfficialReleases(items: ReleaseScheduleItem[]) {
   const today = new Date().toISOString().slice(0, 10);
   return items.filter((item) => item.date >= today);
+}
+
+function isPastOfficialRelease(date: string) {
+  const today = new Date().toISOString().slice(0, 10);
+  return date < today;
 }
 
 function formatMacroCalendarDate(date: string) {
@@ -2185,6 +2208,29 @@ const nextCpiCalendarEvent = officialNextCpi
       </div>
     </section>
 
+    <section className="mt-4 rounded-[22px] border border-cyan-300/25 bg-[linear-gradient(135deg,#176fab,#11588f)] p-5 shadow-[0_8px_24px_rgba(1,20,45,.14),0_0_20px_rgba(34,211,238,.08)]">
+      <div className="mb-3">
+        <h3 className="text-lg font-semibold text-white">{macroT.fullYear} · NFP</h3>
+        <p className="mt-1 text-xs text-sky-100/55">{macroT.officialSchedule}</p>
+      </div>
+      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+        {OFFICIAL_NFP_2026.map((item) => {
+          const past = isPastOfficialRelease(item.date);
+          return (
+            <div key={`nfp-full-${item.date}`} className={`flex items-center justify-between rounded-xl border px-4 py-3 ${past ? "border-white/10 bg-[#0c426f]/70" : "border-cyan-300/25 bg-[#0c426f]"}`}>
+              <div>
+                <div className="font-semibold text-white">{formatOfficialReleaseDate(item.date, macroLang)}</div>
+                <div className="mt-1 text-xs text-sky-100/55">{item.time} · USD</div>
+              </div>
+              <span className={`rounded-full border px-2.5 py-1 text-[10px] font-bold ${past ? "border-emerald-300/20 bg-emerald-400/10 text-emerald-200" : "border-amber-300/30 bg-amber-400/10 text-amber-200"}`}>
+                {past ? macroT.released : macroT.upcoming}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+
     <section className="mt-6 grid gap-6 xl:grid-cols-[1.5fr_0.7fr]">
       <div className="rounded-[26px] border border-cyan-300/25 bg-[linear-gradient(135deg,#176fab,#11588f)] p-5 shadow-[0_8px_24px_rgba(1,20,45,.14),0_0_20px_rgba(34,211,238,.08),inset_0_1px_0_rgba(255,255,255,.09)]">
         <div className="mb-5 flex items-center justify-between">
@@ -2333,6 +2379,29 @@ const nextCpiCalendarEvent = officialNextCpi
             {index === 0 ? <span className="rounded-full border border-amber-300/30 bg-amber-400/10 px-2.5 py-1 text-[10px] font-bold text-amber-200">{macroT.nextBadge}</span> : null}
           </div>
         ))}
+      </div>
+    </section>
+
+    <section className="mt-4 rounded-[22px] border border-cyan-300/25 bg-[linear-gradient(135deg,#176fab,#11588f)] p-5 shadow-[0_8px_24px_rgba(1,20,45,.14),0_0_20px_rgba(34,211,238,.08)]">
+      <div className="mb-3">
+        <h3 className="text-lg font-semibold text-white">{macroT.fullYear} · CPI</h3>
+        <p className="mt-1 text-xs text-sky-100/55">{macroT.officialSchedule}</p>
+      </div>
+      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+        {OFFICIAL_CPI_2026.map((item) => {
+          const past = isPastOfficialRelease(item.date);
+          return (
+            <div key={`cpi-full-${item.date}`} className={`flex items-center justify-between rounded-xl border px-4 py-3 ${past ? "border-white/10 bg-[#0c426f]/70" : "border-cyan-300/25 bg-[#0c426f]"}`}>
+              <div>
+                <div className="font-semibold text-white">{formatOfficialReleaseDate(item.date, macroLang)}</div>
+                <div className="mt-1 text-xs text-sky-100/55">{item.time} · USD</div>
+              </div>
+              <span className={`rounded-full border px-2.5 py-1 text-[10px] font-bold ${past ? "border-emerald-300/20 bg-emerald-400/10 text-emerald-200" : "border-amber-300/30 bg-amber-400/10 text-amber-200"}`}>
+                {past ? macroT.released : macroT.upcoming}
+              </span>
+            </div>
+          );
+        })}
       </div>
     </section>
 
