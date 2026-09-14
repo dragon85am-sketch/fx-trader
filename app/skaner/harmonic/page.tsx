@@ -146,6 +146,36 @@ async function fetchLiveCandles(
   tf: TF,
   signal?: AbortSignal
 ): Promise<CandlestickData[]> {
+  // US30 uses our own Live-Rates candle engine.
+  // GOLD / Forex / BTC stay on Twelve Data.
+  if (symbol === "US30") {
+    const params = new URLSearchParams({
+      interval: TWELVE_INTERVAL[tf],
+      limit: "220",
+    });
+
+    const res = await fetch(`/api/us30/candles?${params.toString()}`, {
+      cache: "no-store",
+      signal,
+    });
+
+    const payload = await res.json();
+
+    if (!res.ok || payload?.status !== "ok") {
+      throw new Error(payload?.error || payload?.message || "Nie udało się pobrać świec US30 z FX Trade Candle Engine.");
+    }
+
+    if (!Array.isArray(payload?.values)) {
+      throw new Error("FX Trade Candle Engine nie zwrócił danych OHLC dla US30.");
+    }
+
+    if (payload.values.length < 30) {
+      throw new Error(`US30: za mało świec ${tf} (${payload.values.length}/30). Candle Engine nadal zbiera historię.`);
+    }
+
+    return normalizeTwelveCandles(payload.values);
+  }
+
   const params = new URLSearchParams({
     symbol: TWELVE_SYMBOL[symbol],
     interval: TWELVE_INTERVAL[tf],
@@ -160,11 +190,11 @@ async function fetchLiveCandles(
   const payload = await res.json();
 
   if (!res.ok) {
-    throw new Error(payload?.message || "Nie udaÅ‚o siÄ™ pobraÄ‡ Å›wiec z Twelve Data.");
+    throw new Error(payload?.message || "Nie udało się pobrać świec z Twelve Data.");
   }
 
   if (!Array.isArray(payload?.values)) {
-    throw new Error(payload?.message || "Twelve Data nie zwrÃ³ciÅ‚o danych OHLC.");
+    throw new Error(payload?.message || "Twelve Data nie zwróciło danych OHLC.");
   }
 
   return normalizeTwelveCandles(payload.values);
@@ -970,7 +1000,7 @@ export default function HarmonicScannerPage() {
           </div>
           <h1 className="mt-1 text-[28px] font-bold">Harmonic Scanner</h1>
           <p className="mt-1 text-[10px] text-sky-100/45">
-            Wybierz instrument, TF, formacjÄ™ i kierunek. SKANUJ pobiera realne Å›wiece Twelve Data i pokazuje X-A-B-C-D tylko wtedy, gdy ukÅ‚ad speÅ‚nia reguÅ‚y harmoniczne.
+            Wybierz instrument, TF, formację i kierunek. US30 korzysta z FX Trade Candle Engine / Live-Rates, a pozostałe instrumenty z Twelve Data. X-A-B-C-D pojawia się tylko wtedy, gdy układ spełnia reguły harmoniczne.
           </p>
         </section>
 
@@ -1132,7 +1162,7 @@ export default function HarmonicScannerPage() {
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
               </span>
               <span className="text-[8px] font-bold uppercase tracking-[.12em] text-emerald-300">
-                Twelve Data Live
+                {activeSetup.symbol === "US30" ? "FX Trade / Live-Rates" : "Twelve Data Live"}
               </span>
               {lastLiveUpdate ? (
                 <span className="text-[7px] text-sky-100/35">
@@ -1151,7 +1181,7 @@ export default function HarmonicScannerPage() {
             ) : chartError && candles.length === 0 ? (
               <div className="flex h-[675px] flex-col items-center justify-center gap-3 rounded-2xl border border-rose-500/25 bg-[#061426] px-6 text-center">
                 <div className="text-[11px] font-bold text-rose-300">
-                  Brak danych z Twelve Data
+                  {activeSetup.symbol === "US30" ? "Brak danych US30" : "Brak danych z Twelve Data"}
                 </div>
                 <div className="max-w-md text-[8px] text-sky-100/45">
                   {chartError}
