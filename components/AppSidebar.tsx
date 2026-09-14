@@ -318,6 +318,7 @@ export default function AppSidebar() {
             label: "Strategies",
             href: "/strategie",
             children: [
+              { label: "All Strategies", href: "/strategie" },
               { label: "Scalping", href: "/strategie/scalping" },
               { label: "Day Trading", href: "/strategie/day-trading" },
               { label: "Swing Trading", href: "/strategie/swing-trading" },
@@ -389,6 +390,7 @@ export default function AppSidebar() {
             label: "Strategie",
             href: "/strategie",
             children: [
+              { label: "Wszystkie strategie", href: "/strategie" },
               { label: "Scalping", href: "/strategie/scalping" },
               { label: "Day Trading", href: "/strategie/day-trading" },
               { label: "Swing Trading", href: "/strategie/swing-trading" },
