@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React from "react";
 import {
@@ -16,7 +16,7 @@ import HarmonicChart, {
   type HarmonicPoint,
 } from "./HarmonicChart";
 
-type SymbolKey = "XAUUSD" | "EURUSD" | "GBPUSD" | "USDJPY" | "US30";
+type SymbolKey = "XAUUSD" | "EURUSD" | "GBPUSD" | "USDJPY" | "US30" | "BTCUSD";
 type TF = "M5" | "M15" | "H1" | "H4";
 type PatternName = "Gartley" | "Bat" | "Butterfly" | "Crab" | "Shark";
 type Direction = "Bullish" | "Bearish";
@@ -38,6 +38,7 @@ const DEFAULT_RESULTS: ScanResult[] = [
   { id: "jpy-gartley-h1", symbol: "USDJPY", tf: "H1", name: "Gartley", direction: "Bearish", score: 82, age: "27m temu" },
   { id: "xau-crab-m15", symbol: "XAUUSD", tf: "M15", name: "Crab", direction: "Bullish", score: 78, age: "35m temu" },
   { id: "us30-shark-m5", symbol: "US30", tf: "M5", name: "Shark", direction: "Bearish", score: 76, age: "41m temu" },
+  { id: "btc-bat-h1", symbol: "BTCUSD", tf: "H1", name: "Bat", direction: "Bullish", score: 80, age: "45m temu" },
 ];
 
 const SYMBOL_BASE: Record<SymbolKey, number> = {
@@ -46,6 +47,7 @@ const SYMBOL_BASE: Record<SymbolKey, number> = {
   GBPUSD: 1.275,
   USDJPY: 156,
   US30: 38900,
+  BTCUSD: 68000,
 };
 
 const TF_SECONDS: Record<TF, number> = {
@@ -71,6 +73,7 @@ const TWELVE_SYMBOL: Record<SymbolKey, string> = {
   // If your Twelve Data plan/provider uses a different US30 ticker,
   // change only this mapping.
   US30: "DJI",
+  BTCUSD: "BTC/USD",
 };
 
 
@@ -80,6 +83,7 @@ const AUTO_SCAN_SYMBOLS: SymbolKey[] = [
   "GBPUSD",
   "USDJPY",
   "US30",
+  "BTCUSD",
 ];
 
 const AUTO_SCAN_TFS: TF[] = ["M5", "M15", "H1", "H4"];
@@ -96,35 +100,7 @@ type AutoScanMatch = ScanResult & {
   pattern: HarmonicPattern;
   candles: CandlestickData[];
   levels: HarmonicLevels | null;
-  rr: number;
-  grade: "PREMIUM" | "STRONG" | "VALID";
 };
-
-function setupGrade(score: number): "PREMIUM" | "STRONG" | "VALID" {
-  if (score >= 90) return "PREMIUM";
-  if (score >= 80) return "STRONG";
-  return "VALID";
-}
-
-function gradeClasses(score: number) {
-  if (score >= 90) return "border-amber-400/30 bg-amber-400/10 text-amber-200";
-  if (score >= 80) return "border-cyan-400/30 bg-cyan-400/10 text-cyan-200";
-  return "border-emerald-400/25 bg-emerald-500/10 text-emerald-300";
-}
-
-function calculateRR(levels: HarmonicLevels | null) {
-  if (!levels) return 0;
-  const risk = Math.abs(levels.entry - levels.sl);
-  if (risk <= 0) return 0;
-  return Math.abs(levels.tp2 - levels.entry) / risk;
-}
-
-function proScore(harmonicScore: number, rr: number) {
-  // Harmonic/Fibonacci quality remains the dominant factor. RR can add up to
-  // 15 points, but it is not presented as a probability of winning.
-  const rrQuality = Math.max(0, Math.min(1, (rr - 1) / 2.5));
-  return Math.max(1, Math.min(99, Math.round(harmonicScore * 0.85 + rrQuality * 15)));
-}
 
 type TwelveDataCandle = {
   datetime: string;
@@ -184,11 +160,11 @@ async function fetchLiveCandles(
   const payload = await res.json();
 
   if (!res.ok) {
-    throw new Error(payload?.message || "Nie udało się pobrać świec z Twelve Data.");
+    throw new Error(payload?.message || "Nie udaÅ‚o siÄ™ pobraÄ‡ Å›wiec z Twelve Data.");
   }
 
   if (!Array.isArray(payload?.values)) {
-    throw new Error(payload?.message || "Twelve Data nie zwróciło danych OHLC.");
+    throw new Error(payload?.message || "Twelve Data nie zwrÃ³ciÅ‚o danych OHLC.");
   }
 
   return normalizeTwelveCandles(payload.values);
@@ -236,6 +212,7 @@ function getRange(symbol: SymbolKey) {
   if (symbol === "EURUSD" || symbol === "GBPUSD") return 0.018;
   if (symbol === "USDJPY") return 3.2;
   if (symbol === "US30") return 520;
+  if (symbol === "BTCUSD") return 4200;
   return 32;
 }
 
@@ -705,7 +682,7 @@ export default function HarmonicScannerPage() {
       setResults([found]);
       setActiveSetup(found);
       setScanMessage(
-        `Znaleziono ${formacja} ${direction} • jakość ${best.score}%`
+        `Znaleziono ${formacja} ${direction} â€¢ jakoÅ›Ä‡ ${best.score}%`
       );
     } catch (error) {
       setResults([]);
@@ -713,7 +690,7 @@ export default function HarmonicScannerPage() {
       setChartError(
         error instanceof Error
           ? error.message
-          : "Nie udało się wykonać skanowania."
+          : "Nie udaÅ‚o siÄ™ wykonaÄ‡ skanowania."
       );
     } finally {
       setScanning(false);
@@ -738,7 +715,7 @@ export default function HarmonicScannerPage() {
     setAutoScanning(true);
     setScanning(false);
     setChartError(null);
-    setScanMessage("AUTO SCAN uruchomiony — analizuję wszystkie instrumenty i timeframe'y...");
+    setScanMessage("AUTO SCAN uruchomiony â€” analizujÄ™ wszystkie instrumenty i timeframe'y...");
     setAutoProgress({
       done: 0,
       total: AUTO_SCAN_SYMBOLS.length * AUTO_SCAN_TFS.length,
@@ -769,13 +746,11 @@ export default function HarmonicScannerPage() {
                 const best = matches[0];
                 if (!best) continue;
 
+                // Quality gate for AUTO SCAN. Lower this if you want more,
+                // but weaker, setups in the result list.
+                if (best.score < 70) continue;
+
                 const levels = makeLevels(best.pattern);
-                const rr = calculateRR(levels);
-                const score = proScore(best.score, rr);
-
-                // AUTO SCAN PRO gate: only VALID / STRONG / PREMIUM setups.
-                if (score < 70) continue;
-
                 const dTime = best.pattern.points[4].time;
                 const id = `auto-${symbol}-${scanTf}-${name}-${scanDirection}-${Number(dTime)}`;
 
@@ -785,13 +760,11 @@ export default function HarmonicScannerPage() {
                   tf: scanTf,
                   name,
                   direction: scanDirection,
-                  score,
+                  score: best.score,
                   age: formatAgeFromTime(dTime),
                   pattern: best.pattern,
                   candles: liveCandles,
                   levels,
-                  rr,
-                  grade: setupGrade(score),
                 };
 
                 allMatches.push(result);
@@ -831,7 +804,7 @@ export default function HarmonicScannerPage() {
 
       if (!deduped.length) {
         setScanMessage(
-          "AUTO SCAN zakończony — brak aktywnych formacji 70%+ w aktualnie zeskanowanych rynkach."
+          "AUTO SCAN zakoÅ„czony â€” brak aktywnych formacji 70%+ w aktualnie zeskanowanych rynkach."
         );
         return;
       }
@@ -845,7 +818,7 @@ export default function HarmonicScannerPage() {
       setCandles(best.candles);
       setLastLiveUpdate(new Date());
       setScanMessage(
-        `AUTO SCAN PRO: ${deduped.length} setupów 70%+. TOP: ${best.grade} • ${best.symbol} ${best.tf} ${best.name} ${best.direction} • SCORE ${best.score}% • RR 1:${best.rr.toFixed(1)}`
+        `AUTO SCAN: znaleziono ${deduped.length} aktywnych formacji. Najlepsza: ${best.symbol} ${best.tf} ${best.name} ${best.direction} â€¢ ${best.score}%`
       );
     } finally {
       setAutoScanning(false);
@@ -883,7 +856,7 @@ export default function HarmonicScannerPage() {
         );
 
         if (!next.length) {
-          throw new Error("Brak świec dla wybranego instrumentu i interwału.");
+          throw new Error("Brak Å›wiec dla wybranego instrumentu i interwaÅ‚u.");
         }
 
         setCandles(next);
@@ -892,7 +865,7 @@ export default function HarmonicScannerPage() {
       } catch (error) {
         if ((error as Error)?.name === "AbortError") return;
         setChartError(
-          error instanceof Error ? error.message : "Błąd pobierania danych."
+          error instanceof Error ? error.message : "BÅ‚Ä…d pobierania danych."
         );
       } finally {
         if (!silent) setChartLoading(false);
@@ -906,7 +879,7 @@ export default function HarmonicScannerPage() {
     void loadCandles(controller.signal);
 
     // Live candle refresh. 5 s is responsive enough for the UI while avoiding
-    // excessive REST requests. Increase to 10–15 s if your plan has a low API limit.
+    // excessive REST requests. Increase to 10â€“15 s if your plan has a low API limit.
     const interval = window.setInterval(() => {
       void loadCandles(controller.signal, true);
     }, 5000);
@@ -984,17 +957,12 @@ export default function HarmonicScannerPage() {
   const formatPrice = (symbol: SymbolKey, value: number) => {
     if (symbol === "EURUSD" || symbol === "GBPUSD") return value.toFixed(5);
     if (symbol === "USDJPY") return value.toFixed(3);
+    if (symbol === "BTCUSD") return value.toFixed(2);
     return value.toFixed(2);
   };
 
   return (
-    <main
-      className="min-h-screen bg-[#03172f] bg-cover bg-center bg-fixed text-white"
-      style={{
-        backgroundImage:
-          "linear-gradient(rgba(3,23,47,0.34), rgba(3,23,47,0.46)), url('/images/harmonic-scanner-bg.png')",
-      }}
-    >
+    <main className="min-h-screen bg-[#03172f] text-white">
       <div className="mx-auto max-w-[1980px] space-y-3 px-3 py-4">
         <section className="rounded-2xl border border-[#0d579e] bg-[linear-gradient(145deg,#082d59,#041f40)] p-4">
           <div className="text-[9px] font-semibold uppercase tracking-[.18em] text-cyan-300/70">
@@ -1002,7 +970,7 @@ export default function HarmonicScannerPage() {
           </div>
           <h1 className="mt-1 text-[28px] font-bold">Harmonic Scanner</h1>
           <p className="mt-1 text-[10px] text-sky-100/45">
-            Wybierz instrument, TF, formację i kierunek. SKANUJ pobiera realne świece Twelve Data i pokazuje X-A-B-C-D tylko wtedy, gdy układ spełnia reguły harmoniczne.
+            Wybierz instrument, TF, formacjÄ™ i kierunek. SKANUJ pobiera realne Å›wiece Twelve Data i pokazuje X-A-B-C-D tylko wtedy, gdy ukÅ‚ad speÅ‚nia reguÅ‚y harmoniczne.
           </p>
         </section>
 
@@ -1010,7 +978,7 @@ export default function HarmonicScannerPage() {
           <SelectBox
             label="Instrument"
             value={instrument}
-            options={["XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "US30"]}
+            options={["XAUUSD", "EURUSD", "GBPUSD", "USDJPY", "US30", "BTCUSD"]}
             onChange={(v) => changeInstrument(v as SymbolKey)}
           />
 
@@ -1100,7 +1068,7 @@ export default function HarmonicScannerPage() {
               <span>{scanMessage}</span>
               {autoScanning ? (
                 <span className="whitespace-nowrap text-[8px] text-cyan-200">
-                  {autoProgress.done}/{autoProgress.total} rynków
+                  {autoProgress.done}/{autoProgress.total} rynkÃ³w
                 </span>
               ) : null}
             </div>
@@ -1117,7 +1085,7 @@ export default function HarmonicScannerPage() {
             <div className="mt-3 max-h-[610px] space-y-2 overflow-y-auto pr-1">
               {!results.length ? (
                 <div className="rounded-xl border border-dashed border-[#0d579e] bg-[#041b36]/50 p-4 text-center text-[8px] text-sky-100/40">
-                  Kliknij SKANUJ. Wynik pojawi się tylko wtedy, gdy prawdziwe świece spełnią proporcje wybranej formacji.
+                  Kliknij SKANUJ. Wynik pojawi siÄ™ tylko wtedy, gdy prawdziwe Å›wiece speÅ‚niÄ… proporcje wybranej formacji.
                 </div>
               ) : null}
 
@@ -1135,7 +1103,7 @@ export default function HarmonicScannerPage() {
                     <Star className="h-3.5 w-3.5 text-slate-500" />
                     <div className="min-w-0 flex-1">
                       <div className="text-[7px] text-slate-500">
-                        {r.symbol} · {r.tf}
+                        {r.symbol} Â· {r.tf}
                       </div>
                       <div className="text-[10px] font-bold">{r.name}</div>
                       <div
@@ -1148,15 +1116,8 @@ export default function HarmonicScannerPage() {
                         {r.direction}
                       </div>
                     </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <div className={`rounded-md border px-1.5 py-1 text-[8px] font-black ${gradeClasses(r.score)}`}>
-                        {setupGrade(r.score)} • {r.score}%
-                      </div>
-                      {autoMatchCacheRef.current.get(r.id) ? (
-                        <div className="text-[7px] font-bold text-sky-200/65">
-                          RR 1:{autoMatchCacheRef.current.get(r.id)!.rr.toFixed(1)}
-                        </div>
-                      ) : null}
+                    <div className="rounded-md bg-emerald-500/15 px-1.5 py-1 text-[9px] font-bold text-emerald-300">
+                      {r.score}%
                     </div>
                   </div>
                 </button>
@@ -1199,7 +1160,7 @@ export default function HarmonicScannerPage() {
                   onClick={() => void loadCandles(undefined)}
                   className="rounded-lg border border-cyan-400/25 bg-cyan-400/10 px-3 py-2 text-[8px] font-bold text-cyan-300"
                 >
-                  Spróbuj ponownie
+                  SprÃ³buj ponownie
                 </button>
               </div>
             ) : (
@@ -1216,13 +1177,13 @@ export default function HarmonicScannerPage() {
 
             {chartError && candles.length > 0 ? (
               <div className="absolute bottom-3 right-3 z-20 rounded-lg border border-amber-400/20 bg-[#03172f]/90 px-2.5 py-1.5 text-[7px] text-amber-200 backdrop-blur">
-                LIVE chwilowo niedostępne — pokazuję ostatnie poprawne świece.
+                LIVE chwilowo niedostÄ™pne â€” pokazujÄ™ ostatnie poprawne Å›wiece.
               </div>
             ) : null}
           </div>
 
           <aside className="rounded-2xl border border-[#0d579e] bg-[#061426] p-4">
-            <h2 className="text-[12px] font-bold">Szczegóły</h2>
+            <h2 className="text-[12px] font-bold">SzczegÃ³Å‚y</h2>
 
             <div className="mt-4 flex items-center justify-between">
               <div className="text-[16px] font-bold text-fuchsia-400">
@@ -1240,11 +1201,7 @@ export default function HarmonicScannerPage() {
             </div>
 
             <div className="mt-2 text-[8px] text-slate-500">
-              {activeSetup.symbol} · {activeSetup.tf}
-            </div>
-
-            <div className={`mt-3 inline-flex rounded-lg border px-2.5 py-1.5 text-[8px] font-black ${gradeClasses(activeSetup.score)}`}>
-              {setupGrade(activeSetup.score)} • SCORE {activeSetup.score}%
+              {activeSetup.symbol} Â· {activeSetup.tf}
             </div>
 
             {pattern ? (
@@ -1257,7 +1214,7 @@ export default function HarmonicScannerPage() {
                   {pattern.points.map((p) => (
                     <div key={p.label} className="flex justify-between text-[8px]">
                       <span className="text-slate-500">
-                        {p.label} · candle {p.index}
+                        {p.label} Â· candle {p.index}
                       </span>
                       <span className="font-semibold">
                         {p.price.toFixed(4)}
@@ -1338,7 +1295,7 @@ export default function HarmonicScannerPage() {
                 Aktywne formacje harmoniczne ({activeRows.length})
               </h2>
               <p className="mt-1 text-[8px] text-sky-100/40">
-                Aktualne setupy z PRZ, SL, TP i RRR. Kliknij wiersz, aby otworzyć formację na wykresie.
+                Aktualne setupy z PRZ, SL, TP i RRR. Kliknij wiersz, aby otworzyÄ‡ formacjÄ™ na wykresie.
               </p>
             </div>
 
@@ -1359,9 +1316,9 @@ export default function HarmonicScannerPage() {
                     "TF",
                     "Formacja",
                     "Kierunek",
-                    "Trafność",
+                    "TrafnoÅ›Ä‡",
                     "Wiek",
-                    "Wejście / PRZ",
+                    "WejÅ›cie / PRZ",
                     "SL",
                     "TP1",
                     "TP2",
@@ -1411,8 +1368,8 @@ export default function HarmonicScannerPage() {
                     </td>
 
                     <td className="px-4 py-3">
-                      <span className={`rounded-md border px-2 py-1 font-bold ${gradeClasses(row.score)}`}>
-                        {setupGrade(row.score)} • {row.score}%
+                      <span className="rounded-md bg-emerald-500/10 px-2 py-1 font-bold text-emerald-300">
+                        {row.score}%
                       </span>
                     </td>
 
