@@ -1323,13 +1323,13 @@ const nextCpiCalendarEvent = officialNextCpi
 
         {activeRoomTab === "Trading Room" ? (
           <>
-            <section className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <section className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 xl:grid-cols-4">
               <button
                 type="button"
                 onClick={() => setActiveRoomTab("Technical Analysis")}
-                className="group overflow-hidden rounded-[18px] border border-blue-400/30 bg-[#06182a] text-left shadow-[0_10px_28px_rgba(0,0,0,.18)] transition hover:-translate-y-0.5 hover:border-blue-300/60 hover:shadow-[0_0_30px_rgba(59,130,246,.14)]"
+                className="group flex h-full min-h-[500px] flex-col overflow-hidden rounded-[20px] border border-blue-400/30 bg-[#06182a] text-left shadow-[0_12px_34px_rgba(0,0,0,.24)] transition hover:-translate-y-0.5 hover:border-blue-300/60 hover:shadow-[0_0_34px_rgba(59,130,246,.16)] xl:min-h-[560px]"
               >
-                <div className="relative flex h-[150px] items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_50%_15%,rgba(59,130,246,.22),transparent_55%),linear-gradient(145deg,#071b30,#041221)] sm:h-[190px]">
+                <div className="relative flex h-[220px] shrink-0 items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_50%_15%,rgba(59,130,246,.22),transparent_55%),linear-gradient(145deg,#071b30,#041221)] sm:h-[230px] xl:h-[245px]">
                   <div className="absolute inset-0 opacity-40 [background-image:linear-gradient(rgba(56,189,248,.08)_1px,transparent_1px),linear-gradient(90deg,rgba(56,189,248,.08)_1px,transparent_1px)] [background-size:24px_24px]" />
                   <div className="relative w-[82%] rounded-xl border border-cyan-300/15 bg-[#07192b]/90 p-3 shadow-2xl">
                     <div className="flex items-center justify-between text-[9px] text-sky-100/50"><span>GBPCHF · M5</span><span className="text-emerald-300">BULLISH</span></div>
@@ -1341,20 +1341,34 @@ const nextCpiCalendarEvent = officialNextCpi
                     <div className="mt-2 flex gap-1">{[1,2,3,4,5].map((n)=><span key={n} className={`h-1.5 flex-1 rounded ${n < 4 ? "bg-emerald-400" : "bg-white/10"}`} />)}</div>
                   </div>
                 </div>
-                <div className="p-4">
+                <div className="flex flex-1 flex-col p-5">
                   <div className="text-[10px] font-bold uppercase tracking-[.18em] text-blue-300/70">TECHNICAL</div>
                   <h2 className="mt-1 text-[18px] font-bold">Technical Analysis</h2>
-                  <p className="mt-1 text-[11px] leading-5 text-sky-100/50">EMA, RSI, trend strength, pivot points i kluczowe poziomy.</p>
-                  <div className="mt-4 flex items-center justify-between rounded-xl border border-blue-300/15 bg-[#0b2d4c] px-3 py-2.5"><span className="text-[11px] font-semibold">Otwórz analizę</span><span className="text-blue-300">→</span></div>
+                  <p className="mt-1 text-[11px] leading-5 text-sky-100/50">EMA, RSI, ADX, trend strength, pivot points i kluczowe poziomy.</p>
+                  <div className="mt-5 grid grid-cols-3 gap-2 text-center">
+                    <div className="rounded-lg border border-blue-400/10 bg-blue-500/5 px-2 py-3">
+                      <div className="text-[9px] text-blue-100/40">TA SCORE</div>
+                      <div className="mt-1 text-[14px] font-black text-emerald-300">57%</div>
+                    </div>
+                    <div className="rounded-lg border border-blue-400/10 bg-blue-500/5 px-2 py-3">
+                      <div className="text-[9px] text-blue-100/40">TREND</div>
+                      <div className="mt-1 text-[12px] font-black text-emerald-300">UPTREND</div>
+                    </div>
+                    <div className="rounded-lg border border-blue-400/10 bg-blue-500/5 px-2 py-3">
+                      <div className="text-[9px] text-blue-100/40">STRENGTH</div>
+                      <div className="mt-1 text-[11px] font-black text-amber-300">MODERATE</div>
+                    </div>
+                  </div>
+                  <div className="mt-auto flex items-center justify-between rounded-xl border border-blue-300/15 bg-[#0b2d4c] px-3 py-2.5"><span className="text-[11px] font-semibold">Otwórz analizę</span><span className="text-blue-300">→</span></div>
                 </div>
               </button>
 
               <button
                 type="button"
                 onClick={() => setActiveRoomTab("Economic Calendar")}
-                className="group overflow-hidden rounded-[18px] border border-cyan-400/25 bg-[#07192b] text-left shadow-[0_10px_28px_rgba(0,0,0,.18)] transition hover:-translate-y-0.5 hover:border-cyan-300/55 hover:shadow-[0_0_30px_rgba(34,211,238,.12)]"
+                className="group flex h-full min-h-[500px] flex-col overflow-hidden rounded-[20px] border border-cyan-400/25 bg-[#07192b] text-left shadow-[0_12px_34px_rgba(0,0,0,.24)] transition hover:-translate-y-0.5 hover:border-cyan-300/55 hover:shadow-[0_0_34px_rgba(34,211,238,.14)] xl:min-h-[560px]"
               >
-                <div className="relative h-[150px] overflow-hidden sm:h-[190px]">
+                <div className="relative h-[220px] shrink-0 overflow-hidden sm:h-[230px] xl:h-[245px]">
                   <img
                     src="/trading-room/economic-calendar-trading.png"
                     alt="Economic Calendar"
@@ -1362,7 +1376,7 @@ const nextCpiCalendarEvent = officialNextCpi
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-[#07192b] via-transparent to-transparent" />
                 </div>
-                <div className="p-4">
+                <div className="flex flex-1 flex-col p-5">
                   <div className="text-[10px] font-bold uppercase tracking-[.18em] text-cyan-300/70">
                     LIVE MACRO
                   </div>
@@ -1370,7 +1384,7 @@ const nextCpiCalendarEvent = officialNextCpi
                   <p className="mt-1 text-[11px] leading-5 text-sky-100/50">
                     CPI, NFP, FOMC i najważniejsze wydarzenia rynkowe.
                   </p>
-                  <div className="mt-4 flex items-center justify-between rounded-xl border border-cyan-300/15 bg-[#0b2d4c] px-3 py-2.5">
+                  <div className="mt-auto flex items-center justify-between rounded-xl border border-cyan-300/15 bg-[#0b2d4c] px-3 py-2.5">
                     <span className="text-[11px] font-semibold">Otwórz kalendarz</span>
                     <span className="text-cyan-300">→</span>
                   </div>
@@ -1380,9 +1394,9 @@ const nextCpiCalendarEvent = officialNextCpi
               <button
                 type="button"
                 onClick={() => setActiveRoomTab("Profit Calendar")}
-                className="group overflow-hidden rounded-[18px] border border-emerald-400/25 bg-[#071b19] text-left shadow-[0_10px_28px_rgba(0,0,0,.18)] transition hover:-translate-y-0.5 hover:border-emerald-300/55 hover:shadow-[0_0_30px_rgba(16,185,129,.12)]"
+                className="group flex h-full min-h-[500px] flex-col overflow-hidden rounded-[20px] border border-emerald-400/25 bg-[#071b19] text-left shadow-[0_12px_34px_rgba(0,0,0,.24)] transition hover:-translate-y-0.5 hover:border-emerald-300/55 hover:shadow-[0_0_34px_rgba(16,185,129,.14)] xl:min-h-[560px]"
               >
-                <div className="relative h-[150px] overflow-hidden sm:h-[190px]">
+                <div className="relative h-[220px] shrink-0 overflow-hidden sm:h-[230px] xl:h-[245px]">
                   <img
                     src="/trading-room/calendar-profit-bull.png"
                     alt="Calendar Profit"
@@ -1390,7 +1404,7 @@ const nextCpiCalendarEvent = officialNextCpi
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-[#071b19] via-transparent to-transparent" />
                 </div>
-                <div className="p-4">
+                <div className="flex flex-1 flex-col p-5">
                   <div className="text-[10px] font-bold uppercase tracking-[.18em] text-emerald-300/70">
                     PERFORMANCE
                   </div>
@@ -1414,7 +1428,7 @@ const nextCpiCalendarEvent = officialNextCpi
                       <div className="mt-1 text-[11px] font-bold text-white">{monthlySummary.totalTrades}</div>
                     </div>
                   </div>
-                  <div className="mt-4 flex items-center justify-between rounded-xl border border-emerald-300/15 bg-[#0b332b] px-3 py-2.5">
+                  <div className="mt-auto flex items-center justify-between rounded-xl border border-emerald-300/15 bg-[#0b332b] px-3 py-2.5">
                     <span className="text-[11px] font-semibold">Pokaż statystyki</span>
                     <span className="text-emerald-300">→</span>
                   </div>
@@ -1424,9 +1438,9 @@ const nextCpiCalendarEvent = officialNextCpi
               <button
                 type="button"
                 onClick={() => router.push("/journal")}
-                className="group overflow-hidden rounded-[18px] border border-violet-400/25 bg-[#15102a] text-left shadow-[0_10px_28px_rgba(0,0,0,.18)] transition hover:-translate-y-0.5 hover:border-violet-300/55 hover:shadow-[0_0_30px_rgba(139,92,246,.14)]"
+                className="group flex h-full min-h-[500px] flex-col overflow-hidden rounded-[20px] border border-violet-400/25 bg-[#15102a] text-left shadow-[0_12px_34px_rgba(0,0,0,.24)] transition hover:-translate-y-0.5 hover:border-violet-300/55 hover:shadow-[0_0_34px_rgba(139,92,246,.16)] xl:min-h-[560px]"
               >
-                <div className="relative h-[150px] overflow-hidden sm:h-[190px]">
+                <div className="relative h-[220px] shrink-0 overflow-hidden sm:h-[230px] xl:h-[245px]">
                   <img
                     src="/trading-room/journal-trading.png"
                     alt="Journal"
@@ -1434,7 +1448,7 @@ const nextCpiCalendarEvent = officialNextCpi
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-[#15102a] via-transparent to-transparent" />
                 </div>
-                <div className="p-4">
+                <div className="flex flex-1 flex-col p-5">
                   <div className="text-[10px] font-bold uppercase tracking-[.18em] text-violet-300/70">
                     TRADE JOURNAL
                   </div>
@@ -1456,7 +1470,7 @@ const nextCpiCalendarEvent = officialNextCpi
                       <div className="mt-1 text-[11px] font-bold text-rose-300">{monthlySummary.losingTrades}</div>
                     </div>
                   </div>
-                  <div className="mt-4 flex items-center justify-between rounded-xl border border-violet-300/15 bg-[#25184b] px-3 py-2.5">
+                  <div className="mt-auto flex items-center justify-between rounded-xl border border-violet-300/15 bg-[#25184b] px-3 py-2.5">
                     <span className="text-[11px] font-semibold">Otwórz journal</span>
                     <span className="text-violet-300">→</span>
                   </div>
