@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import TechnicalAnalysisPanel from "@/components/TechnicalAnalysisPanel";
 export const dynamic = "force-dynamic";
 type Trade = {
   id: string;
@@ -808,6 +809,9 @@ const router = useRouter();
     case "fxmarket":
       return "Trading Room";
 
+    case "technical":
+      return "Technical Analysis";
+
     case "live":
       return "Economic Calendar";
 
@@ -955,6 +959,9 @@ const nextCpiCalendarEvent = officialNextCpi
     switch (tabParam) {
       case "fxmarket":
         setActiveRoomTab("Trading Room");
+        break;
+      case "technical":
+        setActiveRoomTab("Technical Analysis");
         break;
       case "live":
         setActiveRoomTab("Economic Calendar");
@@ -1200,6 +1207,7 @@ const nextCpiCalendarEvent = officialNextCpi
     grossLossAbs > 0 ? grossProfit / grossLossAbs : grossProfit > 0 ? grossProfit : 0;
 
   const roomTabs = [
+    "Technical Analysis",
     "Economic Calendar",
     "NFP Calendar",
     "CPI Calendar",
@@ -1281,6 +1289,16 @@ const nextCpiCalendarEvent = officialNextCpi
               ← Trading Room
             </button>
             <button
+              onClick={() => setActiveRoomTab("Technical Analysis")}
+              className={`rounded-xl border px-4 py-2 text-[11px] font-semibold transition ${
+                activeRoomTab === "Technical Analysis"
+                  ? "border-blue-300/40 bg-blue-600 text-white"
+                  : "border-cyan-300/15 bg-[#0a2946] text-sky-100/70 hover:bg-[#0f416d]"
+              }`}
+            >
+              Technical Analysis
+            </button>
+            <button
               onClick={() => setActiveRoomTab("Economic Calendar")}
               className={`rounded-xl border px-4 py-2 text-[11px] font-semibold transition ${
                 activeRoomTab === "Economic Calendar"
@@ -1305,7 +1323,32 @@ const nextCpiCalendarEvent = officialNextCpi
 
         {activeRoomTab === "Trading Room" ? (
           <>
-            <section className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <section className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <button
+                type="button"
+                onClick={() => setActiveRoomTab("Technical Analysis")}
+                className="group overflow-hidden rounded-[18px] border border-blue-400/30 bg-[#06182a] text-left shadow-[0_10px_28px_rgba(0,0,0,.18)] transition hover:-translate-y-0.5 hover:border-blue-300/60 hover:shadow-[0_0_30px_rgba(59,130,246,.14)]"
+              >
+                <div className="relative flex h-[150px] items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_50%_15%,rgba(59,130,246,.22),transparent_55%),linear-gradient(145deg,#071b30,#041221)] sm:h-[190px]">
+                  <div className="absolute inset-0 opacity-40 [background-image:linear-gradient(rgba(56,189,248,.08)_1px,transparent_1px),linear-gradient(90deg,rgba(56,189,248,.08)_1px,transparent_1px)] [background-size:24px_24px]" />
+                  <div className="relative w-[82%] rounded-xl border border-cyan-300/15 bg-[#07192b]/90 p-3 shadow-2xl">
+                    <div className="flex items-center justify-between text-[9px] text-sky-100/50"><span>GBPCHF · M5</span><span className="text-emerald-300">BULLISH</span></div>
+                    <div className="mt-3 grid grid-cols-3 gap-2">
+                      <div className="rounded bg-emerald-500/10 p-2 text-center"><div className="text-[8px] text-sky-100/40">TA SCORE</div><div className="text-[18px] font-black text-white">57%</div></div>
+                      <div className="rounded bg-blue-500/10 p-2 text-center"><div className="text-[8px] text-sky-100/40">ADX</div><div className="text-[18px] font-black text-white">28.4</div></div>
+                      <div className="rounded bg-amber-500/10 p-2 text-center"><div className="text-[8px] text-sky-100/40">STRENGTH</div><div className="text-[12px] font-black text-amber-300">MODERATE</div></div>
+                    </div>
+                    <div className="mt-2 flex gap-1">{[1,2,3,4,5].map((n)=><span key={n} className={`h-1.5 flex-1 rounded ${n < 4 ? "bg-emerald-400" : "bg-white/10"}`} />)}</div>
+                  </div>
+                </div>
+                <div className="p-4">
+                  <div className="text-[10px] font-bold uppercase tracking-[.18em] text-blue-300/70">TECHNICAL</div>
+                  <h2 className="mt-1 text-[18px] font-bold">Technical Analysis</h2>
+                  <p className="mt-1 text-[11px] leading-5 text-sky-100/50">EMA, RSI, trend strength, pivot points i kluczowe poziomy.</p>
+                  <div className="mt-4 flex items-center justify-between rounded-xl border border-blue-300/15 bg-[#0b2d4c] px-3 py-2.5"><span className="text-[11px] font-semibold">Otwórz analizę</span><span className="text-blue-300">→</span></div>
+                </div>
+              </button>
+
               <button
                 type="button"
                 onClick={() => setActiveRoomTab("Economic Calendar")}
@@ -1426,10 +1469,11 @@ const nextCpiCalendarEvent = officialNextCpi
                 <div>
                   <div className="text-[13px] font-semibold">Trading Room Premium</div>
                   <p className="mt-1 text-[10px] text-sky-100/45">
-                    Economic Calendar, Calendar Profit i Journal w jednym miejscu.
+                    Technical Analysis, Economic Calendar, Calendar Profit i Journal w jednym miejscu.
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
+                  <span className="rounded-full border border-blue-300/15 bg-blue-400/5 px-3 py-1.5 text-[9px] text-blue-200">Technical</span>
                   <span className="rounded-full border border-cyan-300/15 bg-cyan-400/5 px-3 py-1.5 text-[9px] text-cyan-200">
                     Economic
                   </span>
@@ -1443,6 +1487,8 @@ const nextCpiCalendarEvent = officialNextCpi
               </div>
             </section>
           </>
+        ) : activeRoomTab === "Technical Analysis" ? (
+          <TechnicalAnalysisPanel />
         ) : activeRoomTab === "Economic Calendar" ? (
   <>
     {/* =========================================================
