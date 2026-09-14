@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
-const LIVE_RATES_BASE_URL = "https://www.live-rates.com/api";
-
-type LiveRatesRaw = {
+type LiveRateRaw = {
   currency?: string;
   rate?: string | number;
   bid?: string | number;
@@ -15,110 +13,203 @@ type LiveRatesRaw = {
   open?: string | number;
   close?: string | number;
   timestamp?: string | number;
-  [key: string]: unknown;
+  error?: string;
 };
 
-function n(value: unknown): number | null {
-  const num = Number(value);
-  return Number.isFinite(num) ? num : null;
-}
-
-function normalizeSymbol(value: string) {
-  return value.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
-}
-
-function normalizeRate(row: LiveRatesRaw) {
-  const bid = n(row.bid);
-  const ask = n(row.ask);
-  const rate = n(row.rate) ?? (bid !== null && ask !== null ? (bid + ask) / 2 : bid ?? ask);
-
-  return {
-    symbol: normalizeSymbol(String(row.currency ?? "")),
-    currency: String(row.currency ?? ""),
-    rate,
-    bid,
-    ask,
-    high: n(row.high),
-    low: n(row.low),
-    open: n(row.open),
-    close: n(row.close),
-    timestamp: n(row.timestamp) ?? Date.now(),
-  };
-}
-
-export async function GET(req: NextRequest) {
-  const apiKey = process.env.LIVE_RATES_API_KEY;
-
-  if (!apiKey) {
-    return NextResponse.json(
-      { ok: false, message: "Brak LIVE_RATES_API_KEY w .env.local / Vercel Environment Variables." },
-      { status: 500 }
-    );
+function toNumber(value: unknown): number | null {
+  if (
+    value === null ||
+    value === undefined ||
+    value === "" ||
+    value === "n/a"
+  ) {
+    return null;
   }
 
-  const { searchParams } = new URL(req.url);
-  const requestedSymbol = normalizeSymbol(searchParams.get("symbol") ?? "");
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8_000);
+function normalizeSymbol(symbol: string) {
+  return symbol
+    .trim()
+    .toUpperCase()
+    .replace(/\//g, "")
+    .replace(/_/g, "")
+    .replace(/[^A-Z0-9]/g, "");
+}
 
+export async function GET(request: NextRequest) {
   try {
-    // Pobieramy całą paczkę raz. Później centralny FX Trade Engine może cache'ować ten wynik.
-    const url = new URL(`${LIVE_RATES_BASE_URL}/rates`);
-    url.searchParams.set("key", apiKey);
+    const apiKey = process.env.LIVE_RATES_API_KEY;
 
-    const upstream = await fetch(url, {
-      cache: "no-store",
-      signal: controller.signal,
-      headers: { Accept: "application/json" },
-    });
+    if (!apiKey) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Brak LIVE_RATES_API_KEY w zmiennych środowiskowych.",
+        },
+        { status: 500 }
+      );
+    }
 
-    const rawText = await upstream.text();
-    let payload: unknown;
+    const { searchParams } = new URL(request.url);
+
+    const requestedSymbol = searchParams.get("symbol");
+
+    if (!requestedSymbol) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Podaj symbol, np. ?symbol=US30",
+        },
+        { status: 400 }
+      );
+    }
+
+    const symbol = normalizeSymbol(requestedSymbol);
+
+    const upstreamUrl =
+      `https://www.live-rates.com/api/price` +
+      `?key=${encodeURIComponent(apiKey)}` +
+      `&rate=${encodeURIComponent(symbol)}`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+
+    let response: Response;
 
     try {
-      payload = JSON.parse(rawText);
+      response = await fetch(upstreamUrl, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+        },
+        cache: "no-store",
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    const text = await response.text();
+
+    if (!response.ok) {
+      return NextResponse.json(
+        {
+          ok: false,
+          provider: "live-rates",
+          symbol,
+          error: `Live-Rates HTTP ${response.status}`,
+          details: text.slice(0, 500),
+        },
+        { status: response.status }
+      );
+    }
+
+    let payload: LiveRateRaw[] | LiveRateRaw;
+
+    try {
+      payload = JSON.parse(text);
     } catch {
       return NextResponse.json(
-        { ok: false, message: "Live-Rates zwrócił odpowiedź inną niż JSON." },
+        {
+          ok: false,
+          provider: "live-rates",
+          symbol,
+          error: "Live-Rates zwrócił niepoprawny JSON.",
+          details: text.slice(0, 500),
+        },
         { status: 502 }
       );
     }
 
-    if (!upstream.ok) {
+    const row: LiveRateRaw | undefined = Array.isArray(payload)
+      ? payload[0]
+      : payload;
+
+    if (!row) {
       return NextResponse.json(
-        { ok: false, message: "Błąd Live-Rates API.", upstreamStatus: upstream.status, details: payload },
+        {
+          ok: false,
+          provider: "live-rates",
+          symbol,
+          error: "Brak danych dla instrumentu.",
+        },
+        { status: 404 }
+      );
+    }
+
+    if (row.error) {
+      return NextResponse.json(
+        {
+          ok: false,
+          provider: "live-rates",
+          symbol,
+          error: row.error,
+        },
         { status: 502 }
       );
     }
 
-    const rows = (Array.isArray(payload) ? payload : [])
-      .map((row) => normalizeRate(row as LiveRatesRaw))
-      .filter((row) => row.symbol);
+    const bid = toNumber(row.bid);
+    const ask = toNumber(row.ask);
+    const rate = toNumber(row.rate) ?? bid;
 
-    if (requestedSymbol) {
-      const item = rows.find((row) => row.symbol === requestedSymbol);
-      if (!item) {
-        return NextResponse.json(
-          { ok: false, message: `Instrument ${requestedSymbol} nie został zwrócony przez Live-Rates.` },
-          { status: 404 }
-        );
-      }
-
+    if (bid === null && ask === null && rate === null) {
       return NextResponse.json(
-        { ok: true, provider: "live-rates", data: item, updatedAt: Date.now() },
-        { headers: { "Cache-Control": "no-store, max-age=0" } }
+        {
+          ok: false,
+          provider: "live-rates",
+          symbol,
+          error: "Provider nie zwrócił ceny dla tego instrumentu.",
+          rawCurrency: row.currency ?? null,
+        },
+        { status: 502 }
       );
     }
+
+    const timestamp = toNumber(row.timestamp);
 
     return NextResponse.json(
-      { ok: true, provider: "live-rates", count: rows.length, data: rows, updatedAt: Date.now() },
-      { headers: { "Cache-Control": "no-store, max-age=0" } }
+      {
+        ok: true,
+        provider: "live-rates",
+        data: {
+          symbol,
+          currency: row.currency ?? symbol,
+          rate,
+          bid,
+          ask,
+          high: toNumber(row.high),
+          low: toNumber(row.low),
+          open: toNumber(row.open),
+          close: toNumber(row.close),
+          timestamp,
+          updatedAt: timestamp ?? Date.now(),
+        },
+      },
+      {
+        status: 200,
+        headers: {
+          "Cache-Control":
+            "no-store, no-cache, must-revalidate, proxy-revalidate",
+        },
+      }
     );
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Nie udało się połączyć z Live-Rates.";
-    return NextResponse.json({ ok: false, message }, { status: 500 });
-  } finally {
-    clearTimeout(timeout);
+    console.error("LIVE-RATES ERROR:", error);
+
+    return NextResponse.json(
+      {
+        ok: false,
+        provider: "live-rates",
+        error:
+          error instanceof Error
+            ? error.message
+            : "Nieznany błąd Live-Rates.",
+      },
+      { status: 500 }
+    );
   }
 }
