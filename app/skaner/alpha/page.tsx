@@ -41,6 +41,70 @@ type Setup = {
   rr: string;
 };
 
+
+type AlphaTrade = {
+  id: string;
+  instrument: string;
+  tf: string;
+  direction: "BUY" | "SELL";
+  confidence: number;
+  entry: number;
+  sl: number;
+  tp1: number;
+  tp2: number;
+  rr: string;
+  priceAction: string;
+  status: "ACTIVE" | "TP1_HIT" | "TP2_HIT" | "SL_HIT";
+  openedAt: string;
+  tp1HitAt?: string | null;
+  closedAt?: string | null;
+};
+
+function tradeToSetup(base: Setup, trade: AlphaTrade): Setup {
+  return {
+    ...base,
+    direction: trade.direction,
+    confidence: trade.confidence,
+    priceAction:
+      trade.status === "TP1_HIT"
+        ? `${trade.priceAction} · TP1 HIT`
+        : `${trade.priceAction} · ACTIVE`,
+    status: "READY",
+    entry: String(trade.entry),
+    sl: String(trade.sl),
+    tp1: String(trade.tp1),
+    tp2: String(trade.tp2),
+    rr: trade.rr,
+  };
+}
+
+async function syncAlphaTrade(setup: Setup, candles: CandlestickData[]) {
+  const response = await fetch("/api/alpha/trades", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    cache: "no-store",
+    body: JSON.stringify({
+      setup,
+      candles: candles.map((c: any) => ({
+        time: Number(c.time),
+        open: Number(c.open),
+        high: Number(c.high),
+        low: Number(c.low),
+        close: Number(c.close),
+      })),
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+
+  return (await response.json()) as {
+    active: AlphaTrade | null;
+    closed?: AlphaTrade | null;
+  };
+}
+
 const SETUPS: Setup[] = [
   {
     instrument: "XAUUSD",
@@ -539,6 +603,45 @@ export default function AlphaScannerPage() {
   const [fullChart, setFullChart] = React.useState(false);
   const [lastScanAt, setLastScanAt] = React.useState<Date | null>(null);
   const [autoScan, setAutoScan] = React.useState(true);
+  const [activeTrades, setActiveTrades] = React.useState<AlphaTrade[]>([]);
+
+
+  const refreshActiveTrades = React.useCallback(async () => {
+    try {
+      const response = await fetch("/api/alpha/trades", {
+        method: "GET",
+        cache: "no-store",
+      });
+      if (!response.ok) return;
+
+      const data = await response.json();
+      const trades = Array.isArray(data?.trades) ? (data.trades as AlphaTrade[]) : [];
+      setActiveTrades(trades);
+
+      if (trades.length) {
+        setLiveSetups((previous) =>
+          previous.map((setup) => {
+            const trade = trades.find(
+              (t) => t.instrument === setup.instrument && t.tf === setup.tf
+            );
+            return trade ? tradeToSetup(setup, trade) : setup;
+          })
+        );
+        setSelected((current) => {
+          const trade = trades.find(
+            (t) => t.instrument === current.instrument && t.tf === current.tf
+          );
+          return trade ? tradeToSetup(current, trade) : current;
+        });
+      }
+    } catch {
+      // Scanner still works if persistence API is temporarily unavailable.
+    }
+  }, []);
+
+  React.useEffect(() => {
+    void refreshActiveTrades();
+  }, [refreshActiveTrades]);
 
   const filtered = React.useMemo(() => {
     return liveSetups.filter((s) => {
@@ -562,26 +665,32 @@ export default function AlphaScannerPage() {
     try {
       const next = await fetchSetupCandles(setup);
       const analyzed = analyzeSetup(setup, next);
+      const synced = await syncAlphaTrade(analyzed, next);
+      const finalSetup = synced.active
+        ? tradeToSetup(analyzed, synced.active)
+        : analyzed;
+
       setCandles(next);
       setLiveSetups((previous) =>
         previous.map((item) =>
-          item.instrument === analyzed.instrument && item.tf === analyzed.tf
-            ? analyzed
+          item.instrument === finalSetup.instrument && item.tf === finalSetup.tf
+            ? finalSetup
             : item
         )
       );
       setSelected((current) =>
-        current.instrument === analyzed.instrument && current.tf === analyzed.tf
-          ? analyzed
+        current.instrument === finalSetup.instrument && current.tf === finalSetup.tf
+          ? finalSetup
           : current
       );
+      void refreshActiveTrades();
     } catch (e) {
       setCandles([]);
       setError(e instanceof Error ? e.message : "Błąd pobierania danych rynkowych");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [refreshActiveTrades]);
 
   React.useEffect(() => {
     void loadCandles(selected);
@@ -619,8 +728,10 @@ export default function AlphaScannerPage() {
       const results = await Promise.allSettled(
         liveSetups.map(async (setup) => {
           const nextCandles = await fetchSetupCandles(setup);
+          const analyzed = analyzeSetup(setup, nextCandles);
+          const synced = await syncAlphaTrade(analyzed, nextCandles);
           return {
-            setup: analyzeSetup(setup, nextCandles),
+            setup: synced.active ? tradeToSetup(analyzed, synced.active) : analyzed,
             candles: nextCandles,
           };
         })
@@ -644,6 +755,7 @@ export default function AlphaScannerPage() {
 
       setLiveSetups(nextSetups);
       setLastScanAt(new Date());
+      void refreshActiveTrades();
 
       const selectedResult = successful.find(
         (item) =>
@@ -664,7 +776,7 @@ export default function AlphaScannerPage() {
     } finally {
       setScanLoading(false);
     }
-  }, [liveSetups, selected.instrument, selected.tf, scanLoading]);
+  }, [liveSetups, selected.instrument, selected.tf, scanLoading, refreshActiveTrades]);
 
   React.useEffect(() => {
     if (!autoScan) return;
@@ -695,47 +807,14 @@ export default function AlphaScannerPage() {
       };
     }
 
-    const fallback = {
+    return {
       entry: Number(selected.entry),
       sl: Number(selected.sl),
       tp1: Number(selected.tp1),
       tp2: Number(selected.tp2),
       rr: selected.rr,
     };
-
-    if (!candles.length) return fallback;
-
-    const recent = candles.slice(-20) as any[];
-    const last = candles[candles.length - 1] as any;
-    const close = Number(last.close);
-
-    const avgRange =
-      recent.reduce(
-        (sum, c) => sum + Math.abs(Number(c.high) - Number(c.low)),
-        0
-      ) / Math.max(1, recent.length);
-
-    const risk = Math.max(avgRange * 1.6, Math.abs(close) * 0.001);
-
-    if (selected.direction === "BUY") {
-      return {
-        entry: close,
-        sl: close - risk,
-        tp1: close + risk * 1.5,
-        tp2: close + risk * 2.5,
-        rr: "1 : 2.5",
-      };
-    }
-
-    return {
-      entry: close,
-      sl: close + risk,
-      tp1: close - risk * 1.5,
-      tp2: close - risk * 2.5,
-      rr: "1 : 2.5",
-    };
-  }, [candles, selected]);
-
+  }, [selected]);
   const formatLevel = (value: number) => {
     if (!Number.isFinite(value)) return "—";
     if (selected.instrument === "EURUSD" || selected.instrument === "GBPUSD")

@@ -166,3 +166,25 @@ model AffiliateCampaign {
   @@unique([userId, slug])
   @@index([userId])
 }
+
+model AlphaTrade {
+  id          String   @id @default(cuid())
+  instrument  String
+  tf          String
+  direction   String
+  confidence  Int
+  entry       Float
+  sl          Float
+  tp1         Float
+  tp2         Float
+  rr          String
+  priceAction String
+  status      String   @default("ACTIVE")
+  tp1HitAt    DateTime?
+  closedAt    DateTime?
+  openedAt    DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([instrument, tf, status])
+  @@index([openedAt])
+}
