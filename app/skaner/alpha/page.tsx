@@ -685,7 +685,7 @@ export default function AlphaScannerPage() {
   };
 
   const liveLevels = React.useMemo(() => {
-    if (selected.status === "WARMUP") {
+    if (selected.status !== "READY") {
       return {
         entry: Number.NaN,
         sl: Number.NaN,
@@ -747,12 +747,13 @@ export default function AlphaScannerPage() {
     return value.toFixed(2);
   };
 
-  const ready = liveSetups.filter((x) => x.status === "READY").length;
-  const buys = liveSetups.filter((x) => x.status !== "WARMUP" && x.direction === "BUY").length;
-  const sells = liveSetups.filter((x) => x.status !== "WARMUP" && x.direction === "SELL").length;
-  const avg = Math.round(
-    liveSetups.reduce((sum, x) => sum + x.confidence, 0) / Math.max(1, liveSetups.length)
-  );
+  const readySetups = liveSetups.filter((x) => x.status === "READY");
+  const ready = readySetups.length;
+  const buys = readySetups.filter((x) => x.direction === "BUY").length;
+  const sells = readySetups.filter((x) => x.direction === "SELL").length;
+  const avg = readySetups.length
+    ? Math.round(readySetups.reduce((sum, x) => sum + x.confidence, 0) / readySetups.length)
+    : 0;
 
   return (
     <main className="min-h-screen bg-[#061a33] bg-[linear-gradient(rgba(3,18,38,0.58),rgba(3,18,38,0.58)),url('/alpha-scanner-bg.png')] bg-cover bg-center bg-fixed bg-no-repeat px-3 py-4 text-white md:px-5">
@@ -977,12 +978,14 @@ export default function AlphaScannerPage() {
                   </div>
                   <div
                     className={`text-[8px] font-bold ${
-                      s.direction === "BUY"
+                      s.status !== "READY"
+                        ? "text-white/35"
+                        : s.direction === "BUY"
                         ? "text-emerald-300"
                         : "text-rose-300"
                     }`}
                   >
-                    {s.direction}
+                    {s.status === "READY" ? s.direction : "—"}
                   </div>
                   <div>
                     <span
@@ -1009,6 +1012,7 @@ export default function AlphaScannerPage() {
               loading={loading}
               priceAction={selected.priceAction}
               direction={selected.direction}
+              showSignal={selected.status === "READY"}
               entry={liveLevels.entry}
               sl={liveLevels.sl}
               tp1={liveLevels.tp1}
@@ -1030,12 +1034,14 @@ export default function AlphaScannerPage() {
             <div className="mt-4">
               <span
                 className={`rounded-lg px-3 py-1.5 text-[9px] font-bold ${
-                  selected.direction === "BUY"
+                  selected.status !== "READY"
+                    ? "bg-amber-500/15 text-amber-300"
+                    : selected.direction === "BUY"
                     ? "bg-emerald-500/15 text-emerald-300"
                     : "bg-rose-500/15 text-rose-300"
                 }`}
               >
-                {selected.direction} SETUP
+                {selected.status === "READY" ? `${selected.direction} SETUP` : selected.status}
               </span>
             </div>
 
@@ -1140,6 +1146,7 @@ export default function AlphaScannerPage() {
                   loading={loading}
                   priceAction={selected.priceAction}
                   direction={selected.direction}
+                  showSignal={selected.status === "READY"}
                   entry={liveLevels.entry}
                   sl={liveLevels.sl}
                   tp1={liveLevels.tp1}

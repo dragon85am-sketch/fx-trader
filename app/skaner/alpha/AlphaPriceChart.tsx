@@ -18,6 +18,7 @@ type Props = {
   loading?: boolean;
   priceAction: string;
   direction: "BUY" | "SELL";
+  showSignal?: boolean;
   entry: number;
   sl: number;
   tp1: number;
@@ -32,6 +33,7 @@ export default function AlphaPriceChart({
   loading = false,
   priceAction,
   direction,
+  showSignal = false,
   entry,
   sl,
   tp1,
@@ -122,6 +124,18 @@ export default function AlphaPriceChart({
 
     if (!candles.length) return;
 
+    const hasValidLevels =
+      Number.isFinite(entry) &&
+      Number.isFinite(sl) &&
+      Number.isFinite(tp1) &&
+      Number.isFinite(tp2);
+
+    if (!showSignal || !hasValidLevels) {
+      series.setMarkers([]);
+      chart.timeScale().fitContent();
+      return;
+    }
+
     // Clean all price lines when symbol/setup changes.
     // lightweight-charts removes them with references, so recreate chart series by
     // storing only lines created in this effect.
@@ -184,7 +198,7 @@ export default function AlphaPriceChart({
         } catch {}
       });
     };
-  }, [candles, direction, entry, sl, tp1, tp2, priceAction]);
+  }, [candles, direction, showSignal, entry, sl, tp1, tp2, priceAction]);
 
   return (
     <div className="relative overflow-hidden rounded-[22px] border border-white/10 bg-[#061426]">
