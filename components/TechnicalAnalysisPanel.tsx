@@ -643,8 +643,9 @@ export default function TechnicalAnalysisPanel() {
 
     // Register only a genuinely READY setup; one active trade per symbol/timeframe.
     if (s.status === "READY" && (s.side === "BUY" || s.side === "SELL") && !activeTrades.some(x => x.id === key)) {
+      const setupSide: "BUY" | "SELL" = s.side;
       setActiveTrades(prev => [...prev, {
-        id: key, symbol, timeframe, side: s.side, openedAt: new Date().toISOString(),
+        id: key, symbol, timeframe, side: setupSide, openedAt: new Date().toISOString(),
         entry: (s.entryLow + s.entryHigh) / 2, tp1: s.takeProfit1, tp2: s.takeProfit2,
         tp3: s.takeProfit3, sl: s.stopLoss, score: analysis.score, adx: analysis.adx, readiness: s.readiness,
       }]);
