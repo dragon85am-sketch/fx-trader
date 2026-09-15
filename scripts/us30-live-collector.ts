@@ -49,7 +49,9 @@ socket.on("connect", () => {
   socket.emit("key", key);
 });
 
-socket.on("rates", async (raw: string) => {
+let writeChain = Promise.resolve();
+
+socket.on("rates", (raw: string) => {
   try {
     const msg = typeof raw === "string" ? JSON.parse(raw) : raw;
     if (msg?.info) return console.log("[US30]", msg.info);
@@ -59,7 +61,9 @@ socket.on("rates", async (raw: string) => {
     const bid = Number(msg.bid);
     const ts = Number(msg.timestamp) || Date.now();
     if (!Number.isFinite(bid)) return;
-    await upsertTick(bid, ts);
+    writeChain = writeChain
+      .then(() => upsertTick(bid, ts))
+      .catch((e) => console.error("[US30] DB write error", e));
   } catch (e) {
     console.error("[US30] tick error", e);
   }
