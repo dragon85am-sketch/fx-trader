@@ -562,21 +562,189 @@ function fmt(value: number, symbol: string) {
   return value.toFixed(digits);
 }
 
-async function loadSeries(apiSymbol: string, interval: string, outputsize: number) {
-  const qs = new URLSearchParams({ symbol: apiSymbol, interval, outputsize: String(outputsize), format: "JSON", order: "asc" });
-  const res = await fetch(`/api/twelve-data?${qs.toString()}`, { cache: "no-store" });
+function parseCandles(data: any, errorMessage: string): Candle[] {
+  const source = Array.isArray(data?.values)
+    ? data.values
+    : Array.isArray(data?.candles)
+      ? data.candles
+      : [];
+
+  const candles: Candle[] = source
+    .map((v: any) => ({
+      datetime: String(v.datetime ?? ""),
+      time: Number(v.time),
+      open: Number(v.open),
+      high: Number(v.high),
+      low: Number(v.low),
+      close: Number(v.close),
+    }))
+    .filter((c: Candle) =>
+      [c.open, c.high, c.low, c.close].every(Number.isFinite),
+    )
+    .sort((a: Candle, b: Candle) =>
+      String(a.datetime).localeCompare(String(b.datetime)),
+    );
+
+  if (!candles.length) throw new Error(errorMessage);
+  return candles;
+}
+
+function candleTime(c: Candle): number {
+  const rawTime = Number(c.time);
+  if (Number.isFinite(rawTime) && rawTime > 0) {
+    return rawTime > 10_000_000_000 ? rawTime : rawTime * 1000;
+  }
+  const iso = String(c.datetime).replace(" ", "T");
+  const ms = Date.parse(iso.endsWith("Z") ? iso : `${iso}Z`);
+  return Number.isFinite(ms) ? ms : 0;
+}
+
+function aggregateCandles(candles: Candle[], bucketMinutes: number): Candle[] {
+  const bucketMs = bucketMinutes * 60_000;
+  const buckets = new Map<number, Candle[]>();
+
+  for (const candle of candles) {
+    const ms = candleTime(candle);
+    if (!ms) continue;
+    const key = Math.floor(ms / bucketMs) * bucketMs;
+    const list = buckets.get(key) ?? [];
+    list.push(candle);
+    buckets.set(key, list);
+  }
+
+  return [...buckets.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([ms, rows]) => ({
+      datetime: new Date(ms).toISOString().slice(0, 19).replace("T", " "),
+      time: Math.floor(ms / 1000),
+      open: rows[0].open,
+      high: Math.max(...rows.map((x) => x.high)),
+      low: Math.min(...rows.map((x) => x.low)),
+      close: rows[rows.length - 1].close,
+    }));
+}
+
+function aggregateDaily(candles: Candle[]): Candle[] {
+  const groups = new Map<string, Candle[]>();
+
+  for (const candle of candles) {
+    const ms = candleTime(candle);
+    if (!ms) continue;
+    const day = new Date(ms).toISOString().slice(0, 10);
+    const list = groups.get(day) ?? [];
+    list.push(candle);
+    groups.set(day, list);
+  }
+
+  return [...groups.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([day, rows]) => ({
+      datetime: `${day} 00:00:00`,
+      time: Math.floor(Date.parse(`${day}T00:00:00Z`) / 1000),
+      open: rows[0].open,
+      high: Math.max(...rows.map((x) => x.high)),
+      low: Math.min(...rows.map((x) => x.low)),
+      close: rows[rows.length - 1].close,
+    }));
+}
+
+async function loadUs30Series(interval: string, outputsize: number) {
+  // Shared US30 candle engine already used by FX Trade scanners.
+  // It is fed by Live-Rates instead of consuming Twelve Data credits.
+  const requestedBase = interval === "1min" ? "1min" : "5min";
+
+  // Daily/pivots need more M5 history. The endpoint can return what it has;
+  // slicing happens after aggregation.
+  const rawLimit =
+    interval === "1day"
+      ? Math.max(outputsize * 300, 900)
+      : interval === "4h"
+        ? Math.max(outputsize * 48, 600)
+        : interval === "1h"
+          ? Math.max(outputsize * 12, 400)
+          : interval === "30min"
+            ? Math.max(outputsize * 6, 320)
+            : interval === "15min"
+              ? Math.max(outputsize * 3, 280)
+              : outputsize;
+
+  const qs = new URLSearchParams({
+    interval: requestedBase,
+    limit: String(rawLimit),
+  });
+
+  const res = await fetch(`/api/us30/candles?${qs.toString()}`, {
+    cache: "no-store",
+    headers: { Accept: "application/json" },
+  });
+
+  let data: any = null;
+  try {
+    data = await res.json();
+  } catch {
+    throw new Error("US30 Live-Rates returned invalid JSON");
+  }
+
+  if (!res.ok || data?.status === "error" || data?.error) {
+    throw new Error(
+      data?.message ||
+        data?.error ||
+        `US30 Live-Rates candle engine HTTP ${res.status}`,
+    );
+  }
+
+  const base = parseCandles(
+    data,
+    "US30 Live-Rates candle engine nie ma jeszcze danych.",
+  );
+
+  let result = base;
+  if (interval === "15min") result = aggregateCandles(base, 15);
+  if (interval === "30min") result = aggregateCandles(base, 30);
+  if (interval === "1h") result = aggregateCandles(base, 60);
+  if (interval === "4h") result = aggregateCandles(base, 240);
+  if (interval === "1day") result = aggregateDaily(base);
+
+  if (!result.length) {
+    throw new Error(`US30 Live-Rates: brak świec dla ${interval}`);
+  }
+
+  return result.slice(-outputsize);
+}
+
+async function loadSeries(symbol: string, apiSymbol: string, interval: string, outputsize: number) {
+  // US30 bypasses Twelve Data completely.
+  if (symbol === "US30") {
+    return loadUs30Series(interval, outputsize);
+  }
+
+  const qs = new URLSearchParams({
+    symbol: apiSymbol,
+    interval,
+    outputsize: String(outputsize),
+    format: "JSON",
+    order: "asc",
+  });
+
+  const res = await fetch(`/api/twelve-data?${qs.toString()}`, {
+    cache: "no-store",
+  });
+
   const raw = await res.text();
   let data: any = null;
-  try { data = JSON.parse(raw); } catch { throw new Error("Twelve Data returned invalid JSON"); }
-  if (!res.ok || data?.status === "error" || data?.error) throw new Error(data?.message || data?.error || `HTTP ${res.status}`);
-  const source = Array.isArray(data?.values) ? data.values : Array.isArray(data?.candles) ? data.candles : [];
-  const candles: Candle[] = source.map((v: any) => ({
-    datetime: v.datetime,
-    time: Number(v.time),
-    open: Number(v.open), high: Number(v.high), low: Number(v.low), close: Number(v.close),
-  })).filter((c: Candle) => [c.open, c.high, c.low, c.close].every(Number.isFinite));
-  if (!candles.length) throw new Error(data?.message || "No candles returned");
-  return candles;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    throw new Error("Twelve Data returned invalid JSON");
+  }
+
+  if (!res.ok || data?.status === "error" || data?.error) {
+    throw new Error(
+      data?.message || data?.error || `HTTP ${res.status}`,
+    );
+  }
+
+  return parseCandles(data, data?.message || "No candles returned");
 }
 
 export default function TechnicalAnalysisPanel() {
@@ -608,8 +776,8 @@ export default function TechnicalAnalysisPanel() {
     setError("");
     try {
       const [candles, daily] = await Promise.all([
-        loadSeries(instrument.api, TF_MAP[timeframe] ?? "5min", 260),
-        loadSeries(instrument.api, "1day", 10),
+        loadSeries(symbol, instrument.api, TF_MAP[timeframe] ?? "5min", 260),
+        loadSeries(symbol, instrument.api, "1day", 10),
       ]);
       setAnalysis(buildAnalysis(candles, daily));
     } catch (e) {
@@ -618,7 +786,7 @@ export default function TechnicalAnalysisPanel() {
     } finally {
       setLoading(false);
     }
-  }, [instrument.api, timeframe]);
+  }, [symbol, instrument.api, timeframe]);
 
   useEffect(() => { refresh(); }, [refresh]);
   useEffect(() => {
