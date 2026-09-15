@@ -33,7 +33,7 @@ type Setup = {
   session: string;
   confidence: number;
   direction: "BUY" | "SELL";
-  status: "READY" | "WATCH";
+  status: "READY" | "WATCH" | "WARMUP";
   entry: string;
   sl: string;
   tp1: string;
@@ -285,7 +285,26 @@ function formatSetupNumber(instrument: string, value: number) {
 
 function analyzeSetup(base: Setup, candles: CandlestickData[]): Setup {
   const data = candles as any[];
-  if (data.length < 30) return base;
+  const minCandles = 50;
+
+  if (data.length < minCandles) {
+    return {
+      ...base,
+      trend: false,
+      trendDirection: "NEUTRAL",
+      sweep: false,
+      momentum: false,
+      liquidityPct: 0,
+      priceAction: `WARMUP ${data.length}/${minCandles} świec`,
+      confidence: 0,
+      status: "WARMUP",
+      entry: "-",
+      sl: "-",
+      tp1: "-",
+      tp2: "-",
+      rr: "-",
+    };
+  }
 
   const closes = data.map((c) => Number(c.close));
   const ema20 = emaValue(closes, 20);
@@ -652,7 +671,7 @@ export default function AlphaScannerPage() {
 
     const timer = window.setInterval(() => {
       void runScan();
-    }, 60_000);
+    }, 15 * 60_000); // AUTO SCAN co 15 minut
 
     return () => window.clearInterval(timer);
   }, [autoScan, runScan]);

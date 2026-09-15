@@ -929,11 +929,13 @@ export default function HarmonicScannerPage() {
     const controller = new AbortController();
     void loadCandles(controller.signal);
 
-    // Live candle refresh. 5 s is responsive enough for the UI while avoiding
-    // excessive REST requests. Increase to 10â€“15 s if your plan has a low API limit.
+    // US30 comes from our own Live-Rates Candle Engine, so it can refresh fast.
+    // GOLD / Forex / BTC use Twelve Data and refresh much less often to protect API credits.
+    const refreshMs = activeSetup.symbol === "US30" ? 5_000 : 5 * 60_000;
+
     const interval = window.setInterval(() => {
       void loadCandles(controller.signal, true);
-    }, 5000);
+    }, refreshMs);
 
     return () => {
       controller.abort();

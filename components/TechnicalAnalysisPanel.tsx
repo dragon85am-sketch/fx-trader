@@ -22,6 +22,13 @@ type OscRow = { period: number; rsi: number; stochastic: number; rsiSignal: Sign
 
 type TradeSide = "BUY" | "SELL" | "NONE";
 type SetupStatus = "READY" | "WAITING" | "NO_SETUP";
+type TradeResult = "TP1" | "SL";
+type LoggedTrade = {
+  id: string; symbol: string; timeframe: string; side: "BUY" | "SELL";
+  openedAt: string; closedAt: string; entry: number; tp1: number; tp2: number; tp3: number; sl: number;
+  result: TradeResult; score: number; adx: number; readiness: number;
+};
+type ActiveTrade = Omit<LoggedTrade, "closedAt" | "result">;
 
 type EntrySetup = {
   side: TradeSide;
@@ -579,6 +586,8 @@ export default function TechnicalAnalysisPanel() {
   const [analysis, setAnalysis] = useState<LiveAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [activeTrades, setActiveTrades] = useState<ActiveTrade[]>([]);
+  const [tradeLog, setTradeLog] = useState<LoggedTrade[]>([]);
 
   useEffect(() => {
     const sync = () => setLang(getLang());
@@ -617,6 +626,69 @@ export default function TechnicalAnalysisPanel() {
     return () => window.clearInterval(id);
   }, [refresh]);
 
+  useEffect(() => {
+    try {
+      setActiveTrades(JSON.parse(localStorage.getItem("fxtrade_ta_active_trades") || "[]"));
+      setTradeLog(JSON.parse(localStorage.getItem("fxtrade_ta_trade_log") || "[]"));
+    } catch {}
+  }, []);
+
+  useEffect(() => { localStorage.setItem("fxtrade_ta_active_trades", JSON.stringify(activeTrades)); }, [activeTrades]);
+  useEffect(() => { localStorage.setItem("fxtrade_ta_trade_log", JSON.stringify(tradeLog)); }, [tradeLog]);
+
+  useEffect(() => {
+    if (!analysis) return;
+    const s = analysis.setup;
+    const key = `${symbol}-${timeframe}`;
+
+    // Register only a genuinely READY setup; one active trade per symbol/timeframe.
+    if (s.status === "READY" && (s.side === "BUY" || s.side === "SELL") && !activeTrades.some(x => x.id === key)) {
+      setActiveTrades(prev => [...prev, {
+        id: key, symbol, timeframe, side: s.side, openedAt: new Date().toISOString(),
+        entry: (s.entryLow + s.entryHigh) / 2, tp1: s.takeProfit1, tp2: s.takeProfit2,
+        tp3: s.takeProfit3, sl: s.stopLoss, score: analysis.score, adx: analysis.adx, readiness: s.readiness,
+      }]);
+      return;
+    }
+
+    const trade = activeTrades.find(x => x.id === key);
+    if (!trade) return;
+    const price = analysis.price;
+    const hitTP1 = trade.side === "BUY" ? price >= trade.tp1 : price <= trade.tp1;
+    const hitSL = trade.side === "BUY" ? price <= trade.sl : price >= trade.sl;
+    if (!hitTP1 && !hitSL) return;
+
+    const closed: LoggedTrade = { ...trade, closedAt: new Date().toISOString(), result: hitTP1 ? "TP1" : "SL" };
+    setTradeLog(prev => [closed, ...prev]);
+    setActiveTrades(prev => prev.filter(x => x.id !== key));
+  }, [analysis, symbol, timeframe, activeTrades]);
+
+  const exportTradeLog = async () => {
+    if (!tradeLog.length) { alert("Brak zakończonych setupów Technical Analysis."); return; }
+    const XLSX = await import("xlsx-js-style");
+    const tp1 = tradeLog.filter(x => x.result === "TP1").length;
+    const sl = tradeLog.filter(x => x.result === "SL").length;
+    const winRate = tradeLog.length ? (tp1 / tradeLog.length) * 100 : 0;
+    const rows: any[][] = [
+      ["FX TRADE — TECHNICAL ANALYSIS SETUP LOG"],
+      ["Closed Setups Performance Report"], [],
+      ["Wszystkie setupy", tradeLog.length, "TP1", tp1, "SL", sl, "Skuteczność", `${winRate.toFixed(1)}%`], [],
+      ["Data otwarcia", "Data zamknięcia", "Instrument", "TF", "Kierunek", "Wejście", "TP1", "TP2", "TP3", "SL", "Wynik", "TA Score", "ADX", "Readiness"],
+      ...tradeLog.map(x => [x.openedAt.replace("T", " ").slice(0,16), x.closedAt.replace("T", " ").slice(0,16), x.symbol, x.timeframe, x.side, x.entry, x.tp1, x.tp2, x.tp3, x.sl, x.result, x.score, Number.isFinite(x.adx) ? Number(x.adx.toFixed(1)) : "", x.readiness]),
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws["!cols"] = [{wch:18},{wch:18},{wch:12},{wch:8},{wch:10},{wch:14},{wch:14},{wch:14},{wch:14},{wch:14},{wch:10},{wch:10},{wch:9},{wch:11}];
+    ws["!merges"] = [XLSX.utils.decode_range("A1:N1"), XLSX.utils.decode_range("A2:N2")];
+    const range = XLSX.utils.decode_range(ws["!ref"] || "A1:N1");
+    for (let R=0; R<=range.e.r; R++) for (let C=0; C<=range.e.c; C++) {
+      const a = XLSX.utils.encode_cell({r:R,c:C}); if (!ws[a]) continue;
+      ws[a].s = { font:{name:"Arial",sz:R===0?18:R===1?11:10,bold:R===0||R===5,color:{rgb:R===0?"22D3EE":"FFFFFF"}}, fill:{fgColor:{rgb:R<=1?"06192B":R===5?"0B3A67":"0A2C4D"}}, alignment:{horizontal:R<=1?"center":"center",vertical:"center"}, border:{bottom:{style:"thin",color:{rgb:"2C668F"}}} };
+      if (R>=6 && C===10) ws[a].s.font = {...ws[a].s.font, bold:true, color:{rgb:ws[a].v==="TP1"?"34D399":"FB7185"}};
+    }
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Technical Analysis");
+    XLSX.writeFile(wb, `FX-TRADE-Technical-Analysis-Setup-Log-${new Date().toISOString().slice(0,10)}.xlsx`);
+  };
+
   const strengthLabel = analysis?.strength === "STRONG" ? t.strong : analysis?.strength === "WEAK" ? t.weak : t.moderate;
   const trendLabel = analysis?.bias === "BULLISH" ? t.uptrend : analysis?.bias === "BEARISH" ? t.downtrend : t.neutral;
   const score = analysis?.score ?? 0;
@@ -629,9 +701,17 @@ export default function TechnicalAnalysisPanel() {
   const setupCondition =
     setup?.side === "BUY" ? t.waitBuy : setup?.side === "SELL" ? t.waitSell : t.noTrade;
 
+  const closedSetupStats = useMemo(() => {
+    const total = tradeLog.length;
+    const tp1 = tradeLog.filter((row) => row.result === "TP1").length;
+    const sl = tradeLog.filter((row) => row.result === "SL").length;
+    const winRate = total ? (tp1 / total) * 100 : 0;
+    return { total, tp1, sl, winRate };
+  }, [tradeLog]);
+
   return (
     <div className="space-y-4">
-      <div className="rounded-[18px] border border-cyan-400/25 bg-[linear-gradient(135deg,#07192b,#082947)] p-4 shadow-[0_0_28px_rgba(34,211,238,.08)]">
+      <div className="rounded-[18px] border border-cyan-400/25 bg-[linear-gradient(135deg,rgba(100,116,139,.78),rgba(51,65,85,.82))] backdrop-blur-md p-4 shadow-[0_0_28px_rgba(34,211,238,.08)]">
         <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <div className="text-[9px] font-black uppercase tracking-[.22em] text-cyan-300/75">FX TRADE • {t.technical}</div>
@@ -672,125 +752,256 @@ export default function TechnicalAnalysisPanel() {
 
       <div className="grid gap-4 xl:grid-cols-[1.15fr_.85fr]">
         <div className="space-y-4">
-          <div className="rounded-[16px] border border-cyan-300/15 bg-[#07192b] p-4">
-            <div className="flex items-center gap-3"><div className="text-2xl">{instrument.flag}</div><div><div className="flex items-center gap-2"><h3 className="text-[18px] font-black">{instrument.symbol}</h3><span className="rounded bg-white/5 px-2 py-1 text-[9px] text-sky-100/55">{timeframe}</span></div><div className="text-[9px] text-sky-100/40">{instrument.name}</div></div></div>
+          <div className="rounded-[16px] border border-cyan-300/15 bg-slate-700/70 p-4">
+            <div className="flex items-center gap-3"><div className="text-2xl">{instrument.flag}</div><div><div className="flex items-center gap-2"><h3 className="text-[18px] font-black">{instrument.symbol}</h3><span className="rounded bg-slate-300/10 px-2 py-1 text-[9px] text-sky-100/55">{timeframe}</span></div><div className="text-[9px] text-sky-100/40">{instrument.name}</div></div></div>
             <div className="mt-4 flex items-end gap-4"><div className="text-[31px] font-black tracking-tight">{analysis ? fmt(analysis.price, symbol) : "–"}</div><div className={`pb-1 text-[13px] font-bold ${positive ? "text-emerald-300" : "text-rose-300"}`}>{analysis ? `${positive ? "+" : ""}${fmt(analysis.change, symbol)} (${positive ? "+" : ""}${analysis.changePct.toFixed(2)}%)` : "–"}</div></div>
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
-            <div className="rounded-[16px] border border-cyan-300/15 bg-[#07192b] p-4">
+            <div className="rounded-[16px] border border-cyan-300/15 bg-slate-700/70 p-4">
               <h3 className="mb-3 text-[14px] font-bold">〽 {t.moving}</h3>
-              <div className="grid grid-cols-4 gap-2 border-b border-white/5 pb-2 text-[9px] uppercase text-sky-100/40"><span>{t.period}</span><span>{t.simple}</span><span>{t.exponential}</span><span>{t.signal}</span></div>
+              <div className="grid grid-cols-4 gap-2 border-b border-slate-300/10 pb-2 text-[9px] uppercase text-sky-100/40"><span>{t.period}</span><span>{t.simple}</span><span>{t.exponential}</span><span>{t.signal}</span></div>
               <div className="divide-y divide-white/5">{(analysis?.movingAverages ?? []).map((row) => <div key={row.period} className="grid grid-cols-4 items-center gap-2 py-2 text-[10px]"><span>{row.period}</span><span>{fmt(row.simple, symbol)}</span><span>{fmt(row.exponential, symbol)}</span><SignalBadge value={row.signal}/></div>)}</div>
             </div>
-            <div className="rounded-[16px] border border-cyan-300/15 bg-[#07192b] p-4">
+            <div className="rounded-[16px] border border-cyan-300/15 bg-slate-700/70 p-4">
               <h3 className="mb-3 text-[14px] font-bold">◉ {t.oscillators}</h3>
-              <div className="grid grid-cols-5 gap-2 border-b border-white/5 pb-2 text-[9px] uppercase text-sky-100/40"><span>{t.period}</span><span>RSI</span><span>{t.stochastic}</span><span>RSI</span><span>{t.signal}</span></div>
+              <div className="grid grid-cols-5 gap-2 border-b border-slate-300/10 pb-2 text-[9px] uppercase text-sky-100/40"><span>{t.period}</span><span>RSI</span><span>{t.stochastic}</span><span>RSI</span><span>{t.signal}</span></div>
               <div className="divide-y divide-white/5">{(analysis?.oscillators ?? []).map((row) => <div key={row.period} className="grid grid-cols-5 items-center gap-2 py-2 text-[10px]"><span>{row.period}</span><span>{Number.isFinite(row.rsi) ? row.rsi.toFixed(1) : "–"}</span><span>{Number.isFinite(row.stochastic) ? row.stochastic.toFixed(1) : "–"}</span><SignalBadge value={row.rsiSignal}/><SignalBadge value={row.stochasticSignal}/></div>)}</div>
             </div>
           </div>
 
           <div className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-[16px] border border-cyan-300/15 bg-[#07192b] p-4"><div className="text-[11px] text-sky-100/45">◉ {t.overall}</div><div className={`mt-3 text-[23px] font-black ${analysis?.bias === "BULLISH" ? "text-emerald-300" : analysis?.bias === "BEARISH" ? "text-rose-300" : "text-sky-300"}`}>{analysis?.bias ?? "–"}</div></div>
-            <div className="rounded-[16px] border border-cyan-300/15 bg-[#07192b] p-4"><div className="text-[11px] text-sky-100/45">▥ {t.strength}</div><div className="mt-3 inline-flex rounded bg-amber-400/15 px-3 py-1 text-[12px] font-black text-amber-300">{analysis ? strengthLabel : "–"}</div><div className="mt-3 flex gap-1">{Array.from({ length: 5 }).map((_, i) => <span key={i} className={`h-2 w-7 rounded-sm ${analysis && i < Math.ceil(score / 20) ? "bg-amber-400" : "bg-white/10"}`} />)}</div></div>
-            <div className="rounded-[16px] border border-cyan-300/15 bg-[#07192b] p-4"><div className="text-[11px] text-sky-100/45">⌖ {t.key}</div><div className="mt-3 space-y-2 text-[11px]"><div className="flex justify-between"><span>{t.support}</span><b className="text-emerald-300">{analysis ? fmt(analysis.support, symbol) : "–"}</b></div><div className="flex justify-between"><span>{t.resistance}</span><b className="text-rose-300">{analysis ? fmt(analysis.resistance, symbol) : "–"}</b></div></div></div>
+            <div className="rounded-[16px] border border-cyan-300/15 bg-slate-700/70 p-4"><div className="text-[11px] text-sky-100/45">◉ {t.overall}</div><div className={`mt-3 text-[23px] font-black ${analysis?.bias === "BULLISH" ? "text-emerald-300" : analysis?.bias === "BEARISH" ? "text-rose-300" : "text-sky-300"}`}>{analysis?.bias ?? "–"}</div></div>
+            <div className="rounded-[16px] border border-cyan-300/15 bg-slate-700/70 p-4"><div className="text-[11px] text-sky-100/45">▥ {t.strength}</div><div className="mt-3 inline-flex rounded bg-amber-400/15 px-3 py-1 text-[12px] font-black text-amber-300">{analysis ? strengthLabel : "–"}</div><div className="mt-3 flex gap-1">{Array.from({ length: 5 }).map((_, i) => <span key={i} className={`h-2 w-7 rounded-sm ${analysis && i < Math.ceil(score / 20) ? "bg-amber-400" : "bg-white/10"}`} />)}</div></div>
+            <div className="rounded-[16px] border border-cyan-300/15 bg-slate-700/70 p-4"><div className="text-[11px] text-sky-100/45">⌖ {t.key}</div><div className="mt-3 space-y-2 text-[11px]"><div className="flex justify-between"><span>{t.support}</span><b className="text-emerald-300">{analysis ? fmt(analysis.support, symbol) : "–"}</b></div><div className="flex justify-between"><span>{t.resistance}</span><b className="text-rose-300">{analysis ? fmt(analysis.resistance, symbol) : "–"}</b></div></div></div>
           </div>
         </div>
 
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
-            <div className="rounded-[16px] border border-cyan-300/15 bg-[#07192b] p-4"><div className="text-[13px] font-bold">{t.score}</div><div className="mt-4 flex justify-center"><div className="relative h-32 w-56 overflow-hidden"><div className="absolute left-1/2 top-0 h-48 w-48 -translate-x-1/2 rounded-full" style={{ background: `conic-gradient(from 270deg, #10b981 0deg ${score * 1.8}deg, #f59e0b ${score * 1.8}deg 180deg, transparent 180deg 360deg)` }} /><div className="absolute left-1/2 top-7 h-36 w-36 -translate-x-1/2 rounded-full bg-[#07192b]"/><div className="absolute inset-x-0 top-16 text-center text-[30px] font-black">{analysis ? `${score}%` : "–"}</div><div className="absolute bottom-1 left-2 text-[9px] text-emerald-300">{t.buy}</div><div className="absolute bottom-1 right-2 text-[9px] text-rose-300">{t.sell}</div></div></div></div>
-            <div className="rounded-[16px] border border-cyan-300/15 bg-[#07192b] p-4"><h3 className="text-[14px] font-bold">▱ {t.trend}</h3><div className="mt-4 space-y-3 text-[11px]"><div className="flex justify-between"><span className="text-sky-100/45">{t.direction}</span><b className={analysis?.bias === "BEARISH" ? "text-rose-300" : analysis?.bias === "BULLISH" ? "text-emerald-300" : "text-sky-300"}>{analysis ? trendLabel : "–"}</b></div><div className="flex justify-between"><span className="text-sky-100/45">{t.strength}</span><b className="text-amber-300">{analysis ? strengthLabel : "–"}</b></div><div className="flex justify-between"><span className="text-sky-100/45">ADX (14)</span><b>{analysis && Number.isFinite(analysis.adx) ? analysis.adx.toFixed(1) : "–"}</b></div><div className="flex justify-between"><span className="text-sky-100/45">+DI / -DI</span><b>{analysis ? `${analysis.diPlus.toFixed(1)} / ${analysis.diMinus.toFixed(1)}` : "–"}</b></div></div><div className="mt-4 rounded-xl border border-amber-300/15 bg-amber-300/5 p-3 text-[10px] text-amber-100/75">💡 {t.break} <b className="text-amber-300">{analysis ? fmt(analysis.breakAbove, symbol) : "–"}</b></div></div>
+            <div className="rounded-[16px] border border-cyan-300/15 bg-slate-700/70 p-4"><div className="text-[13px] font-bold">{t.score}</div><div className="mt-4 flex justify-center"><div className="relative h-32 w-56 overflow-hidden"><div className="absolute left-1/2 top-0 h-48 w-48 -translate-x-1/2 rounded-full" style={{ background: `conic-gradient(from 270deg, #10b981 0deg ${score * 1.8}deg, #f59e0b ${score * 1.8}deg 180deg, transparent 180deg 360deg)` }} /><div className="absolute left-1/2 top-7 h-36 w-36 -translate-x-1/2 rounded-full bg-slate-700/70"/><div className="absolute inset-x-0 top-16 text-center text-[30px] font-black">{analysis ? `${score}%` : "–"}</div><div className="absolute bottom-1 left-2 text-[9px] text-emerald-300">{t.buy}</div><div className="absolute bottom-1 right-2 text-[9px] text-rose-300">{t.sell}</div></div></div></div>
+            <div className="rounded-[16px] border border-cyan-300/15 bg-slate-700/70 p-4"><h3 className="text-[14px] font-bold">▱ {t.trend}</h3><div className="mt-4 space-y-3 text-[11px]"><div className="flex justify-between"><span className="text-sky-100/45">{t.direction}</span><b className={analysis?.bias === "BEARISH" ? "text-rose-300" : analysis?.bias === "BULLISH" ? "text-emerald-300" : "text-sky-300"}>{analysis ? trendLabel : "–"}</b></div><div className="flex justify-between"><span className="text-sky-100/45">{t.strength}</span><b className="text-amber-300">{analysis ? strengthLabel : "–"}</b></div><div className="flex justify-between"><span className="text-sky-100/45">ADX (14)</span><b>{analysis && Number.isFinite(analysis.adx) ? analysis.adx.toFixed(1) : "–"}</b></div><div className="flex justify-between"><span className="text-sky-100/45">+DI / -DI</span><b>{analysis ? `${analysis.diPlus.toFixed(1)} / ${analysis.diMinus.toFixed(1)}` : "–"}</b></div></div><div className="mt-4 rounded-xl border border-amber-300/15 bg-amber-300/5 p-3 text-[10px] text-amber-100/75">💡 {t.break} <b className="text-amber-300">{analysis ? fmt(analysis.breakAbove, symbol) : "–"}</b></div></div>
           </div>
-          <div className="rounded-[16px] border border-cyan-300/15 bg-[#07192b] p-4"><h3 className="mb-3 text-[14px] font-bold">▰ {t.pivot}</h3><div className="grid grid-cols-4 gap-2 border-b border-white/5 pb-2 text-[9px] uppercase text-sky-100/40"><span>Level</span><span>Classic</span><span>Woodie</span><span>Fibonacci</span></div><div className="divide-y divide-white/5">{(analysis?.pivots ?? []).map((row) => <div key={row.level} className="grid grid-cols-4 gap-2 py-2 text-[10px]"><b>{row.level}</b><span className={row.level === "PP" ? "font-bold text-amber-300" : ""}>{fmt(row.classic, symbol)}</span><span>{fmt(row.woodie, symbol)}</span><span>{fmt(row.fibonacci, symbol)}</span></div>)}</div></div>
+          <div className="rounded-[16px] border border-cyan-300/15 bg-slate-700/70 p-4"><h3 className="mb-3 text-[14px] font-bold">▰ {t.pivot}</h3><div className="grid grid-cols-4 gap-2 border-b border-slate-300/10 pb-2 text-[9px] uppercase text-sky-100/40"><span>Level</span><span>Classic</span><span>Woodie</span><span>Fibonacci</span></div><div className="divide-y divide-white/5">{(analysis?.pivots ?? []).map((row) => <div key={row.level} className="grid grid-cols-4 gap-2 py-2 text-[10px]"><b>{row.level}</b><span className={row.level === "PP" ? "font-bold text-amber-300" : ""}>{fmt(row.classic, symbol)}</span><span>{fmt(row.woodie, symbol)}</span><span>{fmt(row.fibonacci, symbol)}</span></div>)}</div></div>
 
-          <div className="overflow-hidden rounded-[18px] border border-cyan-400/35 bg-[linear-gradient(135deg,#07192b,#061526)] shadow-[0_0_34px_rgba(34,211,238,.08)]">
-            <div className="flex flex-col gap-3 border-b border-white/5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-              <h3 className="text-[15px] font-black text-white">🎯 {t.proposedEntry}</h3>
-              <div className="flex items-center gap-3">
-                <span className="text-[9px] uppercase tracking-wider text-sky-100/45">{t.readiness}</span>
-                <b className="text-[13px] text-white">{setup ? `${setup.readiness}%` : "–"}</b>
-                <div className="h-2 w-28 overflow-hidden rounded-full bg-white/10">
-                  <div
-                    className={`h-full rounded-full transition-all ${
-                      (setup?.readiness ?? 0) >= 75
-                        ? "bg-emerald-400"
-                        : (setup?.readiness ?? 0) >= 60
-                          ? "bg-amber-400"
-                          : "bg-rose-400"
-                    }`}
-                    style={{ width: `${setup?.readiness ?? 0}%` }}
-                  />
+        </div>
+
+        <div className="xl:col-span-2 overflow-hidden rounded-[18px] border border-cyan-400/35 bg-[linear-gradient(135deg,rgba(100,116,139,.72),rgba(51,65,85,.80))] backdrop-blur-md shadow-[0_0_34px_rgba(34,211,238,.08)]">
+          <div className="flex flex-col gap-3 border-b border-slate-300/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <h3 className="text-[15px] font-black text-white">🎯 {t.proposedEntry}</h3>
+            <div className="flex items-center gap-3">
+              <span className="text-[9px] uppercase tracking-wider text-sky-100/45">{t.readiness}</span>
+              <b className="text-[13px] text-white">{setup ? `${setup.readiness}%` : "–"}</b>
+              <div className="h-2 w-28 overflow-hidden rounded-full bg-white/10">
+                <div
+                  className={`h-full rounded-full transition-all ${
+                    (setup?.readiness ?? 0) >= 75
+                      ? "bg-emerald-400"
+                      : (setup?.readiness ?? 0) >= 60
+                        ? "bg-amber-400"
+                        : "bg-rose-400"
+                  }`}
+                  style={{ width: `${setup?.readiness ?? 0}%` }}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-4 p-4 lg:grid-cols-[.9fr_1.1fr]">
+            <div className="rounded-[14px] border border-white/8 bg-white/[.025]">
+              <div
+                className={`flex items-center gap-3 rounded-t-[14px] border-b border-slate-300/10 px-4 py-3 ${
+                  setup?.side === "BUY"
+                    ? "bg-emerald-500/10"
+                    : setup?.side === "SELL"
+                      ? "bg-rose-500/10"
+                      : "bg-slate-500/10"
+                }`}
+              >
+                <div className={`text-3xl ${setup?.side === "BUY" ? "text-emerald-300" : setup?.side === "SELL" ? "text-rose-300" : "text-sky-300"}`}>
+                  {setup?.side === "BUY" ? "↑" : setup?.side === "SELL" ? "↓" : "•"}
                 </div>
+                <div>
+                  <div className={`text-[17px] font-black ${setup?.side === "BUY" ? "text-emerald-300" : setup?.side === "SELL" ? "text-rose-300" : "text-sky-300"}`}>
+                    {setupSideLabel}
+                  </div>
+                  <div className="text-[9px] text-sky-100/45">{instrument.symbol} · {timeframe}</div>
+                </div>
+              </div>
+
+              <div className="space-y-2 px-4 py-3 text-[11px]">
+                <div className="flex justify-between gap-4"><span className="text-sky-100/50">{t.entryZone}</span><b>{setup && setup.side !== "NONE" ? `${fmt(setup.entryLow, symbol)} – ${fmt(setup.entryHigh, symbol)}` : "–"}</b></div>
+                <div className="flex justify-between gap-4"><span className="text-sky-100/50">{t.stopLoss}</span><b className="text-rose-300">{setup && setup.side !== "NONE" ? fmt(setup.stopLoss, symbol) : "–"}</b></div>
+                <div className="flex justify-between gap-4"><span className="text-sky-100/50">{t.takeProfit1}</span><b className="text-emerald-300">{setup && setup.side !== "NONE" ? fmt(setup.takeProfit1, symbol) : "–"}</b></div>
+                <div className="flex justify-between gap-4"><span className="text-sky-100/50">{t.takeProfit2}</span><b className="text-emerald-300">{setup && setup.side !== "NONE" ? fmt(setup.takeProfit2, symbol) : "–"}</b></div>
+                <div className="flex justify-between gap-4"><span className="text-sky-100/50">{t.takeProfit3}</span><b className="text-emerald-300">{setup && setup.side !== "NONE" ? fmt(setup.takeProfit3, symbol) : "–"}</b></div>
+                <div className="flex justify-between gap-4 border-t border-slate-300/10 pt-2"><span className="text-sky-100/50">{t.riskReward}</span><b className="text-amber-300">{setup && setup.side !== "NONE" ? `1 : ${setup.riskReward.toFixed(1)}` : "–"}</b></div>
               </div>
             </div>
 
-            <div className="grid gap-4 p-4 lg:grid-cols-[.9fr_1.1fr]">
-              <div className="rounded-[14px] border border-white/8 bg-white/[.025]">
-                <div
-                  className={`flex items-center gap-3 rounded-t-[14px] border-b border-white/5 px-4 py-3 ${
-                    setup?.side === "BUY"
-                      ? "bg-emerald-500/10"
-                      : setup?.side === "SELL"
-                        ? "bg-rose-500/10"
-                        : "bg-slate-500/10"
-                  }`}
-                >
-                  <div className={`text-3xl ${setup?.side === "BUY" ? "text-emerald-300" : setup?.side === "SELL" ? "text-rose-300" : "text-sky-300"}`}>
-                    {setup?.side === "BUY" ? "↑" : setup?.side === "SELL" ? "↓" : "•"}
+            <div className="flex min-h-full flex-col">
+              <h4 className="text-[11px] font-bold text-white">◉ {t.confirmation}</h4>
+              <div className="mt-3 space-y-2">
+                {(setup?.confirmations ?? []).slice(0, 6).map((item) => (
+                  <div key={item} className="flex items-start gap-2 text-[10px] text-sky-50/80">
+                    <span className="mt-[1px] text-emerald-300">✓</span>
+                    <span>{item}</span>
                   </div>
-                  <div>
-                    <div className={`text-[17px] font-black ${setup?.side === "BUY" ? "text-emerald-300" : setup?.side === "SELL" ? "text-rose-300" : "text-sky-300"}`}>
-                      {setupSideLabel}
-                    </div>
-                    <div className="text-[9px] text-sky-100/45">{instrument.symbol} · {timeframe}</div>
-                  </div>
-                </div>
-
-                <div className="space-y-2 px-4 py-3 text-[11px]">
-                  <div className="flex justify-between gap-4"><span className="text-sky-100/50">{t.entryZone}</span><b>{setup && setup.side !== "NONE" ? `${fmt(setup.entryLow, symbol)} – ${fmt(setup.entryHigh, symbol)}` : "–"}</b></div>
-                  <div className="flex justify-between gap-4"><span className="text-sky-100/50">{t.stopLoss}</span><b className="text-rose-300">{setup && setup.side !== "NONE" ? fmt(setup.stopLoss, symbol) : "–"}</b></div>
-                  <div className="flex justify-between gap-4"><span className="text-sky-100/50">{t.takeProfit1}</span><b className="text-emerald-300">{setup && setup.side !== "NONE" ? fmt(setup.takeProfit1, symbol) : "–"}</b></div>
-                  <div className="flex justify-between gap-4"><span className="text-sky-100/50">{t.takeProfit2}</span><b className="text-emerald-300">{setup && setup.side !== "NONE" ? fmt(setup.takeProfit2, symbol) : "–"}</b></div>
-                  <div className="flex justify-between gap-4"><span className="text-sky-100/50">{t.takeProfit3}</span><b className="text-emerald-300">{setup && setup.side !== "NONE" ? fmt(setup.takeProfit3, symbol) : "–"}</b></div>
-                  <div className="flex justify-between gap-4 border-t border-white/5 pt-2"><span className="text-sky-100/50">{t.riskReward}</span><b className="text-amber-300">{setup && setup.side !== "NONE" ? `1 : ${setup.riskReward.toFixed(1)}` : "–"}</b></div>
-                </div>
+                ))}
+                {!setup?.confirmations?.length && (
+                  <div className="text-[10px] text-sky-100/40">–</div>
+                )}
               </div>
 
-              <div className="flex min-h-full flex-col">
-                <h4 className="text-[11px] font-bold text-white">◉ {t.confirmation}</h4>
-                <div className="mt-3 space-y-2">
-                  {(setup?.confirmations ?? []).slice(0, 6).map((item) => (
-                    <div key={item} className="flex items-start gap-2 text-[10px] text-sky-50/80">
-                      <span className="mt-[1px] text-emerald-300">✓</span>
-                      <span>{item}</span>
-                    </div>
-                  ))}
-                  {!setup?.confirmations?.length && (
-                    <div className="text-[10px] text-sky-100/40">–</div>
-                  )}
-                </div>
+              <div className="mt-4">
+                <div className="text-[10px] font-bold text-white">{t.entryCondition}</div>
+                <p className="mt-1 text-[10px] leading-5 text-sky-100/60">{setupCondition}</p>
+              </div>
 
-                <div className="mt-4">
-                  <div className="text-[10px] font-bold text-white">{t.entryCondition}</div>
-                  <p className="mt-1 text-[10px] leading-5 text-sky-100/60">{setupCondition}</p>
-                </div>
-
-                <div
-                  className={`mt-auto rounded-xl border px-3 py-3 text-center text-[10px] font-black ${
-                    setup?.status === "READY"
-                      ? "border-emerald-300/25 bg-emerald-500/15 text-emerald-200"
-                      : setup?.status === "WAITING"
-                        ? "border-amber-300/25 bg-amber-500/10 text-amber-200"
-                        : "border-rose-300/25 bg-rose-500/10 text-rose-200"
-                  }`}
-                >
-                  {setupStatusLabel}
-                </div>
+              <div
+                className={`mt-auto rounded-xl border px-3 py-3 text-center text-[10px] font-black ${
+                  setup?.status === "READY"
+                    ? "border-emerald-300/25 bg-emerald-500/15 text-emerald-200"
+                    : setup?.status === "WAITING"
+                      ? "border-amber-300/25 bg-amber-500/10 text-amber-200"
+                      : "border-rose-300/25 bg-rose-500/10 text-rose-200"
+                }`}
+              >
+                {setupStatusLabel}
               </div>
             </div>
           </div>
         </div>
+
+      {/* =========================================================
+          TECHNICAL ANALYSIS — CLOSED SETUPS
+          Osobna tabela tylko dla setupów z Technical Analysis.
+          READY -> monitoring -> TP1 / SL -> tabela + SETUP LOG XLSX
+      ========================================================== */}
+      <div id="closed-setups" className="xl:col-span-2 overflow-hidden rounded-[18px] border border-slate-300/25 bg-[linear-gradient(135deg,rgba(100,116,139,.76),rgba(51,65,85,.84))] backdrop-blur-md shadow-[0_0_28px_rgba(34,211,238,.08)]">
+        <div className="flex flex-col gap-3 border-b border-cyan-300/10 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <div className="text-[9px] font-black uppercase tracking-[.22em] text-cyan-300/70">
+              TECHNICAL ANALYSIS
+            </div>
+            <h3 className="mt-1 text-[17px] font-black text-white">Closed Setups</h3>
+            <p className="mt-1 text-[10px] text-sky-100/45">
+              Zakończone setupy Technical Analysis — TP1 albo SL.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="min-w-[105px] rounded-xl border border-slate-300/20 bg-slate-400/10 px-3 py-2 text-center">
+              <div className="text-[8px] font-bold uppercase tracking-wider text-sky-100/40">Wszystkie</div>
+              <div className="mt-1 text-[17px] font-black text-white">{closedSetupStats.total}</div>
+            </div>
+
+            <div className="min-w-[105px] rounded-xl border border-emerald-300/15 bg-emerald-500/[0.06] px-3 py-2 text-center">
+              <div className="text-[8px] font-bold uppercase tracking-wider text-emerald-100/50">TP1</div>
+              <div className="mt-1 text-[17px] font-black text-emerald-300">{closedSetupStats.tp1}</div>
+            </div>
+
+            <div className="min-w-[105px] rounded-xl border border-rose-300/15 bg-rose-500/[0.06] px-3 py-2 text-center">
+              <div className="text-[8px] font-bold uppercase tracking-wider text-rose-100/50">SL</div>
+              <div className="mt-1 text-[17px] font-black text-rose-300">{closedSetupStats.sl}</div>
+            </div>
+
+            <div className="min-w-[115px] rounded-xl border border-cyan-300/15 bg-cyan-500/[0.06] px-3 py-2 text-center">
+              <div className="text-[8px] font-bold uppercase tracking-wider text-cyan-100/50">Skuteczność</div>
+              <div className={`mt-1 text-[17px] font-black ${
+                closedSetupStats.winRate >= 50 ? "text-emerald-300" : "text-amber-300"
+              }`}>
+                {closedSetupStats.total ? `${closedSetupStats.winRate.toFixed(1)}%` : "0.0%"}
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={exportTradeLog}
+            disabled={!tradeLog.length}
+            className="shrink-0 rounded-xl border border-blue-400/50 bg-blue-600 px-5 py-3 text-[10px] font-black uppercase tracking-[.08em] text-white shadow-[0_0_20px_rgba(37,99,235,.22)] transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-45"
+            title={tradeLog.length ? "Eksportuj zakończone setupy do XLSX" : "Brak zakończonych setupów do eksportu"}
+          >
+            ↓ SETUP LOG ({tradeLog.length})
+          </button>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[1080px] border-collapse text-left">
+            <thead>
+              <tr className="border-b border-cyan-300/10 bg-slate-700/70 text-[9px] uppercase tracking-wider text-sky-100/40">
+                <th className="px-4 py-3 font-bold">Data</th>
+                <th className="px-3 py-3 font-bold">Instrument</th>
+                <th className="px-3 py-3 font-bold">TF</th>
+                <th className="px-3 py-3 font-bold">Kierunek</th>
+                <th className="px-3 py-3 text-right font-bold">Entry</th>
+                <th className="px-3 py-3 text-right font-bold">TP1</th>
+                <th className="px-3 py-3 text-right font-bold">TP2</th>
+                <th className="px-3 py-3 text-right font-bold">TP3</th>
+                <th className="px-3 py-3 text-right font-bold">SL</th>
+                <th className="px-4 py-3 text-center font-bold">Wynik</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {tradeLog.length === 0 ? (
+                <tr>
+                  <td colSpan={10} className="px-4 py-10 text-center text-[11px] text-sky-100/35">
+                    Brak zakończonych setupów. Gdy setup Technical Analysis będzie READY i zakończy się na TP1 albo SL,
+                    automatycznie pojawi się w tej tabeli.
+                  </td>
+                </tr>
+              ) : (
+                tradeLog.map((row, index) => (
+                  <tr
+                    key={`${row.id}-${row.closedAt}-${index}`}
+                    className="border-b border-slate-300/10 text-[10px] text-sky-50/80 transition hover:bg-cyan-400/[0.035]"
+                  >
+                    <td className="whitespace-nowrap px-4 py-3 text-sky-100/55">
+                      {row.closedAt.replace("T", " ").slice(0, 16)}
+                    </td>
+                    <td className="px-3 py-3 font-black text-white">{row.symbol}</td>
+                    <td className="px-3 py-3">
+                      <span className="rounded-md border border-slate-300/20 bg-slate-300/10 px-2 py-1 font-bold text-sky-100/70">
+                        {row.timeframe}
+                      </span>
+                    </td>
+                    <td className={`px-3 py-3 font-black ${
+                      row.side === "BUY" ? "text-emerald-300" : "text-rose-300"
+                    }`}>
+                      {row.side}
+                    </td>
+                    <td className="px-3 py-3 text-right font-semibold">{fmt(row.entry, row.symbol)}</td>
+                    <td className="px-3 py-3 text-right font-semibold text-emerald-300">{fmt(row.tp1, row.symbol)}</td>
+                    <td className="px-3 py-3 text-right font-semibold text-emerald-300/80">{fmt(row.tp2, row.symbol)}</td>
+                    <td className="px-3 py-3 text-right font-semibold text-emerald-300/70">{fmt(row.tp3, row.symbol)}</td>
+                    <td className="px-3 py-3 text-right font-semibold text-rose-300">{fmt(row.sl, row.symbol)}</td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={`inline-flex min-w-[58px] justify-center rounded-full border px-2.5 py-1 text-[9px] font-black ${
+                        row.result === "TP1"
+                          ? "border-emerald-300/20 bg-emerald-500/10 text-emerald-300"
+                          : "border-rose-300/20 bg-rose-500/10 text-rose-300"
+                      }`}>
+                        {row.result}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="flex items-center justify-between border-t border-cyan-300/10 px-4 py-3">
+          <div className="text-[9px] text-sky-100/35">
+            Aktywne setupy: <b className="text-cyan-200">{activeTrades.length}</b>
+          </div>
+          <div className="text-[9px] text-sky-100/30">
+            READY → ENTRY → TP1 / SL → CLOSED SETUPS
+          </div>
+        </div>
+      </div>
       </div>
     </div>
   );
