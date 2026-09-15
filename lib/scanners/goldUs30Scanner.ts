@@ -224,6 +224,56 @@ function getHighLow(
 }
 
 // ======================================================
+// TIMEZONE NORMALIZATION
+// ======================================================
+
+const NEW_YORK_TIME_FORMATTER = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/New_York",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hourCycle: "h23",
+});
+
+function utcDatetimeToNewYork(datetime: string): string {
+  const raw = datetime.trim();
+
+  if (!raw) {
+    return datetime;
+  }
+
+  // US30 Candle Engine stores/returns UTC buckets. A timestamp without
+  // an explicit offset (e.g. 2026-09-15 23:22:00) is therefore UTC.
+  const isoBase = raw.includes("T") ? raw : raw.replace(" ", "T");
+  const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(isoBase);
+  const parsed = new Date(hasTimezone ? isoBase : `${isoBase}Z`);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return datetime;
+  }
+
+  const parts = NEW_YORK_TIME_FORMATTER.formatToParts(parsed);
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? "";
+
+  return `${get("year")}-${get("month")}-${get("day")} ${get("hour")}:${get("minute")}:${get("second")}`;
+}
+
+function normalizeScannerDatetime(
+  datetime: string,
+  symbol: ScannerSymbol,
+): string {
+  // XAUUSD from Twelve Data is already requested in America/New_York.
+  // Only US30 from our Live-Rates candle engine needs UTC -> New York.
+  return symbol === "US30"
+    ? utcDatetimeToNewYork(datetime)
+    : datetime;
+}
+
+// ======================================================
 // ATR
 // ======================================================
 
@@ -1004,6 +1054,7 @@ export function scanGoldUs30({
       .map((c) => ({
         ...c,
 
+        datetime: normalizeScannerDatetime(c.datetime, symbol),
         open: safeNumber(c.open),
         high: safeNumber(c.high),
         low: safeNumber(c.low),
@@ -1022,6 +1073,7 @@ export function scanGoldUs30({
       .map((c) => ({
         ...c,
 
+        datetime: normalizeScannerDatetime(c.datetime, symbol),
         open: safeNumber(c.open),
         high: safeNumber(c.high),
         low: safeNumber(c.low),
