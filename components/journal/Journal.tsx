@@ -29,10 +29,45 @@ type TradingPlan = {
 };
 
 const PLAN_KEY = "fxtrader_active_plan";
+const PROFIT_CALENDAR_KEY = "fxtrade_trade_store";
+
+type ProfitCalendarTrade = {
+  id: string;
+  result: number;
+  date: string;
+};
+
+function localDateKey(value: string | Date) {
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function readProfitCalendarTrades(): ProfitCalendarTrade[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(PROFIT_CALENDAR_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (trade): trade is ProfitCalendarTrade =>
+        trade &&
+        typeof trade.date === "string" &&
+        typeof trade.result === "number"
+    );
+  } catch {
+    return [];
+  }
+}
 
 export default function Journal() {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [activeTab, setActiveTab] = useState<"config" | "active">("config");
+  const [profitTrades, setProfitTrades] = useState<ProfitCalendarTrade[]>([]);
+  const [todayKey, setTodayKey] = useState(() => localDateKey(new Date()));
 
   const [plan, setPlan] = useState<TradingPlan>({
     accountBalance: 1000,
@@ -57,6 +92,24 @@ export default function Journal() {
     }
   }, []);
 
+  useEffect(() => {
+    const syncProfitCalendar = () => {
+      setProfitTrades(readProfitCalendarTrades());
+      setTodayKey(localDateKey(new Date()));
+    };
+
+    syncProfitCalendar();
+    window.addEventListener("storage", syncProfitCalendar);
+    window.addEventListener("focus", syncProfitCalendar);
+    const timer = window.setInterval(syncProfitCalendar, 30_000);
+
+    return () => {
+      window.removeEventListener("storage", syncProfitCalendar);
+      window.removeEventListener("focus", syncProfitCalendar);
+      window.clearInterval(timer);
+    };
+  }, []);
+
   const calculations = useMemo(() => {
     const monthlyTarget =
       plan.accountBalance * (plan.monthlyGoalPercent / 100);
@@ -78,6 +131,67 @@ export default function Journal() {
       requiredR,
     };
   }, [plan]);
+
+  const progress = useMemo(() => {
+    const todayTrades = profitTrades.filter(
+      (trade) => localDateKey(trade.date) === todayKey
+    );
+    const todayPnl = todayTrades.reduce((sum, trade) => sum + trade.result, 0);
+
+    const start = new Date(`${plan.startDate}T00:00:00`);
+    const end = new Date(`${plan.endDate}T23:59:59`);
+    const planTrades = profitTrades.filter((trade) => {
+      const date = new Date(trade.date);
+      return !Number.isNaN(date.getTime()) && date >= start && date <= end;
+    });
+    const totalPnl = planTrades.reduce((sum, trade) => sum + trade.result, 0);
+    const progressPercent = plan.accountBalance > 0
+      ? (totalPnl / plan.accountBalance) * 100
+      : 0;
+    const remainingUsd = Math.max(0, calculations.monthlyTarget - totalPnl);
+    const remainingPercent = plan.accountBalance > 0
+      ? (remainingUsd / plan.accountBalance) * 100
+      : 0;
+    const dailyRemaining = Math.max(0, calculations.dailyTarget - todayPnl);
+    const dailyProgress = calculations.dailyTarget > 0
+      ? Math.max(0, Math.min(100, (todayPnl / calculations.dailyTarget) * 100))
+      : 0;
+
+    const activeDays = new Set(
+      planTrades.map((trade) => localDateKey(trade.date)).filter(Boolean)
+    );
+    const profitableDays = [...activeDays].filter((day) =>
+      planTrades
+        .filter((trade) => localDateKey(trade.date) === day)
+        .reduce((sum, trade) => sum + trade.result, 0) > 0
+    ).length;
+    const consistency = activeDays.size > 0
+      ? (profitableDays / activeDays.size) * 100
+      : 0;
+
+    const now = new Date();
+    let daysLeft = 0;
+    const cursor = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const planEnd = new Date(`${plan.endDate}T23:59:59`);
+    while (cursor <= planEnd) {
+      const day = cursor.getDay();
+      if (plan.includeWeekends || (day !== 0 && day !== 6)) daysLeft += 1;
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    return {
+      todayPnl,
+      tradesToday: todayTrades.length,
+      totalPnl,
+      progressPercent,
+      remainingUsd,
+      remainingPercent,
+      dailyRemaining,
+      dailyProgress,
+      consistency,
+      daysLeft: Math.min(plan.tradingDays, daysLeft),
+    };
+  }, [profitTrades, todayKey, plan, calculations]);
 
   const startPlan = () => {
     localStorage.setItem(PLAN_KEY, JSON.stringify(plan));
@@ -228,15 +342,20 @@ export default function Journal() {
                   sub={`${calculations.monthlyTarget.toFixed(2)} USD`}
                   green
                 />
-                <StatCard label="Current Progress" value="+0.00%" sub="0.00 USD" green />
+                <StatCard
+                  label="Current Progress"
+                  value={`${progress.progressPercent >= 0 ? "+" : ""}${progress.progressPercent.toFixed(2)}%`}
+                  sub={`${progress.totalPnl >= 0 ? "+" : ""}${progress.totalPnl.toFixed(2)} USD`}
+                  green={progress.totalPnl >= 0}
+                />
                 <StatCard
                   label="Remaining"
-                  value={`${plan.monthlyGoalPercent}%`}
-                  sub={`${calculations.monthlyTarget.toFixed(2)} USD`}
+                  value={`${progress.remainingPercent.toFixed(2)}%`}
+                  sub={`${progress.remainingUsd.toFixed(2)} USD`}
                   blue
                 />
-                <StatCard label="Days Left" value={String(plan.tradingDays)} sub="trading days" />
-                <StatCard label="Consistency" value="0%" sub="Start tracking" />
+                <StatCard label="Days Left" value={String(progress.daysLeft)} sub="trading days" />
+                <StatCard label="Consistency" value={`${progress.consistency.toFixed(0)}%`} sub={progress.tradesToday ? "Tracking live" : "No trades today"} />
               </div>
 
               <div className="grid grid-cols-1 gap-4 sm:gap-5 lg:grid-cols-3">
@@ -280,18 +399,23 @@ export default function Journal() {
                     </div>
                     <div>
                       <div className="text-white/45">Current P&L</div>
-                      <div className="mt-1 text-emerald-300">0.00 USD</div>
+                      <div className={`mt-1 ${progress.todayPnl >= 0 ? "text-emerald-300" : "text-red-400"}`}>
+                        {progress.todayPnl >= 0 ? "+" : ""}{progress.todayPnl.toFixed(2)} USD
+                      </div>
                     </div>
                     <div>
                       <div className="text-white/45">Remaining</div>
                       <div className="mt-1 text-blue-400">
-                        {calculations.dailyTarget.toFixed(2)} USD
+                        {progress.dailyRemaining.toFixed(2)} USD
                       </div>
                     </div>
                   </div>
 
-                  <div className="mt-6 h-3 rounded-full bg-white/10">
-                    <div className="h-3 w-[4%] rounded-full bg-emerald-400" />
+                  <div className="mt-6 h-3 overflow-hidden rounded-full bg-white/10">
+                    <div
+                      className="h-3 rounded-full bg-emerald-400 transition-[width] duration-500"
+                      style={{ width: `${progress.dailyProgress}%` }}
+                    />
                   </div>
 
                   <div className="mt-6 rounded-xl border border-white/10 bg-[#091424] p-4">
@@ -300,7 +424,7 @@ export default function Journal() {
                       <span>Max Trades</span>
                     </div>
                     <div className="mt-2 flex justify-between text-2xl font-semibold">
-                      <span>0 / {plan.maxTradesPerDay}</span>
+                      <span>{progress.tradesToday} / {plan.maxTradesPerDay}</span>
                       <span>{plan.maxTradesPerDay}</span>
                     </div>
                   </div>
