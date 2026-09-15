@@ -523,23 +523,22 @@ async function fetchTwelveDataCandles(
   pair: string,
   timeframe: Timeframe
 ): Promise<Candle[]> {
-  const apiKey = process.env.NEXT_PUBLIC_TWELVE_DATA_API_KEY;
-
-  if (!apiKey) {
-    throw new Error("Brak NEXT_PUBLIC_TWELVE_DATA_API_KEY w .env.local");
-  }
-
   const interval =
     timeframe === "4h" ? "4h" : timeframe === "1d" ? "1day" : "1week";
 
-  const url = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(
-    pair
-  )}&interval=${interval}&outputsize=240&apikey=${apiKey}`;
+  const params = new URLSearchParams({
+    symbol: pair,
+    interval,
+    outputsize: "240",
+    order: "desc",
+  });
 
-  const response = await fetch(url, { cache: "no-store" });
+  const response = await fetch(`/api/twelve-data?${params.toString()}`, {
+    cache: "no-store",
+  });
   const json = await response.json();
 
-  if (!response.ok || json.status === "error" || !json.values) {
+  if (!response.ok || json.status === "error" || !Array.isArray(json.values)) {
     throw new Error(json.message || "Nie udało się pobrać danych z Twelve Data");
   }
 

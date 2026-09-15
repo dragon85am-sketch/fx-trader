@@ -21,7 +21,41 @@ type Candle = {
   volume?: number;
 };
 
-const ALLOWED_INTERVALS = ["1min", "5min"];
+const ALLOWED_INTERVALS = ["1min", "5min", "15min", "30min", "1h"];
+
+type GoldCacheEntry = { data: any; expiresAt: number; staleUntil: number };
+type GoldGlobal = typeof globalThis & {
+  fxGoldCandleCache?: Map<string, GoldCacheEntry>;
+  fxGoldCandleInflight?: Map<string, Promise<any>>;
+};
+
+const goldGlobal = globalThis as GoldGlobal;
+const goldCache = goldGlobal.fxGoldCandleCache ?? new Map<string, GoldCacheEntry>();
+const goldInflight = goldGlobal.fxGoldCandleInflight ?? new Map<string, Promise<any>>();
+goldGlobal.fxGoldCandleCache = goldCache;
+goldGlobal.fxGoldCandleInflight = goldInflight;
+
+function goldCacheTtl(interval: string) {
+  switch (interval) {
+    case "1min": return 60_000;
+    case "5min": return 5 * 60_000;
+    case "15min": return 10 * 60_000;
+    case "30min": return 15 * 60_000;
+    case "1h": return 30 * 60_000;
+    default: return 5 * 60_000;
+  }
+}
+
+function goldStaleTtl(interval: string) {
+  switch (interval) {
+    case "1min": return 15 * 60_000;
+    case "5min": return 60 * 60_000;
+    case "15min":
+    case "30min": return 2 * 60 * 60_000;
+    case "1h": return 6 * 60 * 60_000;
+    default: return 60 * 60_000;
+  }
+}
 
 function parseTime(datetime: string) {
   if (!datetime) return null;
@@ -284,12 +318,14 @@ export async function GET(
       searchParams.get("interval") ||
       "1min";
 
-    const interval =
-      ALLOWED_INTERVALS.includes(
-        requestedInterval
-      )
-        ? requestedInterval
-        : "1min";
+    if (!ALLOWED_INTERVALS.includes(requestedInterval)) {
+      return NextResponse.json(
+        { ok: false, error: `Nieobsługiwany timeframe: ${requestedInterval}` },
+        { status: 400 }
+      );
+    }
+
+    const interval = requestedInterval;
 
     const outputsizeRaw =
       searchParams.get("outputsize") ||
@@ -332,48 +368,74 @@ export async function GET(
     const url =
       `https://api.twelvedata.com/time_series?${params.toString()}`;
 
-    const response =
-      await fetch(url, {
-        cache: "no-store",
-        headers: {
-          Accept:
-            "application/json",
-        },
-      });
+    const cacheKey = `${apiSymbol}|${interval}|${outputsize}`;
+    const now = Date.now();
+    const cached = goldCache.get(cacheKey);
 
-    const data =
-      await response.json();
+    let data: any;
+    let cacheStatus = "MISS";
 
-    if (
-      !response.ok ||
-      data?.status === "error"
-    ) {
-      console.error(
-        "Twelve Data error:",
-        data
-      );
+    if (cached && cached.expiresAt > now) {
+      data = cached.data;
+      cacheStatus = "HIT";
+    } else {
+      let pending = goldInflight.get(cacheKey);
 
-      return NextResponse.json(
-        {
-          ok: false,
+      if (!pending) {
+        pending = (async () => {
+          const response = await fetch(url, {
+            cache: "no-store",
+            headers: { Accept: "application/json" },
+            signal: AbortSignal.timeout(15_000),
+          });
 
-          symbol,
+          const raw = await response.text();
+          let payload: any;
+          try {
+            payload = JSON.parse(raw);
+          } catch {
+            throw new Error("Twelve Data zwróciło nieprawidłowy JSON");
+          }
 
-          apiSymbol,
+          if (!response.ok || payload?.status === "error" || payload?.code) {
+            throw new Error(payload?.message || `Twelve Data HTTP ${response.status}`);
+          }
 
-          interval,
+          const ttl = goldCacheTtl(interval);
+          goldCache.set(cacheKey, {
+            data: payload,
+            expiresAt: Date.now() + ttl,
+            staleUntil: Date.now() + ttl + goldStaleTtl(interval),
+          });
+          return payload;
+        })();
+        goldInflight.set(cacheKey, pending);
+      } else {
+        cacheStatus = "IN-FLIGHT";
+      }
 
-          error:
-            data?.message ||
-            "Błąd Twelve Data",
-
-          code:
-            data?.code ?? null,
-        },
-        {
-          status: 500,
+      try {
+        data = await pending;
+      } catch (error) {
+        const fallback = goldCache.get(cacheKey);
+        if (fallback && fallback.staleUntil > Date.now()) {
+          data = fallback.data;
+          cacheStatus = "STALE";
+        } else {
+          return NextResponse.json(
+            {
+              ok: false,
+              symbol,
+              apiSymbol,
+              interval,
+              error: error instanceof Error ? error.message : "Błąd Twelve Data",
+            },
+            { status: 500 }
+          );
         }
-      );
+      } finally {
+        goldInflight.delete(cacheKey);
+      }
     }
 
     if (!Array.isArray(data?.values)) {
@@ -565,6 +627,7 @@ export async function GET(
         headers: {
           "Cache-Control":
             "no-store, no-cache, must-revalidate",
+          "X-Gold-Cache": cacheStatus,
         },
       }
     );

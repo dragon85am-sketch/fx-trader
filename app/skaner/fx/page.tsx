@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import type { DrawTool } from "@/components/DrawingsLayer";
 import React from "react";
@@ -1425,9 +1425,9 @@ async function fetchTwelveCandles(symbol: string, tf: Timeframe): Promise<{ cand
   const interval = TWELVE_INTERVAL[tf];
   const tdSymbol = toTwelveSymbol(symbol);
 
-  const url = `/api/twelve?path=/time_series&symbol=${encodeURIComponent(tdSymbol)}&interval=${encodeURIComponent(
+  const url = `/api/twelve-data?symbol=${encodeURIComponent(tdSymbol)}&interval=${encodeURIComponent(
     interval
-  )}&outputsize=220&format=JSON`;
+  )}&outputsize=220&order=desc`;
 
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error(await res.text());
@@ -1663,9 +1663,9 @@ async function fetchPocCandles(
   const tdSymbol = toTwelveSymbol(symbol);
   const interval = POC_INTERVAL[tf];
 
-  const url = `/api/twelve?path=/time_series&symbol=${encodeURIComponent(
+  const url = `/api/twelve-data?symbol=${encodeURIComponent(
     tdSymbol
-  )}&interval=${encodeURIComponent(interval)}&outputsize=220&format=JSON`;
+  )}&interval=${encodeURIComponent(interval)}&outputsize=220&order=desc`;
 
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error(`POC Twelve Data error: ${symbol} ${tf}`);

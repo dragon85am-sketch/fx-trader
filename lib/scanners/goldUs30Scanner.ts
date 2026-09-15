@@ -1029,8 +1029,8 @@ export function scanGoldUs30({
       }));
 
   if (
-    cleanM1.length < 30 ||
-    cleanM5.length < 12
+    cleanM1.length < 60 ||
+    cleanM5.length < 50
   ){
 return {
       symbol,
@@ -1065,7 +1065,7 @@ return {
       rr: 0,
 
       reasons: [
-        "Not enough M1 or M5 candles",
+        `WARMUP: M1 ${cleanM1.length}/60, M5 ${cleanM5.length}/50`,
       ],
     };
   }

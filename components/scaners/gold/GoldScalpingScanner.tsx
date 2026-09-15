@@ -627,6 +627,23 @@ export default function GoldScalpingScanner() {
       setM30(candlesM30);
       setH1(candlesH1);
 
+      const warmupMissing = [
+        candlesM1.length < 220 ? `M1 ${candlesM1.length}/220` : null,
+        candlesM5.length < 220 ? `M5 ${candlesM5.length}/220` : null,
+        candlesM15.length < 60 ? `M15 ${candlesM15.length}/60` : null,
+        candlesM30.length < 60 ? `M30 ${candlesM30.length}/60` : null,
+        candlesH1.length < 60 ? `H1 ${candlesH1.length}/60` : null,
+      ].filter(Boolean);
+
+      if (warmupMissing.length > 0) {
+        setResult({
+          ...emptyResult,
+          reasons: [`WARMUP: ${warmupMissing.join(", ")}`],
+        });
+        setLastScan(new Date());
+        return;
+      }
+
       const scanner = scanGoldScalping({
         m1: candlesM1,
         m5: candlesM5,
@@ -654,7 +671,7 @@ export default function GoldScalpingScanner() {
   useEffect(() => {
     scan();
 
-    const timer = setInterval(scan, 30_000);
+    const timer = setInterval(scan, 5 * 60_000);
 
     return () => clearInterval(timer);
   }, []);

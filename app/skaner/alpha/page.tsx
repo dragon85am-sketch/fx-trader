@@ -685,6 +685,16 @@ export default function AlphaScannerPage() {
   };
 
   const liveLevels = React.useMemo(() => {
+    if (selected.status === "WARMUP") {
+      return {
+        entry: Number.NaN,
+        sl: Number.NaN,
+        tp1: Number.NaN,
+        tp2: Number.NaN,
+        rr: "—",
+      };
+    }
+
     const fallback = {
       entry: Number(selected.entry),
       sl: Number(selected.sl),
@@ -738,8 +748,8 @@ export default function AlphaScannerPage() {
   };
 
   const ready = liveSetups.filter((x) => x.status === "READY").length;
-  const buys = liveSetups.filter((x) => x.direction === "BUY").length;
-  const sells = liveSetups.filter((x) => x.direction === "SELL").length;
+  const buys = liveSetups.filter((x) => x.status !== "WARMUP" && x.direction === "BUY").length;
+  const sells = liveSetups.filter((x) => x.status !== "WARMUP" && x.direction === "SELL").length;
   const avg = Math.round(
     liveSetups.reduce((sum, x) => sum + x.confidence, 0) / Math.max(1, liveSetups.length)
   );

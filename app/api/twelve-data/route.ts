@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,21 +12,61 @@ const ALLOWED_INTERVALS = new Set([
   "1h",
   "4h",
   "1day",
+  "1week",
 ]);
 
 const ALLOWED_SYMBOLS = new Set([
   "XAU/USD",
+  "XAG/USD",
   "EUR/USD",
   "GBP/USD",
-  "GBP/CHF",
   "USD/JPY",
-  "USD/CAD",
+  "USD/CHF",
   "AUD/USD",
+  "USD/CAD",
+  "NZD/USD",
+  "EUR/JPY",
   "EUR/GBP",
+  "EUR/CHF",
+  "EUR/AUD",
+  "EUR/CAD",
+  "EUR/NZD",
+  "GBP/JPY",
+  "GBP/CHF",
+  "GBP/AUD",
+  "GBP/CAD",
+  "GBP/NZD",
+  "AUD/JPY",
+  "AUD/NZD",
+  "AUD/CAD",
+  "AUD/CHF",
+  "CAD/JPY",
+  "CAD/CHF",
+  "CHF/JPY",
+  "NZD/JPY",
+  "NZD/CAD",
+  "NZD/CHF",
   "DJI",
   "BTC/USD",
   "ETH/USD",
   "SOL/USD",
+  "XRP/USD",
+  "BNB/USD",
+  "ADA/USD",
+  "DOGE/USD",
+  "AVAX/USD",
+  "DOT/USD",
+  "LINK/USD",
+  "LTC/USD",
+  "BCH/USD",
+  "TRX/USD",
+  "MATIC/USD",
+  "UNI/USD",
+  "ATOM/USD",
+  "ETC/USD",
+  "APT/USD",
+  "ARB/USD",
+  "OP/USD",
 ]);
 
 type CacheEntry = {
@@ -87,6 +127,9 @@ function getCacheTtl(interval: string) {
     case "1day":
       return 4 * 60 * 60_000;
 
+    case "1week":
+      return 12 * 60 * 60_000;
+
     default:
       return 5 * 60_000;
   }
@@ -113,6 +156,7 @@ function getStaleTtl(interval: string) {
 
     case "4h":
     case "1day":
+    case "1week":
       return 24 * 60 * 60_000;
 
     default:

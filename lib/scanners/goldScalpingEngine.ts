@@ -470,13 +470,13 @@ export function scanGoldScalping({
   };
 
   if (
-    m1.length < 30 ||
-    m5.length < 50
+    m1.length < 220 ||
+    m5.length < 220
   ) {
     return {
       ...emptyResult,
       reasons: [
-        "Za mało świec do analizy",
+        `WARMUP: M1 ${m1.length}/220, M5 ${m5.length}/220`,
       ],
     };
   }

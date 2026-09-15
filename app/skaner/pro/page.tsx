@@ -1037,18 +1037,18 @@ export default function ProScanner() {
             );
 
           if (
-            m1.length < 30
+            m1.length < 60
           ) {
             throw new Error(
-              `${symbol}: za mało świec M1`,
+              `${symbol}: WARMUP M1 ${m1.length}/60 świec`,
             );
           }
 
           if (
-            m5.length < 12
+            m5.length < 50
           ) {
             throw new Error(
-              `${symbol}: za mało świec M5`,
+              `${symbol}: WARMUP M5 ${m5.length}/50 świec`,
             );
           }
 
