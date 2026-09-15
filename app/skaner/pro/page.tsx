@@ -433,8 +433,8 @@ function ConfirmationCard({
     <div
       className={`rounded-[18px] border p-4 transition ${
         active
-          ? "border-emerald-400/25 bg-[linear-gradient(145deg,#0a3658,#08314d)]"
-          : "border-sky-300/15 bg-[linear-gradient(145deg,#0b315f,#08284f)]"
+          ? "border-emerald-400/25 bg-[linear-gradient(145deg,#222a34,#1d252e)]"
+          : "border-slate-300/15 bg-[linear-gradient(145deg,#1c232c,#1b222b)]"
       }`}
     >
       <div className="flex items-start justify-between gap-3">
@@ -490,7 +490,7 @@ function LevelBox({
   symbol: ScannerSymbol;
 }) {
   return (
-    <div className="rounded-xl border border-slate-300/15 bg-[#0a2a50]/85 px-3 py-3">
+    <div className="rounded-xl border border-slate-300/15 bg-[#202832]/85 px-3 py-3">
       <div className="text-[8px] font-bold uppercase tracking-wider text-sky-200/45">
         {label}
       </div>
@@ -780,12 +780,12 @@ function TechnicalMatrix({ matrix }: { matrix: TechMatrix }) {
   const totalSignal = Math.max(matrix.bullCount, matrix.bearCount);
 
   return (
-    <section className="overflow-hidden rounded-[22px] border border-cyan-400/25 bg-[linear-gradient(145deg,#242930_0%,#181c22_58%,#111419_100%)] shadow-[0_16px_40px_rgba(0,0,0,.28)]">
+    <section className="overflow-hidden rounded-[22px] border border-cyan-400/25 bg-[linear-gradient(145deg,#20262e_0%,#161b22_58%,#0f141a_100%)] shadow-[0_16px_40px_rgba(0,0,0,.28)]">
       <div className="overflow-x-auto">
         <div className="min-w-[680px]">
-          <div className="grid grid-cols-[100px_1.15fr_.9fr_.8fr_.9fr] border-b border-sky-400/20 bg-[#242930] text-center text-[10px] font-black text-sky-100/85">
+          <div className="grid grid-cols-[100px_1.15fr_.9fr_.8fr_.9fr] border-b border-slate-300/20 bg-[#20262e] text-center text-[10px] font-black text-sky-100/85">
             {["TF", "STATE", "WT1", "MFI", "SIGNAL"].map((label) => (
-              <div key={label} className="border-r border-sky-400/15 px-3 py-3 last:border-r-0">
+              <div key={label} className="border-r border-slate-300/15 px-3 py-3 last:border-r-0">
                 {label}
               </div>
             ))}
@@ -848,17 +848,17 @@ function TechnicalMatrix({ matrix }: { matrix: TechMatrix }) {
             );
           })}
 
-          <div className="grid grid-cols-[100px_1.15fr_.9fr_.8fr_.9fr] bg-[#08203b] text-center">
-            <div className="border-r border-sky-400/15 px-3 py-3 text-[11px] font-black">
+          <div className="grid grid-cols-[100px_1.15fr_.9fr_.8fr_.9fr] bg-[#171d24] text-center">
+            <div className="border-r border-slate-300/15 px-3 py-3 text-[11px] font-black">
               TOTAL
             </div>
-            <div className="border-r border-sky-400/15 px-3 py-3 text-[11px] font-black">
+            <div className="border-r border-slate-300/15 px-3 py-3 text-[11px] font-black">
               <span className="text-emerald-300">{matrix.bullCount}B</span>
               <span className="text-slate-400"> / </span>
               <span className="text-rose-300">{matrix.bearCount}R</span>
             </div>
-            <div className="border-r border-sky-400/15 px-3 py-3 text-slate-500">—</div>
-            <div className="flex items-center justify-center border-r border-sky-400/15 px-3 py-3">
+            <div className="border-r border-slate-300/15 px-3 py-3 text-slate-500">—</div>
+            <div className="flex items-center justify-center border-r border-slate-300/15 px-3 py-3">
               <MatrixLight value={matrix.bullCount >= matrix.bearCount ? 60 : 40} />
             </div>
             <div className="px-3 py-3 text-[12px] font-black text-white">{totalSignal}/4</div>
@@ -866,8 +866,8 @@ function TechnicalMatrix({ matrix }: { matrix: TechMatrix }) {
         </div>
       </div>
 
-      <div className="grid gap-px border-t border-sky-400/20 bg-sky-400/10 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="bg-[#171b20] p-4">
+      <div className="grid gap-px border-t border-slate-300/20 bg-sky-400/10 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="bg-[#141a21] p-4">
           <div className="flex items-center gap-2 text-[9px] font-black text-sky-100/65">
             <TrendingUp className="h-4 w-4 text-sky-300" />
             ADX
@@ -882,7 +882,7 @@ function TechnicalMatrix({ matrix }: { matrix: TechMatrix }) {
           </div>
         </div>
 
-        <div className="bg-[#171b20] p-4">
+        <div className="bg-[#141a21] p-4">
           <div className="flex items-center gap-2 text-[9px] font-black text-sky-100/65">
             <BarChart3 className="h-4 w-4 text-cyan-300" />
             EMA 50 / 200
@@ -901,7 +901,7 @@ function TechnicalMatrix({ matrix }: { matrix: TechMatrix }) {
           </div>
         </div>
 
-        <div className="bg-[#171b20] p-4">
+        <div className="bg-[#141a21] p-4">
           <div className="flex items-center gap-2 text-[9px] font-black text-sky-100/65">
             <Zap className="h-4 w-4 text-cyan-300" />
             MOMENTUM
@@ -922,7 +922,7 @@ function TechnicalMatrix({ matrix }: { matrix: TechMatrix }) {
           </div>
         </div>
 
-        <div className="bg-[#171b20] p-4">
+        <div className="bg-[#141a21] p-4">
           <div className="flex items-center gap-2 text-[9px] font-black text-sky-100/65">
             <Activity className="h-4 w-4 text-sky-300" />
             ATR (14)
@@ -970,11 +970,12 @@ export default function ProScanner() {
     React.useState(false);
 
   const scannerRootRef = React.useRef<HTMLElement | null>(null);
+  const chartFullscreenRef = React.useRef<HTMLDivElement | null>(null);
   const [isFullscreen, setIsFullscreen] = React.useState(false);
 
   React.useEffect(() => {
     const onFullscreenChange = () => {
-      setIsFullscreen(document.fullscreenElement === scannerRootRef.current);
+      setIsFullscreen(document.fullscreenElement === chartFullscreenRef.current);
     };
 
     document.addEventListener("fullscreenchange", onFullscreenChange);
@@ -984,7 +985,7 @@ export default function ProScanner() {
   const toggleFullscreen = React.useCallback(async () => {
     try {
       if (!document.fullscreenElement) {
-        await scannerRootRef.current?.requestFullscreen();
+        await chartFullscreenRef.current?.requestFullscreen();
       } else {
         await document.exitFullscreen();
       }
@@ -1207,13 +1208,13 @@ export default function ProScanner() {
   );
 
   return (
-    <main ref={scannerRootRef} className="min-h-screen overflow-y-auto bg-[radial-gradient(circle_at_top,#0a2a52_0%,#061a33_34%,#041225_70%,#030b16_100%)] text-white fullscreen:h-screen fullscreen:w-screen">
+    <main ref={scannerRootRef} className="min-h-screen overflow-y-auto bg-[radial-gradient(circle_at_top,#202832_0%,#151b22_34%,#11161c_70%,#0d1116_100%)] text-white fullscreen:h-screen fullscreen:w-screen">
       <div className="mx-auto max-w-[1760px] px-4 py-5 lg:px-6 xl:px-7">
         {/* ============================================ */}
         {/* HEADER */}
         {/* ============================================ */}
 
-        <header className="mb-5 overflow-hidden rounded-[24px] border border-slate-300/25 bg-[linear-gradient(135deg,#30353d_0%,#242930_55%,#191d23_100%)] shadow-[0_18px_55px_rgba(0,0,0,.30)]">
+        <header className="mb-5 overflow-hidden rounded-[24px] border border-slate-300/25 bg-[linear-gradient(135deg,#2c343e_0%,#20262e_55%,#151a21_100%)] shadow-[0_18px_55px_rgba(0,0,0,.30)]">
           <div className="flex flex-col gap-5 p-5 lg:flex-row lg:items-center lg:justify-between lg:p-6">
             <div className="flex items-center gap-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-[14px] border border-cyan-400/20 bg-cyan-500/10 shadow-[0_0_30px_rgba(34,211,238,.06)]">
@@ -1271,7 +1272,7 @@ export default function ProScanner() {
               <button
                 type="button"
                 onClick={() => void toggleFullscreen()}
-                className="flex h-11 items-center gap-2 rounded-xl border border-cyan-300/20 bg-[#252a31]/95 px-4 text-[10px] font-black text-cyan-100 transition hover:border-cyan-300/40 hover:bg-[#343a43]"
+                className="flex h-11 items-center gap-2 rounded-xl border border-cyan-300/20 bg-[#242a32]/95 px-4 text-[10px] font-black text-cyan-100 transition hover:border-cyan-300/40 hover:bg-[#343c46]"
                 title={isFullscreen ? "Wyjdź z pełnego ekranu" : "Pełny ekran"}
               >
                 {isFullscreen ? (
@@ -1312,8 +1313,8 @@ export default function ProScanner() {
           {/* ========================================== */}
 
           <aside className="space-y-5">
-            <section className="overflow-hidden rounded-[22px] border border-slate-300/20 bg-[linear-gradient(145deg,#252a31_0%,#181c22_100%)] shadow-[0_14px_34px_rgba(0,0,0,.22)]">
-              <div className="flex items-center justify-between border-b border-sky-300/15 px-5 py-4">
+            <section className="overflow-hidden rounded-[22px] border border-slate-300/20 bg-[linear-gradient(145deg,#242a32_0%,#161b22_100%)] shadow-[0_14px_34px_rgba(0,0,0,.22)]">
+              <div className="flex items-center justify-between border-b border-slate-300/15 px-5 py-4">
                 <div>
                   <div className="text-[11px] font-black">
                     SESSION MARKETS
@@ -1368,7 +1369,7 @@ export default function ProScanner() {
                                   market.symbol ===
                                   "XAUUSD"
                                     ? "border-amber-400/15 bg-amber-500/[0.06] text-amber-300"
-                                    : "border-sky-400/15 bg-sky-500/[0.06] text-sky-300"
+                                    : "border-slate-300/15 bg-sky-500/[0.06] text-sky-300"
                                 }`}
                               >
                                 {market.symbol ===
@@ -1458,7 +1459,7 @@ export default function ProScanner() {
 
             {/* SCORING */}
 
-            <section className="rounded-[22px] border border-slate-300/20 bg-[linear-gradient(145deg,#252a31_0%,#181c22_100%)] shadow-[0_14px_34px_rgba(0,0,0,.22)] p-5">
+            <section className="rounded-[22px] border border-slate-300/20 bg-[linear-gradient(145deg,#242a32_0%,#161b22_100%)] shadow-[0_14px_34px_rgba(0,0,0,.22)] p-5">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4 text-cyan-300" />
 
@@ -1499,7 +1500,7 @@ export default function ProScanner() {
                 </div>
               </div>
 
-              <div className="mt-4 border-t border-sky-300/15 pt-4 text-[9px] leading-5 text-sky-200/45">
+              <div className="mt-4 border-t border-slate-300/15 pt-4 text-[9px] leading-5 text-sky-200/45">
                 60+ FORMING · 80+ READY · 90+ A+
               </div>
             </section>
@@ -1512,7 +1513,7 @@ export default function ProScanner() {
           <section className="min-w-0 space-y-5">
             {/* SELECTED MARKET HEADER */}
 
-            <div className="rounded-[22px] border border-slate-300/20 bg-[linear-gradient(145deg,#252a31_0%,#181c22_100%)] shadow-[0_14px_34px_rgba(0,0,0,.22)] p-5">
+            <div className="rounded-[22px] border border-slate-300/20 bg-[linear-gradient(145deg,#242a32_0%,#161b22_100%)] shadow-[0_14px_34px_rgba(0,0,0,.22)] p-5">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-3">
                   <div
@@ -1541,7 +1542,7 @@ export default function ProScanner() {
                         }
                       </h2>
 
-                      <span className="rounded-md border border-slate-300/15 bg-[#252a31]/90 px-2 py-1 text-[8px] font-bold text-sky-100/55">
+                      <span className="rounded-md border border-slate-300/15 bg-[#242a32]/90 px-2 py-1 text-[8px] font-bold text-sky-100/55">
                         M5 → M1
                       </span>
                     </div>
@@ -1554,7 +1555,7 @@ export default function ProScanner() {
 
                 {scanner ? (
                   <div className="flex items-center gap-3">
-                    <div className="rounded-xl border border-slate-300/15 bg-[#252a31]/90 px-4 py-2">
+                    <div className="rounded-xl border border-slate-300/15 bg-[#242a32]/90 px-4 py-2">
                       <div className="text-[8px] font-bold text-sky-200/45">
                         M5 BIAS
                       </div>
@@ -1617,7 +1618,7 @@ export default function ProScanner() {
             {/* LOADING */}
 
             {current.loading ? (
-              <div className="flex h-[620px] items-center justify-center rounded-[22px] border border-slate-300/20 bg-[#171b20] shadow-[0_14px_34px_rgba(2,132,199,.08)]">
+              <div className="flex h-[620px] items-center justify-center rounded-[22px] border border-slate-300/20 bg-[#141a21] shadow-[0_14px_34px_rgba(2,132,199,.08)]">
                 <div className="text-center">
                   <Loader2 className="mx-auto h-6 w-6 animate-spin text-cyan-300" />
 
@@ -1638,6 +1639,10 @@ export default function ProScanner() {
             scanner &&
             current.chartCandles.length >
               0 ? (
+              <div
+                ref={chartFullscreenRef}
+                className="overflow-hidden rounded-[22px] bg-[#0f141a] fullscreen:h-screen fullscreen:w-screen fullscreen:rounded-none fullscreen:p-0"
+              >
               <AlphaPriceChart
                 symbol={
                   selectedSymbol
@@ -1707,8 +1712,13 @@ export default function ProScanner() {
                 chochPrice={
                   scanner.chochPrice
                 }
-                height={620}
+                height={
+                  isFullscreen && typeof window !== "undefined"
+                    ? window.innerHeight
+                    : 620
+                }
               />
+              </div>
             ) : null}
 
             {/* MULTI-TIMEFRAME TECHNICAL MATRIX — BELOW CHART */}
@@ -1787,7 +1797,7 @@ export default function ProScanner() {
               <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_370px]">
                 {/* LEVELS */}
 
-                <div className="rounded-[22px] border border-slate-300/20 bg-[linear-gradient(145deg,#252a31_0%,#181c22_100%)] shadow-[0_14px_34px_rgba(0,0,0,.22)] p-5">
+                <div className="rounded-[22px] border border-slate-300/20 bg-[linear-gradient(145deg,#242a32_0%,#161b22_100%)] shadow-[0_14px_34px_rgba(0,0,0,.22)] p-5">
                   <div className="flex items-center gap-2">
                     <BarChart3 className="h-4 w-4 text-cyan-300" />
 
@@ -1879,7 +1889,7 @@ export default function ProScanner() {
                   </div>
 
                   <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-xl border border-slate-300/15 bg-[#23282f]/90 p-4">
+                    <div className="rounded-xl border border-slate-300/15 bg-[#1d232b]/90 p-4">
                       <div className="text-[8px] font-bold text-sky-200/45">
                         BOS LEVEL
                       </div>
@@ -1892,7 +1902,7 @@ export default function ProScanner() {
                       </div>
                     </div>
 
-                    <div className="rounded-xl border border-slate-300/15 bg-[#23282f]/90 p-4">
+                    <div className="rounded-xl border border-slate-300/15 bg-[#1d232b]/90 p-4">
                       <div className="text-[8px] font-bold text-sky-200/45">
                         CHOCH LEVEL
                       </div>
@@ -1909,7 +1919,7 @@ export default function ProScanner() {
 
                 {/* TRADE PLAN */}
 
-                <div className="rounded-[22px] border border-slate-300/20 bg-[linear-gradient(145deg,#252a31_0%,#181c22_100%)] shadow-[0_14px_34px_rgba(0,0,0,.22)] p-5">
+                <div className="rounded-[22px] border border-slate-300/20 bg-[linear-gradient(145deg,#242a32_0%,#161b22_100%)] shadow-[0_14px_34px_rgba(0,0,0,.22)] p-5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Target className="h-4 w-4 text-emerald-300" />
@@ -1928,7 +1938,7 @@ export default function ProScanner() {
 
                   {scanner.direction ===
                   "WAIT" ? (
-                    <div className="mt-5 rounded-[16px] border border-slate-300/15 bg-[#20252b]/90 p-5 text-center">
+                    <div className="mt-5 rounded-[16px] border border-slate-300/15 bg-[#1b2129]/90 p-5 text-center">
                       <Activity className="mx-auto h-5 w-5 text-sky-200/45" />
 
                       <div className="mt-3 text-[12px] font-black text-sky-100/70">
@@ -1943,7 +1953,7 @@ export default function ProScanner() {
                     </div>
                   ) : (
                     <div className="mt-5 space-y-3">
-                      <div className="flex items-center justify-between rounded-xl border border-slate-300/15 bg-[#23282f]/90 px-3 py-3">
+                      <div className="flex items-center justify-between rounded-xl border border-slate-300/15 bg-[#1d232b]/90 px-3 py-3">
                         <span className="text-[9px] text-sky-100/55">
                           Direction
                         </span>
@@ -2014,7 +2024,7 @@ export default function ProScanner() {
                         </span>
                       </div>
 
-                      <div className="flex items-center justify-between border-t border-sky-300/15 pt-4">
+                      <div className="flex items-center justify-between border-t border-slate-300/15 pt-4">
                         <span className="text-[9px] text-sky-100/55">
                           Risk / Reward
                         </span>
@@ -2036,7 +2046,7 @@ export default function ProScanner() {
 
             {scanner &&
             !current.loading ? (
-              <div className="rounded-[22px] border border-slate-300/20 bg-[linear-gradient(145deg,#252a31_0%,#181c22_100%)] shadow-[0_14px_34px_rgba(0,0,0,.22)] p-5">
+              <div className="rounded-[22px] border border-slate-300/20 bg-[linear-gradient(145deg,#242a32_0%,#161b22_100%)] shadow-[0_14px_34px_rgba(0,0,0,.22)] p-5">
                 <div className="flex items-center justify-between">
                   <div className="text-[11px] font-black">
                     SCANNER ANALYSIS
@@ -2069,7 +2079,7 @@ export default function ProScanner() {
                     ) => (
                       <div
                         key={`${reason}-${index}`}
-                        className="flex items-center gap-3 rounded-xl border border-slate-300/15 bg-[#082342]/85 px-3 py-2.5"
+                        className="flex items-center gap-3 rounded-xl border border-slate-300/15 bg-[#191f27]/85 px-3 py-2.5"
                       >
                         <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-400" />
 
@@ -2088,7 +2098,7 @@ export default function ProScanner() {
             {!current.loading &&
             !scanner &&
             !current.error ? (
-              <div className="flex min-h-[400px] items-center justify-center rounded-[22px] border border-slate-300/20 bg-[linear-gradient(145deg,#252a31_0%,#181c22_100%)] shadow-[0_14px_34px_rgba(0,0,0,.22)]">
+              <div className="flex min-h-[400px] items-center justify-center rounded-[22px] border border-slate-300/20 bg-[linear-gradient(145deg,#242a32_0%,#161b22_100%)] shadow-[0_14px_34px_rgba(0,0,0,.22)]">
                 <div className="text-center">
                   <Crosshair className="mx-auto h-7 w-7 text-sky-200/30" />
 
