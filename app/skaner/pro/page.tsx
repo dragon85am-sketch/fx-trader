@@ -490,7 +490,7 @@ function LevelBox({
   symbol: ScannerSymbol;
 }) {
   return (
-    <div className="rounded-xl border border-sky-300/15 bg-[#0a2a50]/85 px-3 py-3">
+    <div className="rounded-xl border border-slate-300/15 bg-[#0a2a50]/85 px-3 py-3">
       <div className="text-[8px] font-bold uppercase tracking-wider text-sky-200/45">
         {label}
       </div>
@@ -780,10 +780,10 @@ function TechnicalMatrix({ matrix }: { matrix: TechMatrix }) {
   const totalSignal = Math.max(matrix.bullCount, matrix.bearCount);
 
   return (
-    <section className="overflow-hidden rounded-[22px] border border-cyan-400/25 bg-[linear-gradient(145deg,#07192f_0%,#061426_58%,#04101f_100%)] shadow-[0_16px_40px_rgba(2,132,199,.12),0_0_30px_rgba(34,211,238,.08)]">
+    <section className="overflow-hidden rounded-[22px] border border-cyan-400/25 bg-[linear-gradient(145deg,#242930_0%,#181c22_58%,#111419_100%)] shadow-[0_16px_40px_rgba(0,0,0,.28)]">
       <div className="overflow-x-auto">
         <div className="min-w-[680px]">
-          <div className="grid grid-cols-[100px_1.15fr_.9fr_.8fr_.9fr] border-b border-sky-400/20 bg-[#071a31] text-center text-[10px] font-black text-sky-100/85">
+          <div className="grid grid-cols-[100px_1.15fr_.9fr_.8fr_.9fr] border-b border-sky-400/20 bg-[#242930] text-center text-[10px] font-black text-sky-100/85">
             {["TF", "STATE", "WT1", "MFI", "SIGNAL"].map((label) => (
               <div key={label} className="border-r border-sky-400/15 px-3 py-3 last:border-r-0">
                 {label}
@@ -867,7 +867,7 @@ function TechnicalMatrix({ matrix }: { matrix: TechMatrix }) {
       </div>
 
       <div className="grid gap-px border-t border-sky-400/20 bg-sky-400/10 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="bg-[#061426] p-4">
+        <div className="bg-[#171b20] p-4">
           <div className="flex items-center gap-2 text-[9px] font-black text-sky-100/65">
             <TrendingUp className="h-4 w-4 text-sky-300" />
             ADX
@@ -882,7 +882,7 @@ function TechnicalMatrix({ matrix }: { matrix: TechMatrix }) {
           </div>
         </div>
 
-        <div className="bg-[#061426] p-4">
+        <div className="bg-[#171b20] p-4">
           <div className="flex items-center gap-2 text-[9px] font-black text-sky-100/65">
             <BarChart3 className="h-4 w-4 text-cyan-300" />
             EMA 50 / 200
@@ -901,7 +901,7 @@ function TechnicalMatrix({ matrix }: { matrix: TechMatrix }) {
           </div>
         </div>
 
-        <div className="bg-[#061426] p-4">
+        <div className="bg-[#171b20] p-4">
           <div className="flex items-center gap-2 text-[9px] font-black text-sky-100/65">
             <Zap className="h-4 w-4 text-cyan-300" />
             MOMENTUM
@@ -922,7 +922,7 @@ function TechnicalMatrix({ matrix }: { matrix: TechMatrix }) {
           </div>
         </div>
 
-        <div className="bg-[#061426] p-4">
+        <div className="bg-[#171b20] p-4">
           <div className="flex items-center gap-2 text-[9px] font-black text-sky-100/65">
             <Activity className="h-4 w-4 text-sky-300" />
             ATR (14)
@@ -1213,7 +1213,7 @@ export default function ProScanner() {
         {/* HEADER */}
         {/* ============================================ */}
 
-        <header className="mb-5 overflow-hidden rounded-[24px] border border-sky-400/25 bg-[linear-gradient(135deg,#0d3d73_0%,#0b315f_55%,#09284f_100%)] shadow-[0_18px_55px_rgba(2,132,199,.18)]">
+        <header className="mb-5 overflow-hidden rounded-[24px] border border-slate-300/25 bg-[linear-gradient(135deg,#30353d_0%,#242930_55%,#191d23_100%)] shadow-[0_18px_55px_rgba(0,0,0,.30)]">
           <div className="flex flex-col gap-5 p-5 lg:flex-row lg:items-center lg:justify-between lg:p-6">
             <div className="flex items-center gap-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-[14px] border border-cyan-400/20 bg-cyan-500/10 shadow-[0_0_30px_rgba(34,211,238,.06)]">
@@ -1271,7 +1271,7 @@ export default function ProScanner() {
               <button
                 type="button"
                 onClick={() => void toggleFullscreen()}
-                className="flex h-11 items-center gap-2 rounded-xl border border-cyan-300/20 bg-[#0a2f5d]/90 px-4 text-[10px] font-black text-cyan-100 transition hover:border-cyan-300/40 hover:bg-[#0d3d73]"
+                className="flex h-11 items-center gap-2 rounded-xl border border-cyan-300/20 bg-[#252a31]/95 px-4 text-[10px] font-black text-cyan-100 transition hover:border-cyan-300/40 hover:bg-[#343a43]"
                 title={isFullscreen ? "Wyjdź z pełnego ekranu" : "Pełny ekran"}
               >
                 {isFullscreen ? (
@@ -1312,7 +1312,7 @@ export default function ProScanner() {
           {/* ========================================== */}
 
           <aside className="space-y-5">
-            <section className="overflow-hidden rounded-[22px] border border-sky-400/20 bg-[linear-gradient(145deg,#0a2f5d_0%,#08284f_100%)] shadow-[0_14px_34px_rgba(2,132,199,.10)]">
+            <section className="overflow-hidden rounded-[22px] border border-slate-300/20 bg-[linear-gradient(145deg,#252a31_0%,#181c22_100%)] shadow-[0_14px_34px_rgba(0,0,0,.22)]">
               <div className="flex items-center justify-between border-b border-sky-300/15 px-5 py-4">
                 <div>
                   <div className="text-[11px] font-black">
@@ -1458,7 +1458,7 @@ export default function ProScanner() {
 
             {/* SCORING */}
 
-            <section className="rounded-[22px] border border-sky-400/20 bg-[linear-gradient(145deg,#0a2f5d_0%,#08284f_100%)] shadow-[0_14px_34px_rgba(2,132,199,.10)] p-5">
+            <section className="rounded-[22px] border border-slate-300/20 bg-[linear-gradient(145deg,#252a31_0%,#181c22_100%)] shadow-[0_14px_34px_rgba(0,0,0,.22)] p-5">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4 text-cyan-300" />
 
@@ -1512,7 +1512,7 @@ export default function ProScanner() {
           <section className="min-w-0 space-y-5">
             {/* SELECTED MARKET HEADER */}
 
-            <div className="rounded-[22px] border border-sky-400/20 bg-[linear-gradient(145deg,#0a2f5d_0%,#08284f_100%)] shadow-[0_14px_34px_rgba(2,132,199,.10)] p-5">
+            <div className="rounded-[22px] border border-slate-300/20 bg-[linear-gradient(145deg,#252a31_0%,#181c22_100%)] shadow-[0_14px_34px_rgba(0,0,0,.22)] p-5">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-3">
                   <div
@@ -1541,7 +1541,7 @@ export default function ProScanner() {
                         }
                       </h2>
 
-                      <span className="rounded-md border border-sky-300/15 bg-[#0b2b52]/80 px-2 py-1 text-[8px] font-bold text-sky-100/55">
+                      <span className="rounded-md border border-slate-300/15 bg-[#252a31]/90 px-2 py-1 text-[8px] font-bold text-sky-100/55">
                         M5 → M1
                       </span>
                     </div>
@@ -1554,7 +1554,7 @@ export default function ProScanner() {
 
                 {scanner ? (
                   <div className="flex items-center gap-3">
-                    <div className="rounded-xl border border-sky-300/15 bg-[#0b2b52]/80 px-4 py-2">
+                    <div className="rounded-xl border border-slate-300/15 bg-[#252a31]/90 px-4 py-2">
                       <div className="text-[8px] font-bold text-sky-200/45">
                         M5 BIAS
                       </div>
@@ -1585,12 +1585,6 @@ export default function ProScanner() {
                 ) : null}
               </div>
             </div>
-
-            {/* MULTI-TIMEFRAME TECHNICAL MATRIX */}
-
-            {!current.loading && current.m1.length > 0 && current.m5.length > 0 ? (
-              <TechnicalMatrix matrix={technicalMatrix} />
-            ) : null}
 
             {/* ERROR */}
 
@@ -1623,7 +1617,7 @@ export default function ProScanner() {
             {/* LOADING */}
 
             {current.loading ? (
-              <div className="flex h-[620px] items-center justify-center rounded-[22px] border border-sky-400/20 bg-[#061426] shadow-[0_14px_34px_rgba(2,132,199,.08)]">
+              <div className="flex h-[620px] items-center justify-center rounded-[22px] border border-slate-300/20 bg-[#171b20] shadow-[0_14px_34px_rgba(2,132,199,.08)]">
                 <div className="text-center">
                   <Loader2 className="mx-auto h-6 w-6 animate-spin text-cyan-300" />
 
@@ -1717,6 +1711,12 @@ export default function ProScanner() {
               />
             ) : null}
 
+            {/* MULTI-TIMEFRAME TECHNICAL MATRIX — BELOW CHART */}
+
+            {!current.loading && current.m1.length > 0 && current.m5.length > 0 ? (
+              <TechnicalMatrix matrix={technicalMatrix} />
+            ) : null}
+
             {/* CONFIRMATIONS */}
 
             {scanner &&
@@ -1787,7 +1787,7 @@ export default function ProScanner() {
               <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_370px]">
                 {/* LEVELS */}
 
-                <div className="rounded-[22px] border border-sky-400/20 bg-[linear-gradient(145deg,#0a2f5d_0%,#08284f_100%)] shadow-[0_14px_34px_rgba(2,132,199,.10)] p-5">
+                <div className="rounded-[22px] border border-slate-300/20 bg-[linear-gradient(145deg,#252a31_0%,#181c22_100%)] shadow-[0_14px_34px_rgba(0,0,0,.22)] p-5">
                   <div className="flex items-center gap-2">
                     <BarChart3 className="h-4 w-4 text-cyan-300" />
 
@@ -1879,7 +1879,7 @@ export default function ProScanner() {
                   </div>
 
                   <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-xl border border-sky-300/15 bg-[#09264a]/85 p-4">
+                    <div className="rounded-xl border border-slate-300/15 bg-[#23282f]/90 p-4">
                       <div className="text-[8px] font-bold text-sky-200/45">
                         BOS LEVEL
                       </div>
@@ -1892,7 +1892,7 @@ export default function ProScanner() {
                       </div>
                     </div>
 
-                    <div className="rounded-xl border border-sky-300/15 bg-[#09264a]/85 p-4">
+                    <div className="rounded-xl border border-slate-300/15 bg-[#23282f]/90 p-4">
                       <div className="text-[8px] font-bold text-sky-200/45">
                         CHOCH LEVEL
                       </div>
@@ -1909,7 +1909,7 @@ export default function ProScanner() {
 
                 {/* TRADE PLAN */}
 
-                <div className="rounded-[22px] border border-sky-400/20 bg-[linear-gradient(145deg,#0a2f5d_0%,#08284f_100%)] shadow-[0_14px_34px_rgba(2,132,199,.10)] p-5">
+                <div className="rounded-[22px] border border-slate-300/20 bg-[linear-gradient(145deg,#252a31_0%,#181c22_100%)] shadow-[0_14px_34px_rgba(0,0,0,.22)] p-5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Target className="h-4 w-4 text-emerald-300" />
@@ -1928,7 +1928,7 @@ export default function ProScanner() {
 
                   {scanner.direction ===
                   "WAIT" ? (
-                    <div className="mt-5 rounded-[16px] border border-sky-300/15 bg-[#082342]/80 p-5 text-center">
+                    <div className="mt-5 rounded-[16px] border border-slate-300/15 bg-[#20252b]/90 p-5 text-center">
                       <Activity className="mx-auto h-5 w-5 text-sky-200/45" />
 
                       <div className="mt-3 text-[12px] font-black text-sky-100/70">
@@ -1943,7 +1943,7 @@ export default function ProScanner() {
                     </div>
                   ) : (
                     <div className="mt-5 space-y-3">
-                      <div className="flex items-center justify-between rounded-xl border border-sky-300/15 bg-[#09264a]/85 px-3 py-3">
+                      <div className="flex items-center justify-between rounded-xl border border-slate-300/15 bg-[#23282f]/90 px-3 py-3">
                         <span className="text-[9px] text-sky-100/55">
                           Direction
                         </span>
@@ -2036,7 +2036,7 @@ export default function ProScanner() {
 
             {scanner &&
             !current.loading ? (
-              <div className="rounded-[22px] border border-sky-400/20 bg-[linear-gradient(145deg,#0a2f5d_0%,#08284f_100%)] shadow-[0_14px_34px_rgba(2,132,199,.10)] p-5">
+              <div className="rounded-[22px] border border-slate-300/20 bg-[linear-gradient(145deg,#252a31_0%,#181c22_100%)] shadow-[0_14px_34px_rgba(0,0,0,.22)] p-5">
                 <div className="flex items-center justify-between">
                   <div className="text-[11px] font-black">
                     SCANNER ANALYSIS
@@ -2069,7 +2069,7 @@ export default function ProScanner() {
                     ) => (
                       <div
                         key={`${reason}-${index}`}
-                        className="flex items-center gap-3 rounded-xl border border-sky-300/15 bg-[#082342]/85 px-3 py-2.5"
+                        className="flex items-center gap-3 rounded-xl border border-slate-300/15 bg-[#082342]/85 px-3 py-2.5"
                       >
                         <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-400" />
 
@@ -2088,7 +2088,7 @@ export default function ProScanner() {
             {!current.loading &&
             !scanner &&
             !current.error ? (
-              <div className="flex min-h-[400px] items-center justify-center rounded-[22px] border border-sky-400/20 bg-[linear-gradient(145deg,#0a2f5d_0%,#08284f_100%)] shadow-[0_14px_34px_rgba(2,132,199,.10)]">
+              <div className="flex min-h-[400px] items-center justify-center rounded-[22px] border border-slate-300/20 bg-[linear-gradient(145deg,#252a31_0%,#181c22_100%)] shadow-[0_14px_34px_rgba(0,0,0,.22)]">
                 <div className="text-center">
                   <Crosshair className="mx-auto h-7 w-7 text-sky-200/30" />
 
