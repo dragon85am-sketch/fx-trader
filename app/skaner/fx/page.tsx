@@ -3293,26 +3293,10 @@ tp1Hit = closedResult.tp1Hit;
 tp2Hit = closedResult.tp2Hit;
 const closedStatus = closedResult.status;
 
-// TP1 trafione -> przesuwamy aktywny SL na BE (ENTRY).
-// TP2 pozostaje tylko etapem po drodze i nie zamyka trade'u.
-if (!closedStatus && !tp1WasHit && tp1Hit) {
-  const bePrice = Number(activeLevels.entry);
-  const bePad = Math.max(tick * 2, Math.abs(bePrice) * 0.00001);
-
-  levels = {
-    ...activeLevels,
-    sl: bePrice,
-    zones: activeLevels.zones?.map((z) =>
-      z.label === "SL"
-        ? {
-            ...z,
-            from: round(bePrice - bePad, 6),
-            to: round(bePrice + bePad, 6),
-          }
-        : z
-    ),
-  };
-}
+// Po TP1 NIE przesuwamy wizualnego SL na Entry.
+// Entry / SL / TP1 / TP2 / TP3 pozostają zamrożone od chwili READY.
+// Break Even jest obsługiwany wewnętrznie przez detectClosedTradeStatus(),
+// ale nie nadpisuje oryginalnego poziomu SL ani jego strefy na wykresie.
 
       if (closedStatus) {
   const tradeId = `${r.symbol}-${tf}-${activeSide}-${Number(signalCandleTime)}`;

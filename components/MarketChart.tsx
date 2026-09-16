@@ -2128,11 +2128,12 @@ fullscreenMode = false,
         secondsVisible: false,
       },
 handleScroll: {
-  // Nawigacja 1:1 jak Alpha Scanner.
-  mouseWheel: true,
-  pressedMouseMove: true,
-  horzTouchDrag: true,
+  // Pan lewo/prawo obsługujemy własnym pointer handlerem poniżej.
+  // Wyłączenie natywnego drag usuwa podwójne/przeciwne przesuwanie.
+  pressedMouseMove: false,
+  horzTouchDrag: false,
   vertTouchDrag: false,
+  mouseWheel: true,
 },
 
 handleScale: {
@@ -2330,6 +2331,55 @@ kineticScroll: {
 
     applyIndicators(safeForChart, prec, minMove);
 
+    // AUTO-FIT TRADE: gdy aktywny jest setup, skala ceny automatycznie
+    // obejmuje SL -> TP3 z dodatkowym marginesem. Dzięki temu nie trzeba
+    // ręcznie rozciągać osi góra/dół po pojawieniu się READY.
+    if (activeShowTradeLines && activeLevels) {
+      try {
+        candleSeries.applyOptions({
+          autoscaleInfoProvider: (original: () => any) => {
+            const base = original();
+            const prices = [
+              Number(activeLevels.entry),
+              Number(activeLevels.sl),
+              ...(activeLevels.tps ?? []).map(Number),
+            ].filter((v) => Number.isFinite(v));
+
+            if (!prices.length) return base;
+
+            const tradeMin = Math.min(...prices);
+            const tradeMax = Math.max(...prices);
+            const tradeRange = Math.max(tradeMax - tradeMin, Math.abs(tradeMax) * 0.0005, minMove * 10);
+            const pad = tradeRange * 0.18;
+
+            const baseMin = Number(base?.priceRange?.minValue);
+            const baseMax = Number(base?.priceRange?.maxValue);
+
+            return {
+              ...base,
+              priceRange: {
+                minValue: Number.isFinite(baseMin) ? Math.min(baseMin, tradeMin - pad) : tradeMin - pad,
+                maxValue: Number.isFinite(baseMax) ? Math.max(baseMax, tradeMax + pad) : tradeMax + pad,
+              },
+            };
+          },
+        } as any);
+
+        chart.priceScale('right').applyOptions({
+          autoScale: true,
+          scaleMargins: { top: 0.08, bottom: 0.10 },
+        });
+      } catch {}
+    } else {
+      try {
+        candleSeries.applyOptions({ autoscaleInfoProvider: undefined } as any);
+        chart.priceScale('right').applyOptions({ autoScale: true });
+      } catch {}
+    }
+
+    // Odśwież także wypełnienie pomiędzy górnym i dolnym pasmem BB.
+    requestAnimationFrame(() => setOverlayTick((v) => v + 1));
+
     const anchorKey = makeTradeAnchorKey(symbol, tf, activeLevels);
 
     if (frozenAnchorKeyRef.current !== anchorKey) {
@@ -2386,48 +2436,31 @@ kineticScroll: {
     if (activeShowTradeLines && activeLevels && safeForChart.length && anchorTime != null) {
       applyTradeLinesWithLevels(safeForChart, prec, anchorTime, activeLevels);
 
-      // STREFY są zakotwiczone do CZASU sygnału, a nie do prawej krawędzi.
-      // SIGNAL -> 1 świeca odstępu -> strefa o długości 20 świec.
-      // Dzięki logicalToCoordinate strefy jadą razem ze świecami przy pan/zoom.
-      const ZONE_GAP_BARS = 1;
-      const ZONE_BARS = 20;
-      const timeScale = chart.timeScale();
-      const anchorX = timeScale.timeToCoordinate(anchorTime);
+      const containerW = containerRef.current?.clientWidth ?? 0;
 
-      if (anchorX == null || !Number.isFinite(Number(anchorX))) {
+      // STREFY: od sygnału -> prawie do prawej osi ceny.
+      // Nie przykrywamy świecy sygnałowej i zostawiamy mały odstęp
+      // przed osią/etykietami ceny, tak jak na wzorze użytkownika.
+      const SIGNAL_TO_ZONE_GAP_PX = 10;
+      const PRICE_AXIS_RESERVE_PX = 78;
+      const ZONE_TO_PRICE_AXIS_GAP_PX = 8;
+
+      const startXCoord = chart.timeScale().timeToCoordinate(anchorTime);
+
+      if (startXCoord == null || !Number.isFinite(Number(startXCoord))) {
         setZoneRects([]);
         setOverlayLines([]);
         setZoneLabels([]);
         return;
       }
 
-      const anchorLogical = timeScale.coordinateToLogical(Number(anchorX));
-      if (anchorLogical == null || !Number.isFinite(Number(anchorLogical))) {
-        setZoneRects([]);
-        setOverlayLines([]);
-        setZoneLabels([]);
-        return;
-      }
-
-      const startLogical = Number(anchorLogical) + ZONE_GAP_BARS;
-      const endLogical = startLogical + ZONE_BARS;
-      const startXCoord = timeScale.logicalToCoordinate(startLogical as any);
-      const endXCoord = timeScale.logicalToCoordinate(endLogical as any);
-
-      if (
-        startXCoord == null ||
-        endXCoord == null ||
-        !Number.isFinite(Number(startXCoord)) ||
-        !Number.isFinite(Number(endXCoord))
-      ) {
-        setZoneRects([]);
-        setOverlayLines([]);
-        setZoneLabels([]);
-        return;
-      }
-
-      const startX = Number(startXCoord);
-      const zoneW = Math.max(1, Number(endXCoord) - startX);
+      const rawStartX = Number(startXCoord) + SIGNAL_TO_ZONE_GAP_PX;
+      const endX = Math.max(
+        rawStartX + 1,
+        containerW - PRICE_AXIS_RESERVE_PX - ZONE_TO_PRICE_AXIS_GAP_PX
+      );
+      const startX = Math.min(rawStartX, endX - 1);
+      const zoneW = Math.max(1, endX - startX);
 
       const tps = (
         activeLevels.tps?.length ? activeLevels.tps : activeLevels.tp !== undefined ? [activeLevels.tp] : []
@@ -2601,9 +2634,6 @@ kineticScroll: {
     detached,
     applyIndicators,
     clearTradeLineSeries,
-    // Ważne: przy PAN/ZOOM przeliczamy x/y stref z czasu/ceny.
-    // Dzięki temu ENTRY/SL/TP pozostają przy świecy sygnałowej i nie "uciekają".
-    overlayTick,
   ]);
 
   React.useEffect(() => {
@@ -3407,13 +3437,33 @@ kineticScroll: {
               touchAction: activeDrawTool === "SELECT" ? (fullscreenMode ? "none" : "pan-y") : "none",
               userSelect: "none",
               WebkitUserSelect: "none",
-              cursor: "crosshair",
+              cursor: activeDrawTool === "SELECT" ? "grab" : "crosshair",
             }}
           />
 
-          {/* SELECT nie dostaje osobnej warstwy PAN.
-              Nawigację i hit-test rysunków obsługuje DrawingsLayer,
-              a kursor/crosshair jest synchronizowany z Lightweight Charts. */}
+          {/* Pełny obszar PAN dla SELECT — obsługuje mouse/touch/pen.
+              Osi ceny i czasu nie przykrywamy, bo mają własne uchwyty. */}
+          {activeDrawTool === "SELECT" ? (
+            <div
+              className="absolute left-0 top-0 z-[35]"
+              style={{
+                right: 86,
+                bottom: 30,
+                cursor: plotPanRef.current ? "grabbing" : "grab",
+                touchAction: fullscreenMode ? "none" : "pan-y",
+                background: "transparent",
+              }}
+              onPointerDown={beginPlotPan}
+              onPointerMove={movePlotPan}
+              onPointerUp={endPlotPan}
+              onPointerCancel={endPlotPan}
+              onTouchStart={beginTwoFingerTouch}
+              onTouchMove={moveTwoFingerTouch}
+              onTouchEnd={endTwoFingerTouch}
+              onTouchCancel={endTwoFingerTouch}
+              onWheel={handlePlotWheel}
+            />
+          ) : null}
 
           {/* Własny uchwyt PRAWEJ OSI CENY.
               Jest aktywny tylko w SELECT i ma prawdziwy kursor ns-resize. */}
