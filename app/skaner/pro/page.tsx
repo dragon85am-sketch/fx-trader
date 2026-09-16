@@ -152,28 +152,86 @@ function toScannerCandles(
 // DATETIME -> LIGHTWEIGHT CHARTS
 // ======================================================
 
-function toTimestamp(
+const DISPLAY_TIME_ZONE = "Europe/Amsterdam";
+
+function getTimeZoneParts(date: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((part) => part.type === type)?.value ?? 0);
+
+  return {
+    year: value("year"),
+    month: value("month"),
+    day: value("day"),
+    hour: value("hour"),
+    minute: value("minute"),
+    second: value("second"),
+  };
+}
+
+function wallClockToUtcMs(datetime: string, sourceTimeZone: string): number {
+  const [datePart, timePart = "00:00:00"] = datetime.split(" ");
+  const [year, month, day] = datePart.split("-").map(Number);
+  const [hour = 0, minute = 0, second = 0] = timePart.split(":").map(Number);
+
+  const wantedWallClock = Date.UTC(year, month - 1, day, hour, minute, second);
+  let instant = wantedWallClock;
+
+  // Two passes are enough to resolve the timezone/DST offset for the instant.
+  for (let i = 0; i < 2; i += 1) {
+    const parts = getTimeZoneParts(new Date(instant), sourceTimeZone);
+    const representedWallClock = Date.UTC(
+      parts.year,
+      parts.month - 1,
+      parts.day,
+      parts.hour,
+      parts.minute,
+      parts.second,
+    );
+    instant += wantedWallClock - representedWallClock;
+  }
+
+  return instant;
+}
+
+function toDisplayTimestamp(
   datetime: string,
+  sourceTimeZone: "UTC" | "America/New_York",
 ): UTCTimestamp {
-  const [datePart, timePart = "00:00:00"] =
-    datetime.split(" ");
+  const instantMs =
+    sourceTimeZone === "UTC"
+      ? (() => {
+          const [datePart, timePart = "00:00:00"] = datetime.split(" ");
+          const [year, month, day] = datePart.split("-").map(Number);
+          const [hour = 0, minute = 0, second = 0] = timePart.split(":").map(Number);
+          return Date.UTC(year, month - 1, day, hour, minute, second);
+        })()
+      : wallClockToUtcMs(datetime, sourceTimeZone);
 
-  const [year, month, day] =
-    datePart.split("-").map(Number);
+  // Lightweight Charts renders UTCTimestamp labels in UTC. Shift the epoch to
+  // the Amsterdam wall-clock value so the axis shows the user's market clock.
+  // Intl resolves CET/CEST automatically, so DST changes do not need +1/+2 hacks.
+  const local = getTimeZoneParts(new Date(instantMs), DISPLAY_TIME_ZONE);
+  const displayMs = Date.UTC(
+    local.year,
+    local.month - 1,
+    local.day,
+    local.hour,
+    local.minute,
+    local.second,
+  );
 
-  const [hour, minute, second] =
-    timePart.split(":").map(Number);
-
-  return Math.floor(
-    Date.UTC(
-      year,
-      month - 1,
-      day,
-      hour || 0,
-      minute || 0,
-      second || 0,
-    ) / 1000,
-  ) as UTCTimestamp;
+  return Math.floor(displayMs / 1000) as UTCTimestamp;
 }
 
 // ======================================================
@@ -182,11 +240,15 @@ function toTimestamp(
 
 function toChartCandles(
   values: TwelveValue[],
+  symbol: ScannerSymbol,
 ): CandlestickData[] {
+  const sourceTimeZone = symbol === "US30" ? "UTC" : "America/New_York";
+
   return values
     .map((item) => ({
-      time: toTimestamp(
+      time: toDisplayTimestamp(
         item.datetime,
+        sourceTimeZone,
       ),
 
       open: Number(item.open),
@@ -1073,6 +1135,7 @@ export default function ProScanner() {
             chartCandles:
               toChartCandles(
                 rawM1,
+                symbol,
               ),
 
             loading: false,
