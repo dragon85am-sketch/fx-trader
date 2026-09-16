@@ -364,8 +364,31 @@ React.useEffect(() => {
           ) {
             return o.id;
           }
+        } else if (o.type === "RAY") {
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const len = Math.max(1, Math.hypot(dx, dy));
+          const rayEnd = {
+            x: a.x + (dx / len) * 5000,
+            y: a.y + (dy / len) * 5000,
+          };
+          if (distToSegment(mouse, a, rayEnd) < 10) return o.id;
+        } else if (o.type === "HORIZONTAL_RAY") {
+          const rayEnd = { x: (canvasRef.current?.clientWidth ?? 0) + 2000, y: a.y };
+          if (distToSegment(mouse, a, rayEnd) < 10) return o.id;
+        } else if (o.type === "FIBO") {
+          const x1 = Math.min(a.x, b.x);
+          const x2 = Math.max(a.x, b.x);
+          const insideX = x >= x1 - 10 && x <= x2 + 10;
+          if (insideX) {
+            for (const level of fiboLevels.filter((level) => level.enabled)) {
+              const yy = a.y + (b.y - a.y) * level.value;
+              if (Math.abs(y - yy) < 10) return o.id;
+            }
+          }
+          if (distToSegment(mouse, a, b) < 10) return o.id;
         } else {
-          if (distToSegment(mouse, a, b) < 8) return o.id;
+          if (distToSegment(mouse, a, b) < 10) return o.id;
         }
       }
 
@@ -843,7 +866,21 @@ if (o.type === "FIBO") {
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
-    const p = pointToData(e.clientX - rect.left, e.clientY - rect.top);
+    const localX = e.clientX - rect.left;
+    const localY = e.clientY - rect.top;
+    const p = pointToData(localX, localY);
+
+    // Crosshair dokładnie jak w Alpha: pion + poziom śledzą kursor.
+    // Canvas Drawing Tools jest nad chartem, więc synchronizujemy crosshair ręcznie.
+    if (p) {
+      try {
+        (chartRef.current as any)?.setCrosshairPosition?.(
+          p.p,
+          p.t as any,
+          candleSeriesRef.current
+        );
+      } catch {}
+    }
 
     if (!p) return;
 
@@ -1174,14 +1211,12 @@ if (o.type === "FIBO") {
   className="absolute inset-0 z-[20]"
   style={{
     pointerEvents: "auto",
-    cursor:
-      activeDrawTool === "SELECT"
-        ? dragRef.current.id || chartPanRef.current.active
-          ? "grabbing"
-          : hoverId
-          ? "move"
-          : "default"
-        : "crosshair",
+    // Bez „łapki”. SELECT ma taki sam kursor/crosshair jak Alpha.
+    cursor: activeDrawTool === "SELECT"
+      ? hoverId
+        ? "move"
+        : "crosshair"
+      : "crosshair",
     touchAction: "none",
   }}
   onWheel={(e) => {

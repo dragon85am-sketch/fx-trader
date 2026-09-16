@@ -32,18 +32,22 @@ const PLAN_KEY = "fxtrader_active_plan";
 const PROFIT_CALENDAR_KEY = "fxtrade_trade_store";
 
 type ProfitCalendarTrade = {
-  id: string;
-  result: number;
-  date: string;
+  id: number | string;
+  day: number;
+  month: number; // 0 = January
+  year: number;
+  pnl: number;
 };
 
-function localDateKey(value: string | Date) {
-  const d = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(d.getTime())) return "";
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
+function localDateKey(value: Date) {
+  const y = value.getFullYear();
+  const m = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
+}
+
+function tradeDateKey(trade: ProfitCalendarTrade) {
+  return `${trade.year}-${String(trade.month + 1).padStart(2, "0")}-${String(trade.day).padStart(2, "0")}`;
 }
 
 function readProfitCalendarTrades(): ProfitCalendarTrade[] {
@@ -55,8 +59,10 @@ function readProfitCalendarTrades(): ProfitCalendarTrade[] {
     return parsed.filter(
       (trade): trade is ProfitCalendarTrade =>
         trade &&
-        typeof trade.date === "string" &&
-        typeof trade.result === "number"
+        typeof trade.day === "number" &&
+        typeof trade.month === "number" &&
+        typeof trade.year === "number" &&
+        typeof trade.pnl === "number"
     );
   } catch {
     return [];
@@ -134,17 +140,17 @@ export default function Journal() {
 
   const progress = useMemo(() => {
     const todayTrades = profitTrades.filter(
-      (trade) => localDateKey(trade.date) === todayKey
+      (trade) => tradeDateKey(trade) === todayKey
     );
-    const todayPnl = todayTrades.reduce((sum, trade) => sum + trade.result, 0);
+    const todayPnl = todayTrades.reduce((sum, trade) => sum + trade.pnl, 0);
 
     const start = new Date(`${plan.startDate}T00:00:00`);
     const end = new Date(`${plan.endDate}T23:59:59`);
     const planTrades = profitTrades.filter((trade) => {
-      const date = new Date(trade.date);
-      return !Number.isNaN(date.getTime()) && date >= start && date <= end;
+      const date = new Date(trade.year, trade.month, trade.day, 12, 0, 0);
+      return date >= start && date <= end;
     });
-    const totalPnl = planTrades.reduce((sum, trade) => sum + trade.result, 0);
+    const totalPnl = planTrades.reduce((sum, trade) => sum + trade.pnl, 0);
     const progressPercent = plan.accountBalance > 0
       ? (totalPnl / plan.accountBalance) * 100
       : 0;
@@ -158,12 +164,12 @@ export default function Journal() {
       : 0;
 
     const activeDays = new Set(
-      planTrades.map((trade) => localDateKey(trade.date)).filter(Boolean)
+      planTrades.map((trade) => tradeDateKey(trade)).filter(Boolean)
     );
     const profitableDays = [...activeDays].filter((day) =>
       planTrades
-        .filter((trade) => localDateKey(trade.date) === day)
-        .reduce((sum, trade) => sum + trade.result, 0) > 0
+        .filter((trade) => tradeDateKey(trade) === day)
+        .reduce((sum, trade) => sum + trade.pnl, 0) > 0
     ).length;
     const consistency = activeDays.size > 0
       ? (profitableDays / activeDays.size) * 100

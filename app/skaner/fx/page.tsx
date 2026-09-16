@@ -4809,15 +4809,6 @@ if (closedNow.length) {
                 </div>
               </div>
 
-              <div className={cn("w-full min-w-0", landscapeFullscreen && "hidden")}>
-                <PocMiniScanner
-                  state={pocScanner}
-                  confirmationCount={selected.confirmationCount ?? 0}
-                  confirmationSide={selected.confirmationSide ?? null}
-                  liquidity={selected.liquidity}
-                />
-              </div>
-
               <div className={cn("min-w-0", landscapeFullscreen && "flex min-h-0 flex-1 flex-col")}>
 
 <div className={cn(
@@ -4882,6 +4873,15 @@ if (closedNow.length) {
                   supertrendUpColor={supertrendSettings.upColor}
                   supertrendDownColor={supertrendSettings.downColor}
                   patternsEnabled={patternsEnabled}
+                />
+              </div>
+
+              <div className={cn("mt-1 w-full min-w-0", landscapeFullscreen && "hidden")}>
+                <PocMiniScanner
+                  state={pocScanner}
+                  confirmationCount={selected.confirmationCount ?? 0}
+                  confirmationSide={selected.confirmationSide ?? null}
+                  liquidity={selected.liquidity}
                 />
               </div>
 
