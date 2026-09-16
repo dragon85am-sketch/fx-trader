@@ -44,6 +44,7 @@ type Props = {
   chochPrice?: number;
 
   height?: number;
+  liveBaseUrl?: string;
 };
 
 export default function AlphaPriceChart({
@@ -78,6 +79,7 @@ export default function AlphaPriceChart({
   chochPrice,
 
   height = 620,
+  liveBaseUrl = process.env.NEXT_PUBLIC_US30_LIVE_URL ?? "",
 }: Props) {
   const containerRef =
     React.useRef<HTMLDivElement | null>(
@@ -93,6 +95,9 @@ export default function AlphaPriceChart({
     React.useRef<
       ISeriesApi<"Candlestick"> | null
     >(null);
+
+  const [liveConnected, setLiveConnected] = React.useState(false);
+  const liveCandleRef = React.useRef<CandlestickData | null>(null);
 
   // ====================================================
   // CREATE CHART
@@ -280,6 +285,67 @@ export default function AlphaPriceChart({
   }, [height, candles.length]);
 
   // ====================================================
+  // US30 LIVE TICK (Railway SSE)
+  // ====================================================
+
+  React.useEffect(() => {
+    if (symbol !== "US30" || !liveBaseUrl) {
+      setLiveConnected(false);
+      return;
+    }
+
+    const base = liveBaseUrl.replace(/\/+$/, "");
+    const source = new EventSource(`${base}/api/us30/stream`);
+
+    const onTick = (event: MessageEvent) => {
+      try {
+        const tick = JSON.parse(event.data) as { price?: number; timestamp?: number };
+        const price = Number(tick.price);
+        const timestamp = Number(tick.timestamp);
+        const series = seriesRef.current;
+        if (!series || !Number.isFinite(price) || !Number.isFinite(timestamp)) return;
+
+        const bucket = Math.floor(timestamp / 1000 / 60) * 60;
+        const prev = liveCandleRef.current;
+
+        const next: CandlestickData =
+          prev && Number(prev.time) === bucket
+            ? {
+                time: bucket as Time,
+                open: prev.open,
+                high: Math.max(prev.high, price),
+                low: Math.min(prev.low, price),
+                close: price,
+              }
+            : {
+                time: bucket as Time,
+                open: price,
+                high: price,
+                low: price,
+                close: price,
+              };
+
+        liveCandleRef.current = next;
+        series.update(next);
+        setLiveConnected(true);
+      } catch (e) {
+        console.error("[US30 LIVE] tick error", e);
+      }
+    };
+
+    source.addEventListener("tick", onTick as EventListener);
+    source.onopen = () => setLiveConnected(true);
+    source.onerror = () => setLiveConnected(false);
+
+    return () => {
+      source.removeEventListener("tick", onTick as EventListener);
+      source.close();
+      setLiveConnected(false);
+      liveCandleRef.current = null;
+    };
+  }, [symbol, liveBaseUrl]);
+
+  // ====================================================
   // DATA + LEVELS
   // ====================================================
 
@@ -300,6 +366,17 @@ export default function AlphaPriceChart({
     series.setData(
       candles,
     );
+
+    if (symbol === "US30" && candles.length > 0) {
+      const last = candles[candles.length - 1];
+      liveCandleRef.current = {
+        time: last.time,
+        open: last.open,
+        high: last.high,
+        low: last.low,
+        close: last.close,
+      };
+    }
 
     if (!candles.length) {
       return;
@@ -568,6 +645,7 @@ export default function AlphaPriceChart({
     };
   }, [
     candles,
+    symbol,
 
     direction,
 
