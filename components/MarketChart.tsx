@@ -2331,52 +2331,6 @@ kineticScroll: {
 
     applyIndicators(safeForChart, prec, minMove);
 
-    // AUTO-FIT TRADE: gdy aktywny jest setup, skala ceny automatycznie
-    // obejmuje SL -> TP3 z dodatkowym marginesem. Dzięki temu nie trzeba
-    // ręcznie rozciągać osi góra/dół po pojawieniu się READY.
-    if (activeShowTradeLines && activeLevels) {
-      try {
-        candleSeries.applyOptions({
-          autoscaleInfoProvider: (original: () => any) => {
-            const base = original();
-            const prices = [
-              Number(activeLevels.entry),
-              Number(activeLevels.sl),
-              ...(activeLevels.tps ?? []).map(Number),
-            ].filter((v) => Number.isFinite(v));
-
-            if (!prices.length) return base;
-
-            const tradeMin = Math.min(...prices);
-            const tradeMax = Math.max(...prices);
-            const tradeRange = Math.max(tradeMax - tradeMin, Math.abs(tradeMax) * 0.0005, minMove * 10);
-            const pad = tradeRange * 0.18;
-
-            const baseMin = Number(base?.priceRange?.minValue);
-            const baseMax = Number(base?.priceRange?.maxValue);
-
-            return {
-              ...base,
-              priceRange: {
-                minValue: Number.isFinite(baseMin) ? Math.min(baseMin, tradeMin - pad) : tradeMin - pad,
-                maxValue: Number.isFinite(baseMax) ? Math.max(baseMax, tradeMax + pad) : tradeMax + pad,
-              },
-            };
-          },
-        } as any);
-
-        chart.priceScale('right').applyOptions({
-          autoScale: true,
-          scaleMargins: { top: 0.08, bottom: 0.10 },
-        });
-      } catch {}
-    } else {
-      try {
-        candleSeries.applyOptions({ autoscaleInfoProvider: undefined } as any);
-        chart.priceScale('right').applyOptions({ autoScale: true });
-      } catch {}
-    }
-
     // Odśwież także wypełnienie pomiędzy górnym i dolnym pasmem BB.
     requestAnimationFrame(() => setOverlayTick((v) => v + 1));
 
@@ -3593,9 +3547,9 @@ kineticScroll: {
             Drawing tools re-enable the drawing overlay.
           */}
           <div
-            className="absolute inset-0 z-[20] pointer-events-auto"
+            className={`absolute inset-0 z-[20] ${activeDrawTool === "SELECT" ? "pointer-events-none" : "pointer-events-auto"}`}
             style={{
-              cursor: activeDrawTool === "SELECT" ? "default" : "crosshair",
+              cursor: "crosshair",
             }}
           >
             <DrawingsLayer
