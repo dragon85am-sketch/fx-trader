@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import type { DrawTool } from "@/components/DrawingsLayer";
 import React from "react";
@@ -28,6 +28,8 @@ import {
 } from "lucide-react";
 const EMA_FAST = 14;
 const WMA_SLOW = 40;
+const ADX_PERIOD = 14;
+const ADX_MIN = 22;
 type DataSource = "AUTO" | "HYBRID";
 const DEFAULT_SOURCE: DataSource = "AUTO";
 
@@ -1190,25 +1192,121 @@ function getRecentPattern(candles: Candle[], side: Side, lookback = 6): CandlePa
   return "NONE";
 }
 
+
+function getAdxDiSignal(
+  candles: Candle[],
+  period = ADX_PERIOD,
+  minAdx = ADX_MIN
+): { signal: Signal; adx: number; diPlus: number; diMinus: number } {
+  if (candles.length < period * 2 + 2) {
+    return { signal: "NONE", adx: 0, diPlus: 0, diMinus: 0 };
+  }
+
+  // Liczymy tylko na zamkniętych świecach.
+  const closed = candles.slice(0, -1);
+  if (closed.length < period * 2 + 1) {
+    return { signal: "NONE", adx: 0, diPlus: 0, diMinus: 0 };
+  }
+
+  const tr: number[] = [];
+  const plusDm: number[] = [];
+  const minusDm: number[] = [];
+
+  for (let i = 1; i < closed.length; i++) {
+    const cur = closed[i];
+    const prev = closed[i - 1];
+
+    const upMove = cur.high - prev.high;
+    const downMove = prev.low - cur.low;
+
+    plusDm.push(upMove > downMove && upMove > 0 ? upMove : 0);
+    minusDm.push(downMove > upMove && downMove > 0 ? downMove : 0);
+
+    tr.push(
+      Math.max(
+        cur.high - cur.low,
+        Math.abs(cur.high - prev.close),
+        Math.abs(cur.low - prev.close)
+      )
+    );
+  }
+
+  if (tr.length < period) {
+    return { signal: "NONE", adx: 0, diPlus: 0, diMinus: 0 };
+  }
+
+  let smoothedTr = tr.slice(0, period).reduce((a, b) => a + b, 0);
+  let smoothedPlus = plusDm.slice(0, period).reduce((a, b) => a + b, 0);
+  let smoothedMinus = minusDm.slice(0, period).reduce((a, b) => a + b, 0);
+
+  const dxValues: number[] = [];
+  let diPlus = 0;
+  let diMinus = 0;
+
+  const pushDx = () => {
+    if (smoothedTr <= 0) {
+      diPlus = 0;
+      diMinus = 0;
+      dxValues.push(0);
+      return;
+    }
+
+    diPlus = 100 * (smoothedPlus / smoothedTr);
+    diMinus = 100 * (smoothedMinus / smoothedTr);
+
+    const sum = diPlus + diMinus;
+    dxValues.push(sum > 0 ? 100 * Math.abs(diPlus - diMinus) / sum : 0);
+  };
+
+  pushDx();
+
+  for (let i = period; i < tr.length; i++) {
+    smoothedTr = smoothedTr - smoothedTr / period + tr[i];
+    smoothedPlus = smoothedPlus - smoothedPlus / period + plusDm[i];
+    smoothedMinus = smoothedMinus - smoothedMinus / period + minusDm[i];
+    pushDx();
+  }
+
+  if (dxValues.length < period) {
+    return { signal: "NONE", adx: 0, diPlus, diMinus };
+  }
+
+  let adx = dxValues.slice(0, period).reduce((a, b) => a + b, 0) / period;
+
+  for (let i = period; i < dxValues.length; i++) {
+    adx = (adx * (period - 1) + dxValues[i]) / period;
+  }
+
+  const signal: Signal =
+    adx >= minAdx && diPlus > diMinus
+      ? "UP"
+      : adx >= minAdx && diMinus > diPlus
+      ? "DOWN"
+      : "NONE";
+
+  return { signal, adx, diPlus, diMinus };
+}
+
 function getDirectionalConfirmations(params: {
   side: Side;
   candles: Candle[];
   emaWmaSignal: Signal;
-  supertrendSignal: Signal;
+  adxDiSignal: Signal;
 }): {
   count: 0 | 1 | 2 | 3 | 4;
   pattern: CandlePattern | "NONE";
 } {
-  const { side, candles, emaWmaSignal, supertrendSignal } = params;
+  const { side, candles, emaWmaSignal, adxDiSignal } = params;
   const wanted: Signal = side === "BUY" ? "UP" : "DOWN";
 
   let count = 0;
 
-  // 1/4 — kierunek EMA14 + WMA40.
+  // 1/4 — EMA14 > WMA40 dla BUY / EMA14 < WMA40 dla SELL.
   if (emaWmaSignal === wanted) count += 1;
 
-  // 2/4 — niezależne potwierdzenie SuperTrend.
-  if (supertrendSignal === wanted) count += 1;
+  // 2/4 — ADX >= 22 + właściwy kierunek DI.
+  // BUY: DI+ > DI- | SELL: DI- > DI+.
+  if (adxDiSignal === wanted) count += 1;
 
   // 3/4 — kierunkowy liquidity sweep z ostatnich zamkniętych świec.
   if (hasRecentDirectionalSweep(candles, side, 4)) count += 1;
@@ -1218,34 +1316,34 @@ function getDirectionalConfirmations(params: {
 
   return {
     count: Math.min(count, 4) as 0 | 1 | 2 | 3 | 4,
-    // Price Action zostaje jako dodatkowa informacja/etykieta setupu.
-    pattern: getRecentPattern(candles, side, 5),
+    // Formacja nie jest warunkiem READY głównego FX Scannera.
+    pattern: "NONE",
   };
 }
 
 function getBestConfirmation(params: {
   candles: Candle[];
   emaWmaSignal: Signal;
-  supertrendSignal: Signal;
+  adxDiSignal: Signal;
 }): {
   side: Side | null;
   count: 0 | 1 | 2 | 3 | 4;
   pattern: CandlePattern | "NONE";
 } {
-  const { candles, emaWmaSignal, supertrendSignal } = params;
+  const { candles, emaWmaSignal, adxDiSignal } = params;
 
   const buy = getDirectionalConfirmations({
     side: "BUY",
     candles,
     emaWmaSignal,
-    supertrendSignal,
+    adxDiSignal,
   });
 
   const sell = getDirectionalConfirmations({
     side: "SELL",
     candles,
     emaWmaSignal,
-    supertrendSignal,
+    adxDiSignal,
   });
 
   if (buy.count === 0 && sell.count === 0) {
@@ -2945,104 +3043,28 @@ const signal: Signal = supertrendEnabled
       supertrendSettings.waitForClose
     );
 
+    const adxDi = getAdxDiSignal(cs);
+
     const best = getBestConfirmation({
       candles: cs,
       emaWmaSignal: emaWmaDirection,
-      supertrendSignal: supertrendDirection,
+      adxDiSignal: adxDi.signal,
     });
 
-    const classicPatternMode = best.side && best.pattern !== "NONE"
-      ? getPatternSignalMode(cs, best.side)
-      : null;
+    // GŁÓWNY FX SCANNER — niezależny od BB, Formacji i SuperTrend.
+    // READY = dokładnie 4/4:
+    // 1) EMA14/WMA40
+    // 2) ADX >= 22 + DI
+    // 3) Liquidity Sweep
+    // 4) Momentum
+    const classicReady = best.count === 4 && !!best.side;
 
-    // Jedna logika BB z trzema poziomami jakości: EARLY -> BUY/SELL -> STRONG.
-    // Zewnętrzna banda tworzy setup; środkowa banda nie generuje sygnału BB.
-    // Używa ustawień BB z wykresu. RENKO nie jest tutaj modyfikowane.
-    const bbLogicConfig: BollingerSignalConfig = {
-      length: bbState.length,
-      maType: bbState.maType,
-      stdDev: bbState.stdDev,
-    };
-    const bbBuy = getRecentBollingerPattern(cs, "BUY", bbLogicConfig, 5);
-    const bbSell = getRecentBollingerPattern(cs, "SELL", bbLogicConfig, 5);
-    const bbSignal = bbBuy && !bbSell
-      ? { side: "BUY" as Side, ...bbBuy }
-      : bbSell && !bbBuy
-      ? { side: "SELL" as Side, ...bbSell }
-      : null;
+    const setupSide: Side | null = classicReady ? best.side : null;
+    const setupPattern: CandlePattern | "NONE" = "NONE";
+    const detectedPatternMode: PatternSignalMode | null = null;
 
-    const classicReady = best.count === 4 && !!best.side && best.pattern !== "NONE";
-
-    // Gdy Bollinger jest WŁĄCZONY na wykresie, markery BUY/SELL skanera
-    // pochodzą WYŁĄCZNIE z logiki zewnętrznych band:
-    // BUY = dolna banda, SELL = górna banda.
-    // Dzięki temu środkowa linia BB nie może generować markerów BUY/SELL.
-    // Po wyłączeniu Bollingera klasyczna logika skanera nadal działa jak wcześniej.
-    const bollingerOuterBandMode = !!bbState.enabled;
-
-    // STRICT BB MODE:
-    // przy włączonym Bollingerze akceptujemy WYŁĄCZNIE sygnały z ZEWNĘTRZNYCH band.
-    // BUY może powstać tylko po odrzuceniu DOLNEJ bandy,
-    // SELL może powstać tylko po odrzuceniu GÓRNEJ bandy.
-    // Środkowa linia BB nigdy nie tworzy wejścia.
-    const isStrictBbMode = (mode?: PatternSignalMode) =>
-      mode === "BOLLINGER_EARLY" ||
-      mode === "BOLLINGER_CONFIRMED" ||
-      mode === "BOLLINGER_STRONG";
-
-    // Jeżeli po włączeniu BB w pamięci został stary trade z klasycznej logiki
-    // (np. sygnał przy środkowej linii), usuwamy go z aktywnego widoku.
-    if (bollingerOuterBandMode && tradeActive && !isStrictBbMode(patternSignalMode)) {
-      tradeActive = false;
-      sideOut = undefined;
-      levels = undefined;
-      hammerTime = undefined;
-      signalCandleTime = undefined;
-      signalPattern = "NONE";
-      patternSignalMode = undefined;
-      tp1Hit = false;
-      tp2Hit = false;
-    }
-
-    const setupSide: Side | null = bollingerOuterBandMode
-      ? bbSignal?.side ?? null
-      : classicReady
-      ? best.side
-      : bbSignal?.side ?? null;
-
-    const setupPattern: CandlePattern | "NONE" = bollingerOuterBandMode
-      ? bbSignal?.pattern ?? "NONE"
-      : classicReady
-      ? best.pattern
-      : bbSignal?.pattern ?? "NONE";
-
-    const detectedPatternMode: PatternSignalMode | null = bollingerOuterBandMode
-      ? bbSignal?.mode ?? null
-      : classicReady
-      ? classicPatternMode
-      : bbSignal?.mode ?? null;
-
-    const htfOk =
-  !r.higherTfSignal ||
-  r.higherTfSignal === "NONE" ||
-  (setupSide === "BUY" && r.higherTfSignal === "UP") ||
-  (setupSide === "SELL" && r.higherTfSignal === "DOWN");
-
-const sessionOk = isTradingSession(
-  r.symbol,
-  new Date()
-);
-
-const activityReady = nextLiquidity >= LIQ_THRESHOLD_HIGH;
-
-// Bollinger ma własny kompletny trigger wejścia, więc nie blokujemy go
-// dodatkowo progiem liquidity/4-of-4. Klasyczna logika skanera nadal go wymaga.
-const setupReadyNow =
-  !!setupSide &&
-  setupPattern !== "NONE" &&
-  (bollingerOuterBandMode
-    ? !!bbSignal
-    : (!!bbSignal || (activityReady && classicReady)));
+    // Liquidity % pozostaje informacją UI. Sam READY wynika wyłącznie z 4/4.
+    const setupReadyNow = !!setupSide && classicReady;
 
     const wasOn = scannerPrevRef.current.get(r.symbol) ?? false;
     scannerPrevRef.current.set(r.symbol, setupReadyNow);
@@ -3057,18 +3079,9 @@ const setupReadyNow =
     setupPrevRef.current.set(r.symbol, setupReadyNow);
 
     if (!tradeActive && setupReadyNow && setupSide && cs.length >= 5) {
-      const signalTime = bollingerOuterBandMode
-        ? bbSignal?.confirmationTime ?? cs[cs.length - 2]?.time
-        : classicReady
-        ? cs[cs.length - 2]?.time
-        : bbSignal?.confirmationTime ?? cs[cs.length - 2]?.time;
-      const patternTime = bollingerOuterBandMode
-        ? bbSignal?.patternTime ?? cs[cs.length - 3]?.time
-        : classicReady
-        ? cs[cs.length - 3]?.time
-        : bbSignal?.patternTime ?? cs[cs.length - 3]?.time;
+      const signalTime = cs[cs.length - 2]?.time;
 
-      if (signalTime && patternTime) {
+      if (signalTime) {
         const lv = buildLevelsLiquidityOnly({
           
           candles: cs,
@@ -3193,7 +3206,7 @@ levels = {
 
           tradeActive = true;
 sideOut = setupSide;
-hammerTime = patternTime;
+hammerTime = signalTime;
 signalCandleTime = signalTime;
 signalPattern = setupPattern;
 patternSignalMode = detectedPatternMode ?? "STANDARD";
@@ -3228,10 +3241,7 @@ tp2Hit = false;
     if (
       tradeActive &&
       sideOut &&
-      bbSignal &&
-      bbSignal.side === sideOut &&
-      hammerTime &&
-      Number(bbSignal.patternTime) === Number(hammerTime)
+      hammerTime
     ) {
       const modeRank = (mode?: PatternSignalMode) => {
         if (mode === "BOLLINGER_STRONG") return 3;
@@ -3239,12 +3249,6 @@ tp2Hit = false;
         if (mode === "BOLLINGER_EARLY") return 1;
         return 0;
       };
-
-      if (modeRank(bbSignal.mode) > modeRank(patternSignalMode)) {
-        patternSignalMode = bbSignal.mode;
-        signalPattern = bbSignal.pattern;
-        signalCandleTime = bbSignal.confirmationTime;
-      }
     }
 
     if (
