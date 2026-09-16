@@ -226,6 +226,24 @@ const equityCurve = useMemo(() => {
     };
   }, [trades]);
 
+  const todayKey = (() => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  })();
+
+  const todayStats = useMemo(() => {
+    const todayTrades = trades.filter((trade) => trade.date === todayKey);
+    const pnl = todayTrades.reduce((sum, trade) => sum + (Number(trade.pnl) || 0), 0);
+
+    return {
+      trades: todayTrades.length,
+      pnl,
+    };
+  }, [trades, todayKey]);
+
   const tradingPlanCalc = useMemo(() => {
     const monthlyTarget = tradingPlan.accountBalance * (tradingPlan.monthlyGoalPercent / 100);
     const riskPerTrade = tradingPlan.accountBalance * (tradingPlan.riskPerTradePercent / 100);
@@ -1897,13 +1915,13 @@ const equityCurve = useMemo(() => {
                           <div>
                             <p className="text-sky-100/40">Current P&L</p>
                             <p className={performance.totalPnl >= 0 ? "mt-1 font-bold text-emerald-300" : "mt-1 font-bold text-rose-300"}>
-                              {performance.totalPnl.toFixed(2)} USD
+                              {todayStats.pnl.toFixed(2)} USD
                             </p>
                           </div>
                           <div>
                             <p className="text-sky-100/40">Remaining</p>
                             <p className="mt-1 font-bold text-blue-400">
-                              {tradingPlanCalc.remainingUsd.toFixed(2)} USD
+                              {Math.max(tradingPlanCalc.dailyTarget - todayStats.pnl, 0).toFixed(2)} USD
                             </p>
                           </div>
                         </div>
@@ -1912,7 +1930,11 @@ const equityCurve = useMemo(() => {
                           <div
                             className="h-full rounded-full bg-[linear-gradient(90deg,#34d399,#22d3ee)] shadow-[0_0_16px_rgba(34,211,238,.28)]"
                             style={{
-                              width: `${Math.min(Math.max(tradingPlanCalc.currentProgressPercent, 0), 100)}%`,
+                              width: `${
+                                tradingPlanCalc.dailyTarget > 0
+                                  ? Math.min(Math.max((todayStats.pnl / tradingPlanCalc.dailyTarget) * 100, 0), 100)
+                                  : 0
+                              }%`,
                             }}
                           />
                         </div>
@@ -1924,7 +1946,7 @@ const equityCurve = useMemo(() => {
                               Trades Today
                             </div>
                             <p className="mt-2 text-2xl font-black">
-                              {Math.min(trades.length, tradingPlan.maxTradesPerDay)} / {tradingPlan.maxTradesPerDay}
+                              {Math.min(todayStats.trades, tradingPlan.maxTradesPerDay)} / {tradingPlan.maxTradesPerDay}
                             </p>
                           </div>
 
