@@ -208,8 +208,8 @@ function round(v: number, dp = 6) {
   return Math.round(v * p) / p;
 }
 
-function calcATR14(candles: Array<{ high: number; low: number; close: number }>) {
-  const period = 14;
+function calcATR(candles: Array<{ high: number; low: number; close: number }>, period = 14) {
+  period = Math.max(2, Math.round(period));
   if (candles.length < period + 1) return 0;
 
   const trs: number[] = [];
@@ -234,6 +234,10 @@ function calcATR14(candles: Array<{ high: number; low: number; close: number }>)
   }
 
   return atr;
+}
+
+function calcATR14(candles: Array<{ high: number; low: number; close: number }>) {
+  return calcATR(candles, 14);
 }
 
 function getSupertrendSignal(
@@ -2339,12 +2343,21 @@ const SUPER_FACTOR = 3;
 
 
 
-const ATR_PERIOD = 14;
+type TargetSettings = {
+  atrPeriod: number;
+  slMultiplier: number;
+  tp1Multiplier: number;
+  tp2Multiplier: number;
+  tp3Multiplier: number;
+};
 
-const SL_ATR_MULT = 5;
-const TP1_ATR_MULT = 0.5;
-const TP2_ATR_MULT = 1;
-const TP3_ATR_MULT = 1.5;
+const DEFAULT_TARGET_SETTINGS: TargetSettings = {
+  atrPeriod: 14,
+  slMultiplier: 1.0,
+  tp1Multiplier: 1.0,
+  tp2Multiplier: 1.5,
+  tp3Multiplier: 2.0,
+};
 function getScannerSupertrendSignal(
   candles: Candle[],
   period = 90,
@@ -2405,6 +2418,11 @@ export default function MarketScannerPage() {
     React.useState<SupertrendSettings>(DEFAULT_SUPERTREND_SETTINGS);
   const [supertrendDraft, setSupertrendDraft] =
     React.useState<SupertrendSettings>(DEFAULT_SUPERTREND_SETTINGS);
+  const [targetsPanelOpen, setTargetsPanelOpen] = React.useState(false);
+  const [targetSettings, setTargetSettings] =
+    React.useState<TargetSettings>(DEFAULT_TARGET_SETTINGS);
+  const [targetDraft, setTargetDraft] =
+    React.useState<TargetSettings>(DEFAULT_TARGET_SETTINGS);
 
   const [scannerEnabled, setScannerEnabled] = React.useState(true);
   const [toolsPanelOpen, setToolsPanelOpen] = React.useState(false);
@@ -3032,6 +3050,7 @@ const signal: Signal = supertrendEnabled
     let patternSignalMode = r.patternSignalMode;
     let tp1Hit = r.tp1Hit ?? false;
     let tp2Hit = r.tp2Hit ?? false;
+    let openedTradeThisRefresh = false;
     const cs = candlesCache.current.get(r.symbol) ?? [];
     const tick = getTickSize(r.symbol);
 
@@ -3106,7 +3125,7 @@ const signal: Signal = supertrendEnabled
     
 const entryPrice = lv.entry;
 
-const atr = calcATR14(cs);
+const atr = calcATR(cs, targetSettings.atrPeriod);
 
 let slPrice = lv.sl;
 
@@ -3121,34 +3140,32 @@ if (atr && Number.isFinite(atr)) {
 );
 
 if (setupSide === "BUY") {
-  tp1Price = entryPrice + atr * TP1_ATR_MULT;
-  tp2Price = entryPrice + atr * TP2_ATR_MULT;
-  tp3Price = entryPrice + atr * TP3_ATR_MULT;
+  tp1Price = entryPrice + atr * targetSettings.tp1Multiplier;
+  tp2Price = entryPrice + atr * targetSettings.tp2Multiplier;
+  tp3Price = entryPrice + atr * targetSettings.tp3Multiplier;
 
-  // 1R: odległość Entry -> SL jest dokładnie taka sama jak Entry -> TP1.
-  const oneR = Math.abs(tp1Price - entryPrice);
-  slPrice = entryPrice - oneR;
+  // SL niezależny od TP1 — odległość sterowana mnożnikiem ATR.
+  slPrice = entryPrice - atr * targetSettings.slMultiplier;
 }
 
-    tp1Price = entryPrice + atr * TP1_ATR_MULT;
-    tp2Price = entryPrice + atr * TP2_ATR_MULT;
-    tp3Price = entryPrice + atr * TP3_ATR_MULT;
+    tp1Price = entryPrice + atr * targetSettings.tp1Multiplier;
+    tp2Price = entryPrice + atr * targetSettings.tp2Multiplier;
+    tp3Price = entryPrice + atr * targetSettings.tp3Multiplier;
   }
 
   if (setupSide === "SELL") {
     if (setupSide === "SELL") {
-  tp1Price = entryPrice - atr * TP1_ATR_MULT;
-  tp2Price = entryPrice - atr * TP2_ATR_MULT;
-  tp3Price = entryPrice - atr * TP3_ATR_MULT;
+  tp1Price = entryPrice - atr * targetSettings.tp1Multiplier;
+  tp2Price = entryPrice - atr * targetSettings.tp2Multiplier;
+  tp3Price = entryPrice - atr * targetSettings.tp3Multiplier;
 
-  // 1R: odległość Entry -> SL jest dokładnie taka sama jak Entry -> TP1.
-  const oneR = Math.abs(entryPrice - tp1Price);
-  slPrice = entryPrice + oneR;
+  // SL niezależny od TP1 — odległość sterowana mnożnikiem ATR.
+  slPrice = entryPrice + atr * targetSettings.slMultiplier;
 }
 
-    tp1Price = entryPrice - atr * TP1_ATR_MULT;
-    tp2Price = entryPrice - atr * TP2_ATR_MULT;
-    tp3Price = entryPrice - atr * TP3_ATR_MULT;
+    tp1Price = entryPrice - atr * targetSettings.tp1Multiplier;
+    tp2Price = entryPrice - atr * targetSettings.tp2Multiplier;
+    tp3Price = entryPrice - atr * targetSettings.tp3Multiplier;
   }
 }
 
@@ -3205,6 +3222,7 @@ levels = {
 };
 
           tradeActive = true;
+openedTradeThisRefresh = true;
 sideOut = setupSide;
 hammerTime = signalTime;
 signalCandleTime = signalTime;
@@ -3253,6 +3271,7 @@ tp2Hit = false;
 
     if (
       tradeActive &&
+      !openedTradeThisRefresh &&
       levels &&
       signalCandleTime &&
       (sideOut === "BUY" || sideOut === "SELL")
@@ -4767,6 +4786,23 @@ if (closedNow.length) {
 
                     <button
                       type="button"
+                      onClick={() => {
+                        setTargetDraft({ ...targetSettings });
+                        setTargetsPanelOpen(true);
+                      }}
+                      title="Ustawienia ATR / SL / TP"
+                      className={cn(
+                        "shrink-0 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[10px] font-semibold transition sm:ml-1 sm:gap-2 sm:px-3 sm:py-1 sm:text-sm",
+                        targetsPanelOpen
+                          ? "border-violet-300/50 bg-violet-500/15 text-violet-100"
+                          : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/75 hover:border-violet-300/35 hover:bg-violet-500/10 hover:text-violet-100"
+                      )}
+                    >
+                      TARGETS
+                    </button>
+
+                    <button
+                      type="button"
                       onClick={() => setSupertrendEnabled((v) => !v)}
                       title={
                         supertrendEnabled
@@ -4801,6 +4837,58 @@ if (closedNow.length) {
                     </button>
 
                   </div>
+
+                  {targetsPanelOpen && typeof document !== "undefined"
+                    ? createPortal(
+                        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 p-4" onMouseDown={() => setTargetsPanelOpen(false)}>
+                          <div className="w-full max-w-md rounded-2xl border border-sky-300/20 bg-[#071a31] p-5 shadow-2xl" onMouseDown={(e) => e.stopPropagation()}>
+                            <div className="mb-4">
+                              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-200/55">Targets</div>
+                              <div className="mt-1 text-lg font-bold text-white">ATR • Stop Loss • Take Profit</div>
+                            </div>
+                            {[
+                              ["ATR period", "atrPeriod", 1],
+                              ["Stop Loss ATR Multiplier", "slMultiplier", 0.1],
+                              ["TP1 Multiplier", "tp1Multiplier", 0.1],
+                              ["TP2 Multiplier", "tp2Multiplier", 0.1],
+                              ["TP3 Multiplier", "tp3Multiplier", 0.1],
+                            ].map(([label, key, step]) => (
+                              <label key={String(key)} className="mb-3 flex items-center justify-between gap-4 text-sm text-sky-50/85">
+                                <span>{String(label)}</span>
+                                <input
+                                  type="number"
+                                  min={key === "atrPeriod" ? 2 : 0.1}
+                                  step={Number(step)}
+                                  value={targetDraft[key as keyof TargetSettings]}
+                                  onChange={(e) => setTargetDraft((prev) => ({
+                                    ...prev,
+                                    [key as keyof TargetSettings]: Number(e.target.value),
+                                  }))}
+                                  className="w-28 rounded-lg border border-sky-300/20 bg-[#0b315c] px-3 py-2 text-right font-semibold text-white outline-none focus:border-sky-300/50"
+                                />
+                              </label>
+                            ))}
+                            <div className="mt-5 flex justify-between gap-3">
+                              <button type="button" onClick={() => setTargetDraft(DEFAULT_TARGET_SETTINGS)} className="rounded-xl border border-sky-300/20 px-4 py-2 text-sm font-semibold text-sky-100">Domyślne</button>
+                              <div className="flex gap-2">
+                                <button type="button" onClick={() => setTargetsPanelOpen(false)} className="rounded-xl border border-red-400/30 px-4 py-2 text-sm font-semibold text-red-100">Anuluj</button>
+                                <button type="button" onClick={() => {
+                                  setTargetSettings({
+                                    atrPeriod: Math.max(2, Math.round(targetDraft.atrPeriod || 14)),
+                                    slMultiplier: Math.max(0.1, targetDraft.slMultiplier || 1),
+                                    tp1Multiplier: Math.max(0.1, targetDraft.tp1Multiplier || 1),
+                                    tp2Multiplier: Math.max(0.1, targetDraft.tp2Multiplier || 1.5),
+                                    tp3Multiplier: Math.max(0.1, targetDraft.tp3Multiplier || 2),
+                                  });
+                                  setTargetsPanelOpen(false);
+                                }} className="rounded-xl border border-emerald-400/35 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-100">Zapisz</button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>,
+                        document.body
+                      )
+                    : null}
                 </div>
 
                 <div className={cn(
