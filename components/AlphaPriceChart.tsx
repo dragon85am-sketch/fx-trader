@@ -305,25 +305,30 @@ export default function AlphaPriceChart({
         const series = seriesRef.current;
         if (!series || !Number.isFinite(price) || !Number.isFinite(timestamp)) return;
 
-        const bucket = Math.floor(timestamp / 1000 / 60) * 60;
+        // Live-Rates timestamp is milliseconds. Update the active M1 candle tick-by-tick.
+        const bucket = Math.floor(timestamp / 60_000) * 60;
         const prev = liveCandleRef.current;
 
-        const next: CandlestickData =
-          prev && Number(prev.time) === bucket
-            ? {
-                time: bucket as Time,
-                open: prev.open,
-                high: Math.max(prev.high, price),
-                low: Math.min(prev.low, price),
-                close: price,
-              }
-            : {
-                time: bucket as Time,
-                open: price,
-                high: price,
-                low: price,
-                close: price,
-              };
+        let next: CandlestickData;
+
+        if (prev && Number(prev.time) === bucket) {
+          next = {
+            time: bucket as Time,
+            open: prev.open,
+            high: Math.max(prev.high, price),
+            low: Math.min(prev.low, price),
+            close: price,
+          };
+        } else {
+          const open = prev ? prev.close : price;
+          next = {
+            time: bucket as Time,
+            open,
+            high: Math.max(open, price),
+            low: Math.min(open, price),
+            close: price,
+          };
+        }
 
         liveCandleRef.current = next;
         series.update(next);
@@ -363,19 +368,24 @@ export default function AlphaPriceChart({
       return;
     }
 
-    series.setData(
-      candles,
-    );
+    series.setData(candles);
 
     if (symbol === "US30" && candles.length > 0) {
       const last = candles[candles.length - 1];
-      liveCandleRef.current = {
-        time: last.time,
-        open: last.open,
-        high: last.high,
-        low: last.low,
-        close: last.close,
-      };
+      const live = liveCandleRef.current;
+
+      // Do not let a REST refresh overwrite a newer live SSE candle.
+      if (live && Number(live.time) >= Number(last.time)) {
+        series.update(live);
+      } else {
+        liveCandleRef.current = {
+          time: last.time,
+          open: last.open,
+          high: last.high,
+          low: last.low,
+          close: last.close,
+        };
+      }
     }
 
     if (!candles.length) {
@@ -684,8 +694,11 @@ export default function AlphaPriceChart({
           </div>
 
           <div className="mt-1 text-[9px] text-white/40">
-            Twelve Data · PRO
-            Session Scanner
+            {symbol === "US30"
+              ? liveConnected
+                ? "LIVE-RATES · REAL-TIME"
+                : "LIVE-RATES · CONNECTING"
+              : "Twelve Data · PRO Session Scanner"}
           </div>
         </div>
 
