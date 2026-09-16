@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { io } from "socket.io-client";
 import dotenv from "dotenv";
+import http from "node:http";
 
 dotenv.config({ path: ".env.local" });
 dotenv.config({ path: ".env" });
@@ -37,6 +38,71 @@ async function upsertTick(price: number, ts: number) {
   }
 }
 
+
+type LiveTick = { symbol: "US30"; price: number; timestamp: number };
+let latestTick: LiveTick | null = null;
+const clients = new Set<http.ServerResponse>();
+const PORT = Number(process.env.PORT || 3001);
+
+function broadcastTick(tick: LiveTick) {
+  const payload = `event: tick\ndata: ${JSON.stringify(tick)}\n\n`;
+  for (const res of clients) {
+    try { res.write(payload); } catch { clients.delete(res); }
+  }
+}
+
+const server = http.createServer((req, res) => {
+  const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+  const origin = req.headers.origin || "";
+  const allowedOrigin =
+    origin === "https://www.fx-trade.eu" ||
+    origin === "https://fx-trade.eu" ||
+    origin.startsWith("http://localhost:")
+      ? origin
+      : "https://www.fx-trade.eu";
+
+  res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
+  res.setHeader("Vary", "Origin");
+
+  if (url.pathname === "/health") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    return res.end(JSON.stringify({
+      ok: true,
+      liveRatesConnected: socket.connected,
+      clients: clients.size,
+      latestTick,
+    }));
+  }
+
+  if (url.pathname === "/api/us30/stream") {
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache, no-transform",
+      "Connection": "keep-alive",
+      "X-Accel-Buffering": "no",
+    });
+    res.write(": connected\n\n");
+    if (latestTick) res.write(`event: tick\ndata: ${JSON.stringify(latestTick)}\n\n`);
+    clients.add(res);
+
+    const ping = setInterval(() => {
+      try { res.write(": ping\n\n"); } catch {}
+    }, 20000);
+
+    req.on("close", () => {
+      clearInterval(ping);
+      clients.delete(res);
+    });
+    return;
+  }
+
+  res.writeHead(404).end();
+});
+
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`[US30] HTTP/SSE listening on :${PORT}`);
+});
+
 const socket = io("https://eu-wss.live-rates.com", {
   transports: ["websocket"],
   reconnection: true,
@@ -59,8 +125,15 @@ socket.on("rates", (raw: string) => {
     if (String(msg?.currency || "").replace(/[^A-Z0-9]/g, "") !== "US30") return;
 
     const bid = Number(msg.bid);
-    const ts = Number(msg.timestamp) || Date.now();
+    const rawTs = Number(msg.timestamp);
+    const ts = Number.isFinite(rawTs) && rawTs > 0
+      ? (rawTs < 10_000_000_000 ? rawTs * 1000 : rawTs)
+      : Date.now();
     if (!Number.isFinite(bid)) return;
+
+    latestTick = { symbol: "US30", price: bid, timestamp: ts };
+    broadcastTick(latestTick);
+
     writeChain = writeChain
       .then(() => upsertTick(bid, ts))
       .catch((e) => console.error("[US30] DB write error", e));
@@ -73,6 +146,7 @@ socket.on("connect_error", (e) => console.error("[US30] socket error", e.message
 
 async function shutdown() {
   socket.close();
+  server.close();
   await prisma.$disconnect();
   process.exit(0);
 }
