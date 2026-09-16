@@ -226,21 +226,19 @@ export default function AlphaPriceChart({
     seriesRef.current =
       series;
 
-    const ro =
-      new ResizeObserver(
-        () => {
-          chart.applyOptions(
-            {
-              width:
-                el.clientWidth,
+    const resizeChart = () => {
+      chart.applyOptions({
+        width: Math.max(1, el.clientWidth),
+        height: Math.max(1, el.clientHeight || height),
+      });
+    };
 
-              height,
-            },
-          );
-        },
-      );
+    const ro = new ResizeObserver(() => {
+      resizeChart();
+    });
 
     ro.observe(el);
+    resizeChart();
 
     return () => {
       ro.disconnect();
@@ -253,7 +251,33 @@ export default function AlphaPriceChart({
       seriesRef.current =
         null;
     };
-  }, [height]);
+  }, []);
+
+  // Resize the existing chart after normal/fullscreen size changes.
+  React.useEffect(() => {
+    const el = containerRef.current;
+    const chart = chartRef.current;
+    if (!el || !chart) return;
+
+    const applySize = () => {
+      chart.applyOptions({
+        width: Math.max(1, el.clientWidth),
+        height: Math.max(1, el.clientHeight || height),
+      });
+      if (candles.length > 0) chart.timeScale().fitContent();
+    };
+
+    const raf = requestAnimationFrame(() => {
+      applySize();
+      requestAnimationFrame(applySize);
+    });
+
+    window.addEventListener("resize", applySize);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", applySize);
+    };
+  }, [height, candles.length]);
 
   // ====================================================
   // DATA + LEVELS
