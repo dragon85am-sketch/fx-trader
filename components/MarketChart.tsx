@@ -3391,7 +3391,7 @@ kineticScroll: {
               touchAction: activeDrawTool === "SELECT" ? (fullscreenMode ? "none" : "pan-y") : "none",
               userSelect: "none",
               WebkitUserSelect: "none",
-              cursor: activeDrawTool === "SELECT" ? "grab" : "crosshair",
+              cursor: "crosshair",
             }}
           />
 
@@ -3403,7 +3403,7 @@ kineticScroll: {
               style={{
                 right: 86,
                 bottom: 30,
-                cursor: plotPanRef.current ? "grabbing" : "grab",
+                cursor: "crosshair",
                 touchAction: fullscreenMode ? "none" : "pan-y",
                 background: "transparent",
               }}
