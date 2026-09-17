@@ -2412,16 +2412,28 @@ kineticScroll: {
     if (activeShowTradeLines && activeLevels && safeForChart.length && anchorTime != null) {
       applyTradeLinesWithLevels(safeForChart, prec, anchorTime, activeLevels);
 
-      const containerW = containerRef.current?.clientWidth ?? 0;
+      // STREFY: kotwiczymy dokładnie do świecy oznaczonej SIGNAL.
+      // Główny skaner rysuje marker SIGNAL z highlightTime, więc używamy
+      // tego samego czasu również dla boxów. Nie używamy prawej krawędzi
+      // wykresu do wyliczania pozycji/szerokości stref.
+      const SIGNAL_TO_ZONE_GAP_PX = 12;
+      const ZONE_WIDTH_PX = 220;
 
-      // STREFY: od sygnału -> prawie do prawej osi ceny.
-      // Nie przykrywamy świecy sygnałowej i zostawiamy mały odstęp
-      // przed osią/etykietami ceny, tak jak na wzorze użytkownika.
-      const SIGNAL_TO_ZONE_GAP_PX = 10;
-      const PRICE_AXIS_RESERVE_PX = 78;
-      const ZONE_TO_PRICE_AXIS_GAP_PX = 8;
+      let zoneAnchorTime = anchorTime;
 
-      const startXCoord = chart.timeScale().timeToCoordinate(anchorTime);
+      if (showTradeLines && levels && highlightTime != null) {
+        const signalIdx = findNearestIndexByTime(safeForChart, highlightTime);
+        if (signalIdx >= 0) {
+          zoneAnchorTime = safeForChart[signalIdx].time as UTCTimestamp;
+        }
+      } else if (patternTradeSignalTime != null) {
+        const signalIdx = findNearestIndexByTime(safeForChart, patternTradeSignalTime);
+        if (signalIdx >= 0) {
+          zoneAnchorTime = safeForChart[signalIdx].time as UTCTimestamp;
+        }
+      }
+
+      const startXCoord = chart.timeScale().timeToCoordinate(zoneAnchorTime);
 
       if (startXCoord == null || !Number.isFinite(Number(startXCoord))) {
         setZoneRects([]);
@@ -2430,13 +2442,8 @@ kineticScroll: {
         return;
       }
 
-      const rawStartX = Number(startXCoord) + SIGNAL_TO_ZONE_GAP_PX;
-      const endX = Math.max(
-        rawStartX + 1,
-        containerW - PRICE_AXIS_RESERVE_PX - ZONE_TO_PRICE_AXIS_GAP_PX
-      );
-      const startX = Math.min(rawStartX, endX - 1);
-      const zoneW = Math.max(1, endX - startX);
+      const startX = Number(startXCoord) + SIGNAL_TO_ZONE_GAP_PX;
+      const zoneW = ZONE_WIDTH_PX;
 
       const tps = (
         activeLevels.tps?.length ? activeLevels.tps : activeLevels.tp !== undefined ? [activeLevels.tp] : []
