@@ -22,6 +22,8 @@ let latestTick: Tick | null = null;
 let lastRestOkAt = 0;
 let lastRestError = "";
 let polling = false;
+let dbWriting = false;
+let pendingDbTick: Tick | null = null;
 const clients = new Set<http.ServerResponse>();
 
 async function upsertTick(price: number, ts: number) {
@@ -45,6 +47,37 @@ function sendTick(tick: Tick) {
   const body = `event: tick\ndata: ${JSON.stringify(tick)}\n\n`;
   for (const client of clients) {
     try { client.write(body); } catch { clients.delete(client); }
+  }
+}
+
+// Keep only the newest pending tick. This guarantees one DB writer at a time
+// while SSE can still publish every REST quote immediately.
+function queueDbTick(tick: Tick) {
+  pendingDbTick = tick;
+  if (!dbWriting) void drainDbQueue();
+}
+
+async function drainDbQueue() {
+  if (dbWriting) return;
+  dbWriting = true;
+
+  try {
+    while (pendingDbTick) {
+      const tick = pendingDbTick;
+      pendingDbTick = null;
+
+      try {
+        await upsertTick(tick.price, tick.timestamp);
+      } catch (e: any) {
+        console.error("[US30] DB write error", e?.code || "", e?.message || e);
+        // If a newer tick arrived while DB was busy, the loop will write it next.
+        // We deliberately do not spawn another writer.
+      }
+    }
+  } finally {
+    dbWriting = false;
+    // Close a tiny race where a tick arrived between the while check and finally.
+    if (pendingDbTick) void drainDbQueue();
   }
 }
 
@@ -92,7 +125,7 @@ async function poll() {
     lastRestOkAt = tick.timestamp;
     lastRestError = "";
     sendTick(tick);
-    void upsertTick(price, tick.timestamp).catch(e => console.error("[US30] DB write error", e));
+    queueDbTick(tick);
   } catch (e) {
     lastRestError = e instanceof Error ? e.message : String(e);
     console.error("[US30] REST poll error:", lastRestError);
@@ -114,6 +147,7 @@ const server = http.createServer((req, res) => {
       ok: true, mode: "REST_1S_TEST",
       liveRatesConnected: Date.now() - lastRestOkAt < 5000,
       clients: clients.size, latestTick, pollMs: POLL_MS,
+      dbWriting, dbPending: Boolean(pendingDbTick),
       lastRestOkAt: lastRestOkAt || null, lastRestError: lastRestError || null,
     }));
     return;
