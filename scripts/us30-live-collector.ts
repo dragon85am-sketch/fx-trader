@@ -119,7 +119,7 @@ socket.on("connect", () => {
   console.log("[US30] Live-Rates SINGLE socket connected");
 
   socket.emit("instruments", ["US30"]);
-  socket.emit("key", key);
+  socket.emit("key", { key });
 
   broadcast("status", {
     provider: "live-rates",
