@@ -2150,7 +2150,37 @@ kineticScroll: {
   mouse: true,
   touch: true,
 },
-      crosshair: { mode: CrosshairMode.Normal },
+      crosshair: {
+        mode: CrosshairMode.Normal,
+        vertLine: {
+          visible: true,
+          labelVisible: true,
+          color: "rgba(226,232,240,0.70)",
+          width: 1,
+          style: LineStyle.Dashed,
+        },
+        horzLine: {
+          visible: true,
+          labelVisible: true,
+          color: "rgba(226,232,240,0.70)",
+          width: 1,
+          style: LineStyle.Dashed,
+        },
+      },
+      localization: {
+        timeFormatter: (time: any) => {
+          const ts = toUTCTimestamp(time);
+          return new Intl.DateTimeFormat("pl-PL", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: false,
+            timeZone: "UTC",
+          }).format(new Date(Number(ts) * 1000));
+        },
+      },
     });
 
     const candleSeries = chart.addCandlestickSeries({
@@ -2392,12 +2422,14 @@ kineticScroll: {
 
       const containerW = containerRef.current?.clientWidth ?? 0;
 
-      // STREFY: od sygnału -> prawie do prawej osi ceny.
-      // Nie przykrywamy świecy sygnałowej i zostawiamy mały odstęp
-      // przed osią/etykietami ceny, tak jak na wzorze użytkownika.
-      const SIGNAL_TO_ZONE_GAP_PX = 10;
-      const PRICE_AXIS_RESERVE_PX = 78;
-      const ZONE_TO_PRICE_AXIS_GAP_PX = 8;
+      // STREFY: zaczynają się tuż przy świecy SIGNAL i mają STAŁĄ,
+      // krótką długość w świecach. Nie są już liczone do prawej krawędzi
+      // kontenera, więc fullscreen / resize nie rozciąga boxów.
+      const SIGNAL_TO_ZONE_GAP_PX = 8;
+      const ZONE_BARS = 18;
+      const MIN_ZONE_WIDTH_PX = 150;
+      const MAX_ZONE_WIDTH_PX = 360;
+      const PRICE_AXIS_RESERVE_PX = 82;
 
       const startXCoord = chart.timeScale().timeToCoordinate(anchorTime);
 
@@ -2408,12 +2440,27 @@ kineticScroll: {
         return;
       }
 
+      const anchorIdx = findNearestIndexByTime(safeForChart, anchorTime);
+      const timeScaleAny = chart.timeScale() as any;
+      const futureLogicalX =
+        anchorIdx >= 0 && typeof timeScaleAny.logicalToCoordinate === "function"
+          ? timeScaleAny.logicalToCoordinate(anchorIdx + ZONE_BARS)
+          : null;
+
       const rawStartX = Number(startXCoord) + SIGNAL_TO_ZONE_GAP_PX;
-      const endX = Math.max(
-        rawStartX + 1,
-        containerW - PRICE_AXIS_RESERVE_PX - ZONE_TO_PRICE_AXIS_GAP_PX
+      const estimatedEndX =
+        futureLogicalX != null && Number.isFinite(Number(futureLogicalX))
+          ? Number(futureLogicalX)
+          : rawStartX + ZONE_BARS * 10;
+
+      const desiredWidth = Math.max(
+        MIN_ZONE_WIDTH_PX,
+        Math.min(MAX_ZONE_WIDTH_PX, estimatedEndX - rawStartX)
       );
-      const startX = Math.min(rawStartX, endX - 1);
+
+      const maxEndX = Math.max(rawStartX + 1, containerW - PRICE_AXIS_RESERVE_PX);
+      const startX = Math.min(rawStartX, maxEndX - 1);
+      const endX = Math.min(startX + desiredWidth, maxEndX);
       const zoneW = Math.max(1, endX - startX);
 
       const tps = (
