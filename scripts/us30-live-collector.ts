@@ -100,7 +100,7 @@ function normalizeTimestamp(value: unknown): number {
   return n < 10_000_000_000 ? n * 1000 : n;
 }
 
-const socket = io("https://eu-wss.live-rates.com", {
+const socket = io("https://wss.live-rates.com", {
   transports: ["websocket"],
 
   // CRITICAL DIAGNOSTIC CHANGE:
