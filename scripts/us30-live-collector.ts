@@ -1,154 +1,160 @@
 import { PrismaClient } from "@prisma/client";
-import { io } from "socket.io-client";
 import dotenv from "dotenv";
 import http from "node:http";
+import crypto from "node:crypto";
 
 dotenv.config({ path: ".env.local" });
 dotenv.config({ path: ".env" });
+
 const prisma = new PrismaClient();
 const key = process.env.LIVE_RATES_API_KEY;
 if (!key) throw new Error("Missing LIVE_RATES_API_KEY");
 
+const PORT = Number(process.env.PORT || 8080);
+const POLL_MS = 1000;
 const frames = [
-  ["1min", 60_000],
-  ["5min", 5 * 60_000],
-  ["15min", 15 * 60_000],
-  ["1h", 60 * 60_000],
-  ["4h", 4 * 60 * 60_000],
+  ["1min", 60_000], ["5min", 300_000], ["15min", 900_000],
+  ["1h", 3_600_000], ["4h", 14_400_000],
 ] as const;
 
-function bucketDate(ts: number, size: number) {
-  return new Date(Math.floor(ts / size) * size);
-}
+type Tick = { symbol: string; price: number; timestamp: number };
+let latestTick: Tick | null = null;
+let lastRestOkAt = 0;
+let lastRestError = "";
+let polling = false;
+const clients = new Set<http.ServerResponse>();
 
 async function upsertTick(price: number, ts: number) {
   for (const [interval, size] of frames) {
-    const bucket = bucketDate(ts, size);
+    const bucket = new Date(Math.floor(ts / size) * size);
     await prisma.$executeRaw`
-      INSERT INTO "MarketCandle" ("id", "symbol", "interval", "bucket", "open", "high", "low", "close", "ticks", "createdAt", "updatedAt")
-      VALUES (${crypto.randomUUID()}, 'US30', ${interval}, ${bucket}, ${price}, ${price}, ${price}, ${price}, 1, NOW(), NOW())
-      ON CONFLICT ("symbol", "interval", "bucket")
+      INSERT INTO "MarketCandle" ("id","symbol","interval","bucket","open","high","low","close","ticks","createdAt","updatedAt")
+      VALUES (${crypto.randomUUID()},'US30',${interval},${bucket},${price},${price},${price},${price},1,NOW(),NOW())
+      ON CONFLICT ("symbol","interval","bucket")
       DO UPDATE SET
-        "high" = GREATEST("MarketCandle"."high", EXCLUDED."high"),
-        "low" = LEAST("MarketCandle"."low", EXCLUDED."low"),
-        "close" = EXCLUDED."close",
-        "ticks" = "MarketCandle"."ticks" + 1,
-        "updatedAt" = NOW();
+        "high"=GREATEST("MarketCandle"."high",EXCLUDED."high"),
+        "low"=LEAST("MarketCandle"."low",EXCLUDED."low"),
+        "close"=EXCLUDED."close",
+        "ticks"="MarketCandle"."ticks"+1,
+        "updatedAt"=NOW();
     `;
   }
 }
 
-
-type LiveTick = { symbol: "US30"; price: number; timestamp: number };
-let latestTick: LiveTick | null = null;
-const clients = new Set<http.ServerResponse>();
-const PORT = Number(process.env.PORT || 3001);
-
-function broadcastTick(tick: LiveTick) {
-  const payload = `event: tick\ndata: ${JSON.stringify(tick)}\n\n`;
-  for (const res of clients) {
-    try { res.write(payload); } catch { clients.delete(res); }
+function sendTick(tick: Tick) {
+  const body = `event: tick\ndata: ${JSON.stringify(tick)}\n\n`;
+  for (const client of clients) {
+    try { client.write(body); } catch { clients.delete(client); }
   }
 }
 
+function num(v: unknown) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function extractPrice(payload: any): number | null {
+  const items: any[] = [];
+  if (Array.isArray(payload)) items.push(...payload); else items.push(payload);
+  if (payload?.data) Array.isArray(payload.data) ? items.push(...payload.data) : items.push(payload.data);
+  if (payload?.rates) Array.isArray(payload.rates) ? items.push(...payload.rates) : items.push(payload.rates);
+
+  for (const x of items) {
+    if (!x || typeof x !== "object") continue;
+    const s = String(x.currency ?? x.symbol ?? x.instrument ?? "").toUpperCase().replace(/[^A-Z0-9]/g,"");
+    if (s && s !== "US30") continue;
+    for (const v of [x.bid, x.price, x.close, x.value, x.mid, x.rate_value]) {
+      const n = num(v); if (n !== null) return n;
+    }
+  }
+  return null;
+}
+
+async function poll() {
+  if (polling) return;
+  polling = true;
+  try {
+    const url = `https://www.live-rates.com/api/price?key=${encodeURIComponent(key!)}&rate=US30&_=${Date.now()}`;
+    const res = await fetch(url, {
+      cache: "no-store",
+      headers: { Accept: "application/json", "Cache-Control": "no-cache" },
+      signal: AbortSignal.timeout(8000),
+    });
+    const raw = await res.text();
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${raw.slice(0,180)}`);
+    let payload: any;
+    try { payload = JSON.parse(raw); } catch { throw new Error(`Invalid JSON: ${raw.slice(0,180)}`); }
+    const price = extractPrice(payload);
+    if (price === null) throw new Error(`US30 price not found: ${raw.slice(0,220)}`);
+
+    const tick = { symbol: "US30", price, timestamp: Date.now() };
+    latestTick = tick;
+    lastRestOkAt = tick.timestamp;
+    lastRestError = "";
+    sendTick(tick);
+    void upsertTick(price, tick.timestamp).catch(e => console.error("[US30] DB write error", e));
+  } catch (e) {
+    lastRestError = e instanceof Error ? e.message : String(e);
+    console.error("[US30] REST poll error:", lastRestError);
+  } finally { polling = false; }
+}
+
 const server = http.createServer((req, res) => {
-  const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
-  const origin = req.headers.origin || "";
-  const allowedOrigin =
-    origin === "https://www.fx-trade.eu" ||
-    origin === "https://fx-trade.eu" ||
-    origin.startsWith("http://localhost:")
-      ? origin
-      : "https://www.fx-trade.eu";
-
-  res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
+  const origin = req.headers.origin || "*";
+  res.setHeader("Access-Control-Allow-Origin", origin);
   res.setHeader("Vary", "Origin");
+  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  if (req.method === "OPTIONS") { res.writeHead(204); res.end(); return; }
 
+  const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
   if (url.pathname === "/health") {
-    res.writeHead(200, { "Content-Type": "application/json" });
-    return res.end(JSON.stringify({
-      ok: true,
-      liveRatesConnected: socket.connected,
-      clients: clients.size,
-      latestTick,
+    res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+    res.end(JSON.stringify({
+      ok: true, mode: "REST_1S_TEST",
+      liveRatesConnected: Date.now() - lastRestOkAt < 5000,
+      clients: clients.size, latestTick, pollMs: POLL_MS,
+      lastRestOkAt: lastRestOkAt || null, lastRestError: lastRestError || null,
     }));
+    return;
   }
 
   if (url.pathname === "/api/us30/stream") {
     res.writeHead(200, {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache, no-transform",
-      "Connection": "keep-alive",
+      Connection: "keep-alive",
       "X-Accel-Buffering": "no",
+      "Access-Control-Allow-Origin": origin,
+      Vary: "Origin",
     });
-    res.write(": connected\n\n");
+    res.write("retry: 2000\n\n");
     if (latestTick) res.write(`event: tick\ndata: ${JSON.stringify(latestTick)}\n\n`);
     clients.add(res);
-
-    const ping = setInterval(() => {
-      try { res.write(": ping\n\n"); } catch {}
-    }, 20000);
-
-    req.on("close", () => {
-      clearInterval(ping);
-      clients.delete(res);
-    });
+    const ka = setInterval(() => { try { res.write(`: keepalive ${Date.now()}\n\n`); } catch {} }, 15000);
+    req.on("close", () => { clearInterval(ka); clients.delete(res); });
     return;
   }
 
-  res.writeHead(404).end();
+  res.writeHead(200, { "Content-Type": "application/json" });
+  res.end(JSON.stringify({ ok: true, service: "FX Trade US30 Collector", mode: "REST_1S_TEST" }));
 });
 
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`[US30] HTTP/SSE listening on :${PORT}`);
+  console.log("[US30] REST 1s diagnostic mode started");
 });
 
-const socket = io("https://eu-wss.live-rates.com", {
-  transports: ["websocket"],
-  reconnection: true,
-  reconnectionDelay: 1500,
-});
+void poll();
+const timer = setInterval(() => void poll(), POLL_MS);
 
-socket.on("connect", () => {
-  console.log("[US30] Live-Rates socket connected");
-  socket.emit("instruments", ["US30"]);
-  socket.emit("key", key);
-});
-
-let writeChain = Promise.resolve();
-
-socket.on("rates", (raw: string) => {
-  try {
-    const msg = typeof raw === "string" ? JSON.parse(raw) : raw;
-    if (msg?.info) return console.log("[US30]", msg.info);
-    if (msg?.error) return console.error("[US30]", msg.error);
-    if (String(msg?.currency || "").replace(/[^A-Z0-9]/g, "") !== "US30") return;
-
-    const bid = Number(msg.bid);
-    const rawTs = Number(msg.timestamp);
-    const ts = Number.isFinite(rawTs) && rawTs > 0
-      ? (rawTs < 10_000_000_000 ? rawTs * 1000 : rawTs)
-      : Date.now();
-    if (!Number.isFinite(bid)) return;
-
-    latestTick = { symbol: "US30", price: bid, timestamp: ts };
-    broadcastTick(latestTick);
-
-    writeChain = writeChain
-      .then(() => upsertTick(bid, ts))
-      .catch((e) => console.error("[US30] DB write error", e));
-  } catch (e) {
-    console.error("[US30] tick error", e);
-  }
-});
-
-socket.on("connect_error", (e) => console.error("[US30] socket error", e.message));
-
-async function shutdown() {
-  socket.close();
+async function shutdown(signal: string) {
+  console.log(`[US30] ${signal} - shutting down`);
+  clearInterval(timer);
+  for (const c of clients) { try { c.end(); } catch {} }
   server.close();
   await prisma.$disconnect();
   process.exit(0);
 }
-process.on("SIGINT", shutdown);
-process.on("SIGTERM", shutdown);
+process.on("SIGINT", () => void shutdown("SIGINT"));
+process.on("SIGTERM", () => void shutdown("SIGTERM"));
