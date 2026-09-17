@@ -1099,6 +1099,12 @@ fullscreenMode = false,
 
   const [detached, setDetached] = React.useState<boolean>(false);
   const [overlayTick, setOverlayTick] = React.useState(0);
+  const [alphaCrosshair, setAlphaCrosshair] = React.useState<{
+    x: number;
+    y: number;
+    price: number;
+    time: number;
+  } | null>(null);
   const lastIndicatorLiveUpdateRef = React.useRef(0);
   const rightOffset = rightPadOn ? 28 : 8;
 
@@ -2154,31 +2160,17 @@ kineticScroll: {
         mode: CrosshairMode.Normal,
         vertLine: {
           visible: true,
-          labelVisible: true,
-          color: "rgba(226,232,240,0.70)",
+          color: "rgba(226,232,240,0.85)",
           width: 1,
           style: LineStyle.Dashed,
+          labelVisible: true,
         },
         horzLine: {
           visible: true,
-          labelVisible: true,
-          color: "rgba(226,232,240,0.70)",
+          color: "rgba(226,232,240,0.85)",
           width: 1,
           style: LineStyle.Dashed,
-        },
-      },
-      localization: {
-        timeFormatter: (time: any) => {
-          const ts = toUTCTimestamp(time);
-          return new Intl.DateTimeFormat("pl-PL", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-            hour12: false,
-            timeZone: "UTC",
-          }).format(new Date(Number(ts) * 1000));
+          labelVisible: true,
         },
       },
     });
@@ -2422,14 +2414,12 @@ kineticScroll: {
 
       const containerW = containerRef.current?.clientWidth ?? 0;
 
-      // STREFY: zaczynają się tuż przy świecy SIGNAL i mają STAŁĄ,
-      // krótką długość w świecach. Nie są już liczone do prawej krawędzi
-      // kontenera, więc fullscreen / resize nie rozciąga boxów.
-      const SIGNAL_TO_ZONE_GAP_PX = 8;
-      const ZONE_BARS = 18;
-      const MIN_ZONE_WIDTH_PX = 150;
-      const MAX_ZONE_WIDTH_PX = 360;
-      const PRICE_AXIS_RESERVE_PX = 82;
+      // STREFY: od sygnału -> prawie do prawej osi ceny.
+      // Nie przykrywamy świecy sygnałowej i zostawiamy mały odstęp
+      // przed osią/etykietami ceny, tak jak na wzorze użytkownika.
+      const SIGNAL_TO_ZONE_GAP_PX = 10;
+      const PRICE_AXIS_RESERVE_PX = 78;
+      const ZONE_TO_PRICE_AXIS_GAP_PX = 8;
 
       const startXCoord = chart.timeScale().timeToCoordinate(anchorTime);
 
@@ -2440,27 +2430,12 @@ kineticScroll: {
         return;
       }
 
-      const anchorIdx = findNearestIndexByTime(safeForChart, anchorTime);
-      const timeScaleAny = chart.timeScale() as any;
-      const futureLogicalX =
-        anchorIdx >= 0 && typeof timeScaleAny.logicalToCoordinate === "function"
-          ? timeScaleAny.logicalToCoordinate(anchorIdx + ZONE_BARS)
-          : null;
-
       const rawStartX = Number(startXCoord) + SIGNAL_TO_ZONE_GAP_PX;
-      const estimatedEndX =
-        futureLogicalX != null && Number.isFinite(Number(futureLogicalX))
-          ? Number(futureLogicalX)
-          : rawStartX + ZONE_BARS * 10;
-
-      const desiredWidth = Math.max(
-        MIN_ZONE_WIDTH_PX,
-        Math.min(MAX_ZONE_WIDTH_PX, estimatedEndX - rawStartX)
+      const endX = Math.max(
+        rawStartX + 1,
+        containerW - PRICE_AXIS_RESERVE_PX - ZONE_TO_PRICE_AXIS_GAP_PX
       );
-
-      const maxEndX = Math.max(rawStartX + 1, containerW - PRICE_AXIS_RESERVE_PX);
-      const startX = Math.min(rawStartX, maxEndX - 1);
-      const endX = Math.min(startX + desiredWidth, maxEndX);
+      const startX = Math.min(rawStartX, endX - 1);
       const zoneW = Math.max(1, endX - startX);
 
       const tps = (
@@ -3117,6 +3092,22 @@ kineticScroll: {
     const state = plotPanRef.current;
     const chart = chartRef.current;
     const candleSeries = candleSeriesRef.current;
+
+    // Crosshair w stylu Alpha działa także bez wciśniętego przycisku myszy.
+    if (chart && candleSeries && e.pointerType !== "touch") {
+      try {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+        const y = Math.max(0, Math.min(rect.height, e.clientY - rect.top));
+        const price = Number((candleSeries as any).coordinateToPrice?.(y));
+        const timeRaw = (chart.timeScale() as any).coordinateToTime?.(x);
+        const time = typeof timeRaw === "number" ? timeRaw : toUTCTimestamp(timeRaw);
+        if (Number.isFinite(price) && Number.isFinite(time)) {
+          setAlphaCrosshair({ x, y, price, time });
+        }
+      } catch {}
+    }
+
     if (!state || !chart || !candleSeries || state.pointerId !== e.pointerId) return;
 
     try {
@@ -3456,6 +3447,7 @@ kineticScroll: {
               }}
               onPointerDown={beginPlotPan}
               onPointerMove={movePlotPan}
+              onPointerLeave={() => setAlphaCrosshair(null)}
               onPointerUp={endPlotPan}
               onPointerCancel={endPlotPan}
               onTouchStart={beginTwoFingerTouch}
@@ -3506,6 +3498,38 @@ kineticScroll: {
               onDoubleClick={resetTimeAxis}
               title="Przeciągnij lewo/prawo, aby skalować czas"
             />
+          ) : null}
+
+          {activeDrawTool === "SELECT" && alphaCrosshair ? (
+            <div className="pointer-events-none absolute inset-0 z-[44] overflow-hidden">
+              <div
+                className="absolute top-0 border-l border-dashed border-slate-200/80"
+                style={{ left: alphaCrosshair.x, bottom: 30 }}
+              />
+              <div
+                className="absolute left-0 border-t border-dashed border-slate-200/80"
+                style={{ top: alphaCrosshair.y, right: 86 }}
+              />
+              <div
+                className="absolute right-0 -translate-y-1/2 rounded bg-slate-600 px-2 py-1 text-[11px] font-bold text-white shadow"
+                style={{ top: alphaCrosshair.y }}
+              >
+                {formatPrice(alphaCrosshair.price, pricePrecision ?? guessPrecision(symbol, alphaCrosshair.price))}
+              </div>
+              <div
+                className="absolute bottom-0 -translate-x-1/2 rounded bg-slate-600 px-2 py-1 text-[11px] font-bold text-white shadow"
+                style={{ left: alphaCrosshair.x }}
+              >
+                {new Date(alphaCrosshair.time * 1000).toLocaleString("pl-PL", {
+                  day: "2-digit",
+                  month: "2-digit",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hour12: false,
+                })}
+              </div>
+            </div>
           ) : null}
 
           {patternsEnabled && patternLabels.length ? (
