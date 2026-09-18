@@ -338,12 +338,32 @@ export default function AlphaPriceChart({
       }
     };
 
+    const onStatus = (event: MessageEvent) => {
+      try {
+        const status = JSON.parse(event.data) as { connected?: boolean };
+        if (status.connected === false) setLiveConnected(false);
+      } catch {}
+    };
+
+    // Railway sends named SSE events: `event: tick` and `event: status`.
+    // REAL-TIME becomes true only after an actual price tick reaches the chart.
     source.addEventListener("tick", onTick as EventListener);
-    source.onopen = () => setLiveConnected(true);
-    source.onerror = () => setLiveConnected(false);
+    source.addEventListener("status", onStatus as EventListener);
+    source.onopen = () => {
+      console.info("[US30 LIVE] SSE connected", `${base}/api/us30/stream`);
+    };
+    source.onmessage = (event) => {
+      // Fallback in case the stream/proxy ever sends an unnamed SSE message.
+      onTick(event);
+    };
+    source.onerror = (event) => {
+      console.warn("[US30 LIVE] SSE error", event);
+      setLiveConnected(false);
+    };
 
     return () => {
       source.removeEventListener("tick", onTick as EventListener);
+      source.removeEventListener("status", onStatus as EventListener);
       source.close();
       setLiveConnected(false);
       liveCandleRef.current = null;
