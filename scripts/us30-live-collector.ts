@@ -23,17 +23,19 @@ const frames = [
 
 type Tick = { symbol: string; price: number; timestamp: number };
 
-let latestTick: Tick | null = null;
+const PROVIDER_INSTRUMENTS = ["US30", "EUR/USD", "GBP/USD", "XAU/USD"] as const;
+const SYMBOL_MAP: Record<string,string> = { US30:"US30", EURUSD:"EURUSD", GBPUSD:"GBPUSD", XAUUSD:"XAUUSD" };
+const latestTicks: Record<string, Tick> = {};
 let liveRatesConnected = false;
 let providerInfo = "";
 let providerError = "";
 
 let dbWriting = false;
-let pendingDbTick: Tick | null = null;
+const pendingDbTicks = new Map<string, Tick>();
 
 const clients = new Set<http.ServerResponse>();
 
-async function upsertTick(price: number, ts: number) {
+async function upsertTick(symbol: string, price: number, ts: number) {
   for (const [interval, size] of frames) {
     const bucket = new Date(Math.floor(ts / size) * size);
 
@@ -41,7 +43,7 @@ async function upsertTick(price: number, ts: number) {
       INSERT INTO "MarketCandle"
         ("id","symbol","interval","bucket","open","high","low","close","ticks","createdAt","updatedAt")
       VALUES
-        (${crypto.randomUUID()},'US30',${interval},${bucket},
+        (${crypto.randomUUID()},${symbol},${interval},${bucket},
          ${price},${price},${price},${price},1,NOW(),NOW())
       ON CONFLICT ("symbol","interval","bucket")
       DO UPDATE SET
@@ -55,29 +57,25 @@ async function upsertTick(price: number, ts: number) {
 }
 
 function queueDbTick(tick: Tick) {
-  // Coalesce: while DB is busy, retain only the newest provider tick.
-  pendingDbTick = tick;
+  pendingDbTicks.set(tick.symbol, tick);
   if (!dbWriting) void drainDbQueue();
 }
 
 async function drainDbQueue() {
   if (dbWriting) return;
   dbWriting = true;
-
   try {
-    while (pendingDbTick) {
-      const tick = pendingDbTick;
-      pendingDbTick = null;
-
-      try {
-        await upsertTick(tick.price, tick.timestamp);
-      } catch (e: any) {
-        console.error("[US30] DB write error", e?.code || "", e?.message || e);
+    while (pendingDbTicks.size > 0) {
+      const batch = Array.from(pendingDbTicks.values());
+      pendingDbTicks.clear();
+      for (const tick of batch) {
+        try { await upsertTick(tick.symbol, tick.price, tick.timestamp); }
+        catch (e: any) { console.error(`[${tick.symbol}] DB write error`, e?.code || "", e?.message || e); }
       }
     }
   } finally {
     dbWriting = false;
-    if (pendingDbTick) void drainDbQueue();
+    if (pendingDbTicks.size > 0) void drainDbQueue();
   }
 }
 
@@ -118,7 +116,7 @@ socket.on("connect", () => {
   providerError = "";
   console.log("[US30] Live-Rates SINGLE socket connected");
 
-  socket.emit("instruments", ["US30"]);
+  socket.emit("instruments", [...PROVIDER_INSTRUMENTS]);
   socket.emit("key", { key });
 
   broadcast("status", {
@@ -162,22 +160,15 @@ socket.on("rates", (raw: any) => {
       return;
     }
 
-    const symbol = String(msg?.currency ?? msg?.symbol ?? "")
-      .toUpperCase()
-      .replace(/[^A-Z0-9]/g, "");
-
-    if (symbol !== "US30") return;
-
+    const providerSymbol = String(msg?.currency ?? msg?.symbol ?? "")
+      .toUpperCase().replace(/[^A-Z0-9]/g, "");
+    const symbol = SYMBOL_MAP[providerSymbol];
+    if (!symbol) return;
     const bid = Number(msg?.bid);
-    if (!Number.isFinite(bid)) return;
+    if (!Number.isFinite(bid) || bid <= 0) return;
 
-    const tick: Tick = {
-      symbol: "US30",
-      price: bid,
-      timestamp: normalizeTimestamp(msg?.timestamp),
-    };
-
-    latestTick = tick;
+    const tick: Tick = { symbol, price: bid, timestamp: normalizeTimestamp(msg?.timestamp) };
+    latestTicks[symbol] = tick;
 
     // Browser gets the tick immediately; DB work is serialized separately.
     broadcast("tick", tick);
@@ -242,9 +233,11 @@ const server = http.createServer((req, res) => {
       mode: "WS_SINGLE_CONNECTION",
       liveRatesConnected,
       clients: clients.size,
-      latestTick,
+      instruments: PROVIDER_INSTRUMENTS,
+      latestTicks,
       dbWriting,
-      dbPending: Boolean(pendingDbTick),
+      dbPending: pendingDbTicks.size > 0,
+      dbPendingSymbols: Array.from(pendingDbTicks.keys()),
       providerInfo: providerInfo || null,
       providerError: providerError || null,
       socketId: socket.id || null,
@@ -254,7 +247,9 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (url.pathname === "/api/us30/stream") {
+  const streamMatch = url.pathname.match(/^\/api\/(us30|eurusd|gbpusd|xauusd)\/stream$/i);
+  if (streamMatch) {
+    const streamSymbol = streamMatch[1].toUpperCase();
     res.writeHead(200, {
       "Content-Type": "text/event-stream; charset=utf-8",
       "Cache-Control": "no-cache, no-transform",
@@ -272,9 +267,8 @@ const server = http.createServer((req, res) => {
       mode: "WS_SINGLE_CONNECTION",
     })}\n\n`);
 
-    if (latestTick) {
-      res.write(`event: tick\ndata: ${JSON.stringify(latestTick)}\n\n`);
-    }
+    const latestTick = latestTicks[streamSymbol];
+    if (latestTick) res.write(`event: tick\ndata: ${JSON.stringify(latestTick)}\n\n`);
 
     clients.add(res);
 
@@ -295,10 +289,11 @@ const server = http.createServer((req, res) => {
   res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
   res.end(JSON.stringify({
     ok: true,
-    service: "FX Trade US30 Collector",
+    service: "FX Trade Multi-Market Collector",
     mode: "WS_SINGLE_CONNECTION",
+    instruments: PROVIDER_INSTRUMENTS,
     health: "/health",
-    stream: "/api/us30/stream",
+    streams: { US30:"/api/us30/stream", EURUSD:"/api/eurusd/stream", GBPUSD:"/api/gbpusd/stream", XAUUSD:"/api/xauusd/stream" },
   }));
 });
 
