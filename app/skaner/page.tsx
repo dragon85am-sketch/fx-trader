@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import {
@@ -26,6 +26,24 @@ type ScannerCard = {
 };
 
 const scanners: ScannerCard[] = [
+  {
+    title: "Sniper Scanner",
+    description: "Precyzyjne wejścia z Demand / Supply",
+    href: "/skaner/sniper",
+    badge: "NOWOŚĆ",
+    image: "/sniper-scanner.png",
+    accent: "cyan",
+    features: ["Automatyczne Demand / Supply Zones", "Trend EMA 50 / 200", "Momentum + potwierdzenie 3/3", "READY + Entry / SL / TP1 / TP2"],
+  },
+  {
+    title: "Chart Pattern Scanner",
+    description: "Automatyczne formacje klasyczne",
+    href: "/skaner/chart-pattern",
+    badge: "NOWOŚĆ",
+    image: "/chart-pattern-scanner.png",
+    accent: "blue",
+    features: ["Triangle / Wedge / Double Top-Bottom", "Automatyczne rysowanie patternu", "Breakout / struktura", "READY + Entry / SL / TP1 / TP2"],
+  },
   {
     title: "FX Scanner",
     description: "Klasyczny skaner rynku Forex",
@@ -199,7 +217,7 @@ export default function SkanerPage() {
 
             <div className="grid w-full grid-cols-2 gap-2 md:grid-cols-4 xl:w-auto">
               {[
-                [ScanSearch, "5", "Skanery dostępne"],
+                [ScanSearch, "7", "Skanery dostępne"],
                 [TrendingUp, "10+", "Rynki obsługiwane"],
                 [Zap, "24/7", "Skanowanie realtime"],
                 [BrainCircuit, "AI", "Inteligentne analizy"],
@@ -226,7 +244,7 @@ export default function SkanerPage() {
         </section>
 
         {/* SCANNERS */}
-        <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
+        <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {scanners.map((scanner) => {
             const a = accentClasses(scanner.accent);
 

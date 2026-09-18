@@ -98,7 +98,6 @@ export default function AlphaPriceChart({
 
   const [liveConnected, setLiveConnected] = React.useState(false);
   const liveCandleRef = React.useRef<CandlestickData | null>(null);
-  const liveTickMinuteRef = React.useRef<number | null>(null);
 
   // ====================================================
   // CREATE CHART
@@ -306,56 +305,31 @@ export default function AlphaPriceChart({
         const series = seriesRef.current;
         if (!series || !Number.isFinite(price) || !Number.isFinite(timestamp)) return;
 
-        // Live-Rates timestamp is milliseconds.
-        // IMPORTANT: historical US30 candles can use a display-time offset, while
-        // Live-Rates sends real UTC epoch time. Comparing those two directly can
-        // make lightweight-charts think the live tick is older than the last bar.
-        // We therefore anchor the first live tick to the existing last chart bar
-        // and only advance chart time by 60s when Live-Rates enters a new minute.
-        const tickMinute = Math.floor(timestamp / 60_000);
+        // Live-Rates timestamp is milliseconds. Update the active M1 candle tick-by-tick.
+        const bucket = Math.floor(timestamp / 60_000) * 60;
         const prev = liveCandleRef.current;
-        const prevTickMinute = liveTickMinuteRef.current;
 
         let next: CandlestickData;
 
-        if (prev) {
-          const isNewMinute = prevTickMinute !== null && tickMinute > prevTickMinute;
-
-          if (isNewMinute) {
-            const prevTime = typeof prev.time === "number" ? prev.time : null;
-            const nextTime = prevTime !== null
-              ? ((prevTime + 60) as Time)
-              : prev.time;
-            const open = prev.close;
-
-            next = {
-              time: nextTime,
-              open,
-              high: Math.max(open, price),
-              low: Math.min(open, price),
-              close: price,
-            };
-          } else {
-            next = {
-              time: prev.time,
-              open: prev.open,
-              high: Math.max(prev.high, price),
-              low: Math.min(prev.low, price),
-              close: price,
-            };
-          }
-        } else {
-          // Fallback only if the REST candle set has not arrived yet.
+        if (prev && Number(prev.time) === bucket) {
           next = {
-            time: (tickMinute * 60) as Time,
-            open: price,
-            high: price,
-            low: price,
+            time: bucket as Time,
+            open: prev.open,
+            high: Math.max(prev.high, price),
+            low: Math.min(prev.low, price),
+            close: price,
+          };
+        } else {
+          const open = prev ? prev.close : price;
+          next = {
+            time: bucket as Time,
+            open,
+            high: Math.max(open, price),
+            low: Math.min(open, price),
             close: price,
           };
         }
 
-        liveTickMinuteRef.current = tickMinute;
         liveCandleRef.current = next;
         series.update(next);
         setLiveConnected(true);
@@ -364,36 +338,15 @@ export default function AlphaPriceChart({
       }
     };
 
-    const onStatus = (event: MessageEvent) => {
-      try {
-        const status = JSON.parse(event.data) as { connected?: boolean };
-        if (status.connected === false) setLiveConnected(false);
-      } catch {}
-    };
-
-    // Railway sends named SSE events: `event: tick` and `event: status`.
-    // REAL-TIME becomes true only after an actual price tick reaches the chart.
     source.addEventListener("tick", onTick as EventListener);
-    source.addEventListener("status", onStatus as EventListener);
-    source.onopen = () => {
-      console.info("[US30 LIVE] SSE connected", `${base}/api/us30/stream`);
-    };
-    source.onmessage = (event) => {
-      // Fallback in case the stream/proxy ever sends an unnamed SSE message.
-      onTick(event);
-    };
-    source.onerror = (event) => {
-      console.warn("[US30 LIVE] SSE error", event);
-      setLiveConnected(false);
-    };
+    source.onopen = () => setLiveConnected(true);
+    source.onerror = () => setLiveConnected(false);
 
     return () => {
       source.removeEventListener("tick", onTick as EventListener);
-      source.removeEventListener("status", onStatus as EventListener);
       source.close();
       setLiveConnected(false);
       liveCandleRef.current = null;
-      liveTickMinuteRef.current = null;
     };
   }, [symbol, liveBaseUrl]);
 

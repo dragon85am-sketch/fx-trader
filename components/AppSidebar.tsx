@@ -415,8 +415,10 @@ export default function AppSidebar() {
               { label: "FX Scanner", href: "/skaner/fx" },
               { label: "Harmonic Scanner", href: "/skaner/harmonic" },
               { label: "PRO FX Scanner", href: "/skaner/pro" },
-                            { label: "Alpha Scanner", href: "/skaner/alpha" },
+              { label: "Alpha Scanner", href: "/skaner/alpha" },
               { label: "GOLD Scalping Scanner", href: "/skaner/gold" },
+              { label: "Sniper Scanner", href: "/skaner/sniper" },
+              { label: "Chart Pattern Scanner", href: "/skaner/chart-pattern" },
             ],
           },
           {
@@ -487,8 +489,10 @@ export default function AppSidebar() {
               { label: "FX Scanner", href: "/skaner/fx" },
               { label: "Harmonic Scanner", href: "/skaner/harmonic" },
               { label: "PRO FX Scanner", href: "/skaner/pro" },
-                            { label: "Alpha Scanner", href: "/skaner/alpha" },
+              { label: "Alpha Scanner", href: "/skaner/alpha" },
               { label: "GOLD Scalping Scanner", href: "/skaner/gold" },
+              { label: "Sniper Scanner", href: "/skaner/sniper" },
+              { label: "Chart Pattern Scanner", href: "/skaner/chart-pattern" },
             ],
           },
           {
