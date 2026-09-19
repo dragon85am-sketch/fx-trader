@@ -982,10 +982,6 @@ function Row({
 /* =========================
    COMPONENT
 ========================= */
-const EMPTY_RENKO_CANDLES: CandlestickData[] = [];
-const EMPTY_ANALYSIS_ZONES: AnalysisZone[] = [];
-const EMPTY_ANALYSIS_LINES: AnalysisLine[] = [];
-
 export default function MarketChart({
   symbol,
   tf,
@@ -997,7 +993,7 @@ export default function MarketChart({
   bbConfig,
   heikinAshi = false,
   renko = false,
-  renkoCandles = EMPTY_RENKO_CANDLES,
+  renkoCandles = [],
   renkoBoxSize,
   showTradeLines = false,
   levels,
@@ -1019,35 +1015,10 @@ supertrendUpColor = "#22c55e",
 supertrendDownColor = "#ef4444",
 patternsEnabled = false,
 fullscreenMode = false,
-analysisZones = EMPTY_ANALYSIS_ZONES,
-analysisLines = EMPTY_ANALYSIS_LINES,
-onVisibleTimeRangeChange,
-onCrosshairTimeChange,
 }: Props) {
   const containerRef = React.useRef<HTMLDivElement | null>(null);
   const chartRef = React.useRef<IChartApi | null>(null);
   const candleSeriesRef = React.useRef<ISeriesApi<"Candlestick"> | null>(null);
-
-  React.useEffect(() => {
-    const chart = chartRef.current;
-    if (!chart) return;
-    const onRange = (r: any) => {
-      if (!onVisibleTimeRangeChange) return;
-      if (!r) return onVisibleTimeRangeChange(null);
-      const conv=(v:any)=> typeof v === "number" ? v : (v && typeof v === "object" && "year" in v ? Date.UTC(v.year,v.month-1,v.day)/1000 : Number(v));
-      onVisibleTimeRangeChange({from:conv(r.from),to:conv(r.to)});
-    };
-    const onCross = (p:any) => {
-      if (!onCrosshairTimeChange) return;
-      const t=p?.time;
-      if (t == null) return onCrosshairTimeChange(null);
-      onCrosshairTimeChange(typeof t === "number" ? t : Date.UTC(t.year,t.month-1,t.day)/1000);
-    };
-    const ts:any=chart.timeScale();
-    ts.subscribeVisibleTimeRangeChange?.(onRange);
-    chart.subscribeCrosshairMove?.(onCross);
-    return()=>{ts.unsubscribeVisibleTimeRangeChange?.(onRange);chart.unsubscribeCrosshairMove?.(onCross);};
-  }, [onVisibleTimeRangeChange,onCrosshairTimeChange,candles.length]);
 
   // Własne uchwyty osi — gwarantują skalowanie nawet wtedy,
   // gdy natywny hit-test osi Lightweight Charts jest przykryty przez layout.
@@ -1119,6 +1090,9 @@ onCrosshairTimeChange,
   const displayCacheRef = React.useRef<CandlestickData[]>([]);
 
   const frozenAnchorTimeRef = React.useRef<UTCTimestamp | null>(null);
+  // Aktualna kotwica boxów TP/SL/ENTRY. Używana także podczas pan/zoom/fit.
+  const zoneAnchorTimeRef = React.useRef<UTCTimestamp | null>(null);
+  const zoneGapPxRef = React.useRef(12);
   const frozenAnchorKeyRef = React.useRef<string>("");
 
   const [freezeDebug, setFreezeDebug] = React.useState<{
@@ -1352,31 +1326,6 @@ onCrosshairTimeChange,
   // Jeśli go nie ma, używamy stref z HH/HL / LL/LH breakout.
   const activeLevels = showTradeLines && levels ? levels : patternTradeLevels;
   const activeShowTradeLines = !!activeLevels;
-
-  const analysisOverlay = React.useMemo(() => {
-    const chart = chartRef.current;
-    const series = candleSeriesRef.current;
-    if (!chart || !series) return { zones: [] as any[], lines: [] as any[] };
-    const last = displayCacheRef.current[displayCacheRef.current.length - 1];
-    const zones = analysisZones.flatMap((z) => {
-      const x1 = chart.timeScale().timeToCoordinate(z.startTime);
-      const endTime = z.endTime;
-      const x2 = endTime ? chart.timeScale().timeToCoordinate(endTime) : Math.max(Number(x1 ?? 0) + 24, (containerRef.current?.clientWidth ?? 900) - 74);
-      const y1 = series.priceToCoordinate(z.from);
-      const y2 = series.priceToCoordinate(z.to);
-      if ([x1, x2, y1, y2].some((v) => v == null || !Number.isFinite(Number(v)))) return [];
-      return [{ ...z, x: Math.min(Number(x1), Number(x2)), y: Math.min(Number(y1), Number(y2)), w: Math.abs(Number(x2)-Number(x1)), h: Math.max(2, Math.abs(Number(y2)-Number(y1))) }];
-    });
-    const lines = analysisLines.flatMap((l) => {
-      const x1 = chart.timeScale().timeToCoordinate(l.fromTime);
-      const x2 = chart.timeScale().timeToCoordinate(l.toTime);
-      const y1 = series.priceToCoordinate(l.fromPrice);
-      const y2 = series.priceToCoordinate(l.toPrice);
-      if ([x1, x2, y1, y2].some((v) => v == null || !Number.isFinite(Number(v)))) return [];
-      return [{ ...l, x1:Number(x1), x2:Number(x2), y1:Number(y1), y2:Number(y2) }];
-    });
-    return { zones, lines };
-  }, [analysisZones, analysisLines, overlayTick, candles, liveCandle]);
 
   const bbFillOverlay = React.useMemo(() => {
     const chart = chartRef.current;
@@ -2271,6 +2220,23 @@ kineticScroll: {
       try {
         setOverlayTick((v) => v + 1);
 
+        // Boxy są HTML/SVG overlayem, więc lightweight-charts nie przesuwa ich
+        // automatycznie razem ze świecami. Przy każdym pan/zoom/fit przeliczamy
+        // X z czasu świecy SIGNAL, aby strefy zawsze zostały przy sygnale.
+        const zoneT = zoneAnchorTimeRef.current;
+        if (zoneT != null) {
+          const zx = chart.timeScale().timeToCoordinate(zoneT);
+          if (zx != null && Number.isFinite(Number(zx))) {
+            const nextX = Number(zx) + zoneGapPxRef.current;
+            setZoneRects((prev) =>
+              prev.map((r) => (Math.abs(r.x - nextX) < 0.5 ? r : { ...r, x: nextX }))
+            );
+            setOverlayLines((prev) =>
+              prev.map((l) => (Math.abs(l.x - nextX) < 0.5 ? l : { ...l, x: nextX }))
+            );
+          }
+        }
+
         const ts: any = chart.timeScale();
         const ds = displayCacheRef.current;
         if (!ds?.length) return;
@@ -2341,6 +2307,7 @@ kineticScroll: {
       lastBarTimeRef.current = null;
       seriesKeyRef.current = "";
       frozenAnchorTimeRef.current = null;
+      zoneAnchorTimeRef.current = null;
       frozenAnchorKeyRef.current = "";
       setFreezeDebug({
         frozen: false,
@@ -2510,6 +2477,9 @@ kineticScroll: {
         }
       }
 
+      zoneAnchorTimeRef.current = zoneAnchorTime;
+      zoneGapPxRef.current = SIGNAL_TO_ZONE_GAP_PX;
+
       const startXCoord = chart.timeScale().timeToCoordinate(zoneAnchorTime);
 
       if (startXCoord == null || !Number.isFinite(Number(startXCoord))) {
@@ -2664,6 +2634,7 @@ kineticScroll: {
       setOverlayLines([]);
       setZoneLabels([]);
       frozenAnchorTimeRef.current = null;
+      zoneAnchorTimeRef.current = null;
       frozenAnchorKeyRef.current = "";
       setFreezeDebug({
         frozen: false,
@@ -3428,8 +3399,11 @@ kineticScroll: {
                 chartRef.current?.timeScale().scrollToRealTime();
               } catch {}
             }}
-            className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-[10px] font-bold text-zinc-200/70 transition hover:bg-white/10 hover:text-white sm:rounded-xl sm:px-2.5 sm:text-xs xl:rounded-2xl xl:px-3 xl:py-2"
-            data-follow-active={followOnTick && !detached ? "true" : "false"}
+            className={`rounded-lg border px-2 py-1.5 text-[10px] font-bold transition sm:rounded-xl sm:px-2.5 sm:text-xs xl:rounded-2xl xl:px-3 xl:py-2 ${
+              followOnTick && !detached
+                ? "border-sky-400/35 bg-sky-500/15 text-sky-100"
+                : "border-white/10 bg-white/5 text-zinc-200/70 hover:bg-white/10 hover:text-white"
+            }`}
             title="Follow (smart)"
           >
             FOLLOW
@@ -3464,11 +3438,6 @@ kineticScroll: {
         </div>
 
         <style>{`
-          button[data-follow-active="true"] {
-            border-color: rgba(56,189,248,.35);
-            background: rgba(14,165,233,.15);
-            color: rgb(224 242 254);
-          }
           @keyframes entryPulse {
             0% {
               opacity: 0.22;
@@ -3681,23 +3650,6 @@ kineticScroll: {
                     />
                   ))
                 : null}
-            </svg>
-          ) : null}
-
-          {(analysisOverlay.zones.length || analysisOverlay.lines.length) ? (
-            <svg className="pointer-events-none absolute inset-0 z-[12] h-full w-full" aria-hidden="true">
-              {analysisOverlay.zones.map((z: any) => (
-                <g key={z.id}>
-                  <rect x={z.x} y={z.y} width={z.w} height={z.h} rx="3" fill={z.kind === "DEMAND" ? "rgba(14,165,233,.16)" : "rgba(239,68,68,.14)"} stroke={z.kind === "DEMAND" ? "#0ea5e9" : "#ef4444"} strokeWidth="1.5" />
-                  <text x={z.x + 8} y={z.y + 16} fill={z.kind === "DEMAND" ? "#38bdf8" : "#f87171"} fontSize="11" fontWeight="700">{z.label ?? `${z.kind} ZONE`}</text>
-                </g>
-              ))}
-              {analysisOverlay.lines.map((l: any) => (
-                <g key={l.id}>
-                  <line x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} stroke="#38bdf8" strokeWidth="2.5" />
-                  {l.label ? <text x={l.x2 + 5} y={l.y2 - 5} fill="#7dd3fc" fontSize="10" fontWeight="700">{l.label}</text> : null}
-                </g>
-              ))}
             </svg>
           ) : null}
 

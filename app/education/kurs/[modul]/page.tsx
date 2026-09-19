@@ -579,7 +579,7 @@ export default function ModulPage({
       className="w-full h-full"
       src={
   active.contentKey === "m0-l1-czym-jest-trading"
-    ? "https://www.youtube.com/embed/NoMn8C2XtAc"
+    ? "https://www.youtube.com/embed/hpTgxMk6NVU"
     : active.contentKey === "m0-l2-jak-dziala-rynek-forex"
     ? "https://www.youtube.com/embed/qOMj6UxLWc0"
     : active.contentKey === "m0-l3-pips-lot-spread"
