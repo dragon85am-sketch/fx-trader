@@ -1093,6 +1093,34 @@ fullscreenMode = false,
   // Aktualna kotwica boxów TP/SL/ENTRY. Używana także podczas pan/zoom/fit.
   const zoneAnchorTimeRef = React.useRef<UTCTimestamp | null>(null);
   const zoneGapPxRef = React.useRef(12);
+  // Overlay stref jest przesuwany bezpośrednio w DOM w każdej klatce.
+  // Dzięki temu nie czeka na render Reacta podczas pan/zoom i nie "lata" względem SIGNAL.
+  const zoneBaseXRef = React.useRef<number | null>(null);
+  const zoneSvgRef = React.useRef<SVGSVGElement | null>(null);
+  const zoneLabelsRef = React.useRef<HTMLDivElement | null>(null);
+
+  React.useEffect(() => {
+    let raf = 0;
+    const sync = () => {
+      const chart = chartRef.current;
+      const t = zoneAnchorTimeRef.current;
+      const baseX = zoneBaseXRef.current;
+      if (chart && t != null && baseX != null) {
+        const x = chart.timeScale().timeToCoordinate(t);
+        if (x != null && Number.isFinite(Number(x))) {
+          const dx = Number(x) + zoneGapPxRef.current - baseX;
+          const tr = `translate3d(${dx}px,0,0)`;
+          if (zoneSvgRef.current) zoneSvgRef.current.style.transform = tr;
+          if (zoneLabelsRef.current) zoneLabelsRef.current.style.transform = tr;
+        }
+      }
+      raf = requestAnimationFrame(sync);
+    };
+    raf = requestAnimationFrame(sync);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+
   const frozenAnchorKeyRef = React.useRef<string>("");
 
   const [freezeDebug, setFreezeDebug] = React.useState<{
@@ -2226,14 +2254,13 @@ kineticScroll: {
         const zoneT = zoneAnchorTimeRef.current;
         if (zoneT != null) {
           const zx = chart.timeScale().timeToCoordinate(zoneT);
-          if (zx != null && Number.isFinite(Number(zx))) {
+          const baseX = zoneBaseXRef.current;
+          if (zx != null && Number.isFinite(Number(zx)) && baseX != null) {
             const nextX = Number(zx) + zoneGapPxRef.current;
-            setZoneRects((prev) =>
-              prev.map((r) => (Math.abs(r.x - nextX) < 0.5 ? r : { ...r, x: nextX }))
-            );
-            setOverlayLines((prev) =>
-              prev.map((l) => (Math.abs(l.x - nextX) < 0.5 ? l : { ...l, x: nextX }))
-            );
+            const dx = nextX - baseX;
+            const tr = `translate3d(${dx}px,0,0)`;
+            if (zoneSvgRef.current) zoneSvgRef.current.style.transform = tr;
+            if (zoneLabelsRef.current) zoneLabelsRef.current.style.transform = tr;
           }
         }
 
@@ -2267,6 +2294,7 @@ kineticScroll: {
     const ro = new ResizeObserver(() => {
       chart.applyOptions({ width: el.clientWidth || 800, height });
       setOverlayTick((v) => v + 1);
+      requestAnimationFrame(onRangeChange);
     });
     ro.observe(el);
 
@@ -2490,6 +2518,9 @@ kineticScroll: {
       }
 
       const startX = Number(startXCoord) + SIGNAL_TO_ZONE_GAP_PX;
+      zoneBaseXRef.current = startX;
+      if (zoneSvgRef.current) zoneSvgRef.current.style.transform = "translate3d(0,0,0)";
+      if (zoneLabelsRef.current) zoneLabelsRef.current.style.transform = "translate3d(0,0,0)";
       const zoneW = ZONE_WIDTH_PX;
 
       const tps = (
@@ -3689,7 +3720,7 @@ kineticScroll: {
               timeframe={tf ?? "default"}
             />
           </div>
-          <svg className="pointer-events-none absolute inset-0 z-[5] h-full w-full">
+          <svg ref={zoneSvgRef} className="pointer-events-none absolute inset-0 z-[5] h-full w-full" style={{ willChange: "transform" }}>
             <defs>
               <linearGradient id="entryGradBuy" x1="0" y1="0" x2="1" y2="0">
                 <stop offset="0%" stopColor="rgba(16,185,129,0.05)" />
@@ -3801,7 +3832,7 @@ kineticScroll: {
             ))}
           </svg>
 
-          <div className="pointer-events-none absolute inset-0 z-[15]">
+          <div ref={zoneLabelsRef} className="pointer-events-none absolute inset-0 z-[15]" style={{ willChange: "transform" }}>
             {zoneLabels.map((lb) => {
               const dp = Math.min(8, (pricePrecision ?? 5) + 0);
               const priceText =
