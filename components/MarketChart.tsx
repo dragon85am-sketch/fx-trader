@@ -3704,9 +3704,11 @@ kineticScroll: {
             Drawing tools re-enable the drawing overlay.
           */}
           <div
-            className={`absolute inset-0 z-[20] ${activeDrawTool === "SELECT" ? "pointer-events-none" : "pointer-events-auto"}`}
+            className="absolute inset-0 z-[20] pointer-events-auto"
             style={{
-              cursor: "crosshair",
+              // DrawingsLayer musi odbierać zdarzenia również w SELECT.
+              // Inaczej hit-test, podświetlenie i drag obiektów nigdy nie startują.
+              cursor: activeDrawTool === "SELECT" ? "default" : "crosshair",
             }}
           >
             <DrawingsLayer

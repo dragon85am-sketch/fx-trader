@@ -1213,9 +1213,11 @@ if (o.type === "FIBO") {
     pointerEvents: "auto",
     // Bez „łapki”. SELECT ma taki sam kursor/crosshair jak Alpha.
     cursor: activeDrawTool === "SELECT"
-      ? hoverId
-        ? "move"
-        : "crosshair"
+      ? dragRef.current.id || chartPanRef.current.active
+        ? "grabbing"
+        : hoverId
+          ? "grab"
+          : "crosshair"
       : "crosshair",
     touchAction: "none",
   }}
@@ -1279,6 +1281,10 @@ if (o.type === "FIBO") {
   onMouseDown={handleMouseDown}
   onMouseMove={handleMouseMove}
   onMouseUp={handleMouseUp}
+  onMouseLeave={() => {
+    if (isMouseDownRef.current) handleMouseUp();
+    setHoverId(null);
+  }}
 />
     </>
   );
