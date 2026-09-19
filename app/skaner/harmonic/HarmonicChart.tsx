@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React from "react";
 import {
@@ -60,6 +60,8 @@ export default function HarmonicChart({
   const containerRef = React.useRef<HTMLDivElement | null>(null);
   const chartRef = React.useRef<IChartApi | null>(null);
   const candleSeriesRef = React.useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const disposedRef = React.useRef(false);
+  const overlayRafRef = React.useRef<number | null>(null);
 
   const [pixelPoints, setPixelPoints] = React.useState<PixelPoint[]>([]);
   const [levelPixels, setLevelPixels] = React.useState<
@@ -70,8 +72,9 @@ export default function HarmonicChart({
   const recalcOverlay = React.useCallback(() => {
     const chart = chartRef.current;
     const series = candleSeriesRef.current;
-    if (!chart || !series) return;
+    if (!chart || !series || disposedRef.current) return;
 
+    try {
     if (pattern?.points?.length === 5) {
       const pts = pattern.points
         .map((p) => {
@@ -118,12 +121,17 @@ export default function HarmonicChart({
       setLevelPixels([]);
       setPrzPixels(null);
     }
+    } catch {
+      // Lightweight Charts may already be disposed during route/TF changes.
+      return;
+    }
   }, [pattern, levels]);
 
   React.useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
 
+    disposedRef.current = false;
     const chart = createChart(el, {
       width: el.clientWidth || 1000,
       height,
@@ -183,38 +191,56 @@ export default function HarmonicChart({
     ts.subscribeVisibleLogicalRangeChange?.(onRange);
 
     const ro = new ResizeObserver(() => {
-      chart.applyOptions({ width: el.clientWidth || 1000, height });
-      requestAnimationFrame(recalcOverlay);
+      if (disposedRef.current) return;
+      try {
+        chart.applyOptions({ width: el.clientWidth || 1000, height });
+      } catch {
+        return;
+      }
+      if (overlayRafRef.current != null) cancelAnimationFrame(overlayRafRef.current);
+      overlayRafRef.current = requestAnimationFrame(() => {
+        if (!disposedRef.current) recalcOverlay();
+      });
     });
     ro.observe(el);
 
-    let raf = 0;
-    const tick = () => {
-      recalcOverlay();
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
+    overlayRafRef.current = requestAnimationFrame(() => {
+      if (!disposedRef.current) recalcOverlay();
+    });
 
     return () => {
-      cancelAnimationFrame(raf);
+      disposedRef.current = true;
+      if (overlayRafRef.current != null) {
+        cancelAnimationFrame(overlayRafRef.current);
+        overlayRafRef.current = null;
+      }
       ro.disconnect();
-      ts.unsubscribeVisibleTimeRangeChange?.(onRange);
-      ts.unsubscribeVisibleLogicalRangeChange?.(onRange);
-      chart.remove();
-      chartRef.current = null;
-      candleSeriesRef.current = null;
+      try { ts.unsubscribeVisibleTimeRangeChange?.(onRange); } catch {}
+      try { ts.unsubscribeVisibleLogicalRangeChange?.(onRange); } catch {}
+
+      // Clear refs before disposing so no queued callback can touch the old API.
+      if (chartRef.current === chart) chartRef.current = null;
+      if (candleSeriesRef.current === series) candleSeriesRef.current = null;
+      try { chart.remove(); } catch {}
     };
   }, [height]);
 
   React.useEffect(() => {
     const chart = chartRef.current;
     const series = candleSeriesRef.current;
-    if (!chart || !series) return;
+    if (!chart || !series || disposedRef.current) return;
 
     const safe = Array.isArray(candles) ? candles : [];
-    series.setData(safe);
-    if (safe.length) chart.timeScale().fitContent();
-    requestAnimationFrame(recalcOverlay);
+    try {
+      series.setData(safe);
+      if (safe.length) chart.timeScale().fitContent();
+    } catch {
+      return;
+    }
+    if (overlayRafRef.current != null) cancelAnimationFrame(overlayRafRef.current);
+    overlayRafRef.current = requestAnimationFrame(() => {
+      if (!disposedRef.current) recalcOverlay();
+    });
   }, [candles, symbol, tf, recalcOverlay]);
 
   const polyline = pixelPoints.map((p) => `${p.x},${p.y}`).join(" ");

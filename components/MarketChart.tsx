@@ -982,6 +982,10 @@ function Row({
 /* =========================
    COMPONENT
 ========================= */
+const EMPTY_RENKO_CANDLES: CandlestickData[] = [];
+const EMPTY_ANALYSIS_ZONES: AnalysisZone[] = [];
+const EMPTY_ANALYSIS_LINES: AnalysisLine[] = [];
+
 export default function MarketChart({
   symbol,
   tf,
@@ -993,7 +997,7 @@ export default function MarketChart({
   bbConfig,
   heikinAshi = false,
   renko = false,
-  renkoCandles = [],
+  renkoCandles = EMPTY_RENKO_CANDLES,
   renkoBoxSize,
   showTradeLines = false,
   levels,
@@ -1015,8 +1019,8 @@ supertrendUpColor = "#22c55e",
 supertrendDownColor = "#ef4444",
 patternsEnabled = false,
 fullscreenMode = false,
-analysisZones = [],
-analysisLines = [],
+analysisZones = EMPTY_ANALYSIS_ZONES,
+analysisLines = EMPTY_ANALYSIS_LINES,
 onVisibleTimeRangeChange,
 onCrosshairTimeChange,
 }: Props) {
@@ -1356,8 +1360,8 @@ onCrosshairTimeChange,
     const last = displayCacheRef.current[displayCacheRef.current.length - 1];
     const zones = analysisZones.flatMap((z) => {
       const x1 = chart.timeScale().timeToCoordinate(z.startTime);
-      const endTime = z.endTime ?? (last?.time as UTCTimestamp | undefined);
-      const x2 = endTime ? chart.timeScale().timeToCoordinate(endTime) : null;
+      const endTime = z.endTime;
+      const x2 = endTime ? chart.timeScale().timeToCoordinate(endTime) : Math.max(Number(x1 ?? 0) + 24, (containerRef.current?.clientWidth ?? 900) - 74);
       const y1 = series.priceToCoordinate(z.from);
       const y2 = series.priceToCoordinate(z.to);
       if ([x1, x2, y1, y2].some((v) => v == null || !Number.isFinite(Number(v)))) return [];
@@ -3424,11 +3428,8 @@ kineticScroll: {
                 chartRef.current?.timeScale().scrollToRealTime();
               } catch {}
             }}
-            className={`rounded-lg border px-2 py-1.5 text-[10px] font-bold transition sm:rounded-xl sm:px-2.5 sm:text-xs xl:rounded-2xl xl:px-3 xl:py-2 ${
-              followOnTick && !detached
-                ? "border-sky-400/35 bg-sky-500/15 text-sky-100"
-                : "border-white/10 bg-white/5 text-zinc-200/70 hover:bg-white/10 hover:text-white"
-            }`}
+            className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-[10px] font-bold text-zinc-200/70 transition hover:bg-white/10 hover:text-white sm:rounded-xl sm:px-2.5 sm:text-xs xl:rounded-2xl xl:px-3 xl:py-2"
+            data-follow-active={followOnTick && !detached ? "true" : "false"}
             title="Follow (smart)"
           >
             FOLLOW
@@ -3463,6 +3464,11 @@ kineticScroll: {
         </div>
 
         <style>{`
+          button[data-follow-active="true"] {
+            border-color: rgba(56,189,248,.35);
+            background: rgba(14,165,233,.15);
+            color: rgb(224 242 254);
+          }
           @keyframes entryPulse {
             0% {
               opacity: 0.22;
@@ -3688,7 +3694,7 @@ kineticScroll: {
               ))}
               {analysisOverlay.lines.map((l: any) => (
                 <g key={l.id}>
-                  <line x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} stroke="#38bdf8" strokeWidth="2" strokeDasharray="6 4" />
+                  <line x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} stroke="#38bdf8" strokeWidth="2.5" />
                   {l.label ? <text x={l.x2 + 5} y={l.y2 - 5} fill="#7dd3fc" fontSize="10" fontWeight="700">{l.label}</text> : null}
                 </g>
               ))}

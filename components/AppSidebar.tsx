@@ -305,6 +305,18 @@ export default function AppSidebar() {
   const [loggingOut, setLoggingOut] = useState(false);
   const [isPremium, setIsPremium] = useState(false);
   const [premiumLoading, setPremiumLoading] = useState(true);
+
+  // Prevent premium links from temporarily turning into paywall links
+  // while the sidebar remounts during navigation between scanners.
+  useEffect(() => {
+    if (isAdmin) return;
+    try {
+      if (sessionStorage.getItem("fxtrade_premium_access") === "1") {
+        setIsPremium(true);
+        setPremiumLoading(false);
+      }
+    } catch {}
+  }, [isAdmin]);
   const [themeMode, setThemeMode] = useState<"light" | "bright" | "dark">("bright");
   const tradingRoomTab = searchParams.get("tab");
 
@@ -333,7 +345,12 @@ export default function AppSidebar() {
 
         if (cancelled) return;
 
-        setIsPremium(res.ok && data?.isPremium === true);
+        const allowed = res.ok && data?.isPremium === true;
+        setIsPremium(allowed);
+        try {
+          if (allowed) sessionStorage.setItem("fxtrade_premium_access", "1");
+          else sessionStorage.removeItem("fxtrade_premium_access");
+        } catch {}
       } catch (error) {
         console.error("SIDEBAR PREMIUM ACCESS ERROR:", error);
 
@@ -573,6 +590,7 @@ export default function AppSidebar() {
         localStorage.removeItem("fxtrader_trades");
         localStorage.removeItem("fxtrade_course_progress_v2");
         localStorage.removeItem("fxtrade_profit_calendar_trades");
+        sessionStorage.removeItem("fxtrade_premium_access");
       } catch {}
       window.location.replace("/login");
     } catch (error) {

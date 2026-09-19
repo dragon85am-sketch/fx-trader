@@ -27,24 +27,6 @@ type ScannerCard = {
 
 const scanners: ScannerCard[] = [
   {
-    title: "Sniper Scanner",
-    description: "Precyzyjne wejścia z Demand / Supply",
-    href: "/skaner/sniper",
-    badge: "NOWOŚĆ",
-    image: "/sniper-scanner.png",
-    accent: "cyan",
-    features: ["Automatyczne Demand / Supply Zones", "Trend EMA 50 / 200", "Momentum + potwierdzenie 3/3", "READY + Entry / SL / TP1 / TP2"],
-  },
-  {
-    title: "Chart Pattern Scanner",
-    description: "Automatyczne formacje klasyczne",
-    href: "/skaner/chart-pattern",
-    badge: "NOWOŚĆ",
-    image: "/chart-pattern-scanner.png",
-    accent: "blue",
-    features: ["Triangle / Wedge / Double Top-Bottom", "Automatyczne rysowanie patternu", "Breakout / struktura", "READY + Entry / SL / TP1 / TP2"],
-  },
-  {
     title: "FX Scanner",
     description: "Klasyczny skaner rynku Forex",
     href: "/skaner/fx",
@@ -113,6 +95,25 @@ const scanners: ScannerCard[] = [
       "Setup Score + Entry / SL / TP",
     ],
   },
+  {
+    title: "Sniper Scanner",
+    description: "Precyzyjne wejścia z Demand / Supply",
+    href: "/skaner/sniper",
+    badge: "NOWOŚĆ",
+    image: "/sniper-scanner.png",
+    accent: "cyan",
+    features: ["Automatyczne Demand / Supply Zones", "Trend EMA 50 / 200", "Momentum + potwierdzenie 3/3", "READY + Entry / SL / TP1 / TP2"],
+  },
+  {
+    title: "Chart Pattern Scanner",
+    description: "Automatyczne formacje klasyczne",
+    href: "/skaner/chart-pattern",
+    badge: "NOWOŚĆ",
+    image: "/chart-pattern-scanner.png",
+    accent: "blue",
+    features: ["Triangle / Wedge / Double Top-Bottom", "Automatyczne rysowanie patternu", "Breakout / struktura", "READY + Entry / SL / TP1 / TP2"],
+  },
+
 ];
 
 function accentClasses(accent: ScannerCard["accent"]) {
