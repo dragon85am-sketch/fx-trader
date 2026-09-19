@@ -3523,7 +3523,7 @@ kineticScroll: {
               Osi ceny i czasu nie przykrywamy, bo mają własne uchwyty. */}
           {activeDrawTool === "SELECT" ? (
             <div
-              className="absolute left-0 top-0 z-[35]"
+              className="absolute left-0 top-0 z-[10] pointer-events-none"
               style={{
                 right: 86,
                 bottom: 30,
@@ -3704,10 +3704,8 @@ kineticScroll: {
             Drawing tools re-enable the drawing overlay.
           */}
           <div
-            className="absolute inset-0 z-[20] pointer-events-auto"
+            className="absolute inset-0 z-[40] pointer-events-auto"
             style={{
-              // DrawingsLayer musi odbierać zdarzenia również w SELECT.
-              // Inaczej hit-test, podświetlenie i drag obiektów nigdy nie startują.
               cursor: activeDrawTool === "SELECT" ? "default" : "crosshair",
             }}
           >

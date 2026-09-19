@@ -872,7 +872,7 @@ if (o.type === "FIBO") {
 
     // Crosshair dokładnie jak w Alpha: pion + poziom śledzą kursor.
     // Canvas Drawing Tools jest nad chartem, więc synchronizujemy crosshair ręcznie.
-    if (p) {
+    if (p && !dragRef.current.id && !chartPanRef.current.active) {
       try {
         (chartRef.current as any)?.setCrosshairPosition?.(
           p.p,
@@ -917,6 +917,7 @@ if (o.type === "FIBO") {
               from: range.from + shift,
               to: range.to + shift,
             });
+            requestAnimationFrame(draw);
           }
 
           // PAN Y: przesuwanie wykresu góra/dół myszką w pustym miejscu.
@@ -980,10 +981,56 @@ if (o.type === "FIBO") {
               return price == null ? o : ({ ...o, price: Number(price) } as AnyObj);
             }
 
+            // MOVE całego obiektu po BARACH + CENIE.
+            // Nie przeliczamy osobno punktów przez coordinateToTime(), bo przy
+            // pan/zoom powodowało to "latanie" i zmianę szerokości RECT/FIBO.
+            const chart = chartRef.current;
+            const series = candleSeriesRef.current;
+            const candles = getCandles();
+            const ts = chart?.timeScale();
+
+            const startLocalX = dragRef.current.startClientX - rect.left;
+            const startLocalY = dragRef.current.startClientY - rect.top;
+            const startLogical = ts?.coordinateToLogical(startLocalX);
+            const currentLogical = ts?.coordinateToLogical(localX);
+            const startPrice = series?.coordinateToPrice(startLocalY);
+            const currentPrice = series?.coordinateToPrice(localY);
+
+            const barDelta =
+              startLogical != null && currentLogical != null
+                ? Math.round(Number(currentLogical) - Number(startLogical))
+                : 0;
+            const priceDelta =
+              startPrice != null && currentPrice != null
+                ? Number(currentPrice) - Number(startPrice)
+                : 0;
+
+            const indexForTime = (t: UTCTimestamp) => {
+              let best = 0;
+              let bestD = Infinity;
+              const target = Number(t);
+              for (let i = 0; i < candles.length; i++) {
+                const d = Math.abs(Number(candles[i].time) - target);
+                if (d < bestD) { bestD = d; best = i; }
+              }
+              return best;
+            };
+
+            const shiftPointStable = (pt: Point): Point => {
+              if (!candles.length) return { t: pt.t, p: pt.p + priceDelta };
+              const idx = indexForTime(pt.t);
+              const next = Math.max(0, Math.min(candles.length - 1, idx + barDelta));
+              return {
+                t: candles[next].time as UTCTimestamp,
+                p: pt.p + priceDelta,
+              };
+            };
+
             if (startObj.type === "VLINE") {
-              const x0 = chartRef.current?.timeScale().timeToCoordinate(startObj.t as any);
-              const time = x0 == null ? null : (chartRef.current?.timeScale() as any)?.coordinateToTime?.(Number(x0) + dx);
-              return time == null ? o : ({ ...o, t: time as UTCTimestamp } as AnyObj);
+              if (!candles.length) return o;
+              const idx = indexForTime(startObj.t);
+              const next = Math.max(0, Math.min(candles.length - 1, idx + barDelta));
+              return { ...o, t: candles[next].time as UTCTimestamp } as AnyObj;
             }
 
             if (
@@ -993,15 +1040,18 @@ if (o.type === "FIBO") {
               startObj.type === "RECT" ||
               startObj.type === "FIBO"
             ) {
-              const a = movePoint(startObj.a);
-              const b = movePoint(startObj.b);
-              return a && b ? ({ ...o, a, b } as AnyObj) : o;
+              return {
+                ...o,
+                a: shiftPointStable(startObj.a),
+                b: shiftPointStable(startObj.b),
+              } as AnyObj;
             }
 
             if (startObj.type === "PATH" || startObj.type === "BRUSH") {
-              const points = startObj.points.map(movePoint);
-              if (points.some((pt) => !pt)) return o;
-              return { ...o, points: points as Point[] } as AnyObj;
+              return {
+                ...o,
+                points: startObj.points.map(shiftPointStable),
+              } as AnyObj;
             }
 
             return o;
@@ -1276,6 +1326,7 @@ if (o.type === "FIBO") {
           anchor +
           nextSpan * (1 - ratio),
       });
+      requestAnimationFrame(draw);
     } catch {}
   }}
   onMouseDown={handleMouseDown}
