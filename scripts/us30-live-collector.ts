@@ -23,7 +23,7 @@ const frames = [
 
 type Tick = { symbol: string; price: number; timestamp: number };
 
-const PROVIDER_INSTRUMENTS = ["US30", "EUR/USD", "GBP/USD", "XAU/USD"] as const;
+const PROVIDER_INSTRUMENTS = ["US30", "EURUSD", "GBPUSD", "XAUUSD"] as const;
 const SYMBOL_MAP: Record<string,string> = { US30:"US30", EURUSD:"EURUSD", GBPUSD:"GBPUSD", XAUUSD:"XAUUSD" };
 const latestTicks: Record<string, Tick> = {};
 let liveRatesConnected = false;
