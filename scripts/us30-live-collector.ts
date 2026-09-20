@@ -103,7 +103,11 @@ const socket = io("https://wss.live-rates.com", {
 
   // CRITICAL DIAGNOSTIC CHANGE:
   // exactly one connection attempt per Railway process.
-  reconnection: false,
+  reconnection: true,
+  reconnectionAttempts: Infinity,
+  reconnectionDelay: 5_000,
+  reconnectionDelayMax: 30_000,
+  randomizationFactor: 0.5,
   forceNew: true,
   multiplex: false,
   autoConnect: false,
@@ -114,7 +118,7 @@ const socket = io("https://wss.live-rates.com", {
 socket.on("connect", () => {
   liveRatesConnected = true;
   providerError = "";
-  console.log("[US30] Live-Rates SINGLE socket connected");
+  console.log("[COLLECTOR] Live-Rates SINGLE socket connected");
 
   socket.emit("instruments", [...PROVIDER_INSTRUMENTS]);
   socket.emit("key", { key });
@@ -132,7 +136,7 @@ socket.on("rates", (raw: any) => {
 
     if (msg?.info) {
       providerInfo = String(msg.info);
-      console.log("[US30]", providerInfo);
+      console.log("[COLLECTOR]", providerInfo);
 
       if (/another connection/i.test(providerInfo)) {
         liveRatesConnected = false;
@@ -150,7 +154,7 @@ socket.on("rates", (raw: any) => {
 
     if (msg?.error) {
       providerError = String(msg.error);
-      console.error("[US30]", providerError);
+      console.error("[COLLECTOR]", providerError);
       broadcast("status", {
         provider: "live-rates",
         connected: liveRatesConnected,
@@ -174,13 +178,13 @@ socket.on("rates", (raw: any) => {
     broadcast("tick", tick);
     queueDbTick(tick);
   } catch (e) {
-    console.error("[US30] tick parse error", e);
+    console.error("[COLLECTOR] tick parse error", e);
   }
 });
 
 socket.on("disconnect", (reason) => {
   liveRatesConnected = false;
-  console.warn("[US30] Live-Rates socket disconnected:", reason);
+  console.warn("[COLLECTOR] Live-Rates socket disconnected:", reason);
 
   broadcast("status", {
     provider: "live-rates",
@@ -189,14 +193,12 @@ socket.on("disconnect", (reason) => {
     mode: "WS_SINGLE_CONNECTION",
   });
 
-  // Deliberately DO NOT reconnect here.
-  // This test prevents a reconnect loop from being mistaken for a second session.
 });
 
 socket.on("connect_error", (e) => {
   liveRatesConnected = false;
   providerError = e.message;
-  console.error("[US30] socket connect error:", e.message);
+  console.error("[COLLECTOR] socket connect error:", e.message);
 
   broadcast("status", {
     provider: "live-rates",
@@ -298,13 +300,13 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, "0.0.0.0", () => {
-  console.log(`[US30] HTTP/SSE listening on :${PORT}`);
-  console.log("[US30] WS SINGLE CONNECTION mode - reconnect disabled");
+  console.log(`[COLLECTOR] HTTP/SSE listening on :${PORT}`);
+  console.log("[COLLECTOR] WS SINGLE CONNECTION mode - auto reconnect enabled");
   socket.connect();
 });
 
 async function shutdown(signal: string) {
-  console.log(`[US30] ${signal} - shutting down`);
+  console.log(`[COLLECTOR] ${signal} - shutting down`);
 
   socket.removeAllListeners();
   socket.disconnect();
