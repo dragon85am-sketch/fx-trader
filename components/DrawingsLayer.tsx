@@ -61,6 +61,23 @@ type PathObj = BaseObj & {
 
 type AnyObj = HLineObj | VLineObj | TwoPointObj | PathObj;
 
+export type TradeLevelsCanvas = {
+  side?: "BUY" | "SELL";
+  entry: number;
+  sl: number;
+  tps?: number[];
+  tp?: number;
+  zones?: Array<{ label: "ENTRY" | "SL" | "TP1" | "TP2" | "TP3"; from: number; to: number }>;
+};
+
+export type TradeZoneCanvasSpec = {
+  anchorTime: UTCTimestamp;
+  levels: TradeLevelsCanvas;
+  widthPx?: number;
+  gapPx?: number;
+  precision?: number;
+} | null;
+
 function getStorageKey(
   symbol: string,
   timeframe: string
@@ -84,7 +101,8 @@ export default function DrawingsLayer({
   activeDrawTool,
   onDrawToolChange,
   symbol,
-timeframe,
+  timeframe,
+  tradeZoneSpec,
 }: {
   wrapRef: React.RefObject<HTMLDivElement | null>;
   chartRef: React.RefObject<IChartApi | null>;
@@ -94,6 +112,7 @@ timeframe,
   onDrawToolChange?: (t: DrawTool) => void;
   symbol: string;
   timeframe: string;
+  tradeZoneSpec?: TradeZoneCanvasSpec;
 }) {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
 
@@ -581,6 +600,77 @@ if (o.type === "FIBO") {
     [chartRef, candleSeriesRef, dataToPoint]
   );
 
+  const drawTradeZones = React.useCallback((ctx: CanvasRenderingContext2D) => {
+    const spec = tradeZoneSpec;
+    const chart = chartRef.current;
+    const series = candleSeriesRef.current;
+    const canvas = canvasRef.current;
+    if (!spec || !chart || !series || !canvas) return;
+
+    const anchorX = chart.timeScale().timeToCoordinate(spec.anchorTime as any);
+    if (anchorX == null || !Number.isFinite(Number(anchorX))) return;
+
+    const levels = spec.levels;
+    const x = Number(anchorX) + (spec.gapPx ?? 12);
+    const w = spec.widthPx ?? 220;
+    const tps = (levels.tps?.length ? levels.tps : levels.tp != null ? [levels.tp] : [])
+      .filter(Number.isFinite).slice(0, 3) as number[];
+    const side: "BUY" | "SELL" = levels.side ?? (tps[0] != null && tps[0] < levels.entry ? "SELL" : "BUY");
+    const risk = Math.max(1e-9, Math.abs(levels.entry - levels.sl));
+    const maxEntryHalf = risk * 0.10;
+    const ez = levels.zones?.find(z => z.label === "ENTRY");
+    let entryHalf = maxEntryHalf;
+    if (ez && Number.isFinite(ez.from) && Number.isFinite(ez.to)) {
+      entryHalf = Math.min(Math.max(Math.abs(ez.to - ez.from) / 2, risk * 0.025), maxEntryHalf);
+    }
+
+    const bands: Array<{from:number;to:number;kind:"ENTRY"|"SL"|"TP1"|"TP2"|"TP3"}> = [
+      { from: levels.entry - entryHalf, to: levels.entry + entryHalf, kind: "ENTRY" },
+      { from: levels.sl, to: levels.entry, kind: "SL" },
+    ];
+    if (side === "BUY") {
+      if (tps[0] != null) bands.push({from:levels.entry,to:tps[0],kind:"TP1"});
+      if (tps[1] != null && tps[0] != null) bands.push({from:tps[0],to:tps[1],kind:"TP2"});
+      if (tps[2] != null && tps[1] != null) bands.push({from:tps[1],to:tps[2],kind:"TP3"});
+    } else {
+      if (tps[0] != null) bands.push({from:tps[0],to:levels.entry,kind:"TP1"});
+      if (tps[1] != null && tps[0] != null) bands.push({from:tps[1],to:tps[0],kind:"TP2"});
+      if (tps[2] != null && tps[1] != null) bands.push({from:tps[2],to:tps[1],kind:"TP3"});
+    }
+
+    const fillFor = (k:string) => k === "SL" ? "rgba(239,68,68,.14)" : k === "ENTRY" ? (side === "BUY" ? "rgba(16,185,129,.20)" : "rgba(239,68,68,.20)") : "rgba(16,185,129,.10)";
+    const strokeFor = (k:string) => k === "SL" ? "rgba(239,68,68,.82)" : k === "ENTRY" ? (side === "BUY" ? "rgba(16,185,129,.95)" : "rgba(239,68,68,.95)") : "rgba(16,185,129,.60)";
+
+    ctx.save();
+    ctx.font = "700 11px Inter, Arial";
+    ctx.textBaseline = "middle";
+    for (const b of bands) {
+      const y1 = series.priceToCoordinate(b.from);
+      const y2 = series.priceToCoordinate(b.to);
+      if (y1 == null || y2 == null) continue;
+      const top = Math.min(Number(y1), Number(y2));
+      const h = Math.max(b.kind === "ENTRY" ? 18 : 6, Math.abs(Number(y2)-Number(y1)));
+      ctx.fillStyle = fillFor(b.kind); ctx.strokeStyle = strokeFor(b.kind); ctx.lineWidth = b.kind === "ENTRY" ? 2 : 1;
+      ctx.beginPath(); ctx.roundRect(x, top, w, h, b.kind === "ENTRY" ? 10 : 6); ctx.fill(); ctx.stroke();
+    }
+
+    const lineItems: Array<[string,number,string,number]> = [["ENTRY",levels.entry,side === "BUY" ? "rgba(16,185,129,.98)" : "rgba(239,68,68,.98)",3],["SL",levels.sl,"rgba(239,68,68,.98)",3]];
+    tps.forEach((v,i)=>lineItems.push([`TP${i+1}`,v,"rgba(16,185,129,.92)",2]));
+    const dp = Math.min(8, Math.max(0, spec.precision ?? 5));
+    for (const [label,price,color,lw] of lineItems) {
+      const yy = series.priceToCoordinate(price);
+      if (yy == null) continue;
+      const y = Number(yy);
+      ctx.strokeStyle=color; ctx.lineWidth=lw; ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+w,y); ctx.stroke();
+      const txt=`${label} ${Number(price).toFixed(dp)}`;
+      const tw=ctx.measureText(txt).width+18;
+      ctx.fillStyle="rgba(7,17,31,.94)"; ctx.strokeStyle=color; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.roundRect(x+w+8,y-12,tw,24,8); ctx.fill(); ctx.stroke();
+      ctx.fillStyle="#f8fafc"; ctx.fillText(txt,x+w+17,y+.5);
+    }
+    ctx.restore();
+  }, [tradeZoneSpec, chartRef, candleSeriesRef]);
+
   const draw = React.useCallback(() => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
@@ -589,6 +679,7 @@ if (o.type === "FIBO") {
 
     ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
 
+    drawTradeZones(ctx);
     objs.forEach((o) => drawObject(ctx, o, o.id === selectedId || o.id === hoverId));
 
     if (draft && preview && TWO_POINT_TOOLS.includes(activeDrawTool)) {
@@ -616,7 +707,7 @@ if (o.type === "FIBO") {
         createdAt: Date.now(),
       } as AnyObj);
     }
-  }, [objs, selectedId, hoverId, draft, preview, activeDrawTool, drawObject]);
+  }, [objs, selectedId, hoverId, draft, preview, activeDrawTool, drawObject, drawTradeZones]);
 
   React.useEffect(() => {
     resize();

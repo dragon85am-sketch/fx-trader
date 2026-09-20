@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import DrawingsLayer, { type DrawTool } from "./DrawingsLayer";
+import DrawingsLayer, { type DrawTool, type TradeZoneCanvasSpec } from "./DrawingsLayer";
 import {
   createChart,
   CrosshairMode,
@@ -2054,6 +2054,8 @@ fullscreenMode = false,
     ]
   );
 
+  const [tradeZoneCanvasSpec, setTradeZoneCanvasSpec] = React.useState<TradeZoneCanvasSpec>(null);
+
   const [zoneRects, setZoneRects] = React.useState<
     Array<{
       key: string;
@@ -2507,6 +2509,13 @@ kineticScroll: {
 
       zoneAnchorTimeRef.current = zoneAnchorTime;
       zoneGapPxRef.current = SIGNAL_TO_ZONE_GAP_PX;
+      setTradeZoneCanvasSpec({
+        anchorTime: zoneAnchorTime,
+        levels: activeLevels,
+        widthPx: ZONE_WIDTH_PX,
+        gapPx: SIGNAL_TO_ZONE_GAP_PX,
+        precision: prec,
+      });
 
       const startXCoord = chart.timeScale().timeToCoordinate(zoneAnchorTime);
 
@@ -2664,6 +2673,7 @@ kineticScroll: {
       setZoneRects([]);
       setOverlayLines([]);
       setZoneLabels([]);
+      setTradeZoneCanvasSpec(null);
       frozenAnchorTimeRef.current = null;
       zoneAnchorTimeRef.current = null;
       frozenAnchorKeyRef.current = "";
@@ -3718,9 +3728,10 @@ kineticScroll: {
               onDrawToolChange={onDrawToolChange}
               symbol={symbol}
               timeframe={tf ?? "default"}
+              tradeZoneSpec={tradeZoneCanvasSpec}
             />
           </div>
-          <svg ref={zoneSvgRef} className="pointer-events-none absolute inset-0 z-[5] h-full w-full" style={{ willChange: "transform" }}>
+          {false && <svg ref={zoneSvgRef} className="pointer-events-none absolute inset-0 z-[5] h-full w-full" style={{ willChange: "transform" }}>
             <defs>
               <linearGradient id="entryGradBuy" x1="0" y1="0" x2="1" y2="0">
                 <stop offset="0%" stopColor="rgba(16,185,129,0.05)" />
@@ -3830,9 +3841,9 @@ kineticScroll: {
                 opacity={0.92}
               />
             ))}
-          </svg>
+          </svg>}
 
-          <div ref={zoneLabelsRef} className="pointer-events-none absolute inset-0 z-[15]" style={{ willChange: "transform" }}>
+          {false && <div ref={zoneLabelsRef} className="pointer-events-none absolute inset-0 z-[15]" style={{ willChange: "transform" }}>
             {zoneLabels.map((lb) => {
               const dp = Math.min(8, (pricePrecision ?? 5) + 0);
               const priceText =
@@ -3859,7 +3870,7 @@ kineticScroll: {
                 </div>
               );
             })}
-          </div>
+          </div>}
         </div>
       </div>
 
