@@ -98,6 +98,7 @@ export default function AlphaPriceChart({
 
   const [liveConnected, setLiveConnected] = React.useState(false);
   const liveCandleRef = React.useRef<CandlestickData | null>(null);
+  const providerMinuteRef = React.useRef<number | null>(null);
 
   // ====================================================
   // CREATE CHART
@@ -305,30 +306,39 @@ export default function AlphaPriceChart({
         const series = seriesRef.current;
         if (!series || !Number.isFinite(price) || !Number.isFinite(timestamp)) return;
 
-        // Live-Rates timestamp is milliseconds. Update the active M1 candle tick-by-tick.
-        const bucket = Math.floor(timestamp / 60_000) * 60;
+        // Anchor provider ticks to the existing chart M1 timeline.
+        const providerMinute = Math.floor(timestamp / 60_000);
         const prev = liveCandleRef.current;
+        if (!prev) return;
 
-        let next: CandlestickData;
+        const prevTime = Number(prev.time);
+        const prevProviderMinute = providerMinuteRef.current;
+        let chartTime = prevTime;
 
-        if (prev && Number(prev.time) === bucket) {
-          next = {
-            time: bucket as Time,
-            open: prev.open,
-            high: Math.max(prev.high, price),
-            low: Math.min(prev.low, price),
-            close: price,
-          };
-        } else {
-          const open = prev ? prev.close : price;
-          next = {
-            time: bucket as Time,
-            open,
-            high: Math.max(open, price),
-            low: Math.min(open, price),
-            close: price,
-          };
+        if (prevProviderMinute === null) {
+          providerMinuteRef.current = providerMinute;
+        } else if (providerMinute > prevProviderMinute) {
+          const minuteDelta = Math.max(1, providerMinute - prevProviderMinute);
+          chartTime = prevTime + minuteDelta * 60;
+          providerMinuteRef.current = providerMinute;
         }
+
+        const next: CandlestickData =
+          chartTime === prevTime
+            ? {
+                time: prev.time,
+                open: prev.open,
+                high: Math.max(prev.high, price),
+                low: Math.min(prev.low, price),
+                close: price,
+              }
+            : {
+                time: chartTime as Time,
+                open: prev.close,
+                high: Math.max(prev.close, price),
+                low: Math.min(prev.close, price),
+                close: price,
+              };
 
         liveCandleRef.current = next;
         series.update(next);
@@ -339,7 +349,8 @@ export default function AlphaPriceChart({
     };
 
     source.addEventListener("tick", onTick as EventListener);
-    source.onopen = () => setLiveConnected(true);
+    source.onopen = () =>
+      console.log("[US30 LIVE] SSE connected", `${base}/api/us30/stream`);
     source.onerror = () => setLiveConnected(false);
 
     return () => {
@@ -347,6 +358,7 @@ export default function AlphaPriceChart({
       source.close();
       setLiveConnected(false);
       liveCandleRef.current = null;
+      providerMinuteRef.current = null;
     };
   }, [symbol, liveBaseUrl]);
 
@@ -385,6 +397,7 @@ export default function AlphaPriceChart({
           low: last.low,
           close: last.close,
         };
+        providerMinuteRef.current = null;
       }
     }
 
