@@ -773,6 +773,62 @@ if (o.type === "FIBO") {
     };
   }, [chartRef, wrapRef, resize, draw]);
 
+  // Keep the Canvas locked to Lightweight Charts while the user drags
+  // the chart/price scale. Price-scale movement does not emit a public
+  // visible-time-range event, so redraw on animation frames only for the
+  // duration of the pointer interaction. Every frame recalculates Y via
+  // series.priceToCoordinate(), keeping drawings and ENTRY/SL/TP on price.
+  React.useEffect(() => {
+    let syncRaf = 0;
+    let syncing = false;
+
+    const frame = () => {
+      if (!syncing) return;
+      draw();
+      syncRaf = requestAnimationFrame(frame);
+    };
+
+    const startSync = (e: PointerEvent) => {
+      const wrap = wrapRef.current;
+      if (!wrap) return;
+
+      const r = wrap.getBoundingClientRect();
+      const inside =
+        e.clientX >= r.left &&
+        e.clientX <= r.right &&
+        e.clientY >= r.top &&
+        e.clientY <= r.bottom;
+
+      if (!inside || syncing) return;
+      syncing = true;
+      draw();
+      syncRaf = requestAnimationFrame(frame);
+    };
+
+    const stopSync = () => {
+      if (!syncing) return;
+      syncing = false;
+      if (syncRaf) cancelAnimationFrame(syncRaf);
+      syncRaf = 0;
+      // One final redraw after Lightweight Charts applies its last scale transform.
+      requestAnimationFrame(draw);
+    };
+
+    window.addEventListener("pointerdown", startSync, true);
+    window.addEventListener("pointerup", stopSync, true);
+    window.addEventListener("pointercancel", stopSync, true);
+    window.addEventListener("blur", stopSync);
+
+    return () => {
+      syncing = false;
+      if (syncRaf) cancelAnimationFrame(syncRaf);
+      window.removeEventListener("pointerdown", startSync, true);
+      window.removeEventListener("pointerup", stopSync, true);
+      window.removeEventListener("pointercancel", stopSync, true);
+      window.removeEventListener("blur", stopSync);
+    };
+  }, [wrapRef, draw]);
+
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
