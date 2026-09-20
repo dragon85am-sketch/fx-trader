@@ -581,7 +581,7 @@ export default function ModulPage({
   active.contentKey === "m0-l1-czym-jest-trading"
     ? "https://www.youtube.com/embed/hpTgxMk6NVU"
     : active.contentKey === "m0-l2-jak-dziala-rynek-forex"
-    ? "https://www.youtube.com/embed/qOMj6UxLWc0"
+    ? "https://www.youtube.com/embed/8m0hSrA2y6U"
     : active.contentKey === "m0-l3-pips-lot-spread"
     ? "https://www.youtube.com/embed/2exu03NGHqI"
     : active.contentKey === "m0-l4-rodzaje-rynkow"
