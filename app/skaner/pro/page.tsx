@@ -35,7 +35,7 @@ import {
 } from "@/lib/scanners/goldUs30Scanner";
 
 // ======================================================
-// LIVE-RATES US30 + TWELVE DATA TYPES
+// LIVE-RATES US30 + XAUUSD TYPES
 // ======================================================
 
 type TwelveValue = {
@@ -77,13 +77,13 @@ type MarketState = {
 };
 
 // ======================================================
-// LIVE-RATES US30 + TWELVE DATA SYMBOLS
+// LIVE-RATES US30 + XAUUSD SYMBOLS
 // ======================================================
 
 const TWELVE_SYMBOLS: Record<ScannerSymbol, string> = {
   XAUUSD: "XAU/USD",
 
-  // Jeśli Twelve Data nie zaakceptuje DJI,
+  // Jeśli FX Trade Candle Engine / Live-Rates nie zaakceptuje DJI,
   // zmienimy później tylko ten ticker.
   US30: "DJI",
 };
@@ -114,7 +114,7 @@ function createEmptyMarket(
 }
 
 // ======================================================
-// LIVE-RATES US30 + TWELVE DATA -> SCANNER
+// LIVE-RATES US30 + XAUUSD -> SCANNER
 // ======================================================
 
 function toScannerCandles(
@@ -235,14 +235,14 @@ function toDisplayTimestamp(
 }
 
 // ======================================================
-// LIVE-RATES US30 + TWELVE DATA -> CHART
+// LIVE-RATES US30 + XAUUSD -> CHART
 // ======================================================
 
 function toChartCandles(
   values: TwelveValue[],
   symbol: ScannerSymbol,
 ): CandlestickData[] {
-  const sourceTimeZone = symbol === "US30" ? "UTC" : "America/New_York";
+  const sourceTimeZone = "UTC";
 
   return values
     .map((item) => ({
@@ -271,7 +271,7 @@ function toChartCandles(
 }
 
 // ======================================================
-// FETCH LIVE-RATES US30 + TWELVE DATA
+// FETCH LIVE-RATES US30 + XAUUSD
 // ======================================================
 
 async function fetchCandles(
@@ -279,91 +279,38 @@ async function fetchCandles(
   interval: "1min" | "5min",
   outputsize: number,
 ): Promise<TwelveValue[]> {
-  // US30 uses our shared FX Trade candle engine fed by Live-Rates.
-  // XAUUSD remains on Twelve Data for now.
-  if (symbol === "US30") {
-    const params = new URLSearchParams({
-      interval,
-      limit: String(outputsize),
-    });
-
-    const response = await fetch(`/api/us30/candles?${params.toString()}`, {
-      method: "GET",
-      cache: "no-store",
-      headers: { Accept: "application/json" },
-    });
-
-    const data = (await response.json()) as TwelveResponse & { warmup?: boolean };
-
-    if (!response.ok || data?.status === "error" || !Array.isArray(data?.values)) {
-      throw new Error(
-        data?.message ||
-          data?.error ||
-          `US30 ${interval}: FX Trade candle engine nie ma jeszcze danych`,
-      );
-    }
-
-    if (data.values.length === 0) {
-      throw new Error(`US30 ${interval}: candle engine rozgrzewa historię`);
-    }
-
-    return data.values;
-  }
-
-  const providerSymbol = TWELVE_SYMBOLS[symbol];
+  // US30 and XAUUSD use our shared FX Trade candle engine fed by Live-Rates.
+  const routeSymbol = symbol === "XAUUSD" ? "xauusd" : "us30";
 
   const params = new URLSearchParams({
-    path: "/time_series",
-    symbol: providerSymbol,
     interval,
-    outputsize: String(outputsize),
-    format: "JSON",
-    timezone: "America/New_York",
-    order: "asc",
+    limit: String(outputsize),
   });
 
-  const response = await fetch(`/api/twelve-data?${params.toString()}`, {
+  const response = await fetch(`/api/${routeSymbol}/candles?${params.toString()}`, {
     method: "GET",
     cache: "no-store",
     headers: { Accept: "application/json" },
   });
 
-  let data: TwelveResponse;
+  let data: TwelveResponse & { warmup?: boolean };
 
   try {
-    data =
-      (await response.json()) as TwelveResponse;
+    data = (await response.json()) as TwelveResponse & { warmup?: boolean };
   } catch {
-    throw new Error(
-      `${symbol} ${interval}: invalid JSON`,
-    );
+    throw new Error(`${symbol} ${interval}: FX Trade candle engine zwrócił invalid JSON`);
   }
 
-  if (!response.ok) {
-    throw new Error(
-      data?.error ||
-        data?.message ||
-        `${symbol} ${interval}: Twelve Data error`,
-    );
-  }
-
-  if (
-    data?.status === "error"
-  ) {
+  if (!response.ok || data?.status === "error" || !Array.isArray(data?.values)) {
     throw new Error(
       data?.message ||
         data?.error ||
-        `${symbol} ${interval}: Twelve Data error`,
+        `${symbol} ${interval}: FX Trade candle engine nie ma jeszcze danych`,
     );
   }
 
-  if (
-    !Array.isArray(data?.values) ||
-    data.values.length === 0
-  ) {
-    throw new Error(
-      `${symbol} ${interval}: brak danych świecowych`,
-    );
+  if (data.values.length === 0) {
+    throw new Error(`${symbol} ${interval}: candle engine rozgrzewa historię`);
   }
 
   return data.values;
@@ -1313,7 +1260,7 @@ export default function ProScanner() {
                   <span>·</span>
 
                   <span>
-                    Twelve Data
+                    FX Trade Candle Engine / Live-Rates
                   </span>
                 </div>
               </div>
@@ -1328,7 +1275,7 @@ export default function ProScanner() {
                 </span>
 
                 <span className="text-[9px] font-black text-emerald-300">
-                  LIVE-RATES US30 + TWELVE DATA
+                  LIVE-RATES US30 + XAUUSD
                 </span>
               </div>
 
@@ -1690,7 +1637,7 @@ export default function ProScanner() {
                   </div>
 
                   <div className="mt-1 text-[9px] text-sky-200/45">
-                    Twelve Data
+                    FX Trade Candle Engine / Live-Rates
                   </div>
                 </div>
               </div>

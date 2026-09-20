@@ -98,7 +98,6 @@ export default function AlphaPriceChart({
 
   const [liveConnected, setLiveConnected] = React.useState(false);
   const liveCandleRef = React.useRef<CandlestickData | null>(null);
-  const providerMinuteRef = React.useRef<number | null>(null);
 
   // ====================================================
   // CREATE CHART
@@ -286,17 +285,18 @@ export default function AlphaPriceChart({
   }, [height, candles.length]);
 
   // ====================================================
-  // US30 LIVE TICK (Railway SSE)
+  // US30 + XAUUSD LIVE TICK (Railway SSE)
   // ====================================================
 
   React.useEffect(() => {
-    if (symbol !== "US30" || !liveBaseUrl) {
+    if ((symbol !== "US30" && symbol !== "XAUUSD") || !liveBaseUrl) {
       setLiveConnected(false);
       return;
     }
 
     const base = liveBaseUrl.replace(/\/+$/, "");
-    const source = new EventSource(`${base}/api/us30/stream`);
+    const streamSymbol = symbol === "XAUUSD" ? "xauusd" : "us30";
+    const source = new EventSource(`${base}/api/${streamSymbol}/stream`);
 
     const onTick = (event: MessageEvent) => {
       try {
@@ -306,51 +306,41 @@ export default function AlphaPriceChart({
         const series = seriesRef.current;
         if (!series || !Number.isFinite(price) || !Number.isFinite(timestamp)) return;
 
-        // Anchor provider ticks to the existing chart M1 timeline.
-        const providerMinute = Math.floor(timestamp / 60_000);
+        // Live-Rates timestamp is milliseconds. Update the active M1 candle tick-by-tick.
+        const bucket = Math.floor(timestamp / 60_000) * 60;
         const prev = liveCandleRef.current;
-        if (!prev) return;
 
-        const prevTime = Number(prev.time);
-        const prevProviderMinute = providerMinuteRef.current;
-        let chartTime = prevTime;
+        let next: CandlestickData;
 
-        if (prevProviderMinute === null) {
-          providerMinuteRef.current = providerMinute;
-        } else if (providerMinute > prevProviderMinute) {
-          const minuteDelta = Math.max(1, providerMinute - prevProviderMinute);
-          chartTime = prevTime + minuteDelta * 60;
-          providerMinuteRef.current = providerMinute;
+        if (prev && Number(prev.time) === bucket) {
+          next = {
+            time: bucket as Time,
+            open: prev.open,
+            high: Math.max(prev.high, price),
+            low: Math.min(prev.low, price),
+            close: price,
+          };
+        } else {
+          const open = prev ? prev.close : price;
+          next = {
+            time: bucket as Time,
+            open,
+            high: Math.max(open, price),
+            low: Math.min(open, price),
+            close: price,
+          };
         }
-
-        const next: CandlestickData =
-          chartTime === prevTime
-            ? {
-                time: prev.time,
-                open: prev.open,
-                high: Math.max(prev.high, price),
-                low: Math.min(prev.low, price),
-                close: price,
-              }
-            : {
-                time: chartTime as Time,
-                open: prev.close,
-                high: Math.max(prev.close, price),
-                low: Math.min(prev.close, price),
-                close: price,
-              };
 
         liveCandleRef.current = next;
         series.update(next);
         setLiveConnected(true);
       } catch (e) {
-        console.error("[US30 LIVE] tick error", e);
+        console.error(`[${symbol} LIVE] tick error`, e);
       }
     };
 
     source.addEventListener("tick", onTick as EventListener);
-    source.onopen = () =>
-      console.log("[US30 LIVE] SSE connected", `${base}/api/us30/stream`);
+    source.onopen = () => setLiveConnected(true);
     source.onerror = () => setLiveConnected(false);
 
     return () => {
@@ -358,7 +348,6 @@ export default function AlphaPriceChart({
       source.close();
       setLiveConnected(false);
       liveCandleRef.current = null;
-      providerMinuteRef.current = null;
     };
   }, [symbol, liveBaseUrl]);
 
@@ -382,7 +371,7 @@ export default function AlphaPriceChart({
 
     series.setData(candles);
 
-    if (symbol === "US30" && candles.length > 0) {
+    if ((symbol === "US30" || symbol === "XAUUSD") && candles.length > 0) {
       const last = candles[candles.length - 1];
       const live = liveCandleRef.current;
 
@@ -397,7 +386,6 @@ export default function AlphaPriceChart({
           low: last.low,
           close: last.close,
         };
-        providerMinuteRef.current = null;
       }
     }
 
@@ -707,11 +695,11 @@ export default function AlphaPriceChart({
           </div>
 
           <div className="mt-1 text-[9px] text-white/40">
-            {symbol === "US30"
+            {symbol === "US30" || symbol === "XAUUSD"
               ? liveConnected
                 ? "LIVE-RATES · REAL-TIME"
                 : "LIVE-RATES · CONNECTING"
-              : "Twelve Data · PRO Session Scanner"}
+              : "PRO Session Scanner"}
           </div>
         </div>
 
