@@ -3616,6 +3616,94 @@ if (closedNow.length) {
     [rows, selectedSymbol]
   );
 
+  // Live-Rates: EURUSD / GBPUSD tickują na żywo przez SSE z centralnego collectora.
+  // Historyczne świece nadal są pobierane normalnie, a liveCandle aktualizuje tylko
+  // aktualnie otwartą świecę wybranego interwału.
+  const [liveCandle, setLiveCandle] = React.useState<Candle | null>(null);
+
+  React.useEffect(() => {
+    setLiveCandle(null);
+
+    const symbol = selected?.symbol?.toUpperCase();
+    if (symbol !== "EURUSD" && symbol !== "GBPUSD") return;
+
+    const baseUrl = (process.env.NEXT_PUBLIC_US30_LIVE_URL ?? "").replace(/\/$/, "");
+    if (!baseUrl) return;
+
+    const intervalSeconds: Record<Timeframe, number> = {
+      M1: 60,
+      M5: 300,
+      M15: 900,
+      M30: 1800,
+      H1: 3600,
+      H4: 14400,
+    };
+
+    const bucketSize = intervalSeconds[tf];
+    const streamPath = symbol === "EURUSD" ? "eurusd" : "gbpusd";
+    const source = new EventSource(`${baseUrl}/api/${streamPath}/stream`);
+
+    source.addEventListener("tick", (event) => {
+      try {
+        const tick = JSON.parse((event as MessageEvent).data) as {
+          symbol?: string;
+          price?: number;
+          timestamp?: number;
+        };
+
+        // Collector może rozsyłać ticki wielu instrumentów — filtr jest obowiązkowy.
+        if (tick.symbol?.toUpperCase() !== symbol) return;
+
+        const price = Number(tick.price);
+        const timestampMs = Number(tick.timestamp);
+        if (!Number.isFinite(price) || price <= 0 || !Number.isFinite(timestampMs)) return;
+
+        const tickSeconds = Math.floor(timestampMs / 1000);
+        const bucketTime = (Math.floor(tickSeconds / bucketSize) * bucketSize) as UTCTimestamp;
+
+        setLiveCandle((prev) => {
+          if (prev && Number(prev.time) === Number(bucketTime)) {
+            return {
+              ...prev,
+              high: Math.max(prev.high, price),
+              low: Math.min(prev.low, price),
+              close: price,
+            };
+          }
+
+          // Przy pierwszym ticku próbujemy zachować OHLC ostatniej świecy historycznej,
+          // jeżeli należy do tego samego bucketu. Dzięki temu po wejściu na wykres
+          // świeca nie startuje sztucznie jako O=H=L=C.
+          const history = candlesCache.current.get(symbol) ?? [];
+          const last = history[history.length - 1];
+          if (last && Number(last.time) === Number(bucketTime)) {
+            return {
+              ...last,
+              high: Math.max(last.high, price),
+              low: Math.min(last.low, price),
+              close: price,
+            };
+          }
+
+          return {
+            time: bucketTime,
+            open: price,
+            high: price,
+            low: price,
+            close: price,
+            volume: 0,
+          };
+        });
+      } catch {
+        // Pojedynczy błędny frame SSE nie może zatrzymać wykresu.
+      }
+    });
+
+    return () => {
+      source.close();
+    };
+  }, [selected?.symbol, tf]);
+
   if (!selected) return null;
 
   const selectedCandles = React.useMemo(
@@ -5014,7 +5102,7 @@ if (closedNow.length) {
                   symbol={selected.symbol}
                   tf={tf}
                   candles={selectedCandles as any}
-                  liveCandle={null}
+                  liveCandle={liveCandle as any}
                   height={landscapeFullscreen ? fullscreenChartHeight : chartHeight}
                   emaConfigs={emaConfigs}
                   bbConfig={bbConfig}
