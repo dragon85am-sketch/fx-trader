@@ -2162,6 +2162,23 @@ fullscreenMode = false,
         background: { color: "#0B1220" },
         textColor: "#d1d5db",
       },
+      localization: {
+        timeFormatter: (time: any) => {
+          try {
+            const ts = toUTCTimestamp(time);
+            return new Intl.DateTimeFormat(undefined, {
+              day: "2-digit",
+              month: "2-digit",
+              year: "2-digit",
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: false,
+            }).format(new Date(Number(ts) * 1000));
+          } catch {
+            return "";
+          }
+        },
+      },
       grid: {
         vertLines: { color: "rgba(255,255,255,0.05)" },
         horzLines: { color: "rgba(255,255,255,0.05)" },
@@ -2188,6 +2205,21 @@ fullscreenMode = false,
         rightBarStaysOnScroll: true,
         timeVisible: true,
         secondsVisible: false,
+        // Lightweight Charts interprets UTCTimestamp correctly, but without a
+        // formatter the axis is effectively shown in UTC. Display labels in
+        // the browser/user local timezone (e.g. 22:10 UTC -> 00:10 CEST).
+        tickMarkFormatter: (time: any) => {
+          try {
+            const ts = toUTCTimestamp(time);
+            return new Intl.DateTimeFormat(undefined, {
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: false,
+            }).format(new Date(Number(ts) * 1000));
+          } catch {
+            return "";
+          }
+        },
       },
 handleScroll: {
   // Pan lewo/prawo obsługujemy własnym pointer handlerem poniżej.
