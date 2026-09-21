@@ -98,6 +98,7 @@ export default function AlphaPriceChart({
 
   const [liveConnected, setLiveConnected] = React.useState(false);
   const liveCandleRef = React.useRef<CandlestickData | null>(null);
+  const providerMinuteRef = React.useRef<number | null>(null);
 
   // ====================================================
   // CREATE CHART
@@ -291,6 +292,8 @@ export default function AlphaPriceChart({
   React.useEffect(() => {
     if ((symbol !== "US30" && symbol !== "XAUUSD") || !liveBaseUrl) {
       setLiveConnected(false);
+      liveCandleRef.current = null;
+      providerMinuteRef.current = null;
       return;
     }
 
@@ -306,27 +309,41 @@ export default function AlphaPriceChart({
         const series = seriesRef.current;
         if (!series || !Number.isFinite(price) || !Number.isFinite(timestamp)) return;
 
-        // Live-Rates timestamp is milliseconds. Update the active M1 candle tick-by-tick.
-        const bucket = Math.floor(timestamp / 60_000) * 60;
+        // Keep live ticks on the SAME chart timeline as the REST candles.
+        // The historical chart is shifted to Europe/Amsterdam for display, so using
+        // the raw provider epoch here would make Lightweight Charts reject updates.
+        const providerMinute = Math.floor(timestamp / 60_000);
         const prev = liveCandleRef.current;
+        if (!prev) return;
 
         let next: CandlestickData;
 
-        if (prev && Number(prev.time) === bucket) {
+        if (providerMinuteRef.current === null) {
+          providerMinuteRef.current = providerMinute;
           next = {
-            time: bucket as Time,
+            time: prev.time,
+            open: prev.open,
+            high: Math.max(prev.high, price),
+            low: Math.min(prev.low, price),
+            close: price,
+          };
+        } else if (providerMinute === providerMinuteRef.current) {
+          next = {
+            time: prev.time,
             open: prev.open,
             high: Math.max(prev.high, price),
             low: Math.min(prev.low, price),
             close: price,
           };
         } else {
-          const open = prev ? prev.close : price;
+          const minuteDelta = Math.max(1, providerMinute - providerMinuteRef.current);
+          providerMinuteRef.current = providerMinute;
+          const nextTime = (Number(prev.time) + minuteDelta * 60) as Time;
           next = {
-            time: bucket as Time,
-            open,
-            high: Math.max(open, price),
-            low: Math.min(open, price),
+            time: nextTime,
+            open: prev.close,
+            high: Math.max(prev.close, price),
+            low: Math.min(prev.close, price),
             close: price,
           };
         }
@@ -348,6 +365,7 @@ export default function AlphaPriceChart({
       source.close();
       setLiveConnected(false);
       liveCandleRef.current = null;
+      providerMinuteRef.current = null;
     };
   }, [symbol, liveBaseUrl]);
 
@@ -726,7 +744,7 @@ export default function AlphaPriceChart({
         <div className="absolute inset-0 top-[52px] z-20 flex items-center justify-center bg-[#061426]/65 backdrop-blur-[1px]">
           <div className="rounded-xl border border-sky-400/20 bg-[#081a31] px-4 py-3 text-[11px] font-semibold text-sky-200">
             Pobieranie świec
-            z Twelve Data...
+            z FX Trade Candle Engine...
           </div>
         </div>
       ) : null}

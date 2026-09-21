@@ -1645,89 +1645,44 @@ export default function ProScanner() {
 
             {/* CHART */}
 
-            {!current.loading &&
-            scanner &&
-            current.chartCandles.length >
-              0 ? (
+            {!current.loading && current.chartCandles.length > 0 ? (
               <div
+                key={selectedSymbol}
                 ref={chartFullscreenRef}
                 className="overflow-hidden rounded-[22px] bg-[#071421] fullscreen:h-screen fullscreen:w-screen fullscreen:rounded-none fullscreen:p-0"
               >
-              <AlphaPriceChart
-                symbol={
-                  selectedSymbol
-                }
-                tf="M1"
-                candles={
-                  current.chartCandles
-                }
-                loading={false}
-                priceAction={
-                  scanner.direction ===
-                  "WAIT"
-                    ? "WAIT · NO TRADE"
-                    : scanner.priceAction
-                }
-                direction={
-                  chartDirection
-                }
-                entry={
-                  scanner.direction ===
-                  "WAIT"
-                    ? 0
-                    : scanner.entry
-                }
-                sl={
-                  scanner.direction ===
-                  "WAIT"
-                    ? 0
-                    : scanner.sl
-                }
-                tp1={
-                  scanner.direction ===
-                  "WAIT"
-                    ? 0
-                    : scanner.tp1
-                }
-                tp2={
-                  scanner.direction ===
-                  "WAIT"
-                    ? 0
-                    : scanner.tp2
-                }
-                asianHigh={
-                  scanner.asianHigh
-                }
-                asianLow={
-                  scanner.asianLow
-                }
-                londonHigh={
-                  scanner.londonHigh
-                }
-                londonLow={
-                  scanner.londonLow
-                }
-                nyOpenHigh={
-                  scanner.nyOpenHigh
-                }
-                nyOpenLow={
-                  scanner.nyOpenLow
-                }
-                vwap={
-                  scanner.vwap
-                }
-                bosPrice={
-                  scanner.bosPrice
-                }
-                chochPrice={
-                  scanner.chochPrice
-                }
-                height={
-                  isFullscreen && typeof window !== "undefined"
-                    ? Math.max(420, window.innerHeight - 53)
-                    : 620
-                }
-              />
+                <AlphaPriceChart
+                  symbol={selectedSymbol}
+                  tf="M1"
+                  candles={current.chartCandles}
+                  loading={false}
+                  priceAction={
+                    scanner
+                      ? scanner.direction === "WAIT"
+                        ? "WAIT · NO TRADE"
+                        : scanner.priceAction
+                      : "LIVE MARKET"
+                  }
+                  direction={scanner?.direction === "SELL" ? "SELL" : "BUY"}
+                  entry={scanner && scanner.direction !== "WAIT" ? scanner.entry : 0}
+                  sl={scanner && scanner.direction !== "WAIT" ? scanner.sl : 0}
+                  tp1={scanner && scanner.direction !== "WAIT" ? scanner.tp1 : 0}
+                  tp2={scanner && scanner.direction !== "WAIT" ? scanner.tp2 : 0}
+                  asianHigh={scanner?.asianHigh}
+                  asianLow={scanner?.asianLow}
+                  londonHigh={scanner?.londonHigh}
+                  londonLow={scanner?.londonLow}
+                  nyOpenHigh={scanner?.nyOpenHigh}
+                  nyOpenLow={scanner?.nyOpenLow}
+                  vwap={scanner?.vwap}
+                  bosPrice={scanner?.bosPrice}
+                  chochPrice={scanner?.chochPrice}
+                  height={
+                    isFullscreen && typeof window !== "undefined"
+                      ? Math.max(420, window.innerHeight - 53)
+                      : 620
+                  }
+                />
               </div>
             ) : null}
 
