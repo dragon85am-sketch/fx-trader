@@ -15,6 +15,7 @@ import {
 type Props = {
   symbol: string;
   tf: string;
+  chartInterval?: "1min" | "5min";
 
   candles: CandlestickData[];
 
@@ -50,6 +51,7 @@ type Props = {
 export default function AlphaPriceChart({
   symbol,
   tf,
+  chartInterval = "1min",
 
   candles = [],
 
@@ -324,12 +326,7 @@ export default function AlphaPriceChart({
           price?: number;
           timestamp?: number;
         };
-
-        // Railway currently broadcasts ticks for all subscribed instruments
-        // to every SSE client. Never allow another market (e.g. XAUUSD)
-        // to update the US30 candle, or vice versa.
         if (tick.symbol !== symbol) return;
-
         const price = Number(tick.price);
         const timestamp = Number(tick.timestamp);
         const series = seriesRef.current;
@@ -338,7 +335,9 @@ export default function AlphaPriceChart({
         // Keep live ticks on the SAME chart timeline as the REST candles.
         // The historical chart is shifted to Europe/Amsterdam for display, so using
         // the raw provider epoch here would make Lightweight Charts reject updates.
-        const providerMinute = Math.floor(timestamp / 60_000);
+        const bucketMinutes = chartInterval === "5min" ? 5 : 1;
+        const providerMinute =
+          Math.floor(timestamp / (bucketMinutes * 60_000)) * bucketMinutes;
         const prev = liveCandleRef.current;
         if (!prev) return;
 
@@ -365,7 +364,8 @@ export default function AlphaPriceChart({
           // The chart timeline is anchored to REST history. Advance exactly one
           // M1 bar when Live-Rates moves into a new provider minute.
           providerMinuteRef.current = providerMinute;
-          const nextTime = (Number(prev.time) + 60) as Time;
+          const nextTime =
+            (Number(prev.time) + (chartInterval === "5min" ? 300 : 60)) as Time;
           next = {
             time: nextTime,
             open: prev.close,
@@ -394,7 +394,7 @@ export default function AlphaPriceChart({
       liveCandleRef.current = null;
       providerMinuteRef.current = null;
     };
-  }, [symbol, liveBaseUrl, candles]);
+  }, [symbol, liveBaseUrl, candles, chartInterval]);
 
   // ====================================================
   // DATA + LEVELS

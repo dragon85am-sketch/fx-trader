@@ -978,6 +978,9 @@ export default function ProScanner() {
   const [scanning, setScanning] =
     React.useState(false);
 
+  const [chartInterval, setChartInterval] =
+    React.useState<"1min" | "5min">("1min");
+
   const scannerRootRef = React.useRef<HTMLElement | null>(null);
   const chartFullscreenRef = React.useRef<HTMLDivElement | null>(null);
   const [isFullscreen, setIsFullscreen] = React.useState(false);
@@ -1215,6 +1218,24 @@ export default function ProScanner() {
   const technicalMatrix = React.useMemo(
     () => buildTechMatrix(current.m1, current.m5),
     [current.m1, current.m5],
+  );
+
+  const selectedChartCandles = React.useMemo(
+    () =>
+      chartInterval === "5min"
+        ? toChartCandles(
+            current.m5.map((item) => ({
+              datetime: item.datetime,
+              open: String(item.open),
+              high: String(item.high),
+              low: String(item.low),
+              close: String(item.close),
+              volume: item.volume !== undefined ? String(item.volume) : undefined,
+            })),
+            selectedSymbol,
+          )
+        : current.chartCandles,
+    [chartInterval, current.m5, current.chartCandles, selectedSymbol],
   );
 
   return (
@@ -1651,10 +1672,34 @@ export default function ProScanner() {
                 ref={chartFullscreenRef}
                 className="overflow-hidden rounded-[22px] bg-[#071421] fullscreen:h-screen fullscreen:w-screen fullscreen:rounded-none fullscreen:p-0"
               >
-                <AlphaPriceChart
+                <div className="mb-3 flex items-center justify-end gap-2">
+                <span className="mr-1 text-[9px] font-black uppercase tracking-[0.18em] text-sky-100/40">
+                  Chart interval
+                </span>
+                {(["1min", "5min"] as const).map((interval) => {
+                  const active = chartInterval === interval;
+                  return (
+                    <button
+                      key={interval}
+                      type="button"
+                      onClick={() => setChartInterval(interval)}
+                      className={`rounded-lg border px-4 py-2 text-[10px] font-black transition ${
+                        active
+                          ? "border-cyan-300/60 bg-cyan-400/15 text-cyan-200"
+                          : "border-white/10 bg-white/[0.03] text-sky-100/50 hover:border-cyan-300/30"
+                      }`}
+                    >
+                      {interval === "1min" ? "M1" : "M5"}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <AlphaPriceChart
                   symbol={selectedSymbol}
+                  chartInterval={chartInterval}
                   tf="M1"
-                  candles={current.chartCandles}
+                  candles={selectedChartCandles}
                   loading={false}
                   priceAction={
                     scanner
