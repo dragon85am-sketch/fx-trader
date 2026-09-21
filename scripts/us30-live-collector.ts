@@ -33,7 +33,15 @@ let providerError = "";
 let dbWriting = false;
 const pendingDbTicks = new Map<string, Tick>();
 
-const clients = new Set<http.ServerResponse>();
+const clientsBySymbol = new Map<string, Set<http.ServerResponse>>(
+  PROVIDER_INSTRUMENTS.map((symbol) => [symbol, new Set<http.ServerResponse>()])
+);
+
+function totalClients() {
+  let total = 0;
+  for (const set of clientsBySymbol.values()) total += set.size;
+  return total;
+}
 
 async function upsertTick(symbol: string, price: number, ts: number) {
   for (const [interval, size] of frames) {
@@ -79,8 +87,24 @@ async function drainDbQueue() {
   }
 }
 
-function broadcast(event: string, payload: unknown) {
+function broadcastStatus(event: string, payload: unknown) {
   const body = `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
+
+  for (const set of clientsBySymbol.values()) {
+    for (const client of set) {
+      try {
+        client.write(body);
+      } catch {
+        set.delete(client);
+      }
+    }
+  }
+}
+
+function broadcastTick(tick: Tick) {
+  const body = `event: tick\ndata: ${JSON.stringify(tick)}\n\n`;
+  const clients = clientsBySymbol.get(tick.symbol);
+  if (!clients) return;
 
   for (const client of clients) {
     try {
@@ -123,7 +147,7 @@ socket.on("connect", () => {
   socket.emit("instruments", [...PROVIDER_INSTRUMENTS]);
   socket.emit("key", { key });
 
-  broadcast("status", {
+  broadcastStatus("status", {
     provider: "live-rates",
     connected: true,
     mode: "WS_SINGLE_CONNECTION",
@@ -143,7 +167,7 @@ socket.on("rates", (raw: any) => {
         providerError = providerInfo;
       }
 
-      broadcast("status", {
+      broadcastStatus("status", {
         provider: "live-rates",
         connected: liveRatesConnected,
         info: providerInfo,
@@ -155,7 +179,7 @@ socket.on("rates", (raw: any) => {
     if (msg?.error) {
       providerError = String(msg.error);
       console.error("[COLLECTOR]", providerError);
-      broadcast("status", {
+      broadcastStatus("status", {
         provider: "live-rates",
         connected: liveRatesConnected,
         error: providerError,
@@ -175,7 +199,7 @@ socket.on("rates", (raw: any) => {
     latestTicks[symbol] = tick;
 
     // Browser gets the tick immediately; DB work is serialized separately.
-    broadcast("tick", tick);
+    broadcastTick(tick);
     queueDbTick(tick);
   } catch (e) {
     console.error("[COLLECTOR] tick parse error", e);
@@ -186,7 +210,7 @@ socket.on("disconnect", (reason) => {
   liveRatesConnected = false;
   console.warn("[COLLECTOR] Live-Rates socket disconnected:", reason);
 
-  broadcast("status", {
+  broadcastStatus("status", {
     provider: "live-rates",
     connected: false,
     reason,
@@ -200,7 +224,7 @@ socket.on("connect_error", (e) => {
   providerError = e.message;
   console.error("[COLLECTOR] socket connect error:", e.message);
 
-  broadcast("status", {
+  broadcastStatus("status", {
     provider: "live-rates",
     connected: false,
     error: e.message,
@@ -234,7 +258,7 @@ const server = http.createServer((req, res) => {
       ok: true,
       mode: "WS_SINGLE_CONNECTION",
       liveRatesConnected,
-      clients: clients.size,
+      clients: totalClients(),
       instruments: PROVIDER_INSTRUMENTS,
       latestTicks,
       dbWriting,
@@ -272,7 +296,12 @@ const server = http.createServer((req, res) => {
     const latestTick = latestTicks[streamSymbol];
     if (latestTick) res.write(`event: tick\ndata: ${JSON.stringify(latestTick)}\n\n`);
 
-    clients.add(res);
+    const streamClients = clientsBySymbol.get(streamSymbol);
+    if (!streamClients) {
+      res.end();
+      return;
+    }
+    streamClients.add(res);
 
     const keepAlive = setInterval(() => {
       try {
@@ -282,7 +311,7 @@ const server = http.createServer((req, res) => {
 
     req.on("close", () => {
       clearInterval(keepAlive);
-      clients.delete(res);
+      streamClients.delete(res);
     });
 
     return;
@@ -311,10 +340,12 @@ async function shutdown(signal: string) {
   socket.removeAllListeners();
   socket.disconnect();
 
-  for (const client of clients) {
-    try { client.end(); } catch {}
+  for (const set of clientsBySymbol.values()) {
+    for (const client of set) {
+      try { client.end(); } catch {}
+    }
+    set.clear();
   }
-  clients.clear();
 
   await new Promise<void>((resolve) => server.close(() => resolve()));
   await prisma.$disconnect();
