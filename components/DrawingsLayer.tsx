@@ -78,12 +78,13 @@ export type TradeZoneCanvasSpec = {
   precision?: number;
 } | null;
 
-function getStorageKey(
-  symbol: string,
-  timeframe: string
-) {
-  return `drawings_${symbol}_${timeframe}`;
+function getStorageKey(symbol: string) {
+  // Drawings are shared by instrument, not by timeframe.
+  // A EURUSD line drawn on M1 is therefore visible on M5/M15/M30/H1/H4/D1.
+  return `drawings_${symbol}_ALL_TF`;
 }
+
+const SHARED_DRAWING_TIMEFRAMES = ["M1", "M5", "M15", "M30", "H1", "H4", "D1", "default"] as const;
 
 const TWO_POINT_TOOLS: DrawTool[] = [
   "TREND",
@@ -139,9 +140,30 @@ const [fiboLevels, setFiboLevels] =
 React.useEffect(() => {
   storageReadyRef.current = false;
   try {
-    const key = getStorageKey(symbol, timeframe);
+    const key = getStorageKey(symbol);
     const raw = localStorage.getItem(key);
-    setObjs(raw ? JSON.parse(raw) : []);
+
+    if (raw) {
+      setObjs(JSON.parse(raw));
+    } else {
+      // One-time migration: merge drawings previously saved separately on each TF.
+      const merged: AnyObj[] = [];
+      const seen = new Set<string>();
+      for (const tfKey of SHARED_DRAWING_TIMEFRAMES) {
+        const legacy = localStorage.getItem(`drawings_${symbol}_${tfKey}`);
+        if (!legacy) continue;
+        try {
+          const parsed = JSON.parse(legacy) as AnyObj[];
+          for (const obj of parsed) {
+            if (!obj?.id || seen.has(obj.id)) continue;
+            seen.add(obj.id);
+            merged.push(obj);
+          }
+        } catch {}
+      }
+      setObjs(merged);
+      if (merged.length) localStorage.setItem(key, JSON.stringify(merged));
+    }
   } catch {
     setObjs([]);
   } finally {
@@ -194,12 +216,12 @@ React.useEffect(() => {
     if (!storageReadyRef.current) return;
     const timer = window.setTimeout(() => {
       try {
-        const key = getStorageKey(symbol, timeframe);
+        const key = getStorageKey(symbol);
         localStorage.setItem(key, JSON.stringify(objs));
       } catch {}
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [objs, symbol, timeframe]);
+  }, [objs, symbol]);
 
   const resize = React.useCallback(() => {
     const canvas = canvasRef.current;
@@ -1473,7 +1495,16 @@ if (o.type === "FIBO") {
           anchor +
           nextSpan * (1 - ratio),
       });
-      requestAnimationFrame(draw);
+      // Lightweight Charts applies the new logical range asynchronously.
+      // Redraw the market-coordinate overlay for a few frames so ENTRY/SL/TP
+      // and drawings stay locked to their TIME + PRICE while wheel-zooming.
+      requestAnimationFrame(() => {
+        draw();
+        requestAnimationFrame(() => {
+          draw();
+          requestAnimationFrame(draw);
+        });
+      });
     } catch {}
   }}
   onMouseDown={handleMouseDown}

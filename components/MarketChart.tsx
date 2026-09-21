@@ -2821,6 +2821,11 @@ kineticScroll: {
       return;
     }
 
+    // IMPORTANT: keep the drawing/crosshair cache in sync with every live bar.
+    // Previously candleSeries.update() moved the visible chart forward, while
+    // displayCacheRef still ended a few bars earlier. DrawingsLayer then clamped
+    // the cursor to that stale last candle.
+    displayCacheRef.current = safeRaw;
     candleSeries.update(lc);
     lastBarTimeRef.current = lc.time as UTCTimestamp;
 
