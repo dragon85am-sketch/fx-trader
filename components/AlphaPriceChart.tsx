@@ -297,6 +297,22 @@ export default function AlphaPriceChart({
       return;
     }
 
+    // Seed the live candle from the last REST candle BEFORE opening SSE.
+    // This removes the race where the first ticks arrived while liveCandleRef was still null.
+    const lastHistorical = candles[candles.length - 1];
+    if (lastHistorical) {
+      liveCandleRef.current = {
+        time: lastHistorical.time,
+        open: lastHistorical.open,
+        high: lastHistorical.high,
+        low: lastHistorical.low,
+        close: lastHistorical.close,
+      };
+    } else {
+      liveCandleRef.current = null;
+    }
+    providerMinuteRef.current = null;
+
     const base = liveBaseUrl.replace(/\/+$/, "");
     const streamSymbol = symbol === "XAUUSD" ? "xauusd" : "us30";
     const source = new EventSource(`${base}/api/${streamSymbol}/stream`);
@@ -336,9 +352,10 @@ export default function AlphaPriceChart({
             close: price,
           };
         } else {
-          const minuteDelta = Math.max(1, providerMinute - providerMinuteRef.current);
+          // The chart timeline is anchored to REST history. Advance exactly one
+          // M1 bar when Live-Rates moves into a new provider minute.
           providerMinuteRef.current = providerMinute;
-          const nextTime = (Number(prev.time) + minuteDelta * 60) as Time;
+          const nextTime = (Number(prev.time) + 60) as Time;
           next = {
             time: nextTime,
             open: prev.close,
@@ -367,7 +384,7 @@ export default function AlphaPriceChart({
       liveCandleRef.current = null;
       providerMinuteRef.current = null;
     };
-  }, [symbol, liveBaseUrl]);
+  }, [symbol, liveBaseUrl, candles]);
 
   // ====================================================
   // DATA + LEVELS
