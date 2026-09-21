@@ -1610,8 +1610,97 @@ async function fetchCoinbaseCandles(symbol: string, tf: Timeframe): Promise<{ ca
 }
 
 
+function aggregateToM30(candles: Candle[]): Candle[] {
+  const buckets = new Map<number, Candle[]>();
+
+  for (const candle of candles) {
+    const bucket = Math.floor(Number(candle.time) / 1800) * 1800;
+    const group = buckets.get(bucket) ?? [];
+    group.push(candle);
+    buckets.set(bucket, group);
+  }
+
+  return [...buckets.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([bucket, group]) => ({
+      time: bucket as UTCTimestamp,
+      open: group[0].open,
+      high: Math.max(...group.map((c) => c.high)),
+      low: Math.min(...group.map((c) => c.low)),
+      close: group[group.length - 1].close,
+      volume: group.reduce((sum, c) => sum + (c.volume ?? 0), 0),
+    }));
+}
+
+async function fetchFxTradeCandles(
+  symbol: "EURUSD" | "GBPUSD",
+  tf: Timeframe
+): Promise<{ candles: Candle[]; volume: number }> {
+  const routeSymbol = symbol.toLowerCase();
+
+  // Collector stores M1/M5/M15/H1/H4. Build M30 locally from M5.
+  const engineInterval = tf === "M30" ? "5min" : TWELVE_INTERVAL[tf];
+  const limit = tf === "M30" ? 1320 : 220;
+
+  const params = new URLSearchParams({
+    interval: engineInterval,
+    limit: String(limit),
+  });
+
+  const res = await fetch(`/api/${routeSymbol}/candles?${params.toString()}`, {
+    cache: "no-store",
+    headers: { Accept: "application/json" },
+  });
+
+  if (!res.ok) throw new Error(`${symbol} FX Trade Candle Engine: ${await res.text()}`);
+
+  const data = await res.json();
+  if (data?.status === "error" || !Array.isArray(data?.values)) {
+    throw new Error(data?.message || data?.error || `${symbol}: brak danych Candle Engine`);
+  }
+
+  let candles: Candle[] = data.values
+    .map((v: any) => ({
+      time: Math.floor(
+        new Date(String(v.datetime).replace(" ", "T") + "Z").getTime() / 1000
+      ) as UTCTimestamp,
+      open: Number(v.open),
+      high: Number(v.high),
+      low: Number(v.low),
+      close: Number(v.close),
+      volume: Number(v.volume ?? 0),
+    }))
+    .filter(
+      (c: Candle) =>
+        Number.isFinite(c.time) &&
+        Number.isFinite(c.open) &&
+        Number.isFinite(c.high) &&
+        Number.isFinite(c.low) &&
+        Number.isFinite(c.close) &&
+        c.open > 0 &&
+        c.high > 0 &&
+        c.low > 0 &&
+        c.close > 0
+    )
+    .sort((a: Candle, b: Candle) => Number(a.time) - Number(b.time));
+
+  if (tf === "M30") {
+    candles = aggregateToM30(candles).slice(-220);
+  }
+
+  const volume = candles.reduce((sum, c) => sum + (c.volume ?? 0), 0);
+  return { candles, volume };
+}
+
 async function fetchAutoCandles(symbol: string, tf: Timeframe, _source: DataSource): Promise<{ candles: Candle[]; volume: number }> {
   if (symbol.endsWith("USDT")) return fetchCoinbaseCandles(symbol, tf);
+
+  // First FX pairs migrated to Live-Rates + FX Trade Candle Engine.
+  if (symbol === "EURUSD" || symbol === "GBPUSD") {
+    return fetchFxTradeCandles(symbol, tf);
+  }
+
+  // Remaining FX pairs stay on Twelve Data until their collector feeds are enabled.
   return fetchTwelveCandles(symbol, tf);
 }
 
