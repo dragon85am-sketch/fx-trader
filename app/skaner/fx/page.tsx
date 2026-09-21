@@ -59,7 +59,7 @@ const DEFAULT_SUPERTREND_SETTINGS: SupertrendSettings = {
   downColor: "#ef4444",
 };
 
-const TIMEFRAMES = ["M1", "M5", "M15", "M30", "H1", "H4"] as const;
+const TIMEFRAMES = ["M1", "M5", "M15", "M30", "H1", "H4", "D1"] as const;
 type Timeframe = (typeof TIMEFRAMES)[number];
 
 const TWELVE_INTERVAL: Record<Timeframe, string> = {
@@ -69,6 +69,7 @@ const TWELVE_INTERVAL: Record<Timeframe, string> = {
   M30: "30min",
   H1: "1h",
   H4: "4h",
+  D1: "1day",
 };
 
 const COINBASE_GRANULARITY: Record<Timeframe, number> = {
@@ -78,6 +79,7 @@ const COINBASE_GRANULARITY: Record<Timeframe, number> = {
   M30: 1800,
   H1: 3600,
   H4: 14400,
+  D1: 86400,
 };
 
 type Signal = "UP" | "DOWN" | "NONE";
@@ -1610,11 +1612,11 @@ async function fetchCoinbaseCandles(symbol: string, tf: Timeframe): Promise<{ ca
 }
 
 
-function aggregateToM30(candles: Candle[]): Candle[] {
+function aggregateCandles(candles: Candle[], bucketSeconds: number): Candle[] {
   const buckets = new Map<number, Candle[]>();
 
   for (const candle of candles) {
-    const bucket = Math.floor(Number(candle.time) / 1800) * 1800;
+    const bucket = Math.floor(Number(candle.time) / bucketSeconds) * bucketSeconds;
     const group = buckets.get(bucket) ?? [];
     group.push(candle);
     buckets.set(bucket, group);
@@ -1632,15 +1634,31 @@ function aggregateToM30(candles: Candle[]): Candle[] {
     }));
 }
 
+function aggregateToM30(candles: Candle[]): Candle[] {
+  return aggregateCandles(candles, 1800);
+}
+
+function aggregateToD1(candles: Candle[]): Candle[] {
+  return aggregateCandles(candles, 86400);
+}
+
 async function fetchFxTradeCandles(
   symbol: "EURUSD" | "GBPUSD",
   tf: Timeframe
 ): Promise<{ candles: Candle[]; volume: number }> {
   const routeSymbol = symbol.toLowerCase();
 
-  // Collector stores M1/M5/M15/H1/H4. Build M30 locally from M5.
-  const engineInterval = tf === "M30" ? "5min" : TWELVE_INTERVAL[tf];
-  const limit = tf === "M30" ? 1320 : 220;
+  // Collector stores M1/M5/M15/H1/H4.
+  // M30 is built from M5, D1 is built from H1.
+  const engineInterval =
+    tf === "M30" ? "5min" :
+    tf === "D1" ? "1h" :
+    TWELVE_INTERVAL[tf];
+
+  const limit =
+    tf === "M30" ? 1320 :
+    tf === "D1" ? 2000 :
+    220;
 
   const params = new URLSearchParams({
     interval: engineInterval,
@@ -1686,6 +1704,8 @@ async function fetchFxTradeCandles(
 
   if (tf === "M30") {
     candles = aggregateToM30(candles).slice(-220);
+  } else if (tf === "D1") {
+    candles = aggregateToD1(candles).slice(-220);
   }
 
   const volume = candles.reduce((sum, c) => sum + (c.volume ?? 0), 0);
@@ -3637,6 +3657,7 @@ if (closedNow.length) {
       M30: 1800,
       H1: 3600,
       H4: 14400,
+      D1: 86400,
     };
 
     const bucketSize = intervalSeconds[tf];
@@ -3706,10 +3727,12 @@ if (closedNow.length) {
 
   if (!selected) return null;
 
-  const selectedCandles = React.useMemo(
-    () => candlesCache.current.get(selected.symbol) ?? [],
-    [selected.symbol, lastSync]
-  );
+  // Read the current cache on every render.
+  // The old useMemo could keep the previous timeframe candles because
+  // candlesCache is a mutable ref and lastSync is not updated by refresh().
+  // rows/tf changes already re-render this component, so the chart now receives
+  // the freshly fetched OHLC for M1/M5/M15/M30/H1/H4/D1.
+  const selectedCandles = candlesCache.current.get(selected.symbol) ?? [];
 
   // RENKO ma własne źródło danych niezależne od głównego interwału wykresu.
   // Domyślnie: M1. CURRENT = aktualny TF. AUTO = M1.

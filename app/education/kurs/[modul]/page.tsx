@@ -585,7 +585,7 @@ export default function ModulPage({
     : active.contentKey === "m0-l3-pips-lot-spread"
     ? "https://www.youtube.com/embed/aicgDtSoI_o"
     : active.contentKey === "m0-l4-rodzaje-rynkow"
-    ? "https://www.youtube.com/embed/bs7rpPVOdoQ"
+    ? "https://www.youtube.com/embed/o8nwGLizf04"
     : active.contentKey === "m0-l5-jak-dziala-broker"
     ? "https://www.youtube.com/embed/UJ-DPccUUhU"
     : active.contentKey === "m0-l6-jak-powstaje-cena"
