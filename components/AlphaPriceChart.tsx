@@ -319,7 +319,17 @@ export default function AlphaPriceChart({
 
     const onTick = (event: MessageEvent) => {
       try {
-        const tick = JSON.parse(event.data) as { price?: number; timestamp?: number };
+        const tick = JSON.parse(event.data) as {
+          symbol?: string;
+          price?: number;
+          timestamp?: number;
+        };
+
+        // Railway currently broadcasts ticks for all subscribed instruments
+        // to every SSE client. Never allow another market (e.g. XAUUSD)
+        // to update the US30 candle, or vice versa.
+        if (tick.symbol !== symbol) return;
+
         const price = Number(tick.price);
         const timestamp = Number(tick.timestamp);
         const series = seriesRef.current;
