@@ -169,7 +169,7 @@ React.useEffect(() => {
   } finally {
     requestAnimationFrame(() => { storageReadyRef.current = true; });
   }
-}, [symbol, timeframe]);
+}, [symbol]);
   React.useEffect(() => {
   localStorage.setItem(
     "fibo_levels",
@@ -281,14 +281,68 @@ React.useEffect(() => {
     [chartRef, candleSeriesRef]
   );
 
+  // Convert an absolute market time to X even when the current timeframe
+  // does not contain that exact candle. Example: a point created at 10:17 on
+  // M1 must still exist between the 10:15 and 10:20 candles on M5.
+  const marketTimeToX = React.useCallback(
+    (time: UTCTimestamp): number | null => {
+      const chart = chartRef.current;
+      if (!chart) return null;
+
+      const ts = chart.timeScale();
+      const exact = ts.timeToCoordinate(time as any);
+      if (exact != null && Number.isFinite(Number(exact))) return Number(exact);
+
+      const candles = getCandles();
+      if (!candles.length) return null;
+
+      const target = Number(time);
+
+      // Binary search: first candle with time >= target.
+      let lo = 0;
+      let hi = candles.length;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (Number(candles[mid].time) < target) lo = mid + 1;
+        else hi = mid;
+      }
+
+      const rightIdx = Math.min(candles.length - 1, lo);
+      const leftIdx = Math.max(0, rightIdx - 1);
+
+      // Outside the loaded history: extrapolate using the nearest two bars.
+      let i0 = leftIdx;
+      let i1 = rightIdx;
+      if (target < Number(candles[0].time) && candles.length > 1) {
+        i0 = 0;
+        i1 = 1;
+      } else if (target > Number(candles[candles.length - 1].time) && candles.length > 1) {
+        i0 = candles.length - 2;
+        i1 = candles.length - 1;
+      }
+
+      const t0 = Number(candles[i0].time);
+      const t1 = Number(candles[i1].time);
+
+      if (i0 === i1 || t1 === t0) {
+        const x = ts.logicalToCoordinate(i0 as any);
+        return x == null ? null : Number(x);
+      }
+
+      const fraction = (target - t0) / (t1 - t0);
+      const logical = i0 + fraction;
+      const x = ts.logicalToCoordinate(logical as any);
+      return x == null || !Number.isFinite(Number(x)) ? null : Number(x);
+    },
+    [chartRef, getCandles]
+  );
+
   const dataToPoint = React.useCallback(
     (p: Point | null) => {
-      const chart = chartRef.current;
       const series = candleSeriesRef.current;
+      if (!series || !p) return null;
 
-      if (!chart || !series || !p) return null;
-
-      const x = chart.timeScale().timeToCoordinate(p.t as any);
+      const x = marketTimeToX(p.t);
       const y = series.priceToCoordinate(p.p);
 
       if (x == null || y == null) return null;
@@ -298,7 +352,7 @@ React.useEffect(() => {
         y: Number(y),
       };
     },
-    [chartRef, candleSeriesRef]
+    [candleSeriesRef, marketTimeToX]
   );
 
   function distance(
@@ -375,7 +429,7 @@ React.useEffect(() => {
       }
 
       if (o.type === "VLINE") {
-        const xx = chartRef.current?.timeScale().timeToCoordinate(o.t as any);
+        const xx = marketTimeToX(o.t);
         if (xx != null && Math.abs(x - Number(xx)) < 8) return o.id;
       }
 
@@ -477,7 +531,7 @@ React.useEffect(() => {
       }
 
       if (o.type === "VLINE") {
-        const x = chartRef.current?.timeScale().timeToCoordinate(o.t as any);
+        const x = marketTimeToX(o.t);
         if (x == null) {
           ctx.restore();
           return;
@@ -619,7 +673,7 @@ if (o.type === "FIBO") {
 
       ctx.restore();
     },
-    [chartRef, candleSeriesRef, dataToPoint]
+    [chartRef, candleSeriesRef, dataToPoint, marketTimeToX]
   );
 
   const drawTradeZones = React.useCallback((ctx: CanvasRenderingContext2D) => {
@@ -629,7 +683,7 @@ if (o.type === "FIBO") {
     const canvas = canvasRef.current;
     if (!spec || !chart || !series || !canvas) return;
 
-    const anchorX = chart.timeScale().timeToCoordinate(spec.anchorTime as any);
+    const anchorX = marketTimeToX(spec.anchorTime);
     if (anchorX == null || !Number.isFinite(Number(anchorX))) return;
 
     const levels = spec.levels;
@@ -691,7 +745,7 @@ if (o.type === "FIBO") {
       ctx.fillStyle="#f8fafc"; ctx.fillText(txt,x+w+17,y+.5);
     }
     ctx.restore();
-  }, [tradeZoneSpec, chartRef, candleSeriesRef]);
+  }, [tradeZoneSpec, chartRef, candleSeriesRef, marketTimeToX]);
 
   const draw = React.useCallback(() => {
     const canvas = canvasRef.current;
@@ -748,6 +802,16 @@ if (o.type === "FIBO") {
   React.useEffect(() => {
     draw();
   }, [draw]);
+
+  // Candles change on every timeframe, drawings do not. Re-project all saved
+  // TIME + PRICE anchors onto the new candle spacing after a TF switch.
+  React.useEffect(() => {
+    const raf1 = requestAnimationFrame(() => {
+      draw();
+      requestAnimationFrame(draw);
+    });
+    return () => cancelAnimationFrame(raf1);
+  }, [timeframe, draw]);
 
   // ============================================================
   // FREEZE DRAWINGS TO MARKET COORDINATES
