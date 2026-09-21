@@ -13,14 +13,16 @@ type CandleRow = {
   high: number | string;
   low: number | string;
   close: number | string;
-  volume: number | string | null;
 };
 
 export async function GET(request: NextRequest) {
   try {
     const interval = request.nextUrl.searchParams.get("interval") ?? "1min";
     const requestedLimit = Number(request.nextUrl.searchParams.get("limit") ?? "220");
-    const limit = Math.max(1, Math.min(Number.isFinite(requestedLimit) ? requestedLimit : 220, 2000));
+    const limit = Math.max(
+      1,
+      Math.min(Number.isFinite(requestedLimit) ? requestedLimit : 220, 2000)
+    );
 
     if (!ALLOWED.has(interval)) {
       return NextResponse.json(
@@ -30,7 +32,7 @@ export async function GET(request: NextRequest) {
     }
 
     const rows = await prisma.$queryRaw<CandleRow[]>`
-      SELECT "bucket", "open", "high", "low", "close", "volume"
+      SELECT "bucket", "open", "high", "low", "close"
       FROM "MarketCandle"
       WHERE "symbol" = ${SYMBOL}
         AND "interval" = ${interval}
@@ -47,7 +49,7 @@ export async function GET(request: NextRequest) {
         high: String(row.high),
         low: String(row.low),
         close: String(row.close),
-        volume: String(row.volume ?? 0),
+        volume: "0",
       }));
 
     return NextResponse.json(
@@ -59,10 +61,15 @@ export async function GET(request: NextRequest) {
         warmup: values.length < 60,
         values,
       },
-      { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate",
+        },
+      }
     );
   } catch (error) {
     console.error(`[${SYMBOL} CANDLES]`, error);
+
     return NextResponse.json(
       {
         status: "error",
