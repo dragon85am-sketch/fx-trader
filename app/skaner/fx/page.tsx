@@ -1643,7 +1643,7 @@ function aggregateToD1(candles: Candle[]): Candle[] {
 }
 
 async function fetchFxTradeCandles(
-  symbol: "EURUSD" | "GBPUSD",
+  symbol: "EURUSD" | "GBPUSD" | "XAUUSD",
   tf: Timeframe
 ): Promise<{ candles: Candle[]; volume: number }> {
   const routeSymbol = symbol.toLowerCase();
@@ -1716,7 +1716,7 @@ async function fetchAutoCandles(symbol: string, tf: Timeframe, _source: DataSour
   if (symbol.endsWith("USDT")) return fetchCoinbaseCandles(symbol, tf);
 
   // First FX pairs migrated to Live-Rates + FX Trade Candle Engine.
-  if (symbol === "EURUSD" || symbol === "GBPUSD") {
+  if (symbol === "EURUSD" || symbol === "GBPUSD" || symbol === "XAUUSD") {
     return fetchFxTradeCandles(symbol, tf);
   }
 
@@ -3739,7 +3739,7 @@ if (closedNow.length) {
     [rows, selectedSymbol]
   );
 
-  // Live-Rates: EURUSD / GBPUSD tickują na żywo przez SSE z centralnego collectora.
+  // Live-Rates: EURUSD / GBPUSD / XAUUSD tickują na żywo przez SSE z centralnego collectora.
   // Historyczne świece nadal są pobierane normalnie, a liveCandle aktualizuje tylko
   // aktualnie otwartą świecę wybranego interwału.
   const [liveCandle, setLiveCandle] = React.useState<Candle | null>(null);
@@ -3748,7 +3748,7 @@ if (closedNow.length) {
     setLiveCandle(null);
 
     const symbol = selected?.symbol?.toUpperCase();
-    if (symbol !== "EURUSD" && symbol !== "GBPUSD") return;
+    if (symbol !== "EURUSD" && symbol !== "GBPUSD" && symbol !== "XAUUSD") return;
 
     const baseUrl = (process.env.NEXT_PUBLIC_US30_LIVE_URL ?? "").replace(/\/$/, "");
     if (!baseUrl) return;
@@ -3764,7 +3764,7 @@ if (closedNow.length) {
     };
 
     const bucketSize = intervalSeconds[tf];
-    const streamPath = symbol === "EURUSD" ? "eurusd" : "gbpusd";
+    const streamPath = symbol.toLowerCase();
     const source = new EventSource(`${baseUrl}/api/${streamPath}/stream`);
 
     source.addEventListener("tick", (event) => {
