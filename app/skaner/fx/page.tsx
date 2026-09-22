@@ -3838,7 +3838,7 @@ if (closedNow.length) {
   const selectedCandles = candlesCache.current.get(selected.symbol) ?? [];
 
   // RENKO ma własne źródło danych niezależne od głównego interwału wykresu.
-  // Domyślnie: M1. CURRENT = aktualny TF. AUTO = M1.
+  // CURRENT/AUTO = aktualny TF, dzięki czemu Renko zachowuje ten sam czas i live tick co wykres.
   React.useEffect(() => {
     let alive = true;
 
@@ -3851,9 +3851,9 @@ if (closedNow.length) {
       const renkoTf: Timeframe =
         renkoSource === "M5"
           ? "M5"
-          : renkoSource === "CURRENT"
-            ? tf
-            : "M1";
+          : renkoSource === "M1"
+            ? "M1"
+            : tf;
 
       // Jeżeli Renko ma korzystać dokładnie z aktualnego TF,
       // nie robimy drugiego requestu.
@@ -3902,7 +3902,7 @@ if (closedNow.length) {
   // wyłącznie na cykliczny refresh danych historycznych.
   const effectiveRenkoCandles = React.useMemo(() => {
     const renkoTf: Timeframe =
-      renkoSource === "M5" ? "M5" : renkoSource === "CURRENT" ? tf : "M1";
+      renkoSource === "M5" ? "M5" : renkoSource === "M1" ? "M1" : tf;
 
     const base = renkoTf === tf ? selectedCandles : renkoCandles;
     if (renkoTf !== tf || !liveCandle) return base;
