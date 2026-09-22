@@ -1956,11 +1956,13 @@ function PocMiniScanner({
   confirmationCount,
   confirmationSide,
   liquidity,
+  compact = false,
 }: {
   state: PocScannerState;
   confirmationCount: 0 | 1 | 2 | 3 | 4;
   confirmationSide: Side | null;
   liquidity: number;
+  compact?: boolean;
 }) {
   const summary = getPocSummary(state.cells);
   const bullish = summary.net > 0;
@@ -1992,6 +1994,57 @@ function PocMiniScanner({
         : premiumStrongSell
           ? "PREMIUM STRONG SELL"
           : summary.label;
+
+  if (compact) {
+    return (
+      <div className="flex h-10 min-w-[560px] items-center gap-2 rounded-xl border border-sky-300/20 bg-[#0b315c]/70 px-2 shadow-[inset_0_1px_0_rgba(255,255,255,.04)]">
+        <div className="flex shrink-0 items-center gap-1.5 border-r border-sky-200/10 pr-2">
+          <ChartNoAxesCombined className="h-3.5 w-3.5 text-fuchsia-300" />
+          <span className="text-[10px] font-black tracking-wide text-white">POC MINI</span>
+          <span className={cn(
+            "rounded-md border px-1.5 py-0.5 text-[8px] font-black",
+            resultLabel.includes("BUY")
+              ? "border-emerald-300/25 bg-emerald-400/10 text-emerald-300"
+              : resultLabel.includes("SELL")
+                ? "border-red-300/25 bg-red-500/10 text-red-300"
+                : "border-amber-300/20 bg-amber-500/10 text-amber-200"
+          )}>
+            {resultLabel}
+          </span>
+        </div>
+
+        <div className="grid min-w-0 flex-1 grid-cols-7 gap-1">
+          {POC_TIMEFRAMES.map((pocTf) => {
+            const cell = state.cells.find((item) => item.tf === pocTf);
+            const isBuy = cell?.relation === "ABOVE" && cell?.trend === "UP";
+            const isSell = cell?.relation === "BELOW" && cell?.trend === "DOWN";
+            return (
+              <div
+                key={pocTf}
+                title={!cell ? `${pocTf}: brak danych` : `${pocTf}: ${cell.relation} / ${cell.trend}`}
+                className={cn(
+                  "flex h-7 min-w-0 items-center justify-center gap-1 rounded-md border px-1",
+                  isBuy
+                    ? "border-emerald-300/20 bg-emerald-400/10"
+                    : isSell
+                      ? "border-red-300/20 bg-red-400/10"
+                      : "border-sky-300/10 bg-[#10385f]/75"
+                )}
+              >
+                <span className="text-[8px] font-black text-sky-100/55">{pocTf}</span>
+                <span className={cn(
+                  "text-[9px] font-black",
+                  isBuy ? "text-emerald-300" : isSell ? "text-red-300" : "text-sky-100/35"
+                )}>
+                  {isBuy ? "▲" : isSell ? "▼" : "—"}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full min-w-0 self-start overflow-hidden rounded-[18px] sm:rounded-[22px] border border-sky-300/35 bg-[linear-gradient(180deg,#174f86_0%,#123f6d_48%,#0d335a_100%)] shadow-[0_14px_35px_rgba(0,0,0,.22),0_0_28px_rgba(14,165,233,.08),inset_0_1px_0_rgba(255,255,255,.08)]">
@@ -2536,7 +2589,7 @@ export default function MarketScannerPage() {
   const [renkoDraftMode, setRenkoDraftMode] =
     React.useState<"AUTO" | "MANUAL">("AUTO");
   const [renkoDraftBoxSize, setRenkoDraftBoxSize] = React.useState<number>(0);
-  const [renkoSource, setRenkoSource] = React.useState<RenkoSource>("M1");
+  const [renkoSource, setRenkoSource] = React.useState<RenkoSource>("CURRENT");
   const [renkoDraftSource, setRenkoDraftSource] = React.useState<RenkoSource>("M1");
   const [renkoCandles, setRenkoCandles] = React.useState<Candle[]>([]);
   const [renkoLoading, setRenkoLoading] = React.useState(false);
@@ -2633,7 +2686,7 @@ export default function MarketScannerPage() {
   }, []);
 
   const [panelH, setPanelH] = React.useState<number>(780);
-  const [chartHeight, setChartHeight] = React.useState<number>(600);
+  const [chartHeight, setChartHeight] = React.useState<number>(690);
 
   const candlesCache = React.useRef<Map<string, Candle[]>>(new Map());
   const [loading, setLoading] = React.useState(false);
@@ -3843,6 +3896,29 @@ if (closedNow.length) {
   ]);
 
 
+  // RENKO LIVE: gdy źródłem jest aktualny interwał, dokładamy bieżącą świecę
+  // budowaną z ticków SSE. Dzięki temu cegły Renko aktualizują się na żywo
+  // po przełączeniu M1 / M5 / M15 / M30 / H1 / H4 / D1, zamiast czekać
+  // wyłącznie na cykliczny refresh danych historycznych.
+  const effectiveRenkoCandles = React.useMemo(() => {
+    const renkoTf: Timeframe =
+      renkoSource === "M5" ? "M5" : renkoSource === "CURRENT" ? tf : "M1";
+
+    const base = renkoTf === tf ? selectedCandles : renkoCandles;
+    if (renkoTf !== tf || !liveCandle) return base;
+
+    const next = [...base];
+    const last = next[next.length - 1];
+
+    if (last && Number(last.time) === Number(liveCandle.time)) {
+      next[next.length - 1] = liveCandle;
+    } else {
+      next.push(liveCandle);
+    }
+
+    return next;
+  }, [renkoSource, tf, selectedCandles, renkoCandles, liveCandle]);
+
   const highlightTime: UTCTimestamp | null = selected.tradeActive ? selected.hammerTime ?? null : null;
   const hasTrade = !!selected.tradeActive && !!selected.levels;
 
@@ -4399,7 +4475,7 @@ if (closedNow.length) {
               </div>
             )}
 
-            <div className="min-h-0 flex-1 space-y-2 overflow-auto pr-1">
+            <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-sky-300/10 bg-[#061c37]/35 [scrollbar-width:thin]">
               {filteredRows.map((r) => {
                 const active = r.symbol === selectedSymbol;
                 const scannerOn = r.liquidity >= LIQ_THRESHOLD_HIGH && (r.confirmationCount ?? 0) === 4 && !!r.confirmationSide;
@@ -4408,6 +4484,7 @@ if (closedNow.length) {
                   !!r.confirmationSide &&
                   r.liquidity < LIQ_THRESHOLD_HIGH;
                 const isFlashing = flashMapRef.current.has(r.symbol);
+                const rowSide = scannerOn ? r.confirmationSide : null;
 
                 return (
                   <div
@@ -4417,108 +4494,66 @@ if (closedNow.length) {
                     }}
                     onClick={() => setSelectedSymbol(r.symbol)}
                     className={cn(
-                      "relative cursor-pointer overflow-hidden rounded-lg border px-2 py-1.5 transition-all duration-200 sm:rounded-xl sm:px-2 sm:py-1.5 xl:rounded-2xl xl:p-4",
-                      active ? "border-cyan-300/45 bg-[linear-gradient(135deg,rgba(13,107,184,.88),rgba(10,67,125,.88))] shadow-[0_0_24px_rgba(34,211,238,.16),inset_0_1px_0_rgba(255,255,255,.06)]" : "border-sky-300/14 bg-[linear-gradient(180deg,rgba(11,49,92,.78),rgba(7,37,72,.84))] hover:border-sky-300/28 hover:bg-[#10477e]",
-                      isFlashing ? "ring-2 ring-emerald-400/60 shadow-[0_0_24px_rgba(52,211,153,0.25)]" : ""
+                      "group grid cursor-pointer grid-cols-[minmax(0,1fr)_34px_62px_42px] items-center gap-2 border-b border-sky-300/[0.07] px-2 py-1.5 text-[11px] transition last:border-b-0 xl:min-h-[36px] xl:px-2.5 xl:py-1.5 xl:text-xs",
+                      active
+                        ? "bg-cyan-400/15 shadow-[inset_3px_0_0_rgba(34,211,238,.9)]"
+                        : "hover:bg-sky-400/[0.08]",
+                      isFlashing && "bg-emerald-400/10 ring-1 ring-inset ring-emerald-400/35"
                     )}
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <button
-                          type="button"
-                          aria-label={favorites.includes(r.symbol) ? `Usuń ${r.symbol} z ulubionych` : `Dodaj ${r.symbol} do ulubionych`}
-                          onClick={(e) => { e.stopPropagation(); toggleFavorite(r.symbol); }}
-                          className={cn(
-                            "shrink-0 text-base leading-none transition hover:scale-110",
-                            favorites.includes(r.symbol) ? "text-amber-300" : "text-sky-100/30 hover:text-amber-200"
-                          )}
-                        >
-                          {favorites.includes(r.symbol) ? "★" : "☆"}
-                        </button>
-                        <span className="truncate text-sm font-semibold xl:text-base">{r.symbol}</span>
-                      </div>
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <button
+                        type="button"
+                        aria-label={favorites.includes(r.symbol) ? `Usuń ${r.symbol} z ulubionych` : `Dodaj ${r.symbol} do ulubionych`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleFavorite(r.symbol);
+                        }}
+                        className={cn(
+                          "w-4 shrink-0 text-sm leading-none transition hover:scale-110",
+                          favorites.includes(r.symbol) ? "text-amber-300" : "text-sky-100/35 hover:text-amber-200"
+                        )}
+                      >
+                        {favorites.includes(r.symbol) ? "★" : "☆"}
+                      </button>
+                      <span className={cn("truncate font-bold", active ? "text-white" : "text-sky-50/90")}>{r.symbol}</span>
+                      {r.tradeActive && r.side ? (
+                        <span className="hidden h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_7px_rgba(52,211,153,.75)] xl:block" title={`Aktywny setup ${r.side}`} />
+                      ) : null}
+                    </div>
 
-                      <div className="flex items-center gap-2">
-                        <ConfirmationBadge count={r.confirmationCount ?? 0} side={r.confirmationSide ?? null} />
+                    <span className="text-center font-semibold text-sky-100/55">{r.tf ?? tf}</span>
 
-                        <span
-                          className={cn(
-                            "rounded-full border px-2 py-1 text-[11px] font-extrabold",
-                            scannerOn
-                              ? "border-emerald-300/30 bg-emerald-500/20 text-emerald-100 shadow-[0_0_16px_rgba(16,185,129,.16)]"
-                              : waitLiquidity
-                                ? "border-amber-300/30 bg-amber-500/15 text-amber-200 shadow-[0_0_14px_rgba(245,158,11,.10)]"
-                                : "border-sky-300/15 bg-[#082749]/75 text-sky-100/40"
-                          )}
-                        >
-                          {scannerOn
-                            ? `SCANNER ${r.confirmationSide ?? "ON"}`
-                            : waitLiquidity
-                              ? `WAIT LIQ ${Math.round(r.liquidity)}%`
-                              : (r.confirmationCount ?? 0) >= 2
-                                ? "WATCH"
-                                : "SCANNER OFF"}
+                    <div className="flex justify-center">
+                      {rowSide ? (
+                        <span className={cn(
+                          "min-w-[50px] rounded-full border px-1.5 py-0.5 text-center text-[9px] font-black xl:text-[10px]",
+                          rowSide === "BUY"
+                            ? "border-emerald-300/25 bg-emerald-500/20 text-emerald-200"
+                            : "border-red-300/25 bg-red-500/20 text-red-200"
+                        )}>
+                          {rowSide}
                         </span>
-
-                        <span className="text-[10px] font-bold text-cyan-200 xl:hidden">{Math.round(r.liquidity)}%</span>
-                        <SignalDot s={r.signal} />
-                      </div>
+                      ) : waitLiquidity ? (
+                        <span className="min-w-[50px] rounded-full border border-amber-300/20 bg-amber-500/10 px-1.5 py-0.5 text-center text-[9px] font-black text-amber-200 xl:text-[10px]">WAIT</span>
+                      ) : (
+                        <span className="min-w-[50px] rounded-full border border-sky-300/10 bg-sky-300/[0.06] px-1.5 py-0.5 text-center text-[9px] font-bold text-sky-100/40 xl:text-[10px]">WAIT</span>
+                      )}
                     </div>
 
-                    <div className="hidden mt-1.5 xl:block">
-                      <LiquidityBar value={r.liquidity} />
-                    </div>
-
-                    <div className="hidden mt-2 justify-between text-sm text-sky-100/78 xl:flex">
-                      <span>TF: {tf}</span>
-                      <span>{r.signal === "UP" ? "Trend UP" : r.signal === "DOWN" ? "Trend DOWN" : "Brak"}</span>
-                    </div>
-
-                    {r.tradeActive && r.side ? (
-                      <div className="mt-2 hidden text-xs text-amber-200/90 xl:block">
-                        ✅ <span className="font-extrabold">FX TRADE • {
-                          r.patternSignalMode === "BOLLINGER_EARLY"
-                            ? `EARLY ${r.side}`
-                            : r.patternSignalMode === "BOLLINGER_CONFIRMED"
-                            ? `${r.side}`
-                            : r.patternSignalMode === "BOLLINGER_STRONG"
-                            ? `STRONG ${r.side}`
-                            : r.patternSignalMode === "STRUCTURE" || r.patternSignalMode === "BOLLINGER_STRUCTURE"
-                            ? `STRONG ${r.side}`
-                            : r.patternSignalMode === "BOLLINGER"
-                            ? `BB ${r.side}`
-                            : r.side
-                        }</span> • RR {r.levels?.rr?.toFixed?.(2) ?? "—"}
-                        {r.signalPattern && r.signalPattern !== "NONE" ? <span className="ml-2 text-yellow-200">• {r.signalPattern}</span> : null}
-                        {r.patternSignalMode ? <span className={cn(
-                          "ml-2 font-black",
-                          r.patternSignalMode === "BOLLINGER_STRONG" || r.patternSignalMode === "STRUCTURE" || r.patternSignalMode === "BOLLINGER_STRUCTURE"
-                            ? "text-emerald-300"
-                            : r.patternSignalMode === "BOLLINGER_EARLY"
-                            ? "text-amber-300"
-                            : "text-sky-200"
-                        )}>• {
-                          r.patternSignalMode === "BOLLINGER_EARLY"
-                            ? "BB REENTRY • EARLY"
-                            : r.patternSignalMode === "BOLLINGER_CONFIRMED"
-                            ? "BB REENTRY • CONFIRMED"
-                            : r.patternSignalMode === "BOLLINGER_STRONG"
-                            ? `BB REENTRY + ${r.side === "BUY" ? "HH/HL" : "LL/LH"}`
-                            : r.patternSignalMode === "BOLLINGER_STRUCTURE"
-                            ? `BOLLINGER + ${r.side === "BUY" ? "HH/HL" : "LL/LH"}`
-                            : r.patternSignalMode === "BOLLINGER"
-                            ? "BOLLINGER"
-                            : r.patternSignalMode === "STRUCTURE"
-                            ? (r.side === "BUY" ? "HH/HL" : "LL/LH")
-                            : "STANDARD"
-                        }</span> : null}
-                      </div>
-                    ) : (
-                      <div className="mt-2 hidden text-xs text-sky-100/30 xl:block">—</div>
-                    )}
+                    <span className={cn(
+                      "text-right font-black tabular-nums",
+                      scannerOn ? "text-emerald-300" : waitLiquidity ? "text-amber-200" : "text-sky-100/55"
+                    )}>
+                      {Math.round(r.liquidity)}%
+                    </span>
                   </div>
                 );
               })}
+
+              {!filteredRows.length ? (
+                <div className="px-3 py-8 text-center text-xs text-sky-100/40">Brak instrumentów dla wybranego filtra.</div>
+              ) : null}
             </div>
           </CardContent>
         </Card>
@@ -5101,6 +5136,16 @@ if (closedNow.length) {
                       <GearIcon className="h-4 w-4" />
                     </button>
 
+                    <div className="ml-2 hidden min-w-[560px] flex-1 lg:block xl:ml-4">
+                      <PocMiniScanner
+                        compact
+                        state={pocScanner}
+                        confirmationCount={selected.confirmationCount ?? 0}
+                        confirmationSide={selected.confirmationSide ?? null}
+                        liquidity={selected.liquidity}
+                      />
+                    </div>
+
                   </div>
 
                   {targetsPanelOpen && typeof document !== "undefined"
@@ -5212,7 +5257,7 @@ if (closedNow.length) {
                   bbConfig={bbConfig}
                   heikinAshi={heikinAshi}
                   renko={renko}
-                  renkoCandles={renkoCandles as any}
+                  renkoCandles={effectiveRenkoCandles as any}
                   renkoBoxSize={renkoBoxSize > 0 ? renkoBoxSize : undefined}
                   showTradeLines={hasTrade}
                   levels={hasTrade ? selected.levels : undefined}
@@ -5233,7 +5278,7 @@ if (closedNow.length) {
                 />
               </div>
 
-              <div className={cn("mt-1 w-full min-w-0", landscapeFullscreen && "hidden")}>
+              <div className={cn("mt-1 w-full min-w-0 lg:hidden", landscapeFullscreen && "hidden")}>
                 <PocMiniScanner
                   state={pocScanner}
                   confirmationCount={selected.confirmationCount ?? 0}
