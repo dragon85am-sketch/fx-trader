@@ -2250,6 +2250,26 @@ function GearIcon({ className }: { className?: string }) {
 }
 
 type DirectionFilter = "BUY" | "SELL" | null;
+type MarketCategory = "ALL" | "FOREX" | "INDICES" | "CRYPTO" | "METALS" | "FAV";
+
+const MARKET_CATEGORY_LABELS: Array<{ key: Exclude<MarketCategory, "FAV">; label: string }> = [
+  { key: "ALL", label: "ALL" },
+  { key: "FOREX", label: "FOREX" },
+  { key: "INDICES", label: "INDICES" },
+  { key: "CRYPTO", label: "CRYPTO" },
+  { key: "METALS", label: "METALS" },
+];
+
+const METAL_SYMBOLS = new Set(["XAUUSD", "XAGUSD"]);
+const INDEX_SYMBOLS = new Set(["US100", "US30", "US500", "GER40", "UK100", "JP225"]);
+
+function getMarketCategory(symbol: string): Exclude<MarketCategory, "ALL" | "FAV"> {
+  const s = symbol.toUpperCase();
+  if (METAL_SYMBOLS.has(s)) return "METALS";
+  if (INDEX_SYMBOLS.has(s)) return "INDICES";
+  if (s.endsWith("USDT")) return "CRYPTO";
+  return "FOREX";
+}
 
 type EmaSlot = {
   id: number;
@@ -2589,7 +2609,28 @@ export default function MarketScannerPage() {
 ];
   const [search, setSearch] = React.useState("");
   const [directionFilter, setDirectionFilter] = React.useState<DirectionFilter>(null);
-  const [onlyReady, setOnlyReady] = React.useState(false);
+  const [marketCategory, setMarketCategory] = React.useState<MarketCategory>("ALL");
+  const [favorites, setFavorites] = React.useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const raw = localStorage.getItem("fx-trade-market-favorites");
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  React.useEffect(() => {
+    try {
+      localStorage.setItem("fx-trade-market-favorites", JSON.stringify(favorites));
+    } catch {}
+  }, [favorites]);
+
+  const toggleFavorite = React.useCallback((symbol: string) => {
+    setFavorites((prev) =>
+      prev.includes(symbol) ? prev.filter((item) => item !== symbol) : [...prev, symbol]
+    );
+  }, []);
 
   const [panelH, setPanelH] = React.useState<number>(780);
   const [chartHeight, setChartHeight] = React.useState<number>(600);
@@ -2904,22 +2945,31 @@ React.useEffect(() => {
 
   const filteredRows = React.useMemo(() => {
     const q = search.trim().toUpperCase();
+    let base = q ? rows.filter((r) => r.symbol.toUpperCase().includes(q)) : rows;
 
-    let base = q
-      ? rows.filter((r) => r.symbol.toUpperCase().includes(q))
-      : rows;
-
-    if (directionFilter === "BUY") {
-      base = base.filter((r) => r.confirmationSide === "BUY");
-    } else if (directionFilter === "SELL") {
-      base = base.filter((r) => r.confirmationSide === "SELL");
+    if (marketCategory === "FAV") {
+      base = base.filter((r) => favorites.includes(r.symbol));
+    } else if (marketCategory !== "ALL") {
+      base = base.filter((r) => getMarketCategory(r.symbol) === marketCategory);
     }
 
-    // W obu kierunkach pokazujemy najaktywniejsze instrumenty na górze.
-    const sorted = [...base].sort((a, b) => b.liquidity - a.liquidity);
+    // BUY / SELL pokazują wyłącznie setupy faktycznie gotowe w skanerze.
+    if (directionFilter) {
+      base = base.filter(
+        (r) =>
+          r.status === "READY" &&
+          r.confirmationSide === directionFilter &&
+          (r.confirmationCount ?? 0) === 4 &&
+          r.liquidity >= LIQ_THRESHOLD_HIGH
+      );
+    }
 
-    return onlyReady ? sorted.filter((r) => r.status === "READY") : sorted;
-  }, [rows, search, directionFilter, onlyReady]);
+    return [...base].sort((a, b) => {
+      const aReady = a.status === "READY" ? 1 : 0;
+      const bReady = b.status === "READY" ? 1 : 0;
+      return bReady - aReady || b.liquidity - a.liquidity;
+    });
+  }, [rows, search, directionFilter, marketCategory, favorites]);
 
   const beep = React.useCallback(() => {
     try {
@@ -4262,67 +4312,85 @@ if (closedNow.length) {
       <div className="flex w-full min-w-0 flex-col gap-3 xl:flex-row xl:gap-4">
         <Card className="w-full min-w-0 shrink-0 overflow-hidden border-sky-300/20 xl:w-[380px] bg-[linear-gradient(180deg,rgba(20,74,128,.96)_0%,rgba(12,54,101,.96)_52%,rgba(8,40,78,.98)_100%)] shadow-[0_18px_45px_rgba(0,10,35,.34),0_0_28px_rgba(14,165,233,.10),inset_0_1px_0_rgba(255,255,255,.06)]" style={{ height: panelH }}>
           <CardContent className="flex h-full flex-col gap-1.5 p-2.5 sm:gap-2 sm:p-3 xl:gap-3 xl:p-5">
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-xs font-bold text-white sm:text-sm xl:text-lg">Lista instrumentów</p>
-                <p className="hidden text-xs text-sky-100/50 sm:block xl:text-sm">Search • BUY / SELL • Filter READY</p>
+                <p className="text-sm font-black tracking-[0.08em] text-white xl:text-base">MARKET WATCH</p>
+                <p className="text-[10px] text-sky-100/45 xl:text-xs">{filteredRows.length} instruments</p>
               </div>
-
-              <div className="text-right text-xs text-sky-100/55">
+              <div className="text-right text-[10px] text-sky-100/45 xl:text-xs">
                 {loading ? "Sync…" : lastSync ? `Sync: ${formatSyncUTC(lastSync)}` : "—"}
               </div>
             </div>
 
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Szukaj… (np. EURUSD / BTCUSDT)"
-              className="w-full rounded-lg border border-sky-300/20 bg-[#061c37]/80 px-2.5 py-1.5 text-[10px] sm:rounded-xl sm:px-3 sm:py-2 sm:text-xs xl:rounded-2xl xl:px-4 xl:py-2.5 xl:text-sm text-white shadow-[inset_0_1px_8px_rgba(0,0,0,.16)] outline-none placeholder:text-sky-100/35 focus:border-cyan-300/45 focus:ring-2 focus:ring-cyan-400/10"
-            />
+            <div className="relative">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sky-100/35">⌕</span>
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Szukaj EURUSD, BTC..."
+                className="w-full rounded-xl border border-sky-300/20 bg-[#061c37]/85 py-2 pl-8 pr-3 text-xs text-white outline-none placeholder:text-sky-100/30 focus:border-cyan-300/45 focus:ring-2 focus:ring-cyan-400/10 xl:py-2.5 xl:text-sm"
+              />
+            </div>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="grid grid-cols-5 gap-1 rounded-xl border border-sky-300/10 bg-[#061c37]/45 p-1">
+              {MARKET_CATEGORY_LABELS.map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => setMarketCategory(item.key)}
+                  className={cn(
+                    "rounded-lg px-1 py-1.5 text-[9px] font-extrabold transition xl:text-[10px]",
+                    marketCategory === item.key
+                      ? "border border-cyan-300/35 bg-sky-500/25 text-white shadow-[0_0_14px_rgba(14,165,233,.16)]"
+                      : "border border-transparent text-sky-100/60 hover:bg-sky-400/10 hover:text-white"
+                  )}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-3 gap-1.5">
               <button
-                className={cn(
-                  "rounded-lg border px-2.5 py-1.5 text-[10px] font-semibold transition sm:rounded-xl sm:text-xs xl:rounded-2xl xl:px-3 xl:py-2 xl:text-sm",
-                  directionFilter === "BUY"
-                    ? "border-emerald-300/40 bg-emerald-500/20 text-emerald-100 shadow-[0_0_18px_rgba(16,185,129,.18)]"
-                    : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/75 hover:border-emerald-300/30 hover:bg-emerald-500/10 hover:text-emerald-100"
-                )}
-                onClick={() =>
-                  setDirectionFilter((prev) => (prev === "BUY" ? null : "BUY"))
-                }
                 type="button"
+                onClick={() => setMarketCategory((prev) => (prev === "FAV" ? "ALL" : "FAV"))}
+                className={cn(
+                  "rounded-xl border px-2 py-2 text-[10px] font-extrabold transition xl:text-xs",
+                  marketCategory === "FAV"
+                    ? "border-amber-300/45 bg-amber-500/15 text-amber-200 shadow-[0_0_16px_rgba(245,158,11,.12)]"
+                    : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/75 hover:border-amber-300/30 hover:text-amber-100"
+                )}
+              >
+                ★ FAV <span className="opacity-60">({favorites.length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setDirectionFilter((prev) => (prev === "BUY" ? null : "BUY"))}
+                className={cn(
+                  "rounded-xl border px-2 py-2 text-[10px] font-extrabold transition xl:text-xs",
+                  directionFilter === "BUY"
+                    ? "border-emerald-300/45 bg-emerald-500/20 text-emerald-100 shadow-[0_0_16px_rgba(16,185,129,.15)]"
+                    : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/75 hover:border-emerald-300/30 hover:text-emerald-100"
+                )}
               >
                 BUY ↑
               </button>
-
               <button
-                className={cn(
-                  "rounded-lg border px-2.5 py-1.5 text-[10px] font-semibold transition sm:rounded-xl sm:text-xs xl:rounded-2xl xl:px-3 xl:py-2 xl:text-sm",
-                  directionFilter === "SELL"
-                    ? "border-red-300/40 bg-red-500/20 text-red-100 shadow-[0_0_18px_rgba(239,68,68,.18)]"
-                    : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/75 hover:border-red-300/30 hover:bg-red-500/10 hover:text-red-100"
-                )}
-                onClick={() =>
-                  setDirectionFilter((prev) => (prev === "SELL" ? null : "SELL"))
-                }
                 type="button"
+                onClick={() => setDirectionFilter((prev) => (prev === "SELL" ? null : "SELL"))}
+                className={cn(
+                  "rounded-xl border px-2 py-2 text-[10px] font-extrabold transition xl:text-xs",
+                  directionFilter === "SELL"
+                    ? "border-red-300/45 bg-red-500/20 text-red-100 shadow-[0_0_16px_rgba(239,68,68,.15)]"
+                    : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/75 hover:border-red-300/30 hover:text-red-100"
+                )}
               >
                 SELL ↓
               </button>
+            </div>
 
-              <button
-                className={cn(
-                  "rounded-lg border px-2.5 py-1.5 text-[10px] font-semibold transition sm:rounded-xl sm:text-xs xl:rounded-2xl xl:px-3 xl:py-2 xl:text-sm",
-                  onlyReady
-                    ? "border-emerald-300/30 bg-emerald-500/20 text-emerald-100 shadow-[0_0_16px_rgba(16,185,129,.16)]"
-                    : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/75 hover:border-sky-300/30 hover:bg-[#12477f] hover:text-white"
-                )}
-                onClick={() => setOnlyReady((v) => !v)}
-                type="button"
-              >
-                Tylko READY
-              </button>
+            <div className="grid grid-cols-[1fr_42px_64px_54px] gap-2 border-b border-sky-300/10 px-2 pb-1 text-[9px] font-bold uppercase tracking-wider text-sky-100/35 xl:text-[10px]">
+              <span>Instrument</span><span>TF</span><span>Signal</span><span className="text-right">Setup</span>
             </div>
 
             {error && (
@@ -4354,8 +4422,21 @@ if (closedNow.length) {
                       isFlashing ? "ring-2 ring-emerald-400/60 shadow-[0_0_24px_rgba(52,211,153,0.25)]" : ""
                     )}
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold xl:text-base">{r.symbol}</span>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <button
+                          type="button"
+                          aria-label={favorites.includes(r.symbol) ? `Usuń ${r.symbol} z ulubionych` : `Dodaj ${r.symbol} do ulubionych`}
+                          onClick={(e) => { e.stopPropagation(); toggleFavorite(r.symbol); }}
+                          className={cn(
+                            "shrink-0 text-base leading-none transition hover:scale-110",
+                            favorites.includes(r.symbol) ? "text-amber-300" : "text-sky-100/30 hover:text-amber-200"
+                          )}
+                        >
+                          {favorites.includes(r.symbol) ? "★" : "☆"}
+                        </button>
+                        <span className="truncate text-sm font-semibold xl:text-base">{r.symbol}</span>
+                      </div>
 
                       <div className="flex items-center gap-2">
                         <ConfirmationBadge count={r.confirmationCount ?? 0} side={r.confirmationSide ?? null} />
