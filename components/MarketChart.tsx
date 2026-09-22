@@ -2770,10 +2770,37 @@ kineticScroll: {
 
     if (renko) {
       if (!safeRaw.length) return;
-      const renkoRaw =
+      // RENKO LIVE: historia Renko może pochodzić z osobnego TF (np. M1),
+      // ale ostatni tick MUSI być dopięty do tego źródła. Wcześniej liveCandle
+      // trafiał tylko do safeRaw, więc przy przekazanym renkoCandles Renko nie
+      // widziało bieżącej ceny i wyglądało jak zamrożone.
+      const renkoBase =
         renkoCandles && renkoCandles.length
           ? normalizeCandles(renkoCandles)
           : safeRaw;
+
+      const renkoRaw = (() => {
+        if (!renkoBase.length) return [lc];
+        const out = [...renkoBase];
+        const lastRenkoSource = out[out.length - 1];
+        const liveT = Number(lc.time);
+        const lastT = Number(lastRenkoSource.time);
+
+        if (liveT === lastT) out[out.length - 1] = lc;
+        else if (liveT > lastT) out.push(lc);
+        else {
+          // Gdy źródło Renko ma nowszy bucket czasu niż główny wykres,
+          // zachowujemy jego czas, ale podmieniamy close na aktualny tick.
+          out[out.length - 1] = {
+            ...(lastRenkoSource as any),
+            high: Math.max(toNum((lastRenkoSource as any).high), toNum((lc as any).close)),
+            low: Math.min(toNum((lastRenkoSource as any).low), toNum((lc as any).close)),
+            close: toNum((lc as any).close),
+          } as CandlestickData;
+        }
+        return normalizeCandles(out);
+      })();
+
       const box =
         currentRenkoBox > 0
           ? currentRenkoBox
