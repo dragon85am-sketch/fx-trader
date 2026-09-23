@@ -8,7 +8,8 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
-    "us30:collector": "tsx scripts/us30-live-collector.ts"
+    "us30:collector": "tsx scripts/master-market-collector.ts",
+    "market:collector": "tsx scripts/master-market-collector.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.16.2",

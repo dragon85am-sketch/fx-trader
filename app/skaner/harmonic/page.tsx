@@ -180,11 +180,12 @@ async function fetchLiveCandles(
   // GOLD / Forex / BTC stay on Twelve Data.
   if (symbol === "US30") {
     const params = new URLSearchParams({
+      symbol: "US30",
       interval: TWELVE_INTERVAL[tf],
       limit: "220",
     });
 
-    const res = await fetch(`/api/us30/candles?${params.toString()}`, {
+    const res = await fetch(`/api/market/candles?${params.toString()}`, {
       cache: "no-store",
       signal,
     });

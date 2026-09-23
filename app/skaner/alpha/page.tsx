@@ -514,6 +514,7 @@ async function fetchSetupCandles(setup: Setup): Promise<CandlestickData[]> {
   const isUs30 = setup.instrument === "US30";
   const qs = isUs30
     ? new URLSearchParams({
+        symbol: setup.instrument,
         interval: INTERVAL_MAP[setup.tf],
         limit: "220",
       })
@@ -527,7 +528,7 @@ async function fetchSetupCandles(setup: Setup): Promise<CandlestickData[]> {
 
   const response = await fetch(
     isUs30
-      ? `/api/us30/candles?${qs.toString()}`
+      ? `/api/market/candles?${qs.toString()}`
       : `/api/twelve-data?${qs.toString()}`,
     { method: "GET", cache: "no-store" }
   );

@@ -1,0 +1,34 @@
+export const MASTER_MARKET_SYMBOLS = [
+  // Forex majors / minors / crosses
+  "EURUSD","GBPUSD","USDJPY","USDCHF","USDCAD","AUDUSD","NZDUSD",
+  "EURGBP","EURJPY","EURCHF","EURCAD","EURAUD","EURNZD",
+  "GBPJPY","GBPCHF","GBPCAD","GBPAUD","GBPNZD",
+  "AUDJPY","AUDCHF","AUDCAD","AUDNZD","NZDJPY","NZDCHF","NZDCAD",
+  "CADJPY","CADCHF","CHFJPY",
+  "USDNOK","USDSEK","USDDKK","USDPLN","USDHUF","USDCZK","USDTRY","USDZAR","USDMXN","USDSGD","USDHKD","USDCNH",
+  "EURNOK","EURSEK","EURDKK","EURPLN","EURHUF","EURCZK","EURTRY","EURZAR","EURSGD",
+  "GBPNOK","GBPSEK","GBPDKK","GBPPLN","GBPSGD","GBPZAR","GBPTRY",
+  "AUDSGD","AUDHKD","NZDSGD","CADSGD","CHFSGD","SGDJPY",
+  // Metals / commodities
+  "XAUUSD","XAGUSD","XAUEUR","XAGEUR","XPTUSD","XPDUSD","WTIUSD","BRENTUSD",
+  // Indices
+  "US30","US100","US500","GER40","UK100","JP225","FRA40","EU50","ES35","IT40","CH20","AUS200","HK50","CN50","SG30","NED25","NOR25","SE30","PL20","VIX",
+  // Crypto
+  "BTCUSD","ETHUSD","BNBUSD","SOLUSD","XRPUSD","ADAUSD","DOGEUSD","AVAXUSD","DOTUSD","LINKUSD",
+  "LTCUSD","BCHUSD","TRXUSD","XLMUSD","ATOMUSD","UNIUSD","ETCUSD","FILUSD","APTUSD","NEARUSD",
+  "ICPUSD","HBARUSD","VETUSD","ALGOUSD","AAVEUSD","MKRUSD","INJUSD","OPUSD","ARBUSD","SUIUSD",
+  "SEIUSD","TIAUSD","RUNEUSD","FTMUSD","GRTUSD","SANDUSD","MANAUSD","AXSUSD","EGLDUSD","THETAUSD",
+  "KASUSD","PEPEUSD","SHIBUSD","BONKUSD","WIFUSD","FLOKIUSD","JUPUSD","PYTHUSD","TONUSD","RENDERUSD",
+  "IMXUSD","LDOUSD","STXUSD","QNTUSD","FLOWUSD","KAVAUSD","CRVUSD","SNXUSD","COMPUSD","ZECUSD",
+] as const;
+
+export type MasterMarketSymbol = (typeof MASTER_MARKET_SYMBOLS)[number];
+
+export function normalizeMarketSymbol(value: string) {
+  return value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+export function getCollectorSymbols(envValue?: string) {
+  if (!envValue?.trim()) return [...MASTER_MARKET_SYMBOLS];
+  return Array.from(new Set(envValue.split(",").map(normalizeMarketSymbol).filter(Boolean)));
+}

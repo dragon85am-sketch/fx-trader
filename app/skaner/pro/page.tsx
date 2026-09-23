@@ -279,15 +279,10 @@ async function fetchCandles(
   interval: "1min" | "5min",
   outputsize: number,
 ): Promise<TwelveValue[]> {
-  // US30 and XAUUSD use our shared FX Trade candle engine fed by Live-Rates.
-  const routeSymbol = symbol === "XAUUSD" ? "xauusd" : "us30";
+  // Shared Master Collector candle engine.
+  const params = new URLSearchParams({ symbol, interval, limit: String(outputsize) });
 
-  const params = new URLSearchParams({
-    interval,
-    limit: String(outputsize),
-  });
-
-  const response = await fetch(`/api/${routeSymbol}/candles?${params.toString()}`, {
+  const response = await fetch(`/api/market/candles?${params.toString()}`, {
     method: "GET",
     cache: "no-store",
     headers: { Accept: "application/json" },

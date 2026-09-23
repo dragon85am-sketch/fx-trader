@@ -1643,29 +1643,14 @@ function aggregateToD1(candles: Candle[]): Candle[] {
 }
 
 async function fetchFxTradeCandles(
-  symbol: "EURUSD" | "GBPUSD" | "XAUUSD",
+  symbol: string,
   tf: Timeframe
 ): Promise<{ candles: Candle[]; volume: number }> {
-  const routeSymbol = symbol.toLowerCase();
+  // Master Collector stores every supported timeframe directly.
+  const engineInterval = TWELVE_INTERVAL[tf];
+  const params = new URLSearchParams({ symbol, interval: engineInterval, limit: "300" });
 
-  // Collector stores M1/M5/M15/H1/H4.
-  // M30 is built from M5, D1 is built from H1.
-  const engineInterval =
-    tf === "M30" ? "5min" :
-    tf === "D1" ? "1h" :
-    TWELVE_INTERVAL[tf];
-
-  const limit =
-    tf === "M30" ? 1320 :
-    tf === "D1" ? 2000 :
-    220;
-
-  const params = new URLSearchParams({
-    interval: engineInterval,
-    limit: String(limit),
-  });
-
-  const res = await fetch(`/api/${routeSymbol}/candles?${params.toString()}`, {
+  const res = await fetch(`/api/market/candles?${params.toString()}`, {
     cache: "no-store",
     headers: { Accept: "application/json" },
   });
@@ -1702,25 +1687,18 @@ async function fetchFxTradeCandles(
     )
     .sort((a: Candle, b: Candle) => Number(a.time) - Number(b.time));
 
-  if (tf === "M30") {
-    candles = aggregateToM30(candles).slice(-220);
-  } else if (tf === "D1") {
-    candles = aggregateToD1(candles).slice(-220);
-  }
-
   const volume = candles.reduce((sum, c) => sum + (c.volume ?? 0), 0);
   return { candles, volume };
 }
 
 async function fetchAutoCandles(symbol: string, tf: Timeframe, _source: DataSource): Promise<{ candles: Candle[]; volume: number }> {
+  // Prefer the shared Master Collector for every instrument. During warm-up or when
+  // a provider does not support a symbol, keep the existing provider as fallback.
+  try {
+    const master = await fetchFxTradeCandles(symbol, tf);
+    if (master.candles.length >= 20) return master;
+  } catch {}
   if (symbol.endsWith("USDT")) return fetchCoinbaseCandles(symbol, tf);
-
-  // First FX pairs migrated to Live-Rates + FX Trade Candle Engine.
-  if (symbol === "EURUSD" || symbol === "GBPUSD" || symbol === "XAUUSD") {
-    return fetchFxTradeCandles(symbol, tf);
-  }
-
-  // Remaining FX pairs stay on Twelve Data until their collector feeds are enabled.
   return fetchTwelveCandles(symbol, tf);
 }
 
@@ -3739,7 +3717,7 @@ if (closedNow.length) {
     [rows, selectedSymbol]
   );
 
-  // Live-Rates: EURUSD / GBPUSD / XAUUSD tickują na żywo przez SSE z centralnego collectora.
+  // Master Collector: każdy obsługiwany instrument tickuje przez wspólny SSE hub.
   // Historyczne świece nadal są pobierane normalnie, a liveCandle aktualizuje tylko
   // aktualnie otwartą świecę wybranego interwału.
   const [liveCandle, setLiveCandle] = React.useState<Candle | null>(null);
@@ -3748,7 +3726,7 @@ if (closedNow.length) {
     setLiveCandle(null);
 
     const symbol = selected?.symbol?.toUpperCase();
-    if (symbol !== "EURUSD" && symbol !== "GBPUSD" && symbol !== "XAUUSD") return;
+    if (!symbol) return;
 
     const baseUrl = (process.env.NEXT_PUBLIC_US30_LIVE_URL ?? "").replace(/\/$/, "");
     if (!baseUrl) return;
@@ -3764,8 +3742,7 @@ if (closedNow.length) {
     };
 
     const bucketSize = intervalSeconds[tf];
-    const streamPath = symbol.toLowerCase();
-    const source = new EventSource(`${baseUrl}/api/${streamPath}/stream`);
+    const source = new EventSource(`${baseUrl}/api/market/${symbol.toLowerCase()}/stream`);
 
     source.addEventListener("tick", (event) => {
       try {
