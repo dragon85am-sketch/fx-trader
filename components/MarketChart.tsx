@@ -3537,14 +3537,19 @@ kineticScroll: {
                 chartRef.current?.timeScale().scrollToRealTime();
               } catch {}
             }}
-            className={`rounded-lg border px-2 py-1.5 text-[10px] font-bold transition sm:rounded-xl sm:px-2.5 sm:text-xs xl:rounded-2xl xl:px-3 xl:py-2 ${
+            aria-label="Przewiń wykres do końca wraz z pojawieniem się ticku"
+            className={`flex h-8 w-9 items-center justify-center rounded-md border transition ${
               followOnTick && !detached
-                ? "border-sky-400/35 bg-sky-500/15 text-sky-100"
-                : "border-white/10 bg-white/5 text-zinc-200/70 hover:bg-white/10 hover:text-white"
+                ? "border-emerald-400/45 bg-emerald-500/10 text-emerald-400"
+                : "border-white/10 bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white"
             }`}
-            title="Follow (smart)"
+            title="Przewiń wykres do końca wraz z pojawieniem się tick'u"
           >
-            FOLLOW
+            <svg viewBox="0 0 36 24" className="h-5 w-7" aria-hidden="true">
+              <path d="M5 7v10M9 4v16M13 8v8" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              <path d="M3 10h4v4H3zM7 7h4v8H7zM11 10h4v4h-4z" fill="currentColor" opacity=".35" />
+              <path d="M17 12h12m-4-4 4 4-4 4M31 5v14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </button>
 
           <button
@@ -3564,14 +3569,19 @@ kineticScroll: {
                 return next;
               });
             }}
-            className={`rounded-lg border px-2 py-1.5 text-[10px] font-bold transition sm:rounded-xl sm:px-2.5 sm:text-xs xl:rounded-2xl xl:px-3 xl:py-2 ${
+            aria-label="Przesuń koniec wykresu od prawej krawędzi"
+            className={`flex h-8 w-9 items-center justify-center rounded-md border transition ${
               rightPadOn
-                ? "border-fuchsia-400/35 bg-fuchsia-500/15 text-fuchsia-100"
-                : "border-white/10 bg-white/5 text-zinc-200/70 hover:bg-white/10 hover:text-white"
+                ? "border-cyan-400/45 bg-cyan-500/10 text-cyan-300"
+                : "border-white/10 bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white"
             }`}
-            title="Odsuń koniec wykresu"
+            title="Przesuń koniec wykresu od prawej krawędzi"
           >
-            PAD
+            <svg viewBox="0 0 36 24" className="h-5 w-7" aria-hidden="true">
+              <path d="M9 5v14M11 12h16m-12-4-4 4 4 4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M23 7v10M27 4v16M31 8v8" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              <path d="M21 10h4v4h-4zM25 7h4v8h-4zM29 10h4v4h-4z" fill="currentColor" opacity=".35" />
+            </svg>
           </button>
         </div>
 
