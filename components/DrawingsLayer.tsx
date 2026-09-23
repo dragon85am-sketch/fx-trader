@@ -1115,14 +1115,15 @@ if (o.type === "FIBO") {
     }
 
     if (activeDrawTool === "VLINE") {
-      // Prefer the chart's own X -> time conversion. This keeps the VLINE time
-      // synchronized with the time scale. If the library cannot resolve it,
-      // fall back to the nearest candle time.
-      const exact = screenToData(x, y);
+      // VLINE must be anchored to a REAL candle timestamp.
+      // coordinateToTime(x) can return an interpolated time between bars,
+      // which made M1 labels jump by several minutes even when the line moved
+      // only a few candles. pointToData() already resolves X -> logical bar ->
+      // nearest candle, so p.t is the canonical timestamp for the drawing.
       addObj({
         ...makeBase("VLINE"),
         type: "VLINE",
-        t: (exact?.t ?? p.t) as UTCTimestamp,
+        t: p.t as UTCTimestamp,
       });
 
       return;
