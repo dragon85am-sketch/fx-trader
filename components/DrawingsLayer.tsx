@@ -21,6 +21,22 @@ export type DrawTool =
   | "PATH";
 
 type Point = { t: UTCTimestamp; p: number };
+
+function formatChartDateTime(time: UTCTimestamp) {
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      day: "2-digit",
+      month: "2-digit",
+      year: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(new Date(Number(time) * 1000));
+  } catch {
+    return "";
+  }
+}
+
 type FiboLevel = {
   id: string;
   value: number;
@@ -560,14 +576,9 @@ React.useEffect(() => {
         ctx.lineTo(Number(x), canvas.clientHeight);
         ctx.stroke();
 
-        // VLINE: show date/time on the bottom edge.
-        const date = new Date(Number(o.t) * 1000);
-        const dd = String(date.getDate()).padStart(2, "0");
-        const mm = String(date.getMonth() + 1).padStart(2, "0");
-        const yy = String(date.getFullYear()).slice(-2);
-        const hh = String(date.getHours()).padStart(2, "0");
-        const min = String(date.getMinutes()).padStart(2, "0");
-        const timeText = `${dd}.${mm}.${yy} ${hh}:${min}`;
+        // VLINE: use the same local-time formatter as the chart axis/crosshair.
+        // No manual timezone offset: the stored anchor remains the absolute UTCTimestamp.
+        const timeText = formatChartDateTime(o.t);
 
         ctx.save();
         ctx.font = "700 11px Inter, Arial";
@@ -1104,10 +1115,14 @@ if (o.type === "FIBO") {
     }
 
     if (activeDrawTool === "VLINE") {
+      // Prefer the chart's own X -> time conversion. This keeps the VLINE time
+      // synchronized with the time scale. If the library cannot resolve it,
+      // fall back to the nearest candle time.
+      const exact = screenToData(x, y);
       addObj({
         ...makeBase("VLINE"),
         type: "VLINE",
-        t: p.t,
+        t: (exact?.t ?? p.t) as UTCTimestamp,
       });
 
       return;

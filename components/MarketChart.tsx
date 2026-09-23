@@ -180,6 +180,35 @@ function toUTCTimestamp(t: unknown): UTCTimestamp {
   return Math.floor(Date.now() / 1000) as UTCTimestamp;
 }
 
+function formatChartDateTime(time: unknown) {
+  try {
+    const ts = toUTCTimestamp(time);
+    return new Intl.DateTimeFormat(undefined, {
+      day: "2-digit",
+      month: "2-digit",
+      year: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(new Date(Number(ts) * 1000));
+  } catch {
+    return "";
+  }
+}
+
+function formatChartAxisTime(time: unknown) {
+  try {
+    const ts = toUTCTimestamp(time);
+    return new Intl.DateTimeFormat(undefined, {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(new Date(Number(ts) * 1000));
+  } catch {
+    return "";
+  }
+}
+
 function toNum(x: unknown) {
   const n = Number(x);
   return Number.isFinite(n) ? n : 0;
@@ -1193,7 +1222,7 @@ fullscreenMode = false,
     time: number;
   } | null>(null);
   const lastIndicatorLiveUpdateRef = React.useRef(0);
-  const rightOffset = rightPadOn ? 28 : 8;
+  const rightOffset = rightPadOn ? 28 : 10;
 
   // FOLLOW LIVE: keep the current zoom/span and move only the logical window
   // so its right edge stays on the newest bar + configured right padding.
@@ -2224,21 +2253,7 @@ fullscreenMode = false,
         textColor: "#d1d5db",
       },
       localization: {
-        timeFormatter: (time: any) => {
-          try {
-            const ts = toUTCTimestamp(time);
-            return new Intl.DateTimeFormat(undefined, {
-              day: "2-digit",
-              month: "2-digit",
-              year: "2-digit",
-              hour: "2-digit",
-              minute: "2-digit",
-              hour12: false,
-            }).format(new Date(Number(ts) * 1000));
-          } catch {
-            return "";
-          }
-        },
+        timeFormatter: (time: any) => formatChartDateTime(time),
       },
       grid: {
         vertLines: { color: "rgba(255,255,255,0.05)" },
@@ -2269,18 +2284,7 @@ fullscreenMode = false,
         // Lightweight Charts interprets UTCTimestamp correctly, but without a
         // formatter the axis is effectively shown in UTC. Display labels in
         // the browser/user local timezone (e.g. 22:10 UTC -> 00:10 CEST).
-        tickMarkFormatter: (time: any) => {
-          try {
-            const ts = toUTCTimestamp(time);
-            return new Intl.DateTimeFormat(undefined, {
-              hour: "2-digit",
-              minute: "2-digit",
-              hour12: false,
-            }).format(new Date(Number(ts) * 1000));
-          } catch {
-            return "";
-          }
-        },
+        tickMarkFormatter: (time: any) => formatChartAxisTime(time),
       },
 handleScroll: {
   // Pan lewo/prawo obsługujemy własnym pointer handlerem poniżej.
@@ -3587,7 +3591,7 @@ kineticScroll: {
                 const next = !v;
                 try {
                   chartRef.current?.applyOptions({
-                    timeScale: { rightOffset: next ? 28 : 8 },
+                    timeScale: { rightOffset: next ? 28 : 10 },
                   });
                   setOverlayTick((x) => x + 1);
                   if (followOnTick && !detached && !manualPanRef.current) {
