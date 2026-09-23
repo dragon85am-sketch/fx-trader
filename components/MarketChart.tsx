@@ -1195,6 +1195,34 @@ fullscreenMode = false,
   const lastIndicatorLiveUpdateRef = React.useRef(0);
   const rightOffset = rightPadOn ? 28 : 8;
 
+  // FOLLOW LIVE: keep the current zoom/span and move only the logical window
+  // so its right edge stays on the newest bar + configured right padding.
+  // This avoids scrollToRealTime(), which can jump to the wrong edge after setData().
+  const followLatestBar = React.useCallback((preferredSpan?: number) => {
+    const chart = chartRef.current;
+    const data = displayCacheRef.current;
+    if (!chart || !data?.length) return;
+
+    try {
+      const ts: any = chart.timeScale();
+      const current = ts.getVisibleLogicalRange?.();
+      const currentSpan =
+        current && Number.isFinite(Number(current.from)) && Number.isFinite(Number(current.to))
+          ? Math.max(6, Number(current.to) - Number(current.from))
+          : NaN;
+
+      const span = Number.isFinite(preferredSpan)
+        ? Math.max(6, Number(preferredSpan))
+        : Number.isFinite(currentSpan)
+          ? currentSpan
+          : Math.min(120, Math.max(40, data.length));
+
+      const lastIndex = Math.max(0, data.length - 1);
+      const to = lastIndex + rightOffset;
+      ts.setVisibleLogicalRange?.({ from: to - span, to });
+    } catch {}
+  }, [rightOffset]);
+
   const patternLabels = React.useMemo(() => {
     if (!patternsEnabled) return [] as Array<{
       key: string;
@@ -1766,10 +1794,10 @@ fullscreenMode = false,
     setOverlayTick((v) => v + 1);
     if (followOnTick && !detached && !manualPanRef.current) {
       try {
-        chart.timeScale().scrollToRealTime();
+        followLatestBar();
       } catch {}
     }
-  }, [rightOffset, followOnTick, detached]);
+  }, [rightOffset, followOnTick, detached, followLatestBar]);
 
   // Jedno źródło ustawień Renko:
   // renkoBoxSize > 0 = MANUAL
@@ -2481,13 +2509,11 @@ kineticScroll: {
     seriesKeyRef.current = keyNow;
 
     if (isNewSeries) {
-      try {
-        chart.timeScale().fitContent();
-      } catch {}
+      // Open a new symbol/TF at the LIVE edge instead of fitting the whole history.
+      // Keep a practical initial window while preserving the configured right pad.
+      followLatestBar(Math.min(120, Math.max(40, safeForChart.length)));
     } else if (followOnTick && !detached && !manualPanRef.current) {
-      try {
-        chart.timeScale().scrollToRealTime();
-      } catch {}
+      followLatestBar();
     }
 
     applyIndicators(safeForChart, prec, minMove);
@@ -2771,6 +2797,7 @@ kineticScroll: {
     detached,
     applyIndicators,
     clearTradeLineSeries,
+    followLatestBar,
   ]);
 
   React.useEffect(() => {
@@ -2856,7 +2883,7 @@ kineticScroll: {
 
       if (followOnTick && !detached && !manualPanRef.current) {
         try {
-          chart.timeScale().scrollToRealTime();
+          followLatestBar();
         } catch {}
       }
       return;
@@ -2875,7 +2902,7 @@ kineticScroll: {
 
       if (followOnTick && !detached && !manualPanRef.current) {
         try {
-          chart.timeScale().scrollToRealTime();
+          followLatestBar();
         } catch {}
       }
       return;
@@ -2901,7 +2928,7 @@ kineticScroll: {
 
     if (followOnTick && !detached && !manualPanRef.current) {
       try {
-        chart.timeScale().scrollToRealTime();
+        followLatestBar();
       } catch {}
     }
   }, [
@@ -2916,6 +2943,7 @@ kineticScroll: {
     patternsEnabled,
     applyIndicators,
     pricePrecision,
+    followLatestBar,
   ]);
 
   const bandStyle = (kind: "TP1" | "TP2" | "TP3" | "SL" | "ENTRY") => {
@@ -3534,7 +3562,7 @@ kineticScroll: {
               setDetached(false);
               setFollowOnTick(true);
               try {
-                chartRef.current?.timeScale().scrollToRealTime();
+                followLatestBar();
               } catch {}
             }}
             aria-label="Przewiń wykres do końca wraz z pojawieniem się ticku"
@@ -3563,7 +3591,7 @@ kineticScroll: {
                   });
                   setOverlayTick((x) => x + 1);
                   if (followOnTick && !detached && !manualPanRef.current) {
-                    chartRef.current?.timeScale().scrollToRealTime();
+                    requestAnimationFrame(() => followLatestBar());
                   }
                 } catch {}
                 return next;
