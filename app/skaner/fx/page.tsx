@@ -2,6 +2,7 @@
 
 import type { DrawTool } from "@/components/DrawingsLayer";
 import React from "react";
+import { MASTER_MARKET_SYMBOLS } from "@/lib/market/master-symbols";
 import * as XLSX from "xlsx-js-style";
 import { createPortal } from "react-dom";
 import { Card, CardContent, Pill, cn, Button } from "@/components/ui";
@@ -161,20 +162,10 @@ type Candle = {
 
 
 
-const FOREX_SYMBOLS = [
-  "EURUSD",
-  "GBPUSD",
-  "USDJPY",
-  "USDCHF",
-  "AUDUSD",
-  "NZDUSD",
-  "USDCAD",
-  "EURJPY",
-  "GBPJPY",
-  "XAUUSD",
-];
-
-const CRYPTO_SYMBOLS = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT"];
+// One source of truth for Market Watch: the same 150-symbol universe used by
+// the Railway Master Collector. Adding/removing a symbol in master-symbols.ts
+// automatically updates this scanner as well.
+const MARKET_WATCH_SYMBOLS = [...MASTER_MARKET_SYMBOLS];
 
 const COINBASE_MAP: Record<string, string> = {
   BTCUSDT: "BTC-USD",
@@ -2291,14 +2282,27 @@ const MARKET_CATEGORY_LABELS: Array<{ key: Exclude<MarketCategory, "FAV">; label
   { key: "METALS", label: "METALS" },
 ];
 
-const METAL_SYMBOLS = new Set(["XAUUSD", "XAGUSD"]);
-const INDEX_SYMBOLS = new Set(["US100", "US30", "US500", "GER40", "UK100", "JP225"]);
+const METAL_SYMBOLS = new Set([
+  "XAUUSD", "XAGUSD", "XAUEUR", "XAGEUR", "XPTUSD", "XPDUSD", "WTIUSD", "BRENTUSD",
+]);
+const INDEX_SYMBOLS = new Set([
+  "US30", "US100", "US500", "GER40", "UK100", "JP225", "FRA40", "EU50", "ES35", "IT40",
+  "CH20", "AUS200", "HK50", "CN50", "SG30", "NED25", "NOR25", "SE30", "PL20", "VIX",
+]);
+const CRYPTO_MARKET_SYMBOLS = new Set([
+  "BTCUSD", "ETHUSD", "BNBUSD", "SOLUSD", "XRPUSD", "ADAUSD", "DOGEUSD", "AVAXUSD", "DOTUSD", "LINKUSD",
+  "LTCUSD", "BCHUSD", "TRXUSD", "XLMUSD", "ATOMUSD", "UNIUSD", "ETCUSD", "FILUSD", "APTUSD", "NEARUSD",
+  "ICPUSD", "HBARUSD", "VETUSD", "ALGOUSD", "AAVEUSD", "MKRUSD", "INJUSD", "OPUSD", "ARBUSD", "SUIUSD",
+  "SEIUSD", "TIAUSD", "RUNEUSD", "FTMUSD", "GRTUSD", "SANDUSD", "MANAUSD", "AXSUSD", "EGLDUSD", "THETAUSD",
+  "KASUSD", "PEPEUSD", "SHIBUSD", "BONKUSD", "WIFUSD", "FLOKIUSD", "JUPUSD", "PYTHUSD", "TONUSD", "RENDERUSD",
+  "IMXUSD", "LDOUSD", "STXUSD", "QNTUSD", "FLOWUSD", "KAVAUSD", "CRVUSD", "SNXUSD", "COMPUSD", "ZECUSD",
+]);
 
 function getMarketCategory(symbol: string): Exclude<MarketCategory, "ALL" | "FAV"> {
   const s = symbol.toUpperCase();
   if (METAL_SYMBOLS.has(s)) return "METALS";
   if (INDEX_SYMBOLS.has(s)) return "INDICES";
-  if (s.endsWith("USDT")) return "CRYPTO";
+  if (CRYPTO_MARKET_SYMBOLS.has(s)) return "CRYPTO";
   return "FOREX";
 }
 
@@ -2684,7 +2688,7 @@ export default function MarketScannerPage() {
   const [flashKey, setFlashKey] = React.useState(0);
   const rowRefs = React.useRef<Record<string, HTMLDivElement | null>>({});
 
-  const instruments = React.useMemo(() => [...CRYPTO_SYMBOLS, ...FOREX_SYMBOLS], []);
+  const instruments = React.useMemo(() => MARKET_WATCH_SYMBOLS, []);
 
   const [rows, setRows] = React.useState<Row[]>(() => {
   try {
@@ -2907,7 +2911,7 @@ React.useEffect(() => {
 
   React.useEffect(() => {
     setSelectedSymbol((prev) =>
-      prev && instruments.includes(prev) ? prev : instruments[0] ?? "BTCUSDT"
+      prev && (instruments as readonly string[]).includes(prev) ? prev : instruments[0] ?? "BTCUSDT"
     );
   }, [instruments]);
 
