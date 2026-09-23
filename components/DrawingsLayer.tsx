@@ -528,6 +528,24 @@ React.useEffect(() => {
         ctx.moveTo(0, Number(y));
         ctx.lineTo(canvas.clientWidth, Number(y));
         ctx.stroke();
+
+        // HLINE: show selected price on the right edge.
+        const priceText = Number(o.price).toFixed(
+          Math.abs(o.price) >= 1000 ? 2 : Math.abs(o.price) >= 100 ? 3 : 5
+        );
+        ctx.save();
+        ctx.font = "700 11px Inter, Arial";
+        ctx.textBaseline = "middle";
+        const padX = 7;
+        const labelH = 22;
+        const labelW = Math.ceil(ctx.measureText(priceText).width) + padX * 2;
+        const labelX = Math.max(0, canvas.clientWidth - labelW);
+        const labelY = Math.max(labelH / 2, Math.min(canvas.clientHeight - labelH / 2, Number(y)));
+        ctx.fillStyle = selected ? "#2563eb" : o.color;
+        ctx.fillRect(labelX, labelY - labelH / 2, labelW, labelH);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText(priceText, labelX + padX, labelY);
+        ctx.restore();
       }
 
       if (o.type === "VLINE") {
@@ -541,6 +559,29 @@ React.useEffect(() => {
         ctx.moveTo(Number(x), 0);
         ctx.lineTo(Number(x), canvas.clientHeight);
         ctx.stroke();
+
+        // VLINE: show date/time on the bottom edge.
+        const date = new Date(Number(o.t) * 1000);
+        const dd = String(date.getDate()).padStart(2, "0");
+        const mm = String(date.getMonth() + 1).padStart(2, "0");
+        const yy = String(date.getFullYear()).slice(-2);
+        const hh = String(date.getHours()).padStart(2, "0");
+        const min = String(date.getMinutes()).padStart(2, "0");
+        const timeText = `${dd}.${mm}.${yy} ${hh}:${min}`;
+
+        ctx.save();
+        ctx.font = "700 11px Inter, Arial";
+        ctx.textBaseline = "middle";
+        const padX = 7;
+        const labelH = 22;
+        const labelW = Math.ceil(ctx.measureText(timeText).width) + padX * 2;
+        const labelX = Math.max(0, Math.min(canvas.clientWidth - labelW, Number(x) - labelW / 2));
+        const labelY = Math.max(0, canvas.clientHeight - labelH);
+        ctx.fillStyle = selected ? "#2563eb" : o.color;
+        ctx.fillRect(labelX, labelY, labelW, labelH);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText(timeText, labelX + padX, labelY + labelH / 2);
+        ctx.restore();
       }
 
       if (
