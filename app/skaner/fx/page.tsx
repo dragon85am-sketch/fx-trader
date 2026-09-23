@@ -2719,8 +2719,28 @@ export default function MarketScannerPage() {
           ? data.latestTicks
           : {};
 
+        // LIVE only when the collector has a recent, valid tick.
+        // A stale entry left in latestTicks must not keep an instrument online forever.
+        const nowMs = Date.now();
+        const MASTER_TICK_STALE_MS = 90_000;
+
         const live = new Set<string>(
-          Object.keys(ticks).map((symbol) => symbol.toUpperCase())
+          Object.entries(ticks)
+            .filter(([, rawTick]) => {
+              const tick = rawTick as { price?: number; timestamp?: number };
+              const price = Number(tick?.price);
+              const timestamp = Number(tick?.timestamp);
+              const ageMs = nowMs - timestamp;
+
+              return (
+                Number.isFinite(price) &&
+                price > 0 &&
+                Number.isFinite(timestamp) &&
+                ageMs >= -10_000 &&
+                ageMs <= MASTER_TICK_STALE_MS
+              );
+            })
+            .map(([symbol]) => symbol.toUpperCase())
         );
 
         if (!alive) return;

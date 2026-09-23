@@ -589,7 +589,7 @@ export default function ModulPage({
     : active.contentKey === "m0-l5-jak-dziala-broker"
     ? "https://www.youtube.com/embed/UZaITtSKVVc"
     : active.contentKey === "m0-l6-jak-powstaje-cena"
-    ? "https://www.youtube.com/embed/kUR5Fgx67IY"
+    ? "https://www.youtube.com/embed/jCnl9983kUA"
     : ""
 }
       title="Wideo lekcji"
