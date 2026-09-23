@@ -2671,6 +2671,14 @@ export default function MarketScannerPage() {
   const [chartHeight, setChartHeight] = React.useState<number>(690);
 
   const candlesCache = React.useRef<Map<string, Candle[]>>(new Map());
+
+  // Cache must be isolated per symbol AND timeframe.
+  // Otherwise e.g. GBPAUD M1 and GBPAUD M5 overwrite the same cache entry.
+  const candleCacheKey = React.useCallback(
+    (symbol: string, timeframe: Timeframe) =>
+      `${symbol.toUpperCase()}:${timeframe}`,
+    []
+  );
   const [loading, setLoading] = React.useState(false);
   const [lastSync, setLastSync] = React.useState<number | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -3273,7 +3281,7 @@ React.useEffect(() => {
           if (res.status !== "fulfilled") continue;
 
           const { symbol, candles, volume } = res.value;
-          candlesCache.current.set(symbol, candles);
+          candlesCache.current.set(candleCacheKey(symbol, tf), candles);
 
           if (!candles || candles.length < 30) {
             metrics.push({ symbol, atrPct: 0, volume: 0, candles: candles ?? [] });
@@ -3872,7 +3880,7 @@ if (closedNow.length) {
           // Przy pierwszym ticku próbujemy zachować OHLC ostatniej świecy historycznej,
           // jeżeli należy do tego samego bucketu. Dzięki temu po wejściu na wykres
           // świeca nie startuje sztucznie jako O=H=L=C.
-          const history = candlesCache.current.get(symbol) ?? [];
+          const history = candlesCache.current.get(candleCacheKey(symbol, tf)) ?? [];
           const last = history[history.length - 1];
           if (last && Number(last.time) === Number(bucketTime)) {
             return {
@@ -3909,7 +3917,7 @@ if (closedNow.length) {
   // candlesCache is a mutable ref and lastSync is not updated by refresh().
   // rows/tf changes already re-render this component, so the chart now receives
   // the freshly fetched OHLC for M1/M5/M15/M30/H1/H4/D1.
-  const selectedCandles = candlesCache.current.get(selected.symbol) ?? [];
+  const selectedCandles = candlesCache.current.get(candleCacheKey(selected.symbol, tf)) ?? [];
 
   // RENKO ma własne źródło danych niezależne od głównego interwału wykresu.
   // CURRENT/AUTO = aktualny TF, dzięki czemu Renko zachowuje ten sam czas i live tick co wykres.
