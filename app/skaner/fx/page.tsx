@@ -2690,6 +2690,75 @@ export default function MarketScannerPage() {
 
   const instruments = React.useMemo(() => MARKET_WATCH_SYMBOLS, []);
 
+  // Master Collector is the source of truth for LIVE/OFFLINE.
+  // A symbol without a current tick is OFFLINE and must always show 0%.
+  const [masterHealthLoaded, setMasterHealthLoaded] = React.useState(false);
+  const [masterLiveSymbols, setMasterLiveSymbols] = React.useState<Set<string>>(
+    () => new Set()
+  );
+
+  React.useEffect(() => {
+    let alive = true;
+
+    const refreshMasterHealth = async () => {
+      const baseUrl = (process.env.NEXT_PUBLIC_US30_LIVE_URL ?? "").replace(/\/$/, "");
+      if (!baseUrl) {
+        if (alive) {
+          setMasterLiveSymbols(new Set());
+          setMasterHealthLoaded(true);
+        }
+        return;
+      }
+
+      try {
+        const res = await fetch(`${baseUrl}/health`, { cache: "no-store" });
+        if (!res.ok) throw new Error(`Master health HTTP ${res.status}`);
+
+        const data = await res.json();
+        const ticks = data?.latestTicks && typeof data.latestTicks === "object"
+          ? data.latestTicks
+          : {};
+
+        const live = new Set<string>(
+          Object.keys(ticks).map((symbol) => symbol.toUpperCase())
+        );
+
+        if (!alive) return;
+        setMasterLiveSymbols(live);
+        setMasterHealthLoaded(true);
+
+        // Immediately force every non-live row to OFFLINE semantics.
+        setRows((prev) =>
+          prev.map((row) =>
+            live.has(row.symbol.toUpperCase())
+              ? row
+              : {
+                  ...row,
+                  liquidity: 0,
+                  status: "CLOSE" as Status,
+                  signal: "NONE" as Signal,
+                  confirmationCount: 0,
+                  confirmationSide: null,
+                  higherTfSignal: "NONE" as Signal,
+                }
+          )
+        );
+      } catch (err) {
+        console.error("Master Collector health error:", err);
+        // Do not turn known live instruments offline because of one transient health failure.
+        if (alive) setMasterHealthLoaded(true);
+      }
+    };
+
+    void refreshMasterHealth();
+    const id = window.setInterval(() => void refreshMasterHealth(), 15_000);
+
+    return () => {
+      alive = false;
+      window.clearInterval(id);
+    };
+  }, []);
+
   const [rows, setRows] = React.useState<Row[]>(() => {
   try {
     const raw = localStorage.getItem(ACTIVE_TRADES_KEY);
@@ -2713,7 +2782,7 @@ const DRAW_TOOL_BUTTONS = [
 
       return {
         symbol: s,
-        liquidity: 50,
+        liquidity: 0,
         tf: "M5",
         status: "CLOSE" as Status,
         signal: "NONE" as Signal,
@@ -2732,7 +2801,7 @@ higherTfSignal: (savedRow?.higherTfSignal ?? "NONE") as Signal,
   } catch {
     return instruments.map((s) => ({
       symbol: s,
-      liquidity: 50,
+      liquidity: 0,
       tf: "M5",
       status: "CLOSE" as Status,
       signal: "NONE" as Signal,
@@ -2890,7 +2959,7 @@ React.useEffect(() => {
 
         return {
           symbol: s,
-          liquidity: 50,
+          liquidity: 0,
           tf,
           status: "CLOSE" as Status,
           signal: "NONE" as Signal,
@@ -3162,8 +3231,12 @@ React.useEffect(() => {
         setError(null);
         setLoading(true);
 
+        const scanSymbols = masterHealthLoaded
+          ? instruments.filter((symbol) => masterLiveSymbols.has(symbol.toUpperCase()))
+          : [];
+
         const results = await Promise.allSettled(
-          instruments.map(async (symbol) => {
+          scanSymbols.map(async (symbol) => {
             const { candles, volume } = await fetchAutoCandles(symbol, tf, source);
             return { symbol, candles, volume };
           })
@@ -3629,7 +3702,7 @@ if (closedNow.length) {
       alive = false;
       window.clearInterval(id);
     };
-  }, [source, tf, instruments, scannerEnabled, beep, triggerFlash, scrollToRow, sendTelegram]);
+  }, [source, tf, instruments, scannerEnabled, beep, triggerFlash, scrollToRow, sendTelegram, masterHealthLoaded, masterLiveSymbols]);
 
 
   React.useEffect(() => {
@@ -4459,8 +4532,10 @@ if (closedNow.length) {
             <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-sky-300/10 bg-[#061c37]/35 [scrollbar-width:thin]">
               {filteredRows.map((r) => {
                 const active = r.symbol === selectedSymbol;
-                const scannerOn = r.liquidity >= LIQ_THRESHOLD_HIGH && (r.confirmationCount ?? 0) === 4 && !!r.confirmationSide;
+                const isOffline = masterHealthLoaded && !masterLiveSymbols.has(r.symbol.toUpperCase());
+                const scannerOn = !isOffline && r.liquidity >= LIQ_THRESHOLD_HIGH && (r.confirmationCount ?? 0) === 4 && !!r.confirmationSide;
                 const waitLiquidity =
+                  !isOffline &&
                   (r.confirmationCount ?? 0) === 4 &&
                   !!r.confirmationSide &&
                   r.liquidity < LIQ_THRESHOLD_HIGH;
@@ -4506,7 +4581,9 @@ if (closedNow.length) {
                     <span className="text-center font-semibold text-sky-100/55">{r.tf ?? tf}</span>
 
                     <div className="flex justify-center">
-                      {rowSide ? (
+                      {isOffline ? (
+                        <span className="min-w-[50px] rounded-full border border-slate-300/10 bg-slate-300/[0.05] px-1.5 py-0.5 text-center text-[9px] font-black text-sky-100/30 xl:text-[10px]">OFFLINE</span>
+                      ) : rowSide ? (
                         <span className={cn(
                           "min-w-[50px] rounded-full border px-1.5 py-0.5 text-center text-[9px] font-black xl:text-[10px]",
                           rowSide === "BUY"
@@ -4526,7 +4603,7 @@ if (closedNow.length) {
                       "text-right font-black tabular-nums",
                       scannerOn ? "text-emerald-300" : waitLiquidity ? "text-amber-200" : "text-sky-100/55"
                     )}>
-                      {Math.round(r.liquidity)}%
+                      {isOffline ? 0 : Math.round(r.liquidity)}%
                     </span>
                   </div>
                 );
