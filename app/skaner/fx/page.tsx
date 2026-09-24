@@ -1682,13 +1682,54 @@ async function fetchFxTradeCandles(
   return { candles, volume };
 }
 
+const TIMEFRAME_SECONDS: Record<Timeframe, number> = {
+  M1: 60,
+  M5: 300,
+  M15: 900,
+  M30: 1800,
+  H1: 3600,
+  H4: 14400,
+  D1: 86400,
+};
+
+function hasCorrectCandleCadence(candles: Candle[], tf: Timeframe): boolean {
+  if (candles.length < 20) return false;
+
+  const expected = TIMEFRAME_SECONDS[tf];
+
+  // Check recent history only. Market/weekend gaps are allowed, but the normal
+  // cadence must still be the selected timeframe. This catches e.g. 5-minute
+  // history accidentally returned for an M1 request.
+  const recent = candles.slice(-120);
+  const deltas: number[] = [];
+
+  for (let i = 1; i < recent.length; i++) {
+    const delta = Number(recent[i].time) - Number(recent[i - 1].time);
+    if (Number.isFinite(delta) && delta > 0) deltas.push(delta);
+  }
+
+  if (deltas.length < 10) return false;
+
+  const normal = deltas.filter((d) => d <= expected * 2);
+  if (normal.length < Math.max(5, Math.floor(deltas.length * 0.55))) return false;
+
+  // At least half of the normal bars should be exactly one selected-TF bucket.
+  const exact = normal.filter((d) => d === expected).length;
+  return exact >= Math.ceil(normal.length * 0.5);
+}
+
 async function fetchAutoCandles(symbol: string, tf: Timeframe, _source: DataSource): Promise<{ candles: Candle[]; volume: number }> {
-  // Prefer the shared Master Collector for every instrument. During warm-up or when
-  // a provider does not support a symbol, keep the existing provider as fallback.
+  // Prefer Master Collector only when its historical cadence really matches
+  // the requested timeframe. Never display M5-like history as M1.
   try {
     const master = await fetchFxTradeCandles(symbol, tf);
-    if (master.candles.length >= 20) return master;
+    if (hasCorrectCandleCadence(master.candles, tf)) return master;
+
+    console.warn(
+      `[CANDLE CADENCE] ${symbol} ${tf}: Master Collector returned invalid/sparse cadence; using provider fallback`
+    );
   } catch {}
+
   if (symbol.endsWith("USDT")) return fetchCoinbaseCandles(symbol, tf);
   return fetchTwelveCandles(symbol, tf);
 }
