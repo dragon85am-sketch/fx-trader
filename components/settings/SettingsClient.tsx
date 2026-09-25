@@ -673,695 +673,90 @@ export default function SettingsClient() {
         ? "AKTYWNA"
         : "WYGASŁA";
 
+  const initials = (name || "U").slice(0, 2).toUpperCase();
+
   return (
     <>
       <main className="relative isolate min-h-screen overflow-hidden bg-[#020817] text-white">
-        <div
-          aria-hidden="true"
-          className="pointer-events-none fixed inset-0 z-0 bg-cover bg-center bg-no-repeat"
-          style={{
-            backgroundImage:
-              "linear-gradient(rgba(2,8,23,.40), rgba(2,8,23,.66)), url('/ustawienia-bg.png')",
-          }}
-        />
-        <div
-          aria-hidden="true"
-          className="pointer-events-none fixed inset-0 z-[1] bg-[radial-gradient(circle_at_50%_8%,rgba(34,211,238,.14),transparent_46%)]"
-        />
+        <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: "linear-gradient(rgba(2,8,23,.66),rgba(2,8,23,.82)),url('/ustawienia-bg.png')" }} />
+        <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-[1] bg-[radial-gradient(circle_at_55%_0%,rgba(14,165,233,.16),transparent_42%)]" />
 
-        <div className="relative z-10 mx-auto w-full max-w-[1500px] space-y-4 px-4 py-6 md:px-6 xl:px-8">
+        <div className="relative z-10 mx-auto w-full max-w-[1160px] px-4 py-7 md:px-7">
+          <header className="mb-6">
+            <h1 className="text-[30px] font-bold tracking-tight">{t("settings")}</h1>
+            <p className="mt-1 text-sm text-slate-300/70">Zarządzaj swoim kontem, bezpieczeństwem i preferencjami aplikacji.</p>
+          </header>
 
-          {/* HEADER */}
-
-          <section className="relative overflow-hidden rounded-[18px] border border-cyan-400/30 bg-[linear-gradient(120deg,#125b9b_0%,#0c477f_52%,#082f5d_100%)] px-5 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,.035)]">
-
-            <div className="pointer-events-none absolute right-[8%] top-0 h-full w-[34%] opacity-[.12] [background-image:radial-gradient(circle,#38bdf8_1px,transparent_1px)] [background-size:7px_7px] [mask-image:radial-gradient(ellipse_at_center,black_0%,transparent_72%)]" />
-
-            <div className="relative z-10 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-
-              <div>
-
-                <div className="text-[9px] font-semibold uppercase tracking-[.18em] text-sky-200/60">
-                  FX TRADE / SYSTEM
-                </div>
-
-                <h1 className="mt-1 text-[28px] font-semibold tracking-tight text-white">
-                  {t("settings")}
-                </h1>
-
-                <p className="mt-1 text-[11px] text-sky-100/50">
-                  {t(
-                    "settingsDescription"
-                  )}
-                </p>
-
-              </div>
-
-              <div className="flex items-center gap-3 rounded-[12px] border border-sky-400/35 bg-[#0a4175]/85 px-4 py-3 shadow-[0_0_20px_rgba(56,189,248,.10)]">
-
-                <div className="flex h-10 w-10 items-center justify-center rounded-full border border-sky-400/35 bg-[#075ecb] text-[12px] font-bold text-white">
-
-                  {(name || "U")
-                    .slice(0, 2)
-                    .toUpperCase()}
-
-                </div>
-
-                <div>
-
-                  <div className="text-[11px] font-semibold text-white">
-                    {name ||
-                      "Użytkownik"}
-                  </div>
-
-                  <div className="mt-0.5 text-[8px] uppercase tracking-[.12em] text-sky-200/45">
-                    {role}
-                  </div>
-
-                </div>
-
-              </div>
-
-            </div>
-
-          </section>
-
-          {/* SETTINGS GRID */}
-
-          <section className="grid gap-4 xl:grid-cols-2">
-
-            {/* PROFILE */}
-
-            <div className="rounded-[16px] border border-cyan-400/25 bg-[linear-gradient(145deg,rgba(8,47,88,.96)_0%,rgba(5,38,75,.96)_55%,rgba(3,27,57,.98)_100%)] p-5 shadow-[0_0_22px_rgba(34,211,238,.10),inset_0_1px_0_rgba(255,255,255,.06)]">
-
-              <div className="flex items-start justify-between gap-4">
-
+          <section className="space-y-3.5">
+            <div className="rounded-[14px] border border-sky-400/35 bg-[linear-gradient(135deg,rgba(7,42,81,.97),rgba(4,29,59,.98))] p-5 shadow-[0_0_28px_rgba(14,165,233,.10)]">
+              <div className="flex items-center justify-between border-b border-sky-300/15 pb-4">
                 <div className="flex items-center gap-3">
-
-                  <div className="flex h-10 w-10 items-center justify-center rounded-[10px] border border-sky-400/25 bg-sky-500/10 text-lg text-sky-300">
-                    ◉
-                  </div>
-
-                  <div>
-
-                    <h2 className="text-[16px] font-semibold text-white">
-                      {t("profile")}
-                    </h2>
-
-                    <p className="mt-1 text-[9px] text-sky-100/40">
-                      Dane widoczne w Twoim panelu FX Trade.
-                    </p>
-
-                  </div>
-
+                  <div className="grid h-10 w-10 place-items-center rounded-xl bg-cyan-500/15 text-cyan-300">♙</div>
+                  <div><h2 className="font-semibold">Profil użytkownika</h2><p className="text-xs text-slate-300/60">Twoje dane widoczne w aplikacji.</p></div>
                 </div>
-
-                <span className="rounded-full border border-sky-400/25 bg-sky-500/10 px-2.5 py-1 text-[8px] font-bold uppercase tracking-[.12em] text-sky-300">
-                  {role}
-                </span>
-
+                <span className="rounded-full border border-sky-400/30 px-3 py-1 text-[10px] font-bold text-sky-300">{role}</span>
               </div>
-
-              <div className="mt-5">
-
-                <label className="text-[9px] font-semibold uppercase tracking-[.12em] text-sky-100/45">
-                  {t("name")}
-                </label>
-
-                <input
-                  value={name}
-                  onChange={(e) =>
-                    setName(
-                      e.target.value
-                    )
-                  }
-                  className="mt-2 w-full rounded-[9px] border border-sky-400/25 bg-[#041d3a] px-3 py-3 text-[11px] text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/10"
-                />
-
+              <div className="mt-5 flex flex-col gap-4 md:flex-row md:items-center">
+                <div className="grid h-20 w-20 shrink-0 place-items-center rounded-full border border-cyan-400/60 bg-gradient-to-br from-blue-500 to-blue-700 text-2xl font-bold shadow-[0_0_24px_rgba(14,165,233,.22)]">{initials}</div>
+                <div className="min-w-0 flex-1">
+                  <input value={name} onChange={e=>setName(e.target.value)} className="mb-2 w-full max-w-md rounded-lg border border-sky-400/20 bg-[#041d3a] px-3 py-2 font-semibold outline-none focus:border-cyan-400/60" />
+                  <input type="email" value={email} onChange={e=>setEmail(e.target.value)} className="w-full max-w-md rounded-lg border border-sky-400/20 bg-[#041d3a] px-3 py-2 text-sm text-slate-300 outline-none focus:border-cyan-400/60" />
+                </div>
+                <button onClick={saveProfile} disabled={loadingProfile} className="rounded-lg border border-cyan-400/60 bg-sky-500/10 px-5 py-2.5 text-sm font-semibold hover:bg-sky-500/20 disabled:opacity-50">{loadingProfile ? t("saving") : "Edytuj / zapisz profil"}</button>
               </div>
-
-
-
-              <div className="mt-4">
-
-                <label className="text-[9px] font-semibold uppercase tracking-[.12em] text-sky-100/45">
-                  Email
-                </label>
-
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  autoComplete="email"
-                  className="mt-2 w-full rounded-[9px] border border-sky-400/25 bg-[#041d3a] px-3 py-3 text-[11px] text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/10"
-                />
-
-              </div>
-
-              <button
-                type="button"
-                onClick={saveProfile}
-                disabled={
-                  loadingProfile
-                }
-                className="mt-4 inline-flex items-center justify-center rounded-[9px] border border-sky-300/20 bg-[linear-gradient(90deg,#075ECB,#0B8FE4)] px-4 py-2.5 text-[10px] font-bold text-white shadow-[0_0_18px_rgba(14,165,233,.12)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {loadingProfile
-                  ? t("saving")
-                  : t(
-                      "saveProfile"
-                    )}
-              </button>
-
             </div>
 
-            {/* PASSWORD */}
-
-            <div className="rounded-[16px] border border-cyan-400/25 bg-[linear-gradient(145deg,rgba(8,47,88,.96)_0%,rgba(5,38,75,.96)_55%,rgba(3,27,57,.98)_100%)] p-5 shadow-[0_0_22px_rgba(34,211,238,.10),inset_0_1px_0_rgba(255,255,255,.06)]">
-
-              <div className="flex items-center gap-3">
-
-                <div className="flex h-10 w-10 items-center justify-center rounded-[10px] border border-sky-400/25 bg-sky-500/10 text-lg text-sky-300">
-                  ◈
+            <div className="rounded-[14px] border border-sky-400/35 bg-[linear-gradient(135deg,rgba(7,42,81,.97),rgba(4,29,59,.98))] p-5">
+              <div className="mb-4 flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-xl bg-cyan-500/15 text-cyan-300">▣</div><div><h2 className="font-semibold">Konto i logowanie</h2><p className="text-xs text-slate-300/60">Zarządzaj e-mailem i hasłem.</p></div></div>
+              <div className="grid gap-3 lg:grid-cols-2">
+                <div className="rounded-[11px] border border-sky-400/20 bg-[#041d3a]/90 p-4">
+                  <div className="mb-3 text-sm font-semibold">E-mail</div><div className="truncate text-xs text-slate-300/70">{email}</div>
                 </div>
-
-                <div>
-
-                  <h2 className="text-[16px] font-semibold text-white">
-                    {t(
-                      "changePassword"
-                    )}
-                  </h2>
-
-                  <p className="mt-1 text-[9px] text-sky-100/40">
-                    Zabezpiecz konto silnym i unikalnym hasłem.
-                  </p>
-
-                </div>
-
-              </div>
-
-              <div className="mt-5 grid gap-3">
-
-                <div>
-
-                  <label className="text-[9px] font-semibold uppercase tracking-[.1em] text-sky-100/45">
-                    {t(
-                      "currentPassword"
-                    )}
-                  </label>
-
-                  <input
-                    type="password"
-                    value={
-                      currentPassword
-                    }
-                    onChange={(e) =>
-                      setCurrentPassword(
-                        e.target.value
-                      )
-                    }
-                    className="mt-2 w-full rounded-[9px] border border-sky-400/25 bg-[#041d3a] px-3 py-3 text-[11px] text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/10"
-                  />
-
-                </div>
-
-                <div className="grid gap-3 md:grid-cols-2">
-
-                  <div>
-
-                    <label className="text-[9px] font-semibold uppercase tracking-[.1em] text-sky-100/45">
-                      {t(
-                        "newPassword"
-                      )}
-                    </label>
-
-                    <input
-                      type="password"
-                      value={
-                        newPassword
-                      }
-                      onChange={(e) =>
-                        setNewPassword(
-                          e.target.value
-                        )
-                      }
-                      className="mt-2 w-full rounded-[9px] border border-sky-400/25 bg-[#041d3a] px-3 py-3 text-[11px] text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/10"
-                    />
-
+                <div className="rounded-[11px] border border-sky-400/20 bg-[#041d3a]/90 p-4">
+                  <div className="mb-3 text-sm font-semibold">Hasło</div>
+                  <div className="grid gap-2 md:grid-cols-3">
+                    <input type="password" placeholder="Aktualne hasło" value={currentPassword} onChange={e=>setCurrentPassword(e.target.value)} className="rounded-lg border border-sky-400/20 bg-[#03182f] px-3 py-2 text-xs outline-none"/>
+                    <input type="password" placeholder="Nowe hasło" value={newPassword} onChange={e=>setNewPassword(e.target.value)} className="rounded-lg border border-sky-400/20 bg-[#03182f] px-3 py-2 text-xs outline-none"/>
+                    <input type="password" placeholder="Powtórz hasło" value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} className="rounded-lg border border-sky-400/20 bg-[#03182f] px-3 py-2 text-xs outline-none"/>
                   </div>
-
-                  <div>
-
-                    <label className="text-[9px] font-semibold uppercase tracking-[.1em] text-sky-100/45">
-                      {t(
-                        "confirmPassword"
-                      )}
-                    </label>
-
-                    <input
-                      type="password"
-                      value={
-                        confirmPassword
-                      }
-                      onChange={(e) =>
-                        setConfirmPassword(
-                          e.target.value
-                        )
-                      }
-                      className="mt-2 w-full rounded-[9px] border border-sky-400/25 bg-[#041d3a] px-3 py-3 text-[11px] text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/10"
-                    />
-
-                  </div>
-
+                  <button onClick={changePassword} disabled={savingPassword} className="mt-3 rounded-lg bg-gradient-to-r from-blue-600 to-sky-500 px-4 py-2 text-xs font-bold disabled:opacity-50">{savingPassword ? t("saving") : "Zmień hasło"}</button>
                 </div>
-
               </div>
-
-              <button
-                type="button"
-                onClick={
-                  changePassword
-                }
-                disabled={
-                  savingPassword
-                }
-                className="mt-4 w-full rounded-[9px] border border-sky-300/20 bg-[linear-gradient(90deg,#075ECB,#0B8FE4)] px-4 py-2.5 text-[10px] font-bold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {savingPassword
-                  ? t("saving")
-                  : t(
-                      "changePasswordButton"
-                    )}
-              </button>
-
             </div>
 
-            {/* PREFERENCES */}
-
-            <div className="rounded-[16px] border border-cyan-400/25 bg-[linear-gradient(145deg,rgba(8,47,88,.96)_0%,rgba(5,38,75,.96)_55%,rgba(3,27,57,.98)_100%)] p-5 shadow-[0_0_22px_rgba(34,211,238,.10),inset_0_1px_0_rgba(255,255,255,.06)]">
-
-              <div className="flex items-center gap-3">
-
-                <div className="flex h-10 w-10 items-center justify-center rounded-[10px] border border-cyan-400/25 bg-cyan-500/10 text-lg text-cyan-300">
-                  ⚙
-                </div>
-
-                <div>
-
-                  <h2 className="text-[16px] font-semibold text-white">
-                    {t(
-                      "preferences"
-                    )}
-                  </h2>
-
-                  <p className="mt-1 text-[9px] text-sky-100/40">
-                    Dopasuj wygląd i język aplikacji.
-                  </p>
-
-                </div>
-
+            <div className="rounded-[14px] border border-sky-400/35 bg-[linear-gradient(135deg,rgba(7,42,81,.97),rgba(4,29,59,.98))] p-5">
+              <div className="mb-4 flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-xl bg-cyan-500/15 text-cyan-300">▤</div><div><h2 className="font-semibold">Wygląd i język</h2><p className="text-xs text-slate-300/60">Dostosuj wygląd aplikacji do swoich preferencji.</p></div></div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div><label className="mb-2 block text-xs text-slate-300/70">Motyw aplikacji</label><div className="grid grid-cols-3 gap-2">
+                  {["light","dark","system"].map(v=><button key={v} onClick={()=>setTheme(v)} className={`rounded-xl border px-3 py-3 text-xs ${theme===v?"border-cyan-300 bg-sky-500/20 shadow-[0_0_16px_rgba(34,211,238,.18)]":"border-sky-400/20 bg-[#041d3a]"}`}>{v==="light"?"Jasny":v==="dark"?"Ciemny":"System"}</button>)}
+                </div></div>
+                <div><label className="mb-2 block text-xs text-slate-300/70">Język</label><select value={language} onChange={e=>{const v=e.target.value as AppLanguage;setLanguage(v);setLang(v);localStorage.setItem("lang",v)}} className="w-full rounded-[10px] border border-sky-400/20 bg-[#041d3a] px-3 py-3 text-sm"><option value="pl">🇵🇱 Polski</option><option value="en">English</option><option value="de">Deutsch</option><option value="nl">Nederlands</option><option value="es">Español</option></select></div>
               </div>
-
-              <div className="mt-5 grid gap-4 md:grid-cols-2">
-
-                <div>
-
-                  <label className="text-[9px] font-semibold uppercase tracking-[.1em] text-sky-100/45">
-                    {t("theme")}
-                  </label>
-
-                  <select
-                    value={theme}
-                    onChange={(e) =>
-                      setTheme(
-                        e.target.value
-                      )
-                    }
-                    className="mt-2 w-full rounded-[9px] border border-sky-400/25 bg-[#041d3a] px-3 py-3 text-[11px] text-white outline-none"
-                  >
-                    <option value="dark">
-                      {t(
-                        "themeDark"
-                      )}
-                    </option>
-
-                    <option value="light">
-                      {t(
-                        "themeLight"
-                      )}
-                    </option>
-
-                    <option value="system">
-                      {t(
-                        "themeSystem"
-                      )}
-                    </option>
-                  </select>
-
-                </div>
-
-                <div>
-
-                  <label className="text-[9px] font-semibold uppercase tracking-[.1em] text-sky-100/45">
-                    {t(
-                      "language"
-                    )}
-                  </label>
-
-                  <select
-                    value={language}
-                    onChange={(e) => {
-                      const newLang =
-                        e.target.value as AppLanguage;
-
-                      setLanguage(
-                        newLang
-                      );
-
-                      setLang(
-                        newLang
-                      );
-
-                      localStorage.setItem(
-                        "lang",
-                        newLang
-                      );
-                    }}
-                    className="mt-2 w-full rounded-[9px] border border-sky-400/25 bg-[#041d3a] px-3 py-3 text-[11px] text-white outline-none"
-                  >
-                    <option value="pl">
-                      Polski
-                    </option>
-
-                    <option value="en">English</option>
-                    <option value="de">Deutsch</option>
-                    <option value="nl">Nederlands</option>
-                    <option value="es">Español</option>
-                  </select>
-
-                </div>
-
-              </div>
-
-              <button
-                type="button"
-                onClick={saveProfile}
-                disabled={
-                  loadingProfile
-                }
-                className="mt-4 inline-flex items-center justify-center rounded-[9px] border border-sky-300/20 bg-[#075ecb] px-4 py-2.5 text-[10px] font-bold text-white transition hover:bg-[#0b76e0] disabled:opacity-60"
-              >
-                {loadingProfile
-                  ? t("saving")
-                  : t(
-                      "savePreferences"
-                    )}
-              </button>
-
+              <button onClick={saveProfile} disabled={loadingProfile} className="mt-4 rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold disabled:opacity-50">Zapisz preferencje</button>
             </div>
 
-            {/* SUBSCRIPTION */}
-
-            <div
-              className={`rounded-[15px] border p-5 shadow-[inset_0_1px_0_rgba(255,255,255,.07)] ${
-                isPremium && cancelAtPeriodEnd
-                  ? "border-amber-400/40 bg-[linear-gradient(145deg,#69440b_0%,#54410b_20%,#093b6e_65%,#062d58_100%)] shadow-[0_0_30px_rgba(245,158,11,.10)]"
-                  : isPremium
-                    ? "border-emerald-400/30 bg-[linear-gradient(145deg,#0c5674_0%,#094774_45%,#062d58_100%)] shadow-[0_0_30px_rgba(16,185,129,.08)]"
-                    : "border-rose-400/25 bg-[linear-gradient(145deg,#4e2533_0%,#243b61_45%,#062d58_100%)] shadow-[0_0_30px_rgba(244,63,94,.06)]"
-              }`}
-            >
-
-              <div className="flex items-start justify-between gap-4">
-
-                <div className="flex items-center gap-3">
-
-                  <div
-                    className={`flex h-10 w-10 items-center justify-center rounded-[10px] border text-lg ${
-                      isPremium && cancelAtPeriodEnd
-                        ? "border-amber-400/30 bg-amber-500/10 text-amber-300"
-                        : isPremium
-                          ? "border-emerald-400/25 bg-emerald-500/10 text-emerald-300"
-                          : "border-rose-400/25 bg-rose-500/10 text-rose-300"
-                    }`}
-                  >
-                    ★
-                  </div>
-
-                  <div>
-
-                    <h2 className="text-[16px] font-semibold text-white">
-                      Subskrypcja Premium
-                    </h2>
-
-                    <p className="mt-1 text-[9px] text-sky-100/45">
-                      FX Trade Professional Trading
-                    </p>
-
-                  </div>
-
-                </div>
-
-                <span
-                  className={`rounded-full border px-3 py-1 text-[8px] font-black uppercase tracking-[.12em] ${
-                    isPremium && cancelAtPeriodEnd
-                      ? "border-amber-400/30 bg-amber-500/10 text-amber-300"
-                      : isPremium
-                        ? "border-emerald-400/25 bg-emerald-500/10 text-emerald-300"
-                        : "border-rose-400/25 bg-rose-500/10 text-rose-300"
-                  }`}
-                >
-                  {subscriptionLabel}
-                </span>
-
+            <div className="rounded-[14px] border border-sky-400/35 bg-[linear-gradient(135deg,rgba(7,42,81,.97),rgba(4,29,59,.98))] p-5">
+              <div className="mb-4 flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-500/15 text-emerald-300">★</div><div><h2 className="font-semibold">Subskrypcja</h2><p className="text-xs text-slate-300/60">Informacje o Twoim planie i płatnościach.</p></div></div>
+              <div className="flex flex-col gap-4 rounded-[11px] border border-sky-400/20 bg-[#041d3a]/90 p-4 md:flex-row md:items-center md:justify-between">
+                <div><div className="text-lg font-semibold">{isPremium ? "Premium" : "Premium wygasł"}</div><div className="mt-1 text-xs text-slate-300/65">{isPremium ? (cancelAtPeriodEnd ? `Dostęp aktywny do: ${premiumDate}` : `Data odnowienia: ${premiumDate}`) : "Odnów dostęp do funkcji Premium."}</div></div>
+                <span className={`w-fit rounded-full border px-3 py-1 text-xs font-bold ${isPremium?"border-emerald-400/50 text-emerald-300":"border-rose-400/50 text-rose-300"}`}>{subscriptionLabel}</span>
+                {isPremium && hasStripeSubscription ? <button onClick={openBillingPortal} disabled={openingPortal} className="rounded-lg border border-cyan-400/50 px-4 py-2 text-xs font-semibold disabled:opacity-50">{openingPortal?"Otwieranie...":"Zarządzaj subskrypcją"}</button> : !isPremium ? <button onClick={renewPremium} disabled={openingCheckout} className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold disabled:opacity-50">{openingCheckout?"Przekierowanie...":"Odnów Premium — 99 € / mies."}</button> : null}
               </div>
-
-              <div className="mt-5 rounded-[11px] border border-white/10 bg-[#041d3a]/80 p-4">
-
-                {isPremium ? (
-                  <>
-                    <div className="text-[11px] font-semibold text-white">
-
-                      {cancelAtPeriodEnd
-                        ? "Premium pozostaje aktywne"
-                        : "Premium aktywne"}
-
-                    </div>
-
-                    <div className="mt-2 text-[10px] leading-5 text-sky-100/55">
-
-                      {cancelAtPeriodEnd ? (
-                        <>
-                          Subskrypcja została anulowana.
-                          Dostęp do platformy pozostanie aktywny do{" "}
-                          <span className="font-bold text-amber-300">
-                            {premiumDate}
-                          </span>
-                          .
-                        </>
-                      ) : (
-                        <>
-                          Następne odnowienie planu:{" "}
-                          <span className="font-bold text-emerald-300">
-                            {premiumDate}
-                          </span>
-                          .
-                        </>
-                      )}
-
-                    </div>
-
-                    {cancelAtPeriodEnd && (
-                      <div className="mt-3 rounded-[9px] border border-amber-400/20 bg-amber-500/[0.07] px-3 py-2.5 text-[9px] leading-4 text-amber-200">
-
-                        Automatyczne odnowienie jest wyłączone.
-                        Stripe nie pobierze kolejnej płatności,
-                        chyba że ponownie aktywujesz subskrypcję.
-
-                      </div>
-                    )}
-
-                  </>
-                ) : (
-                  <>
-                    <div className="text-[11px] font-semibold text-white">
-                      Dostęp Premium wygasł
-                    </div>
-
-                    <div className="mt-2 text-[9px] leading-4 text-sky-100/45">
-                      Odnów subskrypcję, aby odzyskać dostęp do
-                      Dashboardu, skanerów, strategii i pozostałych
-                      funkcji Premium.
-                    </div>
-
-                    <div className="mt-3 rounded-[9px] border border-rose-400/20 bg-rose-500/[0.06] px-3 py-2.5 text-[9px] leading-4 text-rose-200">
-                      Wymagana jest nowa płatność Stripe.
-                    </div>
-                  </>
-                )}
-
-              </div>
-
-              {isPremium && hasStripeSubscription ? (
-                <button
-                  type="button"
-                  onClick={
-                    openBillingPortal
-                  }
-                  disabled={
-                    openingPortal
-                  }
-                  className="mt-4 w-full rounded-[9px] border border-sky-300/20 bg-[linear-gradient(90deg,#075ECB,#0B8FE4)] px-4 py-2.5 text-[10px] font-bold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {openingPortal
-                    ? "Otwieranie Stripe..."
-                    : cancelAtPeriodEnd
-                      ? "Zarządzaj / Wznów subskrypcję"
-                      : "Zarządzaj subskrypcją"}
-                </button>
-              ) : !isPremium ? (
-                <button
-                  type="button"
-                  onClick={
-                    renewPremium
-                  }
-                  disabled={
-                    openingCheckout
-                  }
-                  className="mt-4 w-full rounded-[9px] border border-emerald-300/20 bg-[linear-gradient(90deg,#059669,#10b981)] px-4 py-3 text-[10px] font-black text-white shadow-[0_0_20px_rgba(16,185,129,.12)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {openingCheckout
-                    ? "Przekierowanie do Stripe..."
-                    : "Odnów Premium — 99 € / mies."}
-                </button>
-              ) : null}
-
             </div>
 
-            {/* SECURITY */}
-
-            <div className="rounded-[16px] border border-cyan-400/25 bg-[linear-gradient(145deg,rgba(8,47,88,.96)_0%,rgba(5,38,75,.96)_55%,rgba(3,27,57,.98)_100%)] p-5 shadow-[0_0_22px_rgba(34,211,238,.10),inset_0_1px_0_rgba(255,255,255,.06)]">
-
-              <div className="flex items-center gap-3">
-
-                <div className="flex h-10 w-10 items-center justify-center rounded-[10px] border border-emerald-400/20 bg-emerald-500/10 text-lg text-emerald-300">
-                  ⛨
-                </div>
-
-                <div>
-
-                  <h2 className="text-[16px] font-semibold text-white">
-                    {t(
-                      "security"
-                    )}
-                  </h2>
-
-                  <p className="mt-1 text-[9px] text-sky-100/40">
-                    {t(
-                      "securityDescription"
-                    )}
-                  </p>
-
-                </div>
-
-              </div>
-
-              <div className="mt-5 rounded-[10px] border border-sky-400/25 bg-[#041d3a] p-4">
-
-                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-
-                  <div>
-
-                    <div className="text-[11px] font-semibold text-white">
-                      Aktywne sesje
-                    </div>
-
-                    <div className="mt-1 text-[9px] leading-4 text-sky-100/40">
-                      Wyloguj konto ze wszystkich przeglądarek i urządzeń.
-                    </div>
-
-                  </div>
-
-                  <span className="w-fit rounded-full border border-emerald-400/20 bg-emerald-500/10 px-2.5 py-1 text-[8px] font-bold uppercase tracking-[.1em] text-emerald-300">
-                    Protected
-                  </span>
-
-                </div>
-
-              </div>
-
-              <button
-                type="button"
-                onClick={logoutAll}
-                disabled={
-                  loggingOutAll
-                }
-                className="mt-4 w-full rounded-[9px] border border-rose-400/35 bg-rose-500/[0.06] px-4 py-2.5 text-[10px] font-bold text-rose-300 transition hover:bg-rose-500/10 disabled:opacity-60"
-              >
-                {loggingOutAll
-                  ? t(
-                      "loggingOut"
-                    )
-                  : t(
-                      "logoutAll"
-                    )}
-              </button>
-
+            <div className="rounded-[14px] border border-sky-400/35 bg-[linear-gradient(135deg,rgba(7,42,81,.97),rgba(4,29,59,.98))] p-5">
+              <div className="mb-4 flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-xl bg-cyan-500/15 text-cyan-300">♢</div><div><h2 className="font-semibold">Bezpieczeństwo</h2><p className="text-xs text-slate-300/60">Zarządzaj bezpieczeństwem swojego konta.</p></div></div>
+              <div className="rounded-[11px] border border-sky-400/20 bg-[#041d3a]/90 p-4"><div className="font-semibold">Aktywne sesje</div><div className="mt-1 text-xs text-slate-300/60">Wyloguj konto ze wszystkich przeglądarek i urządzeń.</div></div>
+              <button onClick={logoutAll} disabled={loggingOutAll} className="mt-3 rounded-lg border border-rose-400/50 bg-rose-500/10 px-4 py-2 text-xs font-bold text-rose-300 disabled:opacity-50">{loggingOutAll?t("loggingOut"):t("logoutAll")}</button>
             </div>
 
+            <div className="flex flex-col gap-4 rounded-2xl border border-rose-500/50 bg-gradient-to-r from-rose-950/75 to-[#06254a]/90 p-5 md:flex-row md:items-center md:justify-between">
+              <div><h2 className="font-semibold text-rose-300">{t("dangerZone")}</h2><p className="mt-1 text-xs text-rose-200/55">{t("dangerZoneDescription")}</p></div>
+              <button onClick={()=>setDeleteOpen(true)} className="rounded-lg border border-rose-500/60 bg-rose-600/20 px-5 py-2.5 text-xs font-bold text-rose-300 hover:bg-rose-600/30">{t("deleteAccount")}</button>
+            </div>
           </section>
-
-          {/* DANGER ZONE */}
-
-          <section className="overflow-hidden rounded-[15px] border border-rose-500/30 bg-[linear-gradient(145deg,rgba(73,35,66,.72),rgba(8,54,96,.88))] shadow-[0_0_24px_rgba(244,63,94,.08)]">
-
-            <div className="flex flex-col gap-5 p-5 md:flex-row md:items-center md:justify-between">
-
-              <div className="flex items-start gap-3">
-
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-rose-400/25 bg-rose-500/10 text-lg text-rose-300">
-                  !
-                </div>
-
-                <div>
-
-                  <h2 className="text-[16px] font-semibold text-rose-300">
-                    {t(
-                      "dangerZone"
-                    )}
-                  </h2>
-
-                  <p className="mt-1 text-[9px] text-rose-100/45">
-                    {t(
-                      "dangerZoneDescription"
-                    )}
-                  </p>
-
-                </div>
-
-              </div>
-
-              <button
-                type="button"
-                onClick={() =>
-                  setDeleteOpen(
-                    true
-                  )
-                }
-                className="rounded-[9px] border border-rose-400/30 bg-rose-600 px-5 py-2.5 text-[10px] font-bold text-white transition hover:bg-rose-500"
-              >
-                {t(
-                  "deleteAccount"
-                )}
-              </button>
-
-            </div>
-
-          </section>
-
         </div>
-
       </main>
 
       <DeleteAccountModal
@@ -1388,6 +783,7 @@ export default function SettingsClient() {
           deleteAccount
         }
       />
+
     </>
   );
 }
