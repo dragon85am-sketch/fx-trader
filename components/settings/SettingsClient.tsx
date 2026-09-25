@@ -678,84 +678,108 @@ export default function SettingsClient() {
   return (
     <>
       <main className="relative isolate min-h-screen overflow-hidden bg-[#020817] text-white">
-        <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: "linear-gradient(rgba(2,8,23,.66),rgba(2,8,23,.82)),url('/ustawienia-bg.png')" }} />
-        <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-[1] bg-[radial-gradient(circle_at_55%_0%,rgba(14,165,233,.16),transparent_42%)]" />
+        <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: "linear-gradient(rgba(2,8,23,.70),rgba(2,8,23,.86)),url('/ustawienia-bg.png')" }} />
+        <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_55%_8%,rgba(14,165,233,.18),transparent_40%)]" />
 
-        <div className="relative z-10 mx-auto w-full max-w-[1160px] px-4 py-7 md:px-7">
-          <header className="mb-6">
-            <h1 className="text-[30px] font-bold tracking-tight">{t("settings")}</h1>
-            <p className="mt-1 text-sm text-slate-300/70">Zarządzaj swoim kontem, bezpieczeństwem i preferencjami aplikacji.</p>
+        <div className="mx-auto w-full max-w-[1080px] px-3 py-5 md:px-5">
+          <header className="mb-4">
+            <h1 className="text-[28px] font-bold tracking-tight">{t("settings")}</h1>
+            <p className="mt-1 text-[12px] text-slate-300/65">Zarządzaj swoim kontem, bezpieczeństwem i preferencjami aplikacji.</p>
           </header>
 
-          <section className="space-y-3.5">
-            <div className="rounded-[14px] border border-sky-400/35 bg-[linear-gradient(135deg,rgba(7,42,81,.97),rgba(4,29,59,.98))] p-5 shadow-[0_0_28px_rgba(14,165,233,.10)]">
-              <div className="flex items-center justify-between border-b border-sky-300/15 pb-4">
+          <div className="space-y-3">
+            {/* PROFILE */}
+            <section className="overflow-hidden rounded-xl border border-sky-400/30 bg-[linear-gradient(135deg,rgba(7,43,83,.97),rgba(3,28,58,.98))] shadow-[0_0_22px_rgba(14,165,233,.09)]">
+              <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
                 <div className="flex items-center gap-3">
-                  <div className="grid h-10 w-10 place-items-center rounded-xl bg-cyan-500/15 text-cyan-300">♙</div>
-                  <div><h2 className="font-semibold">Profil użytkownika</h2><p className="text-xs text-slate-300/60">Twoje dane widoczne w aplikacji.</p></div>
+                  <span className="grid h-9 w-9 place-items-center rounded-lg border border-cyan-400/20 bg-cyan-500/10 text-cyan-300">♙</span>
+                  <div><h2 className="text-[13px] font-semibold">Profil użytkownika</h2><p className="text-[9px] text-slate-300/55">Twoje dane widoczne w aplikacji.</p></div>
                 </div>
-                <span className="rounded-full border border-sky-400/30 px-3 py-1 text-[10px] font-bold text-sky-300">{role}</span>
+                <button onClick={saveProfile} disabled={loadingProfile} className="rounded-md border border-sky-400/70 bg-sky-500/[.06] px-3 py-2 text-[9px] font-semibold hover:bg-sky-500/15 disabled:opacity-50">✎ &nbsp; {loadingProfile ? t("saving") : "Edytuj profil"}</button>
               </div>
-              <div className="mt-5 flex flex-col gap-4 md:flex-row md:items-center">
-                <div className="grid h-20 w-20 shrink-0 place-items-center rounded-full border border-cyan-400/60 bg-gradient-to-br from-blue-500 to-blue-700 text-2xl font-bold shadow-[0_0_24px_rgba(14,165,233,.22)]">{initials}</div>
+              <div className="flex items-center gap-4 px-4 py-4">
+                <div className="grid h-[68px] w-[68px] shrink-0 place-items-center rounded-full border border-cyan-300/70 bg-gradient-to-br from-blue-500 to-blue-700 text-xl font-bold shadow-[0_0_18px_rgba(34,211,238,.22)]">{initials}</div>
                 <div className="min-w-0 flex-1">
-                  <input value={name} onChange={e=>setName(e.target.value)} className="mb-2 w-full max-w-md rounded-lg border border-sky-400/20 bg-[#041d3a] px-3 py-2 font-semibold outline-none focus:border-cyan-400/60" />
-                  <input type="email" value={email} onChange={e=>setEmail(e.target.value)} className="w-full max-w-md rounded-lg border border-sky-400/20 bg-[#041d3a] px-3 py-2 text-sm text-slate-300 outline-none focus:border-cyan-400/60" />
-                </div>
-                <button onClick={saveProfile} disabled={loadingProfile} className="rounded-lg border border-cyan-400/60 bg-sky-500/10 px-5 py-2.5 text-sm font-semibold hover:bg-sky-500/20 disabled:opacity-50">{loadingProfile ? t("saving") : "Edytuj / zapisz profil"}</button>
-              </div>
-            </div>
-
-            <div className="rounded-[14px] border border-sky-400/35 bg-[linear-gradient(135deg,rgba(7,42,81,.97),rgba(4,29,59,.98))] p-5">
-              <div className="mb-4 flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-xl bg-cyan-500/15 text-cyan-300">▣</div><div><h2 className="font-semibold">Konto i logowanie</h2><p className="text-xs text-slate-300/60">Zarządzaj e-mailem i hasłem.</p></div></div>
-              <div className="grid gap-3 lg:grid-cols-2">
-                <div className="rounded-[11px] border border-sky-400/20 bg-[#041d3a]/90 p-4">
-                  <div className="mb-3 text-sm font-semibold">E-mail</div><div className="truncate text-xs text-slate-300/70">{email}</div>
-                </div>
-                <div className="rounded-[11px] border border-sky-400/20 bg-[#041d3a]/90 p-4">
-                  <div className="mb-3 text-sm font-semibold">Hasło</div>
-                  <div className="grid gap-2 md:grid-cols-3">
-                    <input type="password" placeholder="Aktualne hasło" value={currentPassword} onChange={e=>setCurrentPassword(e.target.value)} className="rounded-lg border border-sky-400/20 bg-[#03182f] px-3 py-2 text-xs outline-none"/>
-                    <input type="password" placeholder="Nowe hasło" value={newPassword} onChange={e=>setNewPassword(e.target.value)} className="rounded-lg border border-sky-400/20 bg-[#03182f] px-3 py-2 text-xs outline-none"/>
-                    <input type="password" placeholder="Powtórz hasło" value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} className="rounded-lg border border-sky-400/20 bg-[#03182f] px-3 py-2 text-xs outline-none"/>
-                  </div>
-                  <button onClick={changePassword} disabled={savingPassword} className="mt-3 rounded-lg bg-gradient-to-r from-blue-600 to-sky-500 px-4 py-2 text-xs font-bold disabled:opacity-50">{savingPassword ? t("saving") : "Zmień hasło"}</button>
+                  <div className="flex items-center gap-2"><input value={name} onChange={e=>setName(e.target.value)} className="w-full max-w-[220px] bg-transparent text-[13px] font-semibold outline-none" /><span className="rounded-full border border-sky-400/35 bg-sky-500/10 px-2 py-0.5 text-[7px] font-bold text-sky-300">{role}</span></div>
+                  <input type="email" value={email} onChange={e=>setEmail(e.target.value)} className="mt-1 block w-full max-w-[300px] bg-transparent text-[10px] text-slate-300 outline-none" />
+                  <div className="mt-1 text-[9px] text-slate-400">Konto FX TRADE</div>
                 </div>
               </div>
-            </div>
+            </section>
 
-            <div className="rounded-[14px] border border-sky-400/35 bg-[linear-gradient(135deg,rgba(7,42,81,.97),rgba(4,29,59,.98))] p-5">
-              <div className="mb-4 flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-xl bg-cyan-500/15 text-cyan-300">▤</div><div><h2 className="font-semibold">Wygląd i język</h2><p className="text-xs text-slate-300/60">Dostosuj wygląd aplikacji do swoich preferencji.</p></div></div>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div><label className="mb-2 block text-xs text-slate-300/70">Motyw aplikacji</label><div className="grid grid-cols-3 gap-2">
-                  {["light","dark","system"].map(v=><button key={v} onClick={()=>setTheme(v)} className={`rounded-xl border px-3 py-3 text-xs ${theme===v?"border-cyan-300 bg-sky-500/20 shadow-[0_0_16px_rgba(34,211,238,.18)]":"border-sky-400/20 bg-[#041d3a]"}`}>{v==="light"?"Jasny":v==="dark"?"Ciemny":"System"}</button>)}
+            {/* ACCOUNT */}
+            <section className="overflow-hidden rounded-xl border border-sky-400/30 bg-[linear-gradient(135deg,rgba(7,43,83,.97),rgba(3,28,58,.98))]">
+              <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3">
+                <span className="grid h-9 w-9 place-items-center rounded-lg border border-cyan-400/20 bg-cyan-500/10 text-cyan-300">▣</span>
+                <div><h2 className="text-[13px] font-semibold">Konto i logowanie</h2><p className="text-[9px] text-slate-300/55">Zarządzaj e-mailem, hasłem oraz kodem PIN do szybkiego logowania.</p></div>
+              </div>
+              <div className="grid gap-2.5 p-3 md:grid-cols-3">
+                <div className="flex min-h-[126px] flex-col rounded-lg border border-sky-400/20 bg-[#041d3a]/95 p-3">
+                  <div className="flex gap-2.5"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-cyan-500/10 text-cyan-300">✉</span><div className="min-w-0"><b className="text-[10px]">E-mail</b><p className="mt-1 truncate text-[8px] text-slate-300/60">{email}</p></div></div>
+                  <button onClick={saveProfile} disabled={loadingProfile} className="mt-auto rounded-md border border-sky-400/50 bg-blue-600/65 py-2 text-[9px] font-semibold disabled:opacity-50">Zmień e-mail</button>
+                </div>
+
+                <div className="flex min-h-[126px] flex-col rounded-lg border border-sky-400/20 bg-[#041d3a]/95 p-3">
+                  <div className="flex gap-2.5"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-cyan-500/10 text-cyan-300">▢</span><div><b className="text-[10px]">Hasło</b><p className="mt-1 text-[8px] text-slate-300/60">••••••••••••</p></div></div>
+                  <details className="mt-auto">
+                    <summary className="cursor-pointer list-none rounded-md border border-sky-400/50 bg-blue-600/65 py-2 text-center text-[9px] font-semibold">Zmień hasło</summary>
+                    <div className="mt-2 grid gap-1.5">
+                      <input type="password" placeholder="Aktualne hasło" value={currentPassword} onChange={e=>setCurrentPassword(e.target.value)} className="rounded-md border border-sky-400/20 bg-[#03182f] px-2 py-2 text-[9px] outline-none"/>
+                      <input type="password" placeholder="Nowe hasło" value={newPassword} onChange={e=>setNewPassword(e.target.value)} className="rounded-md border border-sky-400/20 bg-[#03182f] px-2 py-2 text-[9px] outline-none"/>
+                      <input type="password" placeholder="Powtórz hasło" value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} className="rounded-md border border-sky-400/20 bg-[#03182f] px-2 py-2 text-[9px] outline-none"/>
+                      <button onClick={changePassword} disabled={savingPassword} className="rounded-md bg-blue-600 py-2 text-[9px] font-bold disabled:opacity-50">{savingPassword?t("saving"):"Zapisz nowe hasło"}</button>
+                    </div>
+                  </details>
+                </div>
+
+                <div className="flex min-h-[126px] flex-col rounded-lg border border-sky-400/20 bg-[#041d3a]/95 p-3">
+                  <div className="flex gap-2.5"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-cyan-500/10 text-cyan-300">⠿</span><div><b className="text-[10px]">Kod PIN</b><p className="mt-1 text-[8px] leading-4 text-slate-300/60">Ustaw 4-cyfrowy kod PIN do szybkiego logowania.</p></div></div>
+                  <button type="button" disabled title="Backend PIN nie jest jeszcze podłączony" className="mt-auto rounded-md border border-sky-400/45 bg-blue-600/55 py-2 text-[9px] font-semibold disabled:opacity-70">Ustaw PIN</button>
+                </div>
+              </div>
+            </section>
+
+            {/* APPEARANCE */}
+            <section className="overflow-hidden rounded-xl border border-sky-400/30 bg-[linear-gradient(135deg,rgba(7,43,83,.97),rgba(3,28,58,.98))]">
+              <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3"><span className="grid h-9 w-9 place-items-center rounded-lg bg-cyan-500/10 text-cyan-300">▤</span><div><h2 className="text-[13px] font-semibold">Wygląd i język</h2><p className="text-[9px] text-slate-300/55">Dostosuj wygląd aplikacji do swoich preferencji.</p></div></div>
+              <div className="grid gap-4 p-3 md:grid-cols-[1.2fr_.72fr_.82fr]">
+                <div><p className="mb-2 text-[8px] text-slate-300/60">Motyw aplikacji</p><div className="grid grid-cols-3 gap-2">
+                  {[["light","☼","Jasny"],["dark","☾","Ciemny"],["system","▣","System"]].map(([v,i,l])=><button key={v} onClick={()=>setTheme(v)} className={`rounded-lg border py-2 text-[8px] ${theme===v?"border-cyan-300 bg-sky-500/15 shadow-[0_0_12px_rgba(34,211,238,.35)]":"border-sky-400/20 bg-[#041d3a]"}`}><span className="block text-lg text-cyan-300">{i}</span>{l}</button>)}
                 </div></div>
-                <div><label className="mb-2 block text-xs text-slate-300/70">Język</label><select value={language} onChange={e=>{const v=e.target.value as AppLanguage;setLanguage(v);setLang(v);localStorage.setItem("lang",v)}} className="w-full rounded-[10px] border border-sky-400/20 bg-[#041d3a] px-3 py-3 text-sm"><option value="pl">🇵🇱 Polski</option><option value="en">English</option><option value="de">Deutsch</option><option value="nl">Nederlands</option><option value="es">Español</option></select></div>
+                <div><p className="mb-2 text-[8px] text-slate-300/60">Język</p><select value={language} onChange={e=>{const v=e.target.value as AppLanguage;setLanguage(v);setLang(v);localStorage.setItem("lang",v)}} className="w-full rounded-lg border border-sky-400/20 bg-[#041d3a] px-3 py-3 text-[9px]"><option value="pl">🇵🇱  Polski</option><option value="en">🇬🇧  English</option><option value="de">🇩🇪  Deutsch</option><option value="nl">🇳🇱  Nederlands</option><option value="es">🇪🇸  Español</option></select></div>
+                <div><p className="mb-2 text-[8px] text-slate-300/60">Format ceny</p><div className="grid grid-cols-2 gap-2"><button type="button" className="rounded-lg border border-cyan-300 bg-sky-500/15 py-2 text-[8px] shadow-[0_0_12px_rgba(34,211,238,.35)]"><b>Standard</b><span className="block text-[7px] text-slate-300">1.23456</span></button><button type="button" className="rounded-lg border border-sky-400/20 bg-[#041d3a] py-2 text-[8px]">Z przecinkiem<span className="block text-[7px] text-slate-300">1,23456</span></button></div></div>
               </div>
-              <button onClick={saveProfile} disabled={loadingProfile} className="mt-4 rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold disabled:opacity-50">Zapisz preferencje</button>
-            </div>
+              <div className="px-3 pb-3"><button onClick={saveProfile} disabled={loadingProfile} className="rounded-md bg-blue-600 px-3 py-2 text-[9px] font-semibold disabled:opacity-50">Zapisz preferencje</button></div>
+            </section>
 
-            <div className="rounded-[14px] border border-sky-400/35 bg-[linear-gradient(135deg,rgba(7,42,81,.97),rgba(4,29,59,.98))] p-5">
-              <div className="mb-4 flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-500/15 text-emerald-300">★</div><div><h2 className="font-semibold">Subskrypcja</h2><p className="text-xs text-slate-300/60">Informacje o Twoim planie i płatnościach.</p></div></div>
-              <div className="flex flex-col gap-4 rounded-[11px] border border-sky-400/20 bg-[#041d3a]/90 p-4 md:flex-row md:items-center md:justify-between">
-                <div><div className="text-lg font-semibold">{isPremium ? "Premium" : "Premium wygasł"}</div><div className="mt-1 text-xs text-slate-300/65">{isPremium ? (cancelAtPeriodEnd ? `Dostęp aktywny do: ${premiumDate}` : `Data odnowienia: ${premiumDate}`) : "Odnów dostęp do funkcji Premium."}</div></div>
-                <span className={`w-fit rounded-full border px-3 py-1 text-xs font-bold ${isPremium?"border-emerald-400/50 text-emerald-300":"border-rose-400/50 text-rose-300"}`}>{subscriptionLabel}</span>
-                {isPremium && hasStripeSubscription ? <button onClick={openBillingPortal} disabled={openingPortal} className="rounded-lg border border-cyan-400/50 px-4 py-2 text-xs font-semibold disabled:opacity-50">{openingPortal?"Otwieranie...":"Zarządzaj subskrypcją"}</button> : !isPremium ? <button onClick={renewPremium} disabled={openingCheckout} className="rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold disabled:opacity-50">{openingCheckout?"Przekierowanie...":"Odnów Premium — 99 € / mies."}</button> : null}
+            {/* SUBSCRIPTION */}
+            <section className="overflow-hidden rounded-xl border border-sky-400/30 bg-[linear-gradient(135deg,rgba(7,43,83,.97),rgba(3,28,58,.98))]">
+              <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3"><span className="grid h-9 w-9 place-items-center rounded-lg bg-emerald-500/15 text-emerald-300">★</span><div><h2 className="text-[13px] font-semibold">Subskrypcja</h2><p className="text-[9px] text-slate-300/55">Informacje o Twoim planie i płatnościach.</p></div></div>
+              <div className="m-3 flex flex-col gap-3 rounded-lg border border-sky-400/20 bg-[#041d3a]/95 p-3 md:flex-row md:items-center">
+                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-emerald-500/15 text-xl text-emerald-300">★</span>
+                <div className="flex-1"><b className="text-[11px]">{isPremium?"Premium":"Premium wygasł"}</b><p className="text-[8px] text-slate-300/60">FX Trade Professional Trading</p><p className="mt-1 text-[8px]">Data odnowienia: <span className="text-cyan-300">{premiumDate}</span></p></div>
+                <span className={`w-fit rounded-full border px-3 py-1 text-[8px] font-bold ${isPremium?"border-emerald-400/50 text-emerald-300":"border-rose-400/50 text-rose-300"}`}>♛ &nbsp; {subscriptionLabel}</span>
+                {isPremium&&hasStripeSubscription?<button onClick={openBillingPortal} disabled={openingPortal} className="rounded-md border border-sky-400/60 px-3 py-2 text-[9px] disabled:opacity-50">▣ &nbsp; {openingPortal?"Otwieranie...":"Zarządzaj subskrypcją"}</button>:!isPremium?<button onClick={renewPremium} disabled={openingCheckout} className="rounded-md bg-emerald-600 px-3 py-2 text-[9px] disabled:opacity-50">{openingCheckout?"Przekierowanie...":"Odnów Premium"}</button>:null}
               </div>
-            </div>
+            </section>
 
-            <div className="rounded-[14px] border border-sky-400/35 bg-[linear-gradient(135deg,rgba(7,42,81,.97),rgba(4,29,59,.98))] p-5">
-              <div className="mb-4 flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-xl bg-cyan-500/15 text-cyan-300">♢</div><div><h2 className="font-semibold">Bezpieczeństwo</h2><p className="text-xs text-slate-300/60">Zarządzaj bezpieczeństwem swojego konta.</p></div></div>
-              <div className="rounded-[11px] border border-sky-400/20 bg-[#041d3a]/90 p-4"><div className="font-semibold">Aktywne sesje</div><div className="mt-1 text-xs text-slate-300/60">Wyloguj konto ze wszystkich przeglądarek i urządzeń.</div></div>
-              <button onClick={logoutAll} disabled={loggingOutAll} className="mt-3 rounded-lg border border-rose-400/50 bg-rose-500/10 px-4 py-2 text-xs font-bold text-rose-300 disabled:opacity-50">{loggingOutAll?t("loggingOut"):t("logoutAll")}</button>
-            </div>
+            {/* SECURITY */}
+            <section className="overflow-hidden rounded-xl border border-sky-400/30 bg-[linear-gradient(135deg,rgba(7,43,83,.97),rgba(3,28,58,.98))]">
+              <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3"><span className="grid h-9 w-9 place-items-center rounded-lg bg-cyan-500/10 text-cyan-300">♢</span><div><h2 className="text-[13px] font-semibold">Bezpieczeństwo</h2><p className="text-[9px] text-slate-300/55">Zarządzaj bezpieczeństwem swojego konta.</p></div></div>
+              <div className="grid gap-2.5 p-3 md:grid-cols-3">
+                <div className="rounded-lg border border-sky-400/20 bg-[#041d3a]/95 p-3"><b className="text-[9px]">▣ &nbsp; Aktywne sesje</b><p className="mt-2 text-[8px] text-slate-300/60">1 aktywna sesja</p><p className="text-[7px] text-slate-400">To urządzenie →</p></div>
+                <div className="rounded-lg border border-sky-400/20 bg-[#041d3a]/95 p-3"><b className="text-[9px]">♢ &nbsp; Dwuetapowe logowanie</b><p className="mt-2 text-[8px] text-slate-300/60">Dodatkowa ochrona konta</p><div className="mt-2 h-4 w-8 rounded-full bg-slate-500 p-0.5"><div className="h-3 w-3 rounded-full bg-white"/></div></div>
+                <div className="rounded-lg border border-rose-400/20 bg-[#041d3a]/95 p-3"><b className="text-[9px]">⇥ &nbsp; Wyloguj ze wszystkich urządzeń</b><p className="mt-2 text-[8px] text-slate-300/60">Zakończ wszystkie aktywne sesje</p><button onClick={logoutAll} disabled={loggingOutAll} className="mt-2 w-full rounded-md border border-rose-500/60 bg-rose-500/10 py-2 text-[8px] text-rose-300 disabled:opacity-50">{loggingOutAll?t("loggingOut"):"Wyloguj wszędzie"}</button></div>
+              </div>
+            </section>
 
-            <div className="flex flex-col gap-4 rounded-2xl border border-rose-500/50 bg-gradient-to-r from-rose-950/75 to-[#06254a]/90 p-5 md:flex-row md:items-center md:justify-between">
-              <div><h2 className="font-semibold text-rose-300">{t("dangerZone")}</h2><p className="mt-1 text-xs text-rose-200/55">{t("dangerZoneDescription")}</p></div>
-              <button onClick={()=>setDeleteOpen(true)} className="rounded-lg border border-rose-500/60 bg-rose-600/20 px-5 py-2.5 text-xs font-bold text-rose-300 hover:bg-rose-600/30">{t("deleteAccount")}</button>
-            </div>
-          </section>
+            {/* DANGER */}
+            <section className="flex flex-col gap-3 rounded-xl border border-rose-500/60 bg-gradient-to-r from-rose-950/80 to-[#151533]/90 p-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-full border border-rose-400/50 bg-rose-500/15 text-rose-300">!</span><div><b className="text-[10px] text-rose-300">{t("dangerZone")}</b><p className="text-[7px] text-rose-200/55">{t("dangerZoneDescription")}</p></div></div>
+              <button onClick={()=>setDeleteOpen(true)} className="rounded-md border border-rose-500/70 px-4 py-2 text-[8px] font-semibold text-rose-300">▥ &nbsp; {t("deleteAccount")}</button>
+            </section>
+          </div>
         </div>
       </main>
 
@@ -783,6 +807,7 @@ export default function SettingsClient() {
           deleteAccount
         }
       />
+
 
     </>
   );
