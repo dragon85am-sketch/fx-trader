@@ -3909,6 +3909,9 @@ if (closedNow.length) {
         const bucketTime = (Math.floor(tickSeconds / bucketSize) * bucketSize) as UTCTimestamp;
 
         setLiveCandle((prev) => {
+          const cacheKey = candleCacheKey(symbol, tf);
+          const history = candlesCache.current.get(cacheKey) ?? [];
+
           if (prev && Number(prev.time) === Number(bucketTime)) {
             return {
               ...prev,
@@ -3918,11 +3921,25 @@ if (closedNow.length) {
             };
           }
 
-          // Przy pierwszym ticku próbujemy zachować OHLC ostatniej świecy historycznej,
-          // jeżeli należy do tego samego bucketu. Dzięki temu po wejściu na wykres
-          // świeca nie startuje sztucznie jako O=H=L=C.
-          const history = candlesCache.current.get(candleCacheKey(symbol, tf)) ?? [];
-          const last = history[history.length - 1];
+          // MASTER 150: gdy tick otwiera nowy bucket, poprzednia live świeca staje się
+          // świecą historyczną w cache danego SYMBOLU + TIMEFRAME. Dzięki temu wykres
+          // nie czeka na kolejny polling REST i działa jak TradingView.
+          if (prev && Number(prev.time) < Number(bucketTime)) {
+            const withoutPrev = history.filter(
+              (c) => Number(c.time) !== Number(prev.time)
+            );
+            candlesCache.current.set(
+              cacheKey,
+              [...withoutPrev, prev]
+                .sort((a, b) => Number(a.time) - Number(b.time))
+                .slice(-300)
+            );
+          }
+
+          // Jeżeli REST ma już świecę dla aktualnego bucketu, zachowujemy jej OPEN/HIGH/LOW
+          // i podmieniamy tylko dane wynikające z najnowszego ticka.
+          const currentHistory = candlesCache.current.get(cacheKey) ?? history;
+          const last = currentHistory[currentHistory.length - 1];
           if (last && Number(last.time) === Number(bucketTime)) {
             return {
               ...last,
@@ -3932,6 +3949,7 @@ if (closedNow.length) {
             };
           }
 
+          // Nowa świeca dokładnie w granicy wybranego TF: M1/M5/M15/M30/H1/H4/D1.
           return {
             time: bucketTime,
             open: price,
