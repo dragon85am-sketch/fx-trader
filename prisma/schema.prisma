@@ -27,6 +27,8 @@ model User {
 
   theme    String?
   language String?
+  priceFormat String? @default("dot")
+  avatarUrl String?
 
   tokenVersion Int @default(0)
 

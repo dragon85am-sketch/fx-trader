@@ -39,17 +39,28 @@ export async function PATCH(req: Request) {
       }
     }
 
+    const avatarUrl =
+      typeof body.avatarUrl === "string"
+        ? body.avatarUrl.trim().slice(0, 2_000_000)
+        : undefined;
+
+    if (avatarUrl !== undefined && avatarUrl !== "" && !/^data:image\/(png|jpeg|webp);base64,/.test(avatarUrl)) {
+      return NextResponse.json({ error: "Nieprawidłowy format zdjęcia profilowego." }, { status: 400 });
+    }
+
     const theme =
       body.theme === "dark" || body.theme === "light" || body.theme === "system"
         ? body.theme
         : undefined;
+
+    const priceFormat = body.priceFormat === "dot" || body.priceFormat === "comma" ? body.priceFormat : undefined;
 
     const language =
       ["pl", "en", "de", "nl", "es"].includes(body.language)
         ? body.language
         : undefined;
 
-    if (name === undefined && email === undefined && theme === undefined && language === undefined) {
+    if (name === undefined && email === undefined && avatarUrl === undefined && theme === undefined && language === undefined && priceFormat === undefined) {
       return NextResponse.json(
         { error: "Brak poprawnych danych do aktualizacji" },
         { status: 400 }
@@ -61,8 +72,10 @@ export async function PATCH(req: Request) {
       data: {
         ...(name !== undefined ? { name } : {}),
         ...(email !== undefined ? { email } : {}),
+        ...(avatarUrl !== undefined ? { avatarUrl: avatarUrl || null } : {}),
         ...(theme !== undefined ? { theme } : {}),
         ...(language !== undefined ? { language } : {}),
+        ...(priceFormat !== undefined ? { priceFormat } : {}),
       },
       select: {
         id: true,
@@ -71,6 +84,8 @@ export async function PATCH(req: Request) {
         role: true,
         theme: true,
         language: true,
+        avatarUrl: true,
+        priceFormat: true,
       },
     });
 

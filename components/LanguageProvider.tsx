@@ -51,6 +51,28 @@ export function LanguageProvider({
     document.documentElement.lang = nextLang;
   }, []);
 
+  React.useEffect(() => {
+    const syncLanguage = (event: Event) => {
+      const custom = event as CustomEvent<string>;
+      const raw = custom.detail ?? localStorage.getItem("fxtrade-language") ?? localStorage.getItem("lang") ?? "pl";
+      const next = normalizeLanguage(raw);
+      setLangState(next);
+      document.documentElement.lang = next;
+    };
+    const syncStorage = (event: StorageEvent) => {
+      if (event.key !== "lang" && event.key !== "fxtrade-language") return;
+      const next = normalizeLanguage(event.newValue ?? "pl");
+      setLangState(next);
+      document.documentElement.lang = next;
+    };
+    window.addEventListener("fxtrade-language-change", syncLanguage as EventListener);
+    window.addEventListener("storage", syncStorage);
+    return () => {
+      window.removeEventListener("fxtrade-language-change", syncLanguage as EventListener);
+      window.removeEventListener("storage", syncStorage);
+    };
+  }, []);
+
   const t = React.useCallback(
     (key: TranslationKey) => translations[lang]?.[key] ?? translations.pl[key] ?? key,
     [lang]

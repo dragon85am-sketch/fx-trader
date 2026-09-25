@@ -20,15 +20,21 @@ export default function ThemeProvider({
       (localStorage.getItem("theme") as Theme) ||
       "dark";
 
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
     const applyTheme = (value: Theme) => {
+      const resolved = value === "system" ? (media.matches ? "dark" : "light") : value;
       root.classList.remove("dark", "light", "system");
-      root.classList.add(value);
+      root.classList.add(resolved);
+      root.dataset.theme = value;
     };
 
     applyTheme(savedTheme);
-
-    // zapis do localStorage (fallback)
     localStorage.setItem("theme", savedTheme);
+    const onSystemChange = () => {
+      if ((localStorage.getItem("theme") as Theme) === "system") applyTheme("system");
+    };
+    media.addEventListener("change", onSystemChange);
+    return () => media.removeEventListener("change", onSystemChange);
   }, [user?.theme]);
 
   return <>{children}</>;

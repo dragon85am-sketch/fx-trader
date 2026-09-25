@@ -18,6 +18,8 @@ type MeResponse = {
 
     theme?: string | null;
     language?: string | null;
+    avatarUrl?: string | null;
+    priceFormat?: string | null;
 
     isPremium?: boolean;
     premiumSince?: string | null;
@@ -43,6 +45,8 @@ export default function SettingsClient() {
   const [name, setName] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [role, setRole] = React.useState("USER");
+  const [avatarUrl, setAvatarUrl] = React.useState("");
+  const avatarInputRef = React.useRef<HTMLInputElement>(null);
   const [loadingProfile, setLoadingProfile] =
     React.useState(false);
 
@@ -71,6 +75,19 @@ export default function SettingsClient() {
 
   const [language, setLanguage] =
     React.useState<AppLanguage>(lang);
+
+  const [priceFormat, setPriceFormat] = React.useState<"dot" | "comma">("dot");
+
+  const previewTheme = (value: string) => {
+    setTheme(value);
+    const root = document.documentElement;
+    const resolved = value === "system"
+      ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+      : value;
+    root.classList.remove("dark", "light", "system");
+    root.classList.add(resolved);
+    root.dataset.theme = value;
+  };
 
   // =====================================================
   // SECURITY
@@ -178,6 +195,10 @@ export default function SettingsClient() {
 
         setName(user.name || "");
         setEmail(user.email || "");
+        setAvatarUrl(user.avatarUrl || "");
+        const savedPriceFormat = user.priceFormat === "comma" ? "comma" : ((localStorage.getItem("priceFormat") === "comma") ? "comma" : "dot");
+        setPriceFormat(savedPriceFormat);
+        localStorage.setItem("priceFormat", savedPriceFormat);
 
         setRole(
           (user.role || "user").toUpperCase()
@@ -252,6 +273,17 @@ export default function SettingsClient() {
     ).format(date);
   }
 
+  const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.type.match(/^image\/(png|jpeg|webp)$/)) { toast.error("Wybierz zdjęcie PNG, JPG lub WEBP."); return; }
+    if (file.size > 1_500_000) { toast.error("Zdjęcie może mieć maksymalnie 1,5 MB."); return; }
+    const reader = new FileReader();
+    reader.onload = () => setAvatarUrl(typeof reader.result === "string" ? reader.result : "");
+    reader.onerror = () => toast.error("Nie udało się wczytać zdjęcia.");
+    reader.readAsDataURL(file);
+  };
+
   // =====================================================
   // SAVE PROFILE
   // =====================================================
@@ -277,6 +309,8 @@ export default function SettingsClient() {
             email,
             theme,
             language,
+            avatarUrl,
+            priceFormat,
           }),
         }
       );
@@ -317,6 +351,9 @@ export default function SettingsClient() {
         "theme",
         theme
       );
+
+      localStorage.setItem("priceFormat", priceFormat);
+      window.dispatchEvent(new CustomEvent("fxtrade:price-format", { detail: priceFormat }));
 
       toast.success(
         t("savedSettings")
@@ -738,14 +775,21 @@ export default function SettingsClient() {
                   <span className="grid h-9 w-9 place-items-center rounded-lg border border-cyan-400/20 bg-cyan-500/10 text-cyan-300">♙</span>
                   <div><h2 className="text-[13px] font-semibold">Profil użytkownika</h2><p className="text-[9px] text-slate-300/55">Twoje dane widoczne w aplikacji.</p></div>
                 </div>
-                <button onClick={saveProfile} disabled={loadingProfile} className="rounded-md border border-sky-400/70 bg-sky-500/[.06] px-3 py-2 text-[9px] font-semibold hover:bg-sky-500/15 disabled:opacity-50">✎ &nbsp; {loadingProfile ? t("saving") : "Edytuj profil"}</button>
+                <button onClick={saveProfile} disabled={loadingProfile} className="rounded-md border border-cyan-300/70 bg-[linear-gradient(90deg,rgba(14,165,233,.24),rgba(37,99,235,.28))] px-4 py-2 text-[9px] font-bold text-white shadow-[0_0_18px_rgba(34,211,238,.25)] transition hover:border-cyan-200 hover:shadow-[0_0_25px_rgba(34,211,238,.42)] disabled:opacity-50">✓ &nbsp; {loadingProfile ? t("saving") : "Zapisz profil"}</button>
               </div>
-              <div className="flex items-center gap-4 px-4 py-4">
-                <div className="grid h-[68px] w-[68px] shrink-0 place-items-center rounded-full border border-cyan-300/70 bg-gradient-to-br from-blue-500 to-blue-700 text-xl font-bold shadow-[0_0_18px_rgba(34,211,238,.22)]">{initials}</div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2"><input value={name} onChange={e=>setName(e.target.value)} className="w-full max-w-[220px] bg-transparent text-[13px] font-semibold outline-none" /><span className="rounded-full border border-sky-400/35 bg-sky-500/10 px-2 py-0.5 text-[7px] font-bold text-sky-300">{role}</span></div>
-                  <input type="email" value={email} onChange={e=>setEmail(e.target.value)} className="mt-1 block w-full max-w-[300px] bg-transparent text-[10px] text-slate-300 outline-none" />
-                  <div className="mt-1 text-[9px] text-slate-400">Konto FX TRADE</div>
+              <div className="grid gap-5 px-4 py-4 md:grid-cols-[92px_1fr] md:items-center">
+                <div className="relative mx-auto md:mx-0">
+                  <button type="button" onClick={()=>avatarInputRef.current?.click()} className="group relative grid h-[82px] w-[82px] place-items-center overflow-hidden rounded-full border-2 border-cyan-300/75 bg-gradient-to-br from-blue-500 to-blue-700 text-xl font-bold shadow-[0_0_22px_rgba(34,211,238,.28)]" title="Zmień zdjęcie profilowe">
+                    {avatarUrl ? <img src={avatarUrl} alt="Zdjęcie profilowe" className="h-full w-full object-cover" /> : <span>{initials}</span>}
+                    <span className="absolute inset-0 grid place-items-center bg-slate-950/55 text-[10px] font-semibold opacity-0 transition group-hover:opacity-100">Zmień</span>
+                  </button>
+                  <button type="button" onClick={()=>avatarInputRef.current?.click()} className="absolute -bottom-1 -right-1 grid h-7 w-7 place-items-center rounded-full border border-cyan-200 bg-[#0877d8] text-[12px] text-white shadow-[0_0_15px_rgba(34,211,238,.65)]" aria-label="Wybierz zdjęcie">✎</button>
+                  <input ref={avatarInputRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={handleAvatarChange} className="hidden" />
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <label className="block"><span className="mb-1 block text-[8px] font-medium uppercase tracking-[.12em] text-slate-400">Nazwa użytkownika</span><input value={name} onChange={e=>setName(e.target.value)} className="w-full rounded-lg border border-sky-400/25 bg-[#041d3a]/95 px-3 py-2.5 text-[11px] font-semibold outline-none transition focus:border-cyan-300 focus:shadow-[0_0_14px_rgba(34,211,238,.18)]" /></label>
+                  <label className="block"><span className="mb-1 block text-[8px] font-medium uppercase tracking-[.12em] text-slate-400">E-mail</span><input type="email" value={email} onChange={e=>setEmail(e.target.value)} className="w-full rounded-lg border border-sky-400/25 bg-[#041d3a]/95 px-3 py-2.5 text-[11px] text-slate-200 outline-none transition focus:border-cyan-300 focus:shadow-[0_0_14px_rgba(34,211,238,.18)]" /></label>
+                  <div className="md:col-span-2 flex items-center gap-2 text-[9px] text-slate-400"><span className="rounded-full border border-sky-400/35 bg-sky-500/10 px-2 py-0.5 text-[7px] font-bold text-sky-300">{role}</span><span>Konto FX TRADE</span><span className="text-slate-600">•</span><span>Kliknij zdjęcie lub ołówek, aby je zmienić</span></div>
                 </div>
               </div>
             </section>
@@ -787,12 +831,12 @@ export default function SettingsClient() {
               <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3"><span className="grid h-9 w-9 place-items-center rounded-lg bg-cyan-500/10 text-cyan-300">▤</span><div><h2 className="text-[13px] font-semibold">Wygląd i język</h2><p className="text-[9px] text-slate-300/55">Dostosuj wygląd aplikacji do swoich preferencji.</p></div></div>
               <div className="grid gap-4 p-3 md:grid-cols-[1.2fr_.72fr_.82fr]">
                 <div><p className="mb-2 text-[8px] text-slate-300/60">Motyw aplikacji</p><div className="grid grid-cols-3 gap-2">
-                  {[["light","☼","Jasny"],["dark","☾","Ciemny"],["system","▣","System"]].map(([v,i,l])=><button key={v} onClick={()=>setTheme(v)} className={`rounded-lg border py-2 text-[8px] ${theme===v?"border-cyan-300 bg-sky-500/15 shadow-[0_0_12px_rgba(34,211,238,.35)]":"border-sky-400/20 bg-[#041d3a]"}`}><span className="block text-lg text-cyan-300">{i}</span>{l}</button>)}
+                  {[["light","☼","Jasny"],["dark","☾","Ciemny"],["system","▣","System"]].map(([v,i,l])=><button key={v} onClick={()=>previewTheme(v)} className={`rounded-lg border py-2 text-[8px] ${theme===v?"border-cyan-300 bg-sky-500/15 shadow-[0_0_12px_rgba(34,211,238,.35)]":"border-sky-400/20 bg-[#041d3a]"}`}><span className="block text-lg text-cyan-300">{i}</span>{l}</button>)}
                 </div></div>
                 <div><p className="mb-2 text-[8px] text-slate-300/60">Język</p><select value={language} onChange={e=>{const v=e.target.value as AppLanguage;setLanguage(v);setLang(v);localStorage.setItem("lang",v)}} className="w-full rounded-lg border border-sky-400/20 bg-[#041d3a] px-3 py-3 text-[9px]"><option value="pl">🇵🇱  Polski</option><option value="en">🇬🇧  English</option><option value="de">🇩🇪  Deutsch</option><option value="nl">🇳🇱  Nederlands</option><option value="es">🇪🇸  Español</option></select></div>
-                <div><p className="mb-2 text-[8px] text-slate-300/60">Format ceny</p><div className="grid grid-cols-2 gap-2"><button type="button" className="rounded-lg border border-cyan-300 bg-sky-500/15 py-2 text-[8px] shadow-[0_0_12px_rgba(34,211,238,.35)]"><b>Standard</b><span className="block text-[7px] text-slate-300">1.23456</span></button><button type="button" className="rounded-lg border border-sky-400/20 bg-[#041d3a] py-2 text-[8px]">Z przecinkiem<span className="block text-[7px] text-slate-300">1,23456</span></button></div></div>
+                <div><p className="mb-2 text-[8px] text-slate-300/60">Format ceny</p><div className="grid grid-cols-2 gap-2"><button type="button" onClick={()=>setPriceFormat("dot")} className={`rounded-lg border py-2 text-[8px] transition ${priceFormat==="dot"?"border-cyan-300 bg-sky-500/15 shadow-[0_0_16px_rgba(34,211,238,.45)]":"border-sky-400/20 bg-[#041d3a] hover:border-cyan-400/50"}`}><b>Standard</b><span className="block text-[7px] text-slate-300">1.23456</span></button><button type="button" onClick={()=>setPriceFormat("comma")} className={`rounded-lg border py-2 text-[8px] transition ${priceFormat==="comma"?"border-cyan-300 bg-sky-500/15 shadow-[0_0_16px_rgba(34,211,238,.45)]":"border-sky-400/20 bg-[#041d3a] hover:border-cyan-400/50"}`}>Z przecinkiem<span className="block text-[7px] text-slate-300">1,23456</span></button></div></div>
               </div>
-              <div className="px-3 pb-3"><button onClick={saveProfile} disabled={loadingProfile} className="rounded-md bg-blue-600 px-3 py-2 text-[9px] font-semibold disabled:opacity-50">Zapisz preferencje</button></div>
+              <div className="px-3 pb-3"><button onClick={saveProfile} disabled={loadingProfile} className="rounded-md border border-cyan-300/60 bg-[linear-gradient(90deg,#0284c7,#2563eb)] px-4 py-2 text-[9px] font-semibold shadow-[0_0_18px_rgba(34,211,238,.35)] transition hover:brightness-110 disabled:opacity-50">Zapisz preferencje</button></div>
             </section>
 
             {/* SUBSCRIPTION */}

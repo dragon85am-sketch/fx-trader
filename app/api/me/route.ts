@@ -23,6 +23,8 @@ export async function GET() {
 
         theme: true,
         language: true,
+        priceFormat: true,
+        avatarUrl: true,
 
         isPremium: true,
         premiumSince: true,
@@ -64,6 +66,7 @@ export async function GET() {
 
         theme: user.theme,
         language: user.language,
+        avatarUrl: user.avatarUrl,
 
         isPremium: premiumActive,
 
