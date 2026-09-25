@@ -689,11 +689,11 @@ export default function SettingsClient() {
           className="pointer-events-none fixed inset-0 z-[1] bg-[radial-gradient(circle_at_50%_8%,rgba(34,211,238,.14),transparent_46%)]"
         />
 
-        <div className="relative z-10 mx-auto w-full max-w-[1900px] space-y-4 px-4 py-5 md:px-6 xl:px-8">
+        <div className="relative z-10 mx-auto w-full max-w-[1500px] space-y-4 px-4 py-6 md:px-6 xl:px-8">
 
           {/* HEADER */}
 
-          <section className="relative overflow-hidden rounded-[16px] border border-sky-400/35 bg-[linear-gradient(120deg,#125b9b_0%,#0c477f_52%,#082f5d_100%)] px-5 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,.035)]">
+          <section className="relative overflow-hidden rounded-[18px] border border-cyan-400/30 bg-[linear-gradient(120deg,#125b9b_0%,#0c477f_52%,#082f5d_100%)] px-5 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,.035)]">
 
             <div className="pointer-events-none absolute right-[8%] top-0 h-full w-[34%] opacity-[.12] [background-image:radial-gradient(circle,#38bdf8_1px,transparent_1px)] [background-size:7px_7px] [mask-image:radial-gradient(ellipse_at_center,black_0%,transparent_72%)]" />
 
@@ -752,7 +752,7 @@ export default function SettingsClient() {
 
             {/* PROFILE */}
 
-            <div className="rounded-[15px] border border-sky-400/35 bg-[linear-gradient(145deg,#0d4d87_0%,#093b6e_55%,#062d58_100%)] p-5 shadow-[0_0_28px_rgba(14,165,233,.14),inset_0_1px_0_rgba(255,255,255,.07)]">
+            <div className="rounded-[16px] border border-cyan-400/25 bg-[linear-gradient(145deg,rgba(8,47,88,.96)_0%,rgba(5,38,75,.96)_55%,rgba(3,27,57,.98)_100%)] p-5 shadow-[0_0_22px_rgba(34,211,238,.10),inset_0_1px_0_rgba(255,255,255,.06)]">
 
               <div className="flex items-start justify-between gap-4">
 
@@ -795,7 +795,7 @@ export default function SettingsClient() {
                       e.target.value
                     )
                   }
-                  className="mt-2 w-full rounded-[9px] border border-sky-400/25 bg-[#062b52] px-3 py-3 text-[11px] text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/10"
+                  className="mt-2 w-full rounded-[9px] border border-sky-400/25 bg-[#041d3a] px-3 py-3 text-[11px] text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/10"
                 />
 
               </div>
@@ -813,7 +813,7 @@ export default function SettingsClient() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   autoComplete="email"
-                  className="mt-2 w-full rounded-[9px] border border-sky-400/25 bg-[#062b52] px-3 py-3 text-[11px] text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/10"
+                  className="mt-2 w-full rounded-[9px] border border-sky-400/25 bg-[#041d3a] px-3 py-3 text-[11px] text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/10"
                 />
 
               </div>
@@ -837,7 +837,7 @@ export default function SettingsClient() {
 
             {/* PASSWORD */}
 
-            <div className="rounded-[15px] border border-sky-400/35 bg-[linear-gradient(145deg,#0d4d87_0%,#093b6e_55%,#062d58_100%)] p-5 shadow-[0_0_28px_rgba(14,165,233,.14),inset_0_1px_0_rgba(255,255,255,.07)]">
+            <div className="rounded-[16px] border border-cyan-400/25 bg-[linear-gradient(145deg,rgba(8,47,88,.96)_0%,rgba(5,38,75,.96)_55%,rgba(3,27,57,.98)_100%)] p-5 shadow-[0_0_22px_rgba(34,211,238,.10),inset_0_1px_0_rgba(255,255,255,.06)]">
 
               <div className="flex items-center gap-3">
 
@@ -881,7 +881,7 @@ export default function SettingsClient() {
                         e.target.value
                       )
                     }
-                    className="mt-2 w-full rounded-[9px] border border-sky-400/25 bg-[#062b52] px-3 py-3 text-[11px] text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/10"
+                    className="mt-2 w-full rounded-[9px] border border-sky-400/25 bg-[#041d3a] px-3 py-3 text-[11px] text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/10"
                   />
 
                 </div>
@@ -906,7 +906,7 @@ export default function SettingsClient() {
                           e.target.value
                         )
                       }
-                      className="mt-2 w-full rounded-[9px] border border-sky-400/25 bg-[#062b52] px-3 py-3 text-[11px] text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/10"
+                      className="mt-2 w-full rounded-[9px] border border-sky-400/25 bg-[#041d3a] px-3 py-3 text-[11px] text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/10"
                     />
 
                   </div>
@@ -929,7 +929,7 @@ export default function SettingsClient() {
                           e.target.value
                         )
                       }
-                      className="mt-2 w-full rounded-[9px] border border-sky-400/25 bg-[#062b52] px-3 py-3 text-[11px] text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/10"
+                      className="mt-2 w-full rounded-[9px] border border-sky-400/25 bg-[#041d3a] px-3 py-3 text-[11px] text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/10"
                     />
 
                   </div>
@@ -959,7 +959,7 @@ export default function SettingsClient() {
 
             {/* PREFERENCES */}
 
-            <div className="rounded-[15px] border border-sky-400/35 bg-[linear-gradient(145deg,#0d4d87_0%,#093b6e_55%,#062d58_100%)] p-5 shadow-[0_0_28px_rgba(14,165,233,.14),inset_0_1px_0_rgba(255,255,255,.07)]">
+            <div className="rounded-[16px] border border-cyan-400/25 bg-[linear-gradient(145deg,rgba(8,47,88,.96)_0%,rgba(5,38,75,.96)_55%,rgba(3,27,57,.98)_100%)] p-5 shadow-[0_0_22px_rgba(34,211,238,.10),inset_0_1px_0_rgba(255,255,255,.06)]">
 
               <div className="flex items-center gap-3">
 
@@ -998,7 +998,7 @@ export default function SettingsClient() {
                         e.target.value
                       )
                     }
-                    className="mt-2 w-full rounded-[9px] border border-sky-400/25 bg-[#062b52] px-3 py-3 text-[11px] text-white outline-none"
+                    className="mt-2 w-full rounded-[9px] border border-sky-400/25 bg-[#041d3a] px-3 py-3 text-[11px] text-white outline-none"
                   >
                     <option value="dark">
                       {t(
@@ -1048,7 +1048,7 @@ export default function SettingsClient() {
                         newLang
                       );
                     }}
-                    className="mt-2 w-full rounded-[9px] border border-sky-400/25 bg-[#062b52] px-3 py-3 text-[11px] text-white outline-none"
+                    className="mt-2 w-full rounded-[9px] border border-sky-400/25 bg-[#041d3a] px-3 py-3 text-[11px] text-white outline-none"
                   >
                     <option value="pl">
                       Polski
@@ -1137,7 +1137,7 @@ export default function SettingsClient() {
 
               </div>
 
-              <div className="mt-5 rounded-[11px] border border-white/10 bg-[#062b52]/80 p-4">
+              <div className="mt-5 rounded-[11px] border border-white/10 bg-[#041d3a]/80 p-4">
 
                 {isPremium ? (
                   <>
@@ -1241,7 +1241,7 @@ export default function SettingsClient() {
 
             {/* SECURITY */}
 
-            <div className="rounded-[15px] border border-sky-400/35 bg-[linear-gradient(145deg,#0d4d87_0%,#093b6e_55%,#062d58_100%)] p-5 shadow-[0_0_28px_rgba(14,165,233,.14),inset_0_1px_0_rgba(255,255,255,.07)]">
+            <div className="rounded-[16px] border border-cyan-400/25 bg-[linear-gradient(145deg,rgba(8,47,88,.96)_0%,rgba(5,38,75,.96)_55%,rgba(3,27,57,.98)_100%)] p-5 shadow-[0_0_22px_rgba(34,211,238,.10),inset_0_1px_0_rgba(255,255,255,.06)]">
 
               <div className="flex items-center gap-3">
 
@@ -1267,7 +1267,7 @@ export default function SettingsClient() {
 
               </div>
 
-              <div className="mt-5 rounded-[10px] border border-sky-400/25 bg-[#062b52] p-4">
+              <div className="mt-5 rounded-[10px] border border-sky-400/25 bg-[#041d3a] p-4">
 
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
 
