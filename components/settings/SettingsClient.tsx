@@ -26,6 +26,7 @@ type MeResponse = {
 
     hasStripeCustomer?: boolean;
     hasStripeSubscription?: boolean;
+    hasPin?: boolean;
   };
 
   error?: string;
@@ -77,25 +78,14 @@ export default function SettingsClient() {
   const [loggingOutAll, setLoggingOutAll] =
     React.useState(false);
 
+  const [hasPin, setHasPin] = React.useState(false);
   const [pinOpen, setPinOpen] = React.useState(false);
-  const [pinValue, setPinValue] = React.useState("");
-  const [pinConfirm, setPinConfirm] = React.useState("");
   const [pinPassword, setPinPassword] = React.useState("");
+  const [currentPin, setCurrentPin] = React.useState("");
+  const [newPin, setNewPin] = React.useState("");
+  const [confirmPin, setConfirmPin] = React.useState("");
   const [savingPin, setSavingPin] = React.useState(false);
 
-  const savePin = async () => {
-    if (!/^\d{4}$/.test(pinValue)) return toast.error("PIN musi mieć 4 cyfry.");
-    if (pinValue !== pinConfirm) return toast.error("Kody PIN nie są takie same.");
-    if (!pinPassword) return toast.error("Podaj hasło do konta.");
-    setSavingPin(true);
-    try {
-      const res = await fetch("/api/settings/pin", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin: pinValue, password: pinPassword }) });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Nie udało się ustawić PIN-u");
-      toast.success("Kod PIN został ustawiony.");
-      setPinValue(""); setPinConfirm(""); setPinPassword(""); setPinOpen(false);
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Błąd PIN"); } finally { setSavingPin(false); }
-  };
 
   // =====================================================
   // SUBSCRIPTION
@@ -213,6 +203,8 @@ export default function SettingsClient() {
         setHasStripeSubscription(
           user.hasStripeSubscription === true
         );
+
+        setHasPin(user.hasPin === true);
       } catch (err) {
         console.error(
           "SETTINGS LOAD ERROR:",
@@ -693,6 +685,22 @@ export default function SettingsClient() {
         ? "AKTYWNA"
         : "WYGASŁA";
 
+  async function savePinSettings(action: "set" | "change" | "remove") {
+    if (action !== "remove" && (!/^\d{4}$/.test(newPin) || newPin !== confirmPin)) {
+      toast.error(newPin !== confirmPin ? "Kody PIN nie są takie same" : "PIN musi mieć 4 cyfry");
+      return;
+    }
+    setSavingPin(true);
+    try {
+      const res = await fetch("/api/pin/manage", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ action, password: pinPassword, currentPin, newPin }) });
+      const data = await res.json();
+      if (!res.ok) { toast.error(data?.error || "Nie udało się zapisać PIN-u"); return; }
+      toast.success(data?.message || "PIN zapisany");
+      setHasPin(action !== "remove"); setPinOpen(false); setPinPassword(""); setCurrentPin(""); setNewPin(""); setConfirmPin("");
+    } catch { toast.error("Problem z połączeniem z serwerem"); }
+    finally { setSavingPin(false); }
+  }
+
   const initials = (name || "U").slice(0, 2).toUpperCase();
 
   return (
@@ -755,13 +763,7 @@ export default function SettingsClient() {
 
                 <div className="flex min-h-[126px] flex-col rounded-lg border border-sky-400/20 bg-[#041d3a]/95 p-3">
                   <div className="flex gap-2.5"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-cyan-500/10 text-cyan-300">⠿</span><div><b className="text-[10px]">Kod PIN</b><p className="mt-1 text-[8px] leading-4 text-slate-300/60">Ustaw 4-cyfrowy kod PIN do szybkiego logowania.</p></div></div>
-                  <button type="button" onClick={()=>setPinOpen(v=>!v)} className="mt-auto rounded-md border border-cyan-300/70 bg-blue-600/70 py-2 text-[9px] font-semibold shadow-[0_0_14px_rgba(34,211,238,.28)] hover:brightness-110">{pinOpen ? "Anuluj" : "Ustaw PIN"}</button>
-                  {pinOpen && <div className="mt-2 grid gap-1.5">
-                    <input inputMode="numeric" maxLength={4} placeholder="Nowy PIN (4 cyfry)" value={pinValue} onChange={e=>setPinValue(e.target.value.replace(/\D/g,"").slice(0,4))} className="rounded-md border border-sky-400/25 bg-[#03182f] px-2 py-2 text-[9px] outline-none"/>
-                    <input inputMode="numeric" maxLength={4} placeholder="Powtórz PIN" value={pinConfirm} onChange={e=>setPinConfirm(e.target.value.replace(/\D/g,"").slice(0,4))} className="rounded-md border border-sky-400/25 bg-[#03182f] px-2 py-2 text-[9px] outline-none"/>
-                    <input type="password" placeholder="Potwierdź hasłem" value={pinPassword} onChange={e=>setPinPassword(e.target.value)} className="rounded-md border border-sky-400/25 bg-[#03182f] px-2 py-2 text-[9px] outline-none"/>
-                    <button type="button" onClick={savePin} disabled={savingPin} className="rounded-md border border-cyan-300/70 bg-blue-600/80 py-2 text-[9px] font-bold shadow-[0_0_14px_rgba(34,211,238,.28)] disabled:opacity-50">{savingPin?"Zapisywanie...":"Zapisz PIN"}</button>
-                  </div>}
+                  <button type="button" onClick={()=>setPinOpen(true)} className="mt-auto rounded-md border border-cyan-300/70 bg-blue-600/70 py-2 text-[9px] font-semibold shadow-[0_0_14px_rgba(34,211,238,.28)] hover:brightness-110">{hasPin ? "Zmień PIN" : "Ustaw PIN"}</button>
                 </div>
               </div>
             </section>
@@ -808,6 +810,21 @@ export default function SettingsClient() {
           </div>
         </div>
       </main>
+
+      {pinOpen ? (
+        <div className="fixed inset-0 z-[100] grid place-items-center bg-black/70 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-[420px] rounded-2xl border border-cyan-400/50 bg-[#041a35] p-5 shadow-[0_0_45px_rgba(34,211,238,.22)]">
+            <div className="flex items-center justify-between"><div><h3 className="text-lg font-bold">{hasPin ? "Zmień kod PIN" : "Ustaw kod PIN"}</h3><p className="mt-1 text-xs text-slate-400">4-cyfrowy kod do szybkiego logowania.</p></div><button onClick={()=>setPinOpen(false)} className="text-xl text-slate-400">×</button></div>
+            <div className="mt-5 grid gap-3">
+              {hasPin ? <input inputMode="numeric" maxLength={4} value={currentPin} onChange={e=>setCurrentPin(e.target.value.replace(/\D/g,"").slice(0,4))} placeholder="Aktualny PIN" className="rounded-xl border border-sky-400/30 bg-[#03142b] px-4 py-3 outline-none focus:border-cyan-300"/> : <input type="password" value={pinPassword} onChange={e=>setPinPassword(e.target.value)} placeholder="Hasło do konta" className="rounded-xl border border-sky-400/30 bg-[#03142b] px-4 py-3 outline-none focus:border-cyan-300"/>}
+              <input inputMode="numeric" maxLength={4} value={newPin} onChange={e=>setNewPin(e.target.value.replace(/\D/g,"").slice(0,4))} placeholder="Nowy 4-cyfrowy PIN" className="rounded-xl border border-sky-400/30 bg-[#03142b] px-4 py-3 outline-none focus:border-cyan-300"/>
+              <input inputMode="numeric" maxLength={4} value={confirmPin} onChange={e=>setConfirmPin(e.target.value.replace(/\D/g,"").slice(0,4))} placeholder="Powtórz nowy PIN" className="rounded-xl border border-sky-400/30 bg-[#03142b] px-4 py-3 outline-none focus:border-cyan-300"/>
+              <button disabled={savingPin} onClick={()=>savePinSettings(hasPin ? "change" : "set")} className="rounded-xl border border-cyan-300/70 bg-gradient-to-r from-cyan-500 to-blue-600 py-3 font-bold shadow-[0_0_20px_rgba(34,211,238,.30)] disabled:opacity-50">{savingPin ? "Zapisywanie..." : hasPin ? "Zmień PIN" : "Ustaw PIN"}</button>
+              {hasPin ? <><div className="my-1 h-px bg-white/10"/><input type="password" value={pinPassword} onChange={e=>setPinPassword(e.target.value)} placeholder="Hasło do konta — wymagane do usunięcia PIN" className="rounded-xl border border-rose-400/25 bg-[#03142b] px-4 py-3 outline-none"/><button disabled={savingPin} onClick={()=>savePinSettings("remove")} className="rounded-xl border border-rose-500/60 bg-rose-500/10 py-3 font-semibold text-rose-300">Usuń PIN</button></> : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <DeleteAccountModal
         open={deleteOpen}

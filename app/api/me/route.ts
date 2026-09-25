@@ -31,6 +31,7 @@ export async function GET() {
 
         stripeCustomerId: true,
         stripeSubscriptionId: true,
+        pinHash: true,
       },
     });
 
@@ -79,6 +80,8 @@ export async function GET() {
 
         hasStripeSubscription:
           Boolean(user.stripeSubscriptionId),
+
+        hasPin: Boolean(user.pinHash),
       },
     });
   } catch (error) {
