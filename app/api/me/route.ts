@@ -66,6 +66,7 @@ export async function GET() {
 
         theme: user.theme,
         language: user.language,
+        priceFormat: user.priceFormat ?? "dot",
         avatarUrl: user.avatarUrl,
 
         isPremium: premiumActive,
