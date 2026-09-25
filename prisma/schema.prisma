@@ -42,6 +42,11 @@ model User {
 
   password String?
 
+  // Quick login PIN (bcrypt hash only; never store the raw PIN)
+  pinHash           String?
+  pinFailedAttempts Int       @default(0)
+  pinLockedUntil    DateTime?
+
   affiliateSales AffiliateSale[]
   affiliateStat  AffiliateStat?
   dashboardStat  DashboardStat?

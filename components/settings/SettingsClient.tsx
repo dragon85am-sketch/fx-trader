@@ -77,6 +77,26 @@ export default function SettingsClient() {
   const [loggingOutAll, setLoggingOutAll] =
     React.useState(false);
 
+  const [pinOpen, setPinOpen] = React.useState(false);
+  const [pinValue, setPinValue] = React.useState("");
+  const [pinConfirm, setPinConfirm] = React.useState("");
+  const [pinPassword, setPinPassword] = React.useState("");
+  const [savingPin, setSavingPin] = React.useState(false);
+
+  const savePin = async () => {
+    if (!/^\d{4}$/.test(pinValue)) return toast.error("PIN musi mieć 4 cyfry.");
+    if (pinValue !== pinConfirm) return toast.error("Kody PIN nie są takie same.");
+    if (!pinPassword) return toast.error("Podaj hasło do konta.");
+    setSavingPin(true);
+    try {
+      const res = await fetch("/api/settings/pin", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin: pinValue, password: pinPassword }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Nie udało się ustawić PIN-u");
+      toast.success("Kod PIN został ustawiony.");
+      setPinValue(""); setPinConfirm(""); setPinPassword(""); setPinOpen(false);
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Błąd PIN"); } finally { setSavingPin(false); }
+  };
+
   // =====================================================
   // SUBSCRIPTION
   // =====================================================
@@ -735,7 +755,13 @@ export default function SettingsClient() {
 
                 <div className="flex min-h-[126px] flex-col rounded-lg border border-sky-400/20 bg-[#041d3a]/95 p-3">
                   <div className="flex gap-2.5"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-cyan-500/10 text-cyan-300">⠿</span><div><b className="text-[10px]">Kod PIN</b><p className="mt-1 text-[8px] leading-4 text-slate-300/60">Ustaw 4-cyfrowy kod PIN do szybkiego logowania.</p></div></div>
-                  <button type="button" disabled title="Backend PIN nie jest jeszcze podłączony" className="mt-auto rounded-md border border-sky-400/45 bg-blue-600/55 py-2 text-[9px] font-semibold disabled:opacity-70">Ustaw PIN</button>
+                  <button type="button" onClick={()=>setPinOpen(v=>!v)} className="mt-auto rounded-md border border-cyan-300/70 bg-blue-600/70 py-2 text-[9px] font-semibold shadow-[0_0_14px_rgba(34,211,238,.28)] hover:brightness-110">{pinOpen ? "Anuluj" : "Ustaw PIN"}</button>
+                  {pinOpen && <div className="mt-2 grid gap-1.5">
+                    <input inputMode="numeric" maxLength={4} placeholder="Nowy PIN (4 cyfry)" value={pinValue} onChange={e=>setPinValue(e.target.value.replace(/\D/g,"").slice(0,4))} className="rounded-md border border-sky-400/25 bg-[#03182f] px-2 py-2 text-[9px] outline-none"/>
+                    <input inputMode="numeric" maxLength={4} placeholder="Powtórz PIN" value={pinConfirm} onChange={e=>setPinConfirm(e.target.value.replace(/\D/g,"").slice(0,4))} className="rounded-md border border-sky-400/25 bg-[#03182f] px-2 py-2 text-[9px] outline-none"/>
+                    <input type="password" placeholder="Potwierdź hasłem" value={pinPassword} onChange={e=>setPinPassword(e.target.value)} className="rounded-md border border-sky-400/25 bg-[#03182f] px-2 py-2 text-[9px] outline-none"/>
+                    <button type="button" onClick={savePin} disabled={savingPin} className="rounded-md border border-cyan-300/70 bg-blue-600/80 py-2 text-[9px] font-bold shadow-[0_0_14px_rgba(34,211,238,.28)] disabled:opacity-50">{savingPin?"Zapisywanie...":"Zapisz PIN"}</button>
+                  </div>}
                 </div>
               </div>
             </section>
