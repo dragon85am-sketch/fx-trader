@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
   try {
-    const { code } = await req.json();
+    const { code, challengeToken } = await req.json();
     const cleanCode = String(code ?? "").replace(/\D/g, "").slice(0, 6);
     if (!/^\d{6}$/.test(cleanCode)) {
       return NextResponse.json({ error: "Wpisz poprawny 6-cyfrowy kod 2FA." }, { status: 400 });
@@ -18,12 +18,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Brak konfiguracji JWT." }, { status: 500 });
     }
 
+    // Prefer the signed challenge explicitly returned by the first login step.
+    // Cookie remains as a backwards-compatible fallback.
     const rawCookie = req.headers.get("cookie")?.match(/(?:^|; )two_factor_challenge=([^;]+)/)?.[1];
-    if (!rawCookie) {
+    const rawChallenge = typeof challengeToken === "string" && challengeToken
+      ? challengeToken
+      : rawCookie ? decodeURIComponent(rawCookie) : "";
+    if (!rawChallenge) {
       return NextResponse.json({ error: "Sesja 2FA wygasła. Zaloguj się ponownie." }, { status: 401 });
     }
 
-    const challenge = jwt.verify(decodeURIComponent(rawCookie), process.env.JWT_SECRET) as Challenge;
+    const challenge = jwt.verify(rawChallenge, process.env.JWT_SECRET) as Challenge;
     if (challenge.purpose !== "2fa-login" || !challenge.userId) {
       return NextResponse.json({ error: "Nieprawidłowa sesja 2FA. Zaloguj się ponownie." }, { status: 401 });
     }

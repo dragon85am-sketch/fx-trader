@@ -66,7 +66,7 @@ export async function POST(req: Request) {
 
     if (user.twoFactorEnabled) {
       const challenge = jwt.sign({ userId: user.id, purpose: "2fa-login" }, process.env.JWT_SECRET, { expiresIn: "5m" });
-      const pending = NextResponse.json({ ok: true, requiresTwoFactor: true });
+      const pending = NextResponse.json({ ok: true, requiresTwoFactor: true, twoFactorChallenge: challenge });
       pending.cookies.set("two_factor_challenge", challenge, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 300 });
       return pending;
     }
