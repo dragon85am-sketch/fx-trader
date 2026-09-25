@@ -38,6 +38,13 @@ export async function POST(req: Request) {
     if (!process.env.JWT_SECRET) return NextResponse.json({ error: "Brak konfiguracji JWT_SECRET" }, { status: 500 });
     await prisma.user.update({ where: { id: user.id }, data: { pinFailedAttempts: 0, pinLockedUntil: null } });
 
+    if (user.twoFactorEnabled) {
+      const challenge = jwt.sign({ userId: user.id, purpose: "2fa-login" }, process.env.JWT_SECRET, { expiresIn: "5m" });
+      const pending = NextResponse.json({ ok: true, requiresTwoFactor: true });
+      pending.cookies.set("two_factor_challenge", challenge, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 300 });
+      return pending;
+    }
+
     const token = jwt.sign({ userId: user.id, role: user.role, tokenVersion: user.tokenVersion, isPremium: user.isPremium, premiumUntil: user.premiumUntil, isBanned: user.isBanned }, process.env.JWT_SECRET, { expiresIn: "7d" });
     const response = NextResponse.json({ ok: true, user: { id: user.id, email: user.email, name: user.name, role: user.role, isPremium: user.isPremium } });
     response.cookies.set("token", token, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 60 * 60 * 24 * 7 });

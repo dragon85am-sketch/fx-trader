@@ -27,6 +27,7 @@ type MeResponse = {
     hasStripeCustomer?: boolean;
     hasStripeSubscription?: boolean;
     hasPin?: boolean;
+    twoFactorEnabled?: boolean;
   };
 
   error?: string;
@@ -85,6 +86,13 @@ export default function SettingsClient() {
   const [newPin, setNewPin] = React.useState("");
   const [confirmPin, setConfirmPin] = React.useState("");
   const [savingPin, setSavingPin] = React.useState(false);
+  const [twoFactorEnabled,setTwoFactorEnabled]=React.useState(false);
+  const [twoFactorOpen,setTwoFactorOpen]=React.useState(false);
+  const [twoFactorStep,setTwoFactorStep]=React.useState<"password"|"verify"|"disable">("password");
+  const [twoFactorPassword,setTwoFactorPassword]=React.useState("");
+  const [twoFactorCode,setTwoFactorCode]=React.useState("");
+  const [twoFactorSecret,setTwoFactorSecret]=React.useState("");
+  const [twoFactorSaving,setTwoFactorSaving]=React.useState(false);
 
 
   // =====================================================
@@ -205,6 +213,7 @@ export default function SettingsClient() {
         );
 
         setHasPin(user.hasPin === true);
+        setTwoFactorEnabled(user.twoFactorEnabled === true);
       } catch (err) {
         console.error(
           "SETTINGS LOAD ERROR:",
@@ -701,6 +710,11 @@ export default function SettingsClient() {
     finally { setSavingPin(false); }
   }
 
+  async function startTwoFactor(){setTwoFactorSaving(true);try{const res=await fetch("/api/2fa/setup",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"include",body:JSON.stringify({password:twoFactorPassword})});const data=await res.json();if(!res.ok){toast.error(data?.error||"Nie udało się rozpocząć konfiguracji 2FA");return;}setTwoFactorSecret(data.secret);setTwoFactorStep("verify");setTwoFactorCode("");}finally{setTwoFactorSaving(false)}}
+  async function enableTwoFactor(){if(!/^\d{6}$/.test(twoFactorCode)){toast.error("Wpisz 6-cyfrowy kod");return;}setTwoFactorSaving(true);try{const res=await fetch("/api/2fa/enable",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"include",body:JSON.stringify({code:twoFactorCode})});const data=await res.json();if(!res.ok){toast.error(data?.error||"Nieprawidłowy kod");return;}setTwoFactorEnabled(true);setTwoFactorOpen(false);setTwoFactorPassword("");setTwoFactorCode("");setTwoFactorSecret("");toast.success("Dwuetapowe logowanie zostało włączone");}finally{setTwoFactorSaving(false)}}
+  async function disableTwoFactor(){if(!/^\d{6}$/.test(twoFactorCode)||!twoFactorPassword){toast.error("Podaj hasło i 6-cyfrowy kod");return;}setTwoFactorSaving(true);try{const res=await fetch("/api/2fa/disable",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"include",body:JSON.stringify({password:twoFactorPassword,code:twoFactorCode})});const data=await res.json();if(!res.ok){toast.error(data?.error||"Nie udało się wyłączyć 2FA");return;}setTwoFactorEnabled(false);setTwoFactorOpen(false);setTwoFactorPassword("");setTwoFactorCode("");toast.success("Dwuetapowe logowanie zostało wyłączone");}finally{setTwoFactorSaving(false)}}
+  function openTwoFactor(){setTwoFactorPassword("");setTwoFactorCode("");setTwoFactorSecret("");setTwoFactorStep(twoFactorEnabled?"disable":"password");setTwoFactorOpen(true)}
+
   const initials = (name || "U").slice(0, 2).toUpperCase();
 
   return (
@@ -797,7 +811,7 @@ export default function SettingsClient() {
               <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3"><span className="grid h-9 w-9 place-items-center rounded-lg bg-cyan-500/10 text-cyan-300">♢</span><div><h2 className="text-[13px] font-semibold">Bezpieczeństwo</h2><p className="text-[9px] text-slate-300/55">Zarządzaj bezpieczeństwem swojego konta.</p></div></div>
               <div className="grid gap-2.5 p-3 md:grid-cols-3">
                 <div className="rounded-lg border border-sky-400/20 bg-[#041d3a]/95 p-3"><b className="text-[9px]">▣ &nbsp; Aktywne sesje</b><p className="mt-2 text-[8px] text-slate-300/60">1 aktywna sesja</p><p className="text-[7px] text-slate-400">To urządzenie →</p></div>
-                <div className="rounded-lg border border-sky-400/20 bg-[#041d3a]/95 p-3"><b className="text-[9px]">♢ &nbsp; Dwuetapowe logowanie</b><p className="mt-2 text-[8px] text-slate-300/60">Dodatkowa ochrona konta</p><div className="mt-2 h-4 w-8 rounded-full bg-slate-500 p-0.5"><div className="h-3 w-3 rounded-full bg-white"/></div></div>
+                <div className="rounded-lg border border-sky-400/20 bg-[#041d3a]/95 p-3"><b className="text-[9px]">♢ &nbsp; Dwuetapowe logowanie</b><p className="mt-2 text-[8px] text-slate-300/60">{twoFactorEnabled ? "Aktywne — Authenticator" : "Dodatkowa ochrona konta"}</p><button type="button" onClick={openTwoFactor} className={`mt-3 flex h-5 w-10 items-center rounded-full border p-0.5 transition-all ${twoFactorEnabled?"justify-end border-emerald-300 bg-emerald-500/60 shadow-[0_0_14px_rgba(52,211,153,.4)]":"justify-start border-slate-500 bg-slate-600"}`}><span className="h-3.5 w-3.5 rounded-full bg-white shadow"/></button></div>
                 <div className="rounded-lg border border-rose-400/20 bg-[#041d3a]/95 p-3"><b className="text-[9px]">⇥ &nbsp; Wyloguj ze wszystkich urządzeń</b><p className="mt-2 text-[8px] text-slate-300/60">Zakończ wszystkie aktywne sesje</p><button onClick={logoutAll} disabled={loggingOutAll} className="mt-2 w-full rounded-md border border-rose-500/60 bg-rose-500/10 py-2 text-[8px] text-rose-300 disabled:opacity-50">{loggingOutAll?t("loggingOut"):"Wyloguj wszędzie"}</button></div>
               </div>
             </section>
@@ -810,6 +824,14 @@ export default function SettingsClient() {
           </div>
         </div>
       </main>
+
+      {twoFactorOpen ? (
+        <div className="fixed inset-0 z-[110] grid place-items-center bg-black/75 p-4 backdrop-blur-sm"><div className="w-full max-w-[460px] rounded-2xl border border-cyan-400/60 bg-[#041a35] p-6 shadow-[0_0_45px_rgba(34,211,238,.25)]"><div className="flex items-center justify-between"><div><h3 className="text-lg font-bold">{twoFactorEnabled?"Wyłącz 2FA":"Dwuetapowe logowanie"}</h3><p className="mt-1 text-xs text-slate-400">Google Authenticator / Microsoft Authenticator</p></div><button onClick={()=>setTwoFactorOpen(false)} className="text-xl text-slate-400">×</button></div>
+        {twoFactorStep==="password"?<div className="mt-5 grid gap-3"><p className="text-sm text-slate-300">Potwierdź hasło do konta, aby rozpocząć konfigurację.</p><input type="password" value={twoFactorPassword} onChange={e=>setTwoFactorPassword(e.target.value)} placeholder="Hasło do konta" className="rounded-xl border border-sky-400/30 bg-[#03142b] px-4 py-3 outline-none focus:border-cyan-300"/><button disabled={twoFactorSaving} onClick={startTwoFactor} className="rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 py-3 font-bold shadow-[0_0_20px_rgba(34,211,238,.30)] disabled:opacity-50">Dalej</button></div>:null}
+        {twoFactorStep==="verify"?<div className="mt-5 grid gap-3"><p className="text-sm text-slate-300">W aplikacji Authenticator wybierz dodanie konta przez <b>klucz konfiguracji</b> i wpisz poniższy sekret:</p><div className="select-all break-all rounded-xl border border-cyan-400/30 bg-[#03142b] p-4 text-center font-mono text-sm tracking-wider text-cyan-300">{twoFactorSecret}</div><p className="text-xs text-slate-400">Typ klucza: czasowy (TOTP). Następnie wpisz wygenerowany 6-cyfrowy kod.</p><input inputMode="numeric" maxLength={6} value={twoFactorCode} onChange={e=>setTwoFactorCode(e.target.value.replace(/\D/g,"").slice(0,6))} placeholder="000000" className="rounded-xl border border-sky-400/30 bg-[#03142b] px-4 py-3 text-center text-xl tracking-[.35em] outline-none focus:border-cyan-300"/><button disabled={twoFactorSaving} onClick={enableTwoFactor} className="rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 py-3 font-bold shadow-[0_0_20px_rgba(34,211,238,.30)] disabled:opacity-50">Włącz 2FA</button></div>:null}
+        {twoFactorStep==="disable"?<div className="mt-5 grid gap-3"><p className="text-sm text-slate-300">Aby wyłączyć 2FA, potwierdź hasło oraz aktualny kod z aplikacji Authenticator.</p><input type="password" value={twoFactorPassword} onChange={e=>setTwoFactorPassword(e.target.value)} placeholder="Hasło do konta" className="rounded-xl border border-sky-400/30 bg-[#03142b] px-4 py-3 outline-none"/><input inputMode="numeric" maxLength={6} value={twoFactorCode} onChange={e=>setTwoFactorCode(e.target.value.replace(/\D/g,"").slice(0,6))} placeholder="Kod 2FA" className="rounded-xl border border-sky-400/30 bg-[#03142b] px-4 py-3 text-center text-xl tracking-[.35em] outline-none"/><button disabled={twoFactorSaving} onClick={disableTwoFactor} className="rounded-xl border border-rose-500/60 bg-rose-500/10 py-3 font-semibold text-rose-300 disabled:opacity-50">Wyłącz 2FA</button></div>:null}
+        </div></div>
+      ) : null}
 
       {pinOpen ? (
         <div className="fixed inset-0 z-[100] grid place-items-center bg-black/70 p-4 backdrop-blur-sm">

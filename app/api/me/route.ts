@@ -32,6 +32,7 @@ export async function GET() {
         stripeCustomerId: true,
         stripeSubscriptionId: true,
         pinHash: true,
+        twoFactorEnabled: true,
       },
     });
 
@@ -82,6 +83,7 @@ export async function GET() {
           Boolean(user.stripeSubscriptionId),
 
         hasPin: Boolean(user.pinHash),
+        twoFactorEnabled: user.twoFactorEnabled,
       },
     });
   } catch (error) {

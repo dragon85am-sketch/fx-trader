@@ -31,6 +31,7 @@ export async function POST(req: Request) {
     isPremium: true,
     premiumUntil: true,
     isBanned: true,
+    twoFactorEnabled: true,
   },
 });
 
@@ -61,6 +62,13 @@ export async function POST(req: Request) {
         { error: "Brak konfiguracji JWT_SECRET" },
         { status: 500 }
       );
+    }
+
+    if (user.twoFactorEnabled) {
+      const challenge = jwt.sign({ userId: user.id, purpose: "2fa-login" }, process.env.JWT_SECRET, { expiresIn: "5m" });
+      const pending = NextResponse.json({ ok: true, requiresTwoFactor: true });
+      pending.cookies.set("two_factor_challenge", challenge, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 300 });
+      return pending;
     }
 
     const token = jwt.sign(
