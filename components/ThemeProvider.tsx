@@ -30,6 +30,11 @@ export default function ThemeProvider({
 
     applyTheme(savedTheme);
     localStorage.setItem("theme", savedTheme);
+    const applyPriceFormat = (value: "dot" | "comma") => {
+      root.dataset.priceFormat = value;
+      localStorage.setItem("priceFormat", value);
+    };
+    applyPriceFormat(localStorage.getItem("priceFormat") === "comma" ? "comma" : "dot");
 
     const onThemeChange = (event: Event) => {
       const custom = event as CustomEvent<Theme>;
@@ -42,10 +47,17 @@ export default function ThemeProvider({
       if ((localStorage.getItem("theme") as Theme) === "system") applyTheme("system");
     };
 
+    const onPriceFormat = (event: Event) => {
+      const custom = event as CustomEvent<"dot" | "comma">;
+      applyPriceFormat(custom.detail === "comma" ? "comma" : "dot");
+    };
+
     window.addEventListener("fxtrade:theme-change", onThemeChange as EventListener);
+    window.addEventListener("fxtrade:price-format", onPriceFormat as EventListener);
     media.addEventListener("change", onSystemChange);
     return () => {
       window.removeEventListener("fxtrade:theme-change", onThemeChange as EventListener);
+      window.removeEventListener("fxtrade:price-format", onPriceFormat as EventListener);
       media.removeEventListener("change", onSystemChange);
     };
   }, [user?.theme]);

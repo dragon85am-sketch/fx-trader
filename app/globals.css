@@ -786,3 +786,34 @@ html[data-fx-theme="dark"] {
   --fx-language-hover: #0a3a65;
   --fx-language-menu: #061f38;
 }
+
+/* =========================
+   FX TRADE USER THEMES
+========================= */
+html.light {
+  --bg: #eef7ff;
+  --text: #08213d;
+  --sidebar: #e6f3ff;
+  --panel: rgba(244,250,255,.96);
+  --panel-light: rgba(231,245,255,.96);
+  --card: rgba(240,248,255,.96);
+  color-scheme: light;
+  background: #eaf5ff;
+}
+html.light body {
+  color: #08213d !important;
+  background:
+    radial-gradient(circle at 50% -8%, rgba(56,189,248,.20), transparent 38%),
+    linear-gradient(180deg,#f5fbff 0%,#eaf6ff 48%,#ddecfa 100%) !important;
+}
+html.light .fx-animated-bg::before { opacity: .25; }
+html.light [class*="bg-[#041d3a]"],
+html.light [class*="bg-[#03182f]"],
+html.light [class*="bg-[#021a34]"],
+html.light [class*="bg-[#061f3d]"] { background: rgba(244,250,255,.96) !important; }
+html.light [class*="text-white"] { color: #08213d !important; }
+html.light [class*="text-slate-300"] { color: #52677f !important; }
+html.light input, html.light select, html.light textarea {
+  color: #08213d !important;
+  background-color: rgba(248,252,255,.96) !important;
+}

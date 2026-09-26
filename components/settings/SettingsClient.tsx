@@ -77,6 +77,7 @@ export default function SettingsClient() {
     React.useState<AppLanguage>(lang);
 
   const [priceFormat, setPriceFormat] = React.useState<"dot" | "comma">("dot");
+  const [savingPreferences, setSavingPreferences] = React.useState(false);
 
   const previewTheme = (value: string) => {
     setTheme(value);
@@ -96,6 +97,38 @@ export default function SettingsClient() {
     setPriceFormat(value);
     localStorage.setItem("priceFormat", value);
     window.dispatchEvent(new CustomEvent("fxtrade:price-format", { detail: value }));
+  };
+
+  const savePreferences = async () => {
+    try {
+      setSavingPreferences(true);
+      const res = await fetch("/api/settings/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ theme, language, priceFormat }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data?.error || "Nie udało się zapisać preferencji.");
+        return;
+      }
+      localStorage.setItem("theme", theme);
+      localStorage.setItem("lang", language);
+      localStorage.setItem("fxtrade-language", language);
+      localStorage.setItem("priceFormat", priceFormat);
+      document.cookie = `fxtrade-language=${language}; path=/; max-age=31536000; samesite=lax`;
+      setLang(language);
+      window.dispatchEvent(new CustomEvent("fxtrade:theme-change", { detail: theme }));
+      window.dispatchEvent(new CustomEvent("fxtrade-language-change", { detail: language }));
+      window.dispatchEvent(new CustomEvent("fxtrade:price-format", { detail: priceFormat }));
+      toast.success("Preferencje zostały zapisane.");
+    } catch (err) {
+      console.error("SAVE PREFERENCES ERROR:", err);
+      toast.error("Błąd serwera podczas zapisywania preferencji.");
+    } finally {
+      setSavingPreferences(false);
+    }
   };
 
   // =====================================================
@@ -840,10 +873,10 @@ export default function SettingsClient() {
                 <div><p className="mb-2 text-[8px] text-slate-300/60">Motyw aplikacji</p><div className="grid grid-cols-3 gap-2">
                   {[["light","☼","Jasny"],["dark","☾","Ciemny"],["system","▣","System"]].map(([v,i,l])=><button key={v} onClick={()=>previewTheme(v)} className={`rounded-lg border py-2 text-[8px] ${theme===v?"border-cyan-300 bg-sky-500/15 shadow-[0_0_12px_rgba(34,211,238,.35)]":"border-sky-400/20 bg-[#041d3a]"}`}><span className="block text-lg text-cyan-300">{i}</span>{l}</button>)}
                 </div></div>
-                <div><p className="mb-2 text-[8px] text-slate-300/60">Język</p><select value={language} onChange={e=>changeAppLanguage(e.target.value as AppLanguage)} className="w-full rounded-lg border border-sky-400/20 bg-[#041d3a] px-3 py-3 text-[9px]"><option value="pl">🇵🇱  Polski</option><option value="en">🇬🇧  English</option><option value="de">🇩🇪  Deutsch</option><option value="nl">🇳🇱  Nederlands</option><option value="es">🇪🇸  Español</option></select></div>
+                <div><p className="mb-2 text-[8px] text-slate-300/60">Język</p><div className="relative flex items-center"><span className="pointer-events-none absolute left-3 z-10 text-base">{({pl:"🇵🇱",en:"🇬🇧",de:"🇩🇪",nl:"🇳🇱",es:"🇪🇸"} as Record<AppLanguage,string>)[language]}</span><select value={language} onChange={e=>changeAppLanguage(e.target.value as AppLanguage)} className="w-full appearance-none rounded-lg border border-cyan-300/55 bg-[#041d3a] py-3 pl-10 pr-8 text-[9px] shadow-[0_0_12px_rgba(34,211,238,.18)] outline-none"><option value="pl">Polski</option><option value="en">English</option><option value="de">Deutsch</option><option value="nl">Nederlands</option><option value="es">Español</option></select><span className="pointer-events-none absolute right-3 text-cyan-200">⌄</span></div></div>
                 <div><p className="mb-2 text-[8px] text-slate-300/60">Format ceny</p><div className="grid grid-cols-2 gap-2"><button type="button" onClick={()=>changePriceFormat("dot")} className={`rounded-lg border py-2 text-[8px] transition ${priceFormat==="dot"?"border-cyan-300 bg-sky-500/15 shadow-[0_0_16px_rgba(34,211,238,.45)]":"border-sky-400/20 bg-[#041d3a] hover:border-cyan-400/50"}`}><b>Standard</b><span className="block text-[7px] text-slate-300">1.23456</span></button><button type="button" onClick={()=>changePriceFormat("comma")} className={`rounded-lg border py-2 text-[8px] transition ${priceFormat==="comma"?"border-cyan-300 bg-sky-500/15 shadow-[0_0_16px_rgba(34,211,238,.45)]":"border-sky-400/20 bg-[#041d3a] hover:border-cyan-400/50"}`}>Z przecinkiem<span className="block text-[7px] text-slate-300">1,23456</span></button></div></div>
               </div>
-              <div className="px-3 pb-3"><button onClick={saveProfile} disabled={loadingProfile} className="rounded-md border border-cyan-300/60 bg-[linear-gradient(90deg,#0284c7,#2563eb)] px-4 py-2 text-[9px] font-semibold shadow-[0_0_18px_rgba(34,211,238,.35)] transition hover:brightness-110 disabled:opacity-50">Zapisz preferencje</button></div>
+              <div className="px-3 pb-4"><button type="button" onClick={savePreferences} disabled={savingPreferences} className="group relative overflow-hidden rounded-xl border border-cyan-200/90 bg-[linear-gradient(100deg,#083b82_0%,#087eea_45%,#2457ff_100%)] px-5 py-2.5 text-[10px] font-extrabold text-white shadow-[0_0_8px_rgba(103,232,249,.85),0_0_22px_rgba(34,211,238,.55),0_0_42px_rgba(37,99,235,.32),inset_0_1px_0_rgba(255,255,255,.25)] transition duration-200 hover:-translate-y-[1px] hover:border-white hover:brightness-125 hover:shadow-[0_0_12px_rgba(255,255,255,.9),0_0_28px_rgba(34,211,238,.8),0_0_58px_rgba(37,99,235,.55)] active:translate-y-0 active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none"><span className="relative z-10">⚙ &nbsp; {savingPreferences ? "Zapisywanie..." : "Zapisz preferencje"}</span><span className="absolute inset-y-0 -left-1/3 w-1/3 skew-x-[-20deg] bg-white/25 blur-md transition-all duration-500 group-hover:left-[120%]" /></button></div>
             </section>
 
             {/* SUBSCRIPTION */}
