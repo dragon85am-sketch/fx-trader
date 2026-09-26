@@ -26,6 +26,7 @@ export default function ThemeProvider({
       root.classList.remove("dark", "light", "system");
       root.classList.add(resolved);
       root.dataset.theme = value;
+      root.dataset.fxTheme = resolved;
     };
 
     applyTheme(savedTheme);

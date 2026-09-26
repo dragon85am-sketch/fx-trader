@@ -347,12 +347,9 @@ export default function SettingsClient() {
           credentials: "include",
 
           body: JSON.stringify({
-            name,
-            email,
-            theme,
-            language,
+            name: name.trim(),
+            email: email.trim(),
             avatarUrl,
-            priceFormat,
           }),
         }
       );

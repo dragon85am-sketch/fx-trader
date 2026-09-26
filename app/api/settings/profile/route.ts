@@ -18,7 +18,7 @@ export async function PATCH(req: Request) {
         : undefined;
 
     if (email !== undefined) {
-      const emailOk = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email);
+      const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
       if (!emailOk) {
         return NextResponse.json(
           { error: "Podaj poprawny adres email." },
