@@ -80,13 +80,22 @@ export default function SettingsClient() {
 
   const previewTheme = (value: string) => {
     setTheme(value);
-    const root = document.documentElement;
-    const resolved = value === "system"
-      ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
-      : value;
-    root.classList.remove("dark", "light", "system");
-    root.classList.add(resolved);
-    root.dataset.theme = value;
+    localStorage.setItem("theme", value);
+    window.dispatchEvent(new CustomEvent("fxtrade:theme-change", { detail: value }));
+  };
+
+  const changeAppLanguage = (value: AppLanguage) => {
+    setLanguage(value);
+    setLang(value);
+    localStorage.setItem("lang", value);
+    localStorage.setItem("fxtrade-language", value);
+    window.dispatchEvent(new CustomEvent("fxtrade-language-change", { detail: value }));
+  };
+
+  const changePriceFormat = (value: "dot" | "comma") => {
+    setPriceFormat(value);
+    localStorage.setItem("priceFormat", value);
+    window.dispatchEvent(new CustomEvent("fxtrade:price-format", { detail: value }));
   };
 
   // =====================================================
@@ -347,10 +356,8 @@ export default function SettingsClient() {
         language
       );
 
-      localStorage.setItem(
-        "theme",
-        theme
-      );
+      localStorage.setItem("theme", theme);
+      window.dispatchEvent(new CustomEvent("fxtrade:theme-change", { detail: theme }));
 
       localStorage.setItem("priceFormat", priceFormat);
       window.dispatchEvent(new CustomEvent("fxtrade:price-format", { detail: priceFormat }));
@@ -833,8 +840,8 @@ export default function SettingsClient() {
                 <div><p className="mb-2 text-[8px] text-slate-300/60">Motyw aplikacji</p><div className="grid grid-cols-3 gap-2">
                   {[["light","☼","Jasny"],["dark","☾","Ciemny"],["system","▣","System"]].map(([v,i,l])=><button key={v} onClick={()=>previewTheme(v)} className={`rounded-lg border py-2 text-[8px] ${theme===v?"border-cyan-300 bg-sky-500/15 shadow-[0_0_12px_rgba(34,211,238,.35)]":"border-sky-400/20 bg-[#041d3a]"}`}><span className="block text-lg text-cyan-300">{i}</span>{l}</button>)}
                 </div></div>
-                <div><p className="mb-2 text-[8px] text-slate-300/60">Język</p><select value={language} onChange={e=>{const v=e.target.value as AppLanguage;setLanguage(v);setLang(v);localStorage.setItem("lang",v)}} className="w-full rounded-lg border border-sky-400/20 bg-[#041d3a] px-3 py-3 text-[9px]"><option value="pl">🇵🇱  Polski</option><option value="en">🇬🇧  English</option><option value="de">🇩🇪  Deutsch</option><option value="nl">🇳🇱  Nederlands</option><option value="es">🇪🇸  Español</option></select></div>
-                <div><p className="mb-2 text-[8px] text-slate-300/60">Format ceny</p><div className="grid grid-cols-2 gap-2"><button type="button" onClick={()=>setPriceFormat("dot")} className={`rounded-lg border py-2 text-[8px] transition ${priceFormat==="dot"?"border-cyan-300 bg-sky-500/15 shadow-[0_0_16px_rgba(34,211,238,.45)]":"border-sky-400/20 bg-[#041d3a] hover:border-cyan-400/50"}`}><b>Standard</b><span className="block text-[7px] text-slate-300">1.23456</span></button><button type="button" onClick={()=>setPriceFormat("comma")} className={`rounded-lg border py-2 text-[8px] transition ${priceFormat==="comma"?"border-cyan-300 bg-sky-500/15 shadow-[0_0_16px_rgba(34,211,238,.45)]":"border-sky-400/20 bg-[#041d3a] hover:border-cyan-400/50"}`}>Z przecinkiem<span className="block text-[7px] text-slate-300">1,23456</span></button></div></div>
+                <div><p className="mb-2 text-[8px] text-slate-300/60">Język</p><select value={language} onChange={e=>changeAppLanguage(e.target.value as AppLanguage)} className="w-full rounded-lg border border-sky-400/20 bg-[#041d3a] px-3 py-3 text-[9px]"><option value="pl">🇵🇱  Polski</option><option value="en">🇬🇧  English</option><option value="de">🇩🇪  Deutsch</option><option value="nl">🇳🇱  Nederlands</option><option value="es">🇪🇸  Español</option></select></div>
+                <div><p className="mb-2 text-[8px] text-slate-300/60">Format ceny</p><div className="grid grid-cols-2 gap-2"><button type="button" onClick={()=>changePriceFormat("dot")} className={`rounded-lg border py-2 text-[8px] transition ${priceFormat==="dot"?"border-cyan-300 bg-sky-500/15 shadow-[0_0_16px_rgba(34,211,238,.45)]":"border-sky-400/20 bg-[#041d3a] hover:border-cyan-400/50"}`}><b>Standard</b><span className="block text-[7px] text-slate-300">1.23456</span></button><button type="button" onClick={()=>changePriceFormat("comma")} className={`rounded-lg border py-2 text-[8px] transition ${priceFormat==="comma"?"border-cyan-300 bg-sky-500/15 shadow-[0_0_16px_rgba(34,211,238,.45)]":"border-sky-400/20 bg-[#041d3a] hover:border-cyan-400/50"}`}>Z przecinkiem<span className="block text-[7px] text-slate-300">1,23456</span></button></div></div>
               </div>
               <div className="px-3 pb-3"><button onClick={saveProfile} disabled={loadingProfile} className="rounded-md border border-cyan-300/60 bg-[linear-gradient(90deg,#0284c7,#2563eb)] px-4 py-2 text-[9px] font-semibold shadow-[0_0_18px_rgba(34,211,238,.35)] transition hover:brightness-110 disabled:opacity-50">Zapisz preferencje</button></div>
             </section>

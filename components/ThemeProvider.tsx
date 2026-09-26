@@ -30,11 +30,24 @@ export default function ThemeProvider({
 
     applyTheme(savedTheme);
     localStorage.setItem("theme", savedTheme);
+
+    const onThemeChange = (event: Event) => {
+      const custom = event as CustomEvent<Theme>;
+      const next = custom.detail || (localStorage.getItem("theme") as Theme) || "dark";
+      localStorage.setItem("theme", next);
+      applyTheme(next);
+    };
+
     const onSystemChange = () => {
       if ((localStorage.getItem("theme") as Theme) === "system") applyTheme("system");
     };
+
+    window.addEventListener("fxtrade:theme-change", onThemeChange as EventListener);
     media.addEventListener("change", onSystemChange);
-    return () => media.removeEventListener("change", onSystemChange);
+    return () => {
+      window.removeEventListener("fxtrade:theme-change", onThemeChange as EventListener);
+      media.removeEventListener("change", onSystemChange);
+    };
   }, [user?.theme]);
 
   return <>{children}</>;
