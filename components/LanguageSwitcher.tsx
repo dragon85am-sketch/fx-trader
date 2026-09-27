@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 import { useLanguage } from "@/components/LanguageProvider";
 
@@ -83,6 +84,7 @@ function Flag({ code }: { code: LanguageCode }) {
 }
 
 export default function LanguageSwitcher() {
+  const router = useRouter();
   const { lang, setLang } = useLanguage();
 
   const [open, setOpen] = useState(false);
@@ -113,6 +115,9 @@ export default function LanguageSwitcher() {
 
     setLang(code);
     setOpen(false);
+
+    // Natychmiast odświeża Server Components po zmianie cookie języka.
+    router.refresh();
 
     // Zostawiamy kompatybilność ze starszymi komponentami aplikacji.
     window.dispatchEvent(
