@@ -1300,7 +1300,7 @@ fullscreenMode = false,
     } catch {
       return [];
     }
-  }, [patternsEnabled, overlayTick, candles, liveCandle, heikinAshi, renko]);
+  }, [patternsEnabled, overlayTick, candles, heikinAshi, renko]);
 
   // ============================================================
   // AUTO STREFY DLA NOWEJ LOGIKI HH/HL / LL/LH
@@ -1415,7 +1415,7 @@ fullscreenMode = false,
     }
 
     return undefined;
-  }, [patternsEnabled, overlayTick, candles, liveCandle, heikinAshi, renko]);
+  }, [patternsEnabled, overlayTick, candles, heikinAshi, renko]);
 
   // Czas świecy sygnałowej dla automatycznych stref FORMATION.
   // Dzięki temu strefy zaczynają się dokładnie przy świecy breakout,
@@ -1438,7 +1438,7 @@ fullscreenMode = false,
     if (signalIdx < 0 || signalIdx < safe.length - 4) return null;
 
     return latest.time as UTCTimestamp;
-  }, [patternsEnabled, overlayTick, candles, liveCandle, heikinAshi, renko]);
+  }, [patternsEnabled, overlayTick, candles, heikinAshi, renko]);
 
   // Priorytet ma setup przesłany z głównego skanera.
   // Jeśli go nie ma, używamy stref z HH/HL / LL/LH breakout.
@@ -1516,7 +1516,6 @@ fullscreenMode = false,
     overlayTick,
     bbConfig,
     candles,
-    liveCandle,
     heikinAshi,
     renko,
     renkoBoxSize,
@@ -1614,7 +1613,6 @@ fullscreenMode = false,
     supertrendUpColor,
     supertrendDownColor,
     candles,
-    liveCandle,
     heikinAshi,
     renko,
     renkoBoxSize,
@@ -1802,7 +1800,6 @@ fullscreenMode = false,
     supertrendUpColor,
     supertrendDownColor,
     candles,
-    liveCandle,
     heikinAshi,
     renko,
     renkoBoxSize,
@@ -2928,6 +2925,9 @@ kineticScroll: {
       const prec = pricePrecision ?? guessPrecision(symbol, lastClose);
       const minMove = minMoveFromPrecision(prec);
       applyIndicators(ds, prec, minMove);
+      // Heavy overlays/pattern geometry do not need to recompute on every market tick.
+      // Refresh them together with indicators (max 4x/s); the candle itself still uses update().
+      setOverlayTick((v) => v + 1);
     }
 
     if (followOnTick && !detached && !manualPanRef.current) {
