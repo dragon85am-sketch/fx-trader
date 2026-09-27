@@ -369,8 +369,18 @@ export default async function HomePage() {
           </div>
         </section>
 
+        {/* MARKET TICKERS */}
+        <section className="grid grid-cols-2 gap-2 py-3 sm:grid-cols-3 xl:grid-cols-6">
+          <Ticker symbol="EURUSD" price="1.0874" change="+0.21%" up />
+          <Ticker symbol="GBPUSD" price="1.2653" change="+0.18%" up />
+          <Ticker symbol="XAUUSD" price="2,365.40" change="+0.32%" up />
+          <Ticker symbol="US30" price="42,156" change="-0.12%" />
+          <Ticker symbol="NAS100" price="19,842" change="+0.36%" up />
+          <Ticker symbol="BTCUSDT" price="67,432" change="+1.24%" up />
+        </section>
+
         {/* STATS */}
-        <section className="grid grid-cols-1 overflow-hidden rounded-[14px] border border-sky-300/35 bg-[#041a32]/90 min-[390px]:grid-cols-2 lg:grid-cols-5">
+        <section className="grid grid-cols-2 overflow-hidden rounded-[16px] border border-cyan-300/25 bg-[linear-gradient(180deg,rgba(5,35,66,.94),rgba(2,23,44,.97))] shadow-[0_0_34px_rgba(14,165,233,.08)] lg:grid-cols-5">
           <BigStat icon={<Radar />} value="5" text={t.stat1} />
           <BigStat icon={<TrendingUp />} value="50+" text={t.stat2} />
           <BigStat icon={<Zap />} value="24/7" text={t.stat3} />
@@ -378,122 +388,59 @@ export default async function HomePage() {
           <BigStat icon={<Users />} value={t.community} text={t.traders} />
         </section>
 
-        {/* 5 MAIN CARDS */}
-        <section className="grid min-w-0 grid-cols-1 items-stretch gap-2.5 py-3 sm:grid-cols-2 xl:grid-cols-5">
-          <FeatureCard
-            id="scanner"
-            icon={<Radar />}
-            title="Market Scanner"
-            description={t.cardScannerDesc}
-            image="/home/market-scanner.png"
-            href="/skaner"
-            button={t.openScanner}
-          />
-          <FeatureCard
-            icon={<BarChart3 />}
-            title="Premium Charts"
-            description={t.cardChartsDesc}
-            image="/home/premium-chart.png"
-            href="/dashboard"
-            button={t.openCharts}
-          />
-          <FeatureCard
-            icon={<Target />}
-            title="Harmonic Scanner"
-            description={t.harmonicDesc}
-            preview={<HarmonicPreview />}
-            href="/skaner/harmonic"
-            button={t.openHarmonic}
-          />
-          <FeatureCard
-            id="strategie"
-            icon={<ShieldCheck />}
-            title={t.strategies}
-            description={t.strategyDesc}
-            image="/home/strategies.png"
-            href="/strategie"
-            button={t.seeStrategies}
-          />
-          <FeatureCard
-            id="edukacja"
-            icon={<GraduationCap />}
-            title={t.education}
-            description={t.educationDesc}
-            image="/home/education.png"
-            href="/edukacja"
-            button={t.openEducation}
-          />
+        {/* SCANNER + LIVE CHART */}
+        <section id="scanner" className="grid min-w-0 gap-4 py-4 lg:grid-cols-[.98fr_1.02fr]">
+          <article className="min-w-0 overflow-hidden rounded-[18px] border border-cyan-300/30 bg-[linear-gradient(180deg,rgba(5,35,66,.97),rgba(2,23,44,.99))] p-3.5 shadow-[0_18px_50px_rgba(0,8,24,.26),0_0_34px_rgba(14,165,233,.08)] sm:p-5">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-cyan-300/30 bg-cyan-400/[0.06] text-cyan-300 shadow-[0_0_18px_rgba(34,211,238,.12)]"><Radar className="h-5 w-5" /></span>
+                <div className="min-w-0"><h2 className="text-[18px] font-black text-white">{t.scannerNav}</h2><p className="mt-0.5 text-[9px] text-slate-400">{t.cardScannerDesc}</p></div>
+              </div>
+              <Link href="/skaner" className="hidden shrink-0 items-center gap-2 rounded-lg border border-blue-400/50 bg-blue-500/10 px-3 py-2 text-[9px] font-bold text-sky-300 transition hover:bg-blue-500/20 sm:flex">{t.openScanner}<ArrowRight className="h-3.5 w-3.5" /></Link>
+            </div>
+            <div className="overflow-hidden rounded-xl border border-sky-300/20 bg-[#02172c]">
+              <div className="grid grid-cols-[1.15fr_.55fr_.65fr_.75fr_.7fr] border-b border-white/[0.07] bg-white/[0.025] px-3 py-2.5 text-[7px] font-bold uppercase tracking-[.08em] text-slate-500 sm:text-[8px]"><span>Instrument</span><span>TF</span><span>Trend</span><span>Sygnał</span><span>Status</span></div>
+              <ScannerRow symbol="EURUSD" tf="M5" signal="BUY" status="READY" up />
+              <ScannerRow symbol="GBPUSD" tf="M5" signal="BUY" status="READY" up />
+              <ScannerRow symbol="XAUUSD" tf="M5" signal="SELL" status="READY" />
+              <ScannerRow symbol="US30" tf="M1" signal="BUY" status="READY" up />
+              <ScannerRow symbol="NAS100" tf="M5" signal="SELL" status="CLOSE" />
+              <ScannerRow symbol="BTCUSDT" tf="M15" signal="BUY" status="READY" up />
+            </div>
+          </article>
+
+          <article className="min-w-0 overflow-hidden rounded-[18px] border border-cyan-300/30 bg-[linear-gradient(180deg,rgba(5,35,66,.97),rgba(2,23,44,.99))] p-3.5 shadow-[0_18px_50px_rgba(0,8,24,.26),0_0_34px_rgba(14,165,233,.08)] sm:p-5">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div><h2 className="text-[18px] font-black text-white">Wykres na żywo</h2><p className="mt-0.5 text-[9px] text-slate-400">{t.cardChartsDesc}</p></div>
+              <Link href="/dashboard" className="hidden shrink-0 items-center gap-2 rounded-lg border border-blue-400/50 bg-blue-500/10 px-3 py-2 text-[9px] font-bold text-sky-300 transition hover:bg-blue-500/20 sm:flex">{t.openCharts}<ArrowRight className="h-3.5 w-3.5" /></Link>
+            </div>
+            <div className="overflow-hidden rounded-xl border border-sky-300/20 bg-[#02172c]">
+              <div className="flex items-center justify-between gap-3 border-b border-white/[0.07] px-3 py-2.5">
+                <div className="flex items-center gap-3 text-[10px] font-bold"><span>EURUSD</span><span className="text-sky-400">1.08742</span><span className="text-emerald-400">+0.21%</span></div>
+                <div className="flex gap-1 text-[8px] text-slate-400"><span className="rounded bg-white/[0.04] px-2 py-1">M1</span><span className="rounded bg-blue-600 px-2 py-1 font-bold text-white shadow-[0_0_12px_rgba(37,99,235,.45)]">M5</span><span className="rounded bg-white/[0.04] px-2 py-1">M15</span><span className="hidden rounded bg-white/[0.04] px-2 py-1 sm:block">H1</span></div>
+              </div>
+              <div className="relative h-[300px] sm:h-[340px]"><Image src="/home/hero-chart.png" alt="FX Trade live chart" fill sizes="(max-width: 1024px) 100vw, 50vw" className="object-cover object-center" /></div>
+            </div>
+          </article>
         </section>
 
-        {/* BENEFITS */}
-        <section className="grid grid-cols-1 overflow-hidden rounded-[14px] border border-sky-300/45 bg-[#06335C]/92 min-[390px]:grid-cols-2 xl:grid-cols-4">
-          <Benefit
-            icon={<LockKeyhole />}
-            title={t.security}
-            text={t.securityDesc}
-          />
-          <Benefit
-            icon={<Zap />}
-            title={t.speed}
-            text={t.speedDesc}
-          />
-          <Benefit
-            icon={<ShieldCheck />}
-            title={t.reliability}
-            text={t.reliabilityDesc}
-          />
-          <Benefit
-            icon={<Headphones />}
-            title={t.support}
-            text={t.supportDesc}
-          />
+        {/* STRATEGIES / EDUCATION / TRADING ROOM */}
+        <section className="grid gap-4 pb-4 md:grid-cols-3">
+          <PromoCard id="strategie" icon={<TrendingUp />} title={t.strategies} text={t.strategyDesc} image="/home/strategies.png" href="/strategie" action={t.seeStrategies} />
+          <PromoCard id="edukacja" icon={<GraduationCap />} title={t.education} text={t.educationDesc} image="/home/education.png" href="/edukacja" action={t.openEducation} />
+          <PromoCard icon={<Users />} title="Trading Room" text="Analizy na żywo, pomysły i wsparcie społeczności traderów." image="/home/market-scanner.png" href="/trading-room" action="Dołącz teraz" />
         </section>
 
-        <section className="mt-3 overflow-hidden rounded-[18px] border border-cyan-300/30 bg-[linear-gradient(135deg,rgba(6,37,70,.96),rgba(3,24,47,.98))] p-4 shadow-[0_18px_48px_rgba(2,12,27,.26)] sm:p-5">
-          <div className="grid items-center gap-4 lg:grid-cols-[auto_minmax(0,1fr)_minmax(420px,.9fr)]">
-            <div className="shrink-0">
-              <FxLogo />
-            </div>
-
-            <div className="min-w-0">
-              <h2 className="text-[20px] font-black tracking-tight text-white sm:text-[24px]">
-                {t.ctaTitle}
-              </h2>
-              <p className="mt-2 max-w-[620px] text-[10px] leading-5 text-slate-400 sm:text-[11px]">
-                {t.ctaDesc}
-              </p>
-            </div>
-
-            <div className="grid gap-2.5 sm:grid-cols-2">
-              <Link
-                href="/checkout"
-                className="group relative flex min-h-[68px] items-center gap-3 overflow-hidden rounded-2xl border border-cyan-300/40 bg-[linear-gradient(135deg,#22d3ee_0%,#0ea5e9_28%,#2563eb_66%,#4338ca_100%)] px-4 py-3.5 text-white shadow-[0_0_0_1px_rgba(255,255,255,.05)_inset,0_14px_36px_rgba(37,99,235,.24),0_0_30px_rgba(34,211,238,.16)] transition duration-300 hover:-translate-y-0.5 hover:brightness-110"
-              >
-                <Crown className="h-5 w-5 shrink-0" />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[12px] font-black">{t.buyFull}</span>
-                  <span className="mt-0.5 block text-[8px] text-blue-50/80">
-                    {t.fullAccess}
-                  </span>
-                </span>
-                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-              </Link>
-
-              <Link
-                href="/register"
-                className="group flex min-h-[68px] items-center gap-3 rounded-2xl border border-cyan-300/45 bg-[#041b34]/90 px-4 py-3.5 text-white transition duration-300 hover:-translate-y-0.5 hover:border-cyan-300/80 hover:bg-[#06294d]"
-              >
-                <User className="h-5 w-5 shrink-0 text-cyan-300" />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[12px] font-black">{t.register}</span>
-                  <span className="mt-0.5 block text-[8px] text-sky-100/55">
-                    {t.registerSub}
-                  </span>
-                </span>
-                <ArrowRight className="h-4 w-4 text-cyan-300 transition-transform group-hover:translate-x-1" />
-              </Link>
-            </div>
-          </div>
+        {/* GLOW NAVIGATION */}
+        <section className="grid grid-cols-2 gap-2 rounded-[18px] border border-cyan-300/25 bg-[linear-gradient(180deg,rgba(5,35,66,.92),rgba(2,23,44,.96))] p-2 shadow-[0_0_40px_rgba(14,165,233,.08)] sm:grid-cols-4 xl:grid-cols-8">
+          <GlowNav href="/skaner" icon={<Radar />} label={t.scannerNav} active />
+          <GlowNav href="/strategie" icon={<TrendingUp />} label={t.strategies} />
+          <GlowNav href="/dashboard" icon={<BarChart3 />} label="Wykresy" />
+          <GlowNav href="/trading-room" icon={<Users />} label="Trading Room" />
+          <GlowNav href="/edukacja" icon={<GraduationCap />} label={t.education} />
+          <GlowNav href="/cennik" icon={<Crown />} label={t.pricing} />
+          <GlowNav href="/affiliate" icon={<BrainCircuit />} label="Affiliate" />
+          <GlowNav href="#onas" icon={<ShieldCheck />} label={t.about} />
         </section>
 
         <section
@@ -721,6 +668,38 @@ function FeatureCard({
         <ArrowRight className="h-3 w-3" />
       </Link>
     </article>
+  );
+}
+
+function Ticker({ symbol, price, change, up = false }: { symbol: string; price: string; change: string; up?: boolean }) {
+  return (
+    <div className="group flex min-w-0 items-center justify-between gap-2 rounded-xl border border-cyan-300/25 bg-[linear-gradient(180deg,rgba(5,35,66,.94),rgba(2,23,44,.97))] px-3 py-3 transition hover:-translate-y-0.5 hover:border-cyan-300/45 hover:shadow-[0_0_24px_rgba(14,165,233,.12)]">
+      <div className="min-w-0"><div className="text-[10px] font-black text-white">{symbol}</div><div className="mt-1 text-[9px] text-slate-300">{price}</div></div>
+      <div className={`text-right text-[9px] font-bold ${up ? "text-emerald-400" : "text-rose-400"}`}><div>{change}</div><div className="mt-1 text-[14px] leading-none">{up ? "↗" : "↘"}</div></div>
+    </div>
+  );
+}
+
+function ScannerRow({ symbol, tf, signal, status, up = false }: { symbol: string; tf: string; signal: "BUY" | "SELL"; status: "READY" | "CLOSE"; up?: boolean }) {
+  return (
+    <div className="grid grid-cols-[1.15fr_.55fr_.65fr_.75fr_.7fr] items-center border-b border-white/[0.055] px-3 py-3 text-[9px] last:border-b-0 sm:text-[10px]">
+      <span className="font-bold text-white">{symbol}</span><span className="text-slate-300">{tf}</span><span className={`text-[17px] font-black ${up ? "text-emerald-400" : "text-rose-400"}`}>{up ? "↑" : "↓"}</span><span><span className={`rounded-md px-2 py-1 text-[8px] font-black ${signal === "BUY" ? "bg-emerald-500/15 text-emerald-300" : "bg-rose-500/15 text-rose-300"}`}>{signal}</span></span><span><span className={`rounded-md border px-2 py-1 text-[7px] font-black ${status === "READY" ? "border-emerald-400/35 bg-emerald-500/15 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,.12)]" : "border-slate-400/20 bg-slate-500/10 text-slate-400"}`}>{status}</span></span>
+    </div>
+  );
+}
+
+function PromoCard({ id, icon, title, text, image, href, action }: { id?: string; icon: React.ReactNode; title: string; text: string; image: string; href: string; action: string }) {
+  return (
+    <article id={id} className="group overflow-hidden rounded-[18px] border border-cyan-300/28 bg-[linear-gradient(180deg,rgba(5,35,66,.97),rgba(2,23,44,.99))] shadow-[0_18px_44px_rgba(0,8,24,.22)] transition hover:-translate-y-1 hover:border-cyan-300/50 hover:shadow-[0_20px_50px_rgba(0,8,24,.28),0_0_30px_rgba(14,165,233,.10)]">
+      <div className="relative h-[150px] overflow-hidden border-b border-cyan-300/15"><Image src={image} alt={title} fill sizes="(max-width: 768px) 100vw, 33vw" className="object-cover object-center transition duration-500 group-hover:scale-[1.025]" /><div className="absolute inset-0 bg-gradient-to-t from-[#03172c] via-transparent to-transparent" /></div>
+      <div className="p-4"><div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl border border-cyan-300/30 bg-cyan-400/[0.06] text-cyan-300 [&_svg]:h-5 [&_svg]:w-5">{icon}</span><h3 className="text-[15px] font-black text-white">{title}</h3></div><p className="mt-3 min-h-[40px] text-[9px] leading-5 text-slate-400">{text}</p><Link href={href} className="mt-3 inline-flex items-center gap-2 text-[10px] font-bold text-cyan-300 transition group-hover:text-cyan-200">{action}<ArrowRight className="h-3.5 w-3.5" /></Link></div>
+    </article>
+  );
+}
+
+function GlowNav({ href, icon, label, active = false }: { href: string; icon: React.ReactNode; label: string; active?: boolean }) {
+  return (
+    <Link href={href} className={`group flex min-h-[88px] flex-col items-center justify-center gap-2 rounded-xl border px-2 text-center transition duration-300 ${active ? "border-cyan-300/65 bg-cyan-400/[0.08] shadow-[0_0_24px_rgba(34,211,238,.20),inset_0_0_20px_rgba(37,99,235,.10)]" : "border-sky-300/20 bg-white/[0.025] hover:-translate-y-0.5 hover:border-cyan-300/45 hover:bg-cyan-400/[0.05]"}`}><span className={`[&_svg]:h-6 [&_svg]:w-6 ${active ? "text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,.55)]" : "text-slate-300 group-hover:text-cyan-300"}`}>{icon}</span><span className="text-[9px] font-bold text-slate-100">{label}</span></Link>
   );
 }
 
