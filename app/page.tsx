@@ -1,4 +1,4 @@
-﻿import { cookies } from "next/headers";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -201,172 +201,56 @@ export default async function HomePage() {
       </header>
 
       <div className="relative z-10 mx-auto w-full min-w-0 max-w-[1380px] px-2 pb-6 sm:px-4 md:px-6">
-        {/* HERO */}
-        <section className="grid min-w-0 grid-cols-1 items-center gap-5 py-4 sm:gap-7 sm:py-6 lg:grid-cols-[minmax(0,.86fr)_minmax(0,1.14fr)]">
-          <div className="relative isolate min-w-0">
-          {/* STATIC HERO CANDLES — anchored to hero, do not follow scroll */}
-          <div className="pointer-events-none absolute right-[-30px] top-[18px] z-0 hidden h-[360px] w-[310px] xl:block">
-            {[
-              [10, 238, 54, 18],
-              [46, 208, 70, 23],
-              [82, 178, 86, 27],
-              [120, 194, 62, 21],
-              [156, 148, 98, 31],
-              [194, 116, 112, 35],
-              [232, 82, 132, 40],
-              [270, 48, 150, 45],
-            ].map(([x, y, wick, body], i) => (
-              <div key={i} className="absolute" style={{ left: x, top: y }}>
-                <div
-                  className="absolute left-1/2 -translate-x-1/2 bg-sky-300/55"
-                  style={{
-                    width: "1px",
-                    height: wick,
-                    boxShadow: "0 0 14px rgba(56,189,248,.60)",
-                  }}
-                />
-                <div
-                  className="absolute left-1/2 top-[12px] -translate-x-1/2 rounded-[2px] bg-gradient-to-b from-cyan-100 via-sky-400 to-blue-600"
-                  style={{
-                    width: "12px",
-                    height: body,
-                    boxShadow:
-                      "0 0 15px rgba(56,189,248,.95), 0 0 38px rgba(37,99,235,.60)",
-                  }}
-                />
-                <div
-                  className="absolute left-1/2 top-[4px] h-[42px] w-[42px] -translate-x-1/2 rounded-full bg-sky-300/20 blur-xl"
-                />
-              </div>
-            ))}
-            <div className="absolute bottom-[45px] left-[5px] h-[120px] w-[285px] rounded-[50%] border-b border-sky-400/15" />
+        {/* HERO — PRO GLOW / reference layout */}
+        <section className="relative min-w-0 overflow-hidden rounded-[22px] border border-cyan-300/15 bg-[#03182f] shadow-[0_28px_90px_rgba(0,0,0,.28),0_0_55px_rgba(14,165,233,.08)]">
+          <div className="absolute inset-0">
+            <Image
+              src="/home/pro-trading-hero.png"
+              alt="Profesjonalne stanowisko tradingowe FX Trade"
+              fill
+              priority
+              sizes="100vw"
+              className="object-cover object-[68%_center] opacity-95"
+            />
+            <div className="absolute inset-0 bg-[linear-gradient(90deg,#03182f_0%,rgba(3,24,47,.98)_29%,rgba(3,24,47,.78)_43%,rgba(3,24,47,.18)_67%,rgba(3,24,47,.12)_100%)]" />
+            <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(3,24,47,.08),rgba(3,24,47,.05)_60%,#03182f_100%)]" />
           </div>
 
-            <div className="mb-4 inline-flex max-w-full items-center rounded-full border border-sky-400/38 bg-sky-500/[0.06] px-3 py-2 text-[8px] font-bold uppercase tracking-[0.10em] text-sky-400 sm:mb-5 sm:px-4 sm:text-[9px] sm:tracking-[0.19em]">
-              {t.badge}
-            </div>
-
-            <h1 className="relative z-10 max-w-[650px] text-[40px] font-black leading-[0.98] tracking-[-0.045em] min-[390px]:text-[46px] sm:text-[58px] xl:text-[64px]">
-              <span className="block text-white">{t.hero1}</span>
-              <span className="mt-1 block bg-gradient-to-r from-cyan-300 via-sky-400 to-blue-600 bg-clip-text text-transparent">
-                {t.hero2}
-              </span>
-              <span className="mt-1 block text-white">{t.hero3}</span>
-            </h1>
-
-            <p className="relative z-10 mt-5 max-w-[620px] text-[12px] leading-5 text-slate-300/80 sm:mt-6 sm:text-[13px] sm:leading-6">
-              {t.heroDesc}
-            </p>
-
-            <div id="funkcje" className="mt-5 grid grid-cols-2 gap-3 sm:mt-6 sm:grid-cols-4 sm:gap-4">
-              <MiniFeature
-                icon={<Target />}
-                title={t.f1t}
-                text={t.f1d}
-              />
-              <MiniFeature
-                icon={<TrendingUp />}
-                title={t.f2t}
-                text={t.f2d}
-              />
-              <MiniFeature
-                icon={<ShieldCheck />}
-                title={t.f3t}
-                text={t.f3d}
-              />
-              <MiniFeature
-                icon={<BookOpen />}
-                title={t.f4t}
-                text={t.f4d}
-              />
-            </div>
-
-            <div className="mt-6 grid w-full gap-3 sm:max-w-[560px] sm:grid-cols-2">
-              <Link
-                href="/checkout"
-                className="group relative flex min-h-[74px] w-full items-center gap-4 overflow-hidden rounded-2xl border border-cyan-300/40 bg-[linear-gradient(135deg,#22d3ee_0%,#0ea5e9_28%,#2563eb_66%,#4338ca_100%)] px-5 py-4 text-left text-white shadow-[0_0_0_1px_rgba(255,255,255,.05)_inset,0_16px_40px_rgba(37,99,235,.26),0_0_36px_rgba(34,211,238,.18)] transition duration-300 hover:-translate-y-1 hover:border-cyan-200/70 hover:brightness-110 hover:shadow-[0_0_0_1px_rgba(255,255,255,.08)_inset,0_20px_48px_rgba(37,99,235,.32),0_0_44px_rgba(34,211,238,.28)] active:translate-y-0"
-              >
-                <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/80" />
-                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-white/20 bg-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,.16)]">
-                  <Crown className="h-5 w-5 drop-shadow-[0_0_8px_rgba(255,255,255,.35)]" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[13px] font-black leading-tight sm:text-[14px]">
-                    {t.buyFull}
-                  </span>
-                  <span className="mt-1 block text-[9px] font-medium text-blue-50/80 sm:text-[10px]">
-                    {t.fullAccess}
-                  </span>
-                </span>
-                <ArrowRight className="h-5 w-5 shrink-0 transition-transform duration-300 group-hover:translate-x-1.5" />
-              </Link>
-
-              <Link
-                href="/register"
-                className="group relative flex min-h-[74px] w-full items-center gap-4 overflow-hidden rounded-2xl border border-cyan-300/45 bg-[linear-gradient(180deg,rgba(6,34,65,.92),rgba(3,22,43,.96))] px-5 py-4 text-left text-white shadow-[0_0_0_1px_rgba(255,255,255,.02)_inset,0_12px_34px_rgba(2,12,27,.24)] transition duration-300 hover:-translate-y-1 hover:border-cyan-300/80 hover:bg-[linear-gradient(180deg,rgba(8,48,88,.95),rgba(4,27,52,.98))] hover:shadow-[0_14px_38px_rgba(2,12,27,.30),0_0_32px_rgba(34,211,238,.16)] active:translate-y-0"
-              >
-                <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-cyan-200/40" />
-                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-cyan-300/25 bg-cyan-400/[0.06] text-cyan-300">
-                  <User className="h-5 w-5" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[13px] font-black leading-tight sm:text-[14px]">
-                    {t.register}
-                  </span>
-                  <span className="mt-1 block text-[9px] font-medium text-sky-100/55 sm:text-[10px]">
-                    {t.registerSub}
-                  </span>
-                </span>
-                <ArrowRight className="h-5 w-5 shrink-0 text-cyan-300 transition-transform duration-300 group-hover:translate-x-1.5" />
-              </Link>
-            </div>
-
-            <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-[9px] font-medium text-sky-100/65 sm:text-[10px]">
-              <TrustItem text={t.trust1} />
-              <TrustItem text={t.trust2} />
-              <TrustItem text={t.trust3} />
-            </div>
-          </div>
-
-          {/* HERO CHART */}
-          <div className="relative min-w-0">
-            <div className="absolute inset-0 bg-blue-400/[0.12] blur-[90px]" />
-
-            <div className="relative w-full min-w-0 overflow-hidden rounded-[14px] border border-sky-400/38 bg-gradient-to-br from-[#073A6A] to-[#061C33] p-2.5 shadow-[0_24px_70px_rgba(2,12,27,.32)] sm:rounded-[18px] sm:p-4">
-              <div className="mb-3 flex items-center justify-between">
-                <div className="flex gap-2">
-                  <span className="rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 text-[10px] font-bold">
-                    EURUSD
-                  </span>
-                  <span className="rounded-md border border-white/10 bg-white/[0.03] px-3 py-2 text-[10px] text-slate-400">
-                    M15
-                  </span>
-                </div>
-
-                <span className="text-[10px] font-bold text-emerald-400">
-                  1.08742&nbsp;&nbsp;+0.21%
-                </span>
+          <div className="relative z-10 min-h-[520px] px-5 pb-7 pt-7 sm:px-8 sm:pt-9 lg:min-h-[610px] lg:px-10 lg:pb-9 lg:pt-10 xl:px-12">
+            <div className="max-w-[610px]">
+              <div className="mb-5 inline-flex items-center rounded-full border border-cyan-300/55 bg-[#06253f]/75 px-4 py-2 text-[9px] font-black uppercase tracking-[.20em] text-cyan-200 shadow-[0_0_22px_rgba(34,211,238,.08)]">
+                {t.badge}
               </div>
 
-              <div className="relative h-[205px] overflow-hidden rounded-lg min-[390px]:h-[230px] sm:h-[315px] border border-sky-200/22 bg-[#042845]">
-                <Image
-                  src="/home/hero-chart.png"
-                  alt="FX Trade EURUSD chart"
-                  fill
-                  priority
-                  sizes="(max-width: 1024px) 100vw, 58vw"
-                  className="object-cover object-center"
-                />
-              </div>
+              <h1 className="max-w-[600px] text-[42px] font-black leading-[.98] tracking-[-.05em] min-[390px]:text-[48px] sm:text-[58px] lg:text-[64px] xl:text-[68px]">
+                <span className="block text-white">{t.hero1}</span>
+                <span className="mt-1 block bg-gradient-to-r from-cyan-300 via-cyan-400 to-blue-500 bg-clip-text text-transparent drop-shadow-[0_0_24px_rgba(34,211,238,.20)]">{t.hero2}</span>
+                <span className="mt-1 block text-white">{t.hero3}</span>
+              </h1>
 
-              <div className="mt-2.5 grid grid-cols-2 overflow-hidden rounded-lg border border-sky-200/22 bg-sky-300/[0.035] sm:grid-cols-4 sm:divide-x sm:divide-white/[0.06]">
-                <ChartStat label="BID" value="1.08738" />
-                <ChartStat label="ASK" value="1.08746" />
-                <ChartStat label="SPREAD" value="0.8" />
-                <ChartStat label="VOLUME" value="124.6K" />
+              <p className="mt-6 max-w-[560px] text-[12px] leading-6 text-slate-200/80 sm:text-[13px]">{t.heroDesc}</p>
+
+              <div className="mt-7 flex flex-col gap-3 min-[460px]:flex-row">
+                <Link href="/checkout" className="group relative flex min-h-[58px] min-w-[205px] items-center justify-center gap-3 overflow-hidden rounded-xl border border-cyan-200/55 bg-[linear-gradient(135deg,#16d9f4_0%,#0ea5e9_32%,#2563eb_68%,#4f46e5_100%)] px-6 text-[13px] font-black text-white shadow-[0_0_32px_rgba(34,211,238,.32),0_14px_38px_rgba(37,99,235,.28)] transition hover:-translate-y-1 hover:brightness-110">
+                  <span className="absolute inset-x-0 top-0 h-px bg-white/80" />
+                  {t.buyShort}<ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" />
+                </Link>
+                <Link href="/register" className="group flex min-h-[58px] min-w-[190px] items-center justify-center gap-3 rounded-xl border border-cyan-300/35 bg-[#041d35]/88 px-6 text-[13px] font-bold text-white shadow-[inset_0_1px_0_rgba(255,255,255,.04),0_10px_28px_rgba(0,0,0,.20)] backdrop-blur-md transition hover:-translate-y-1 hover:border-cyan-200/65 hover:bg-[#062945]">
+                  <span className="grid h-8 w-8 place-items-center rounded-full border border-cyan-300/35 text-cyan-300"><User className="h-4 w-4" /></span>
+                  {t.register}<ArrowRight className="h-4 w-4 text-cyan-300 transition group-hover:translate-x-1" />
+                </Link>
               </div>
             </div>
           </div>
+        </section>
+
+        {/* FEATURES — one row like reference */}
+        <section id="funkcje" className="relative z-20 -mt-1 grid grid-cols-2 overflow-hidden rounded-[16px] border border-cyan-300/20 bg-[linear-gradient(180deg,rgba(4,31,57,.96),rgba(2,23,44,.98))] shadow-[0_18px_50px_rgba(0,0,0,.18),0_0_28px_rgba(14,165,233,.06)] md:grid-cols-5">
+          <FeatureCard icon={<Radar />} title={t.f1t} text={t.f1d} />
+          <FeatureCard icon={<TrendingUp />} title={t.f2t} text={t.f2d} />
+          <FeatureCard icon={<BrainCircuit />} title={t.strategies} text="Scalping, Day Trading, Swing Trading." />
+          <FeatureCard icon={<ShieldCheck />} title={t.f3t} text={t.f3d} />
+          <FeatureCard icon={<GraduationCap />} title={t.education} text={t.f4d} />
         </section>
 
         {/* MARKET TICKERS */}
