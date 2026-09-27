@@ -10,6 +10,18 @@ export const languages: Array<{ code: AppLanguage; short: string; label: string;
   { code: "es", short: "ES", label: "Español", locale: "es-ES" },
 ];
 
+export const languageNames: Record<AppLanguage, Record<AppLanguage, string>> = {
+  pl: { pl: "Polski", en: "Polish", de: "Polnisch", nl: "Pools", es: "Polaco" },
+  en: { pl: "Angielski", en: "English", de: "Englisch", nl: "Engels", es: "Inglés" },
+  de: { pl: "Niemiecki", en: "German", de: "Deutsch", nl: "Duits", es: "Alemán" },
+  nl: { pl: "Niderlandzki", en: "Dutch", de: "Niederländisch", nl: "Nederlands", es: "Neerlandés" },
+  es: { pl: "Hiszpański", en: "Spanish", de: "Spanisch", nl: "Spaans", es: "Español" },
+};
+
+export function getLanguageName(code: AppLanguage, uiLanguage: AppLanguage): string {
+  return languageNames[code]?.[uiLanguage] ?? languages.find((item) => item.code === code)?.label ?? code.toUpperCase();
+}
+
 function row(pl: string, en: string, de: string, nl: string, es: string): TranslationRow {
   return { pl, en, de, nl, es };
 }

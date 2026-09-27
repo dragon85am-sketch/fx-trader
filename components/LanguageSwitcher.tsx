@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useLanguage } from "@/components/LanguageProvider";
-import { useRouter } from "next/navigation";
 import { Check, ChevronDown } from "lucide-react";
+
+import { useLanguage } from "@/components/LanguageProvider";
+import { getLanguageName } from "@/lib/i18n/catalog";
 
 type LanguageCode = "pl" | "en" | "de" | "nl" | "es";
 
@@ -20,7 +21,6 @@ const languages: Language[] = [
   { code: "nl", short: "NL", label: "Nederlands" },
   { code: "es", short: "ES", label: "Español" },
 ];
-
 
 function Flag({ code }: { code: LanguageCode }) {
   const base =
@@ -65,14 +65,18 @@ function Flag({ code }: { code: LanguageCode }) {
     );
   }
 
+  // English / United Kingdom
   return (
     <span className={`${base} bg-[#012169]`} aria-hidden="true">
       <span className="absolute left-1/2 top-1/2 h-[5px] w-[46px] -translate-x-1/2 -translate-y-1/2 rotate-[33deg] bg-white" />
       <span className="absolute left-1/2 top-1/2 h-[5px] w-[46px] -translate-x-1/2 -translate-y-1/2 -rotate-[33deg] bg-white" />
+
       <span className="absolute left-1/2 top-1/2 h-[2px] w-[46px] -translate-x-1/2 -translate-y-1/2 rotate-[33deg] bg-[#c8102e]" />
       <span className="absolute left-1/2 top-1/2 h-[2px] w-[46px] -translate-x-1/2 -translate-y-1/2 -rotate-[33deg] bg-[#c8102e]" />
+
       <span className="absolute left-1/2 top-0 h-full w-[8px] -translate-x-1/2 bg-white" />
       <span className="absolute left-0 top-1/2 h-[8px] w-full -translate-y-1/2 bg-white" />
+
       <span className="absolute left-1/2 top-0 h-full w-[4px] -translate-x-1/2 bg-[#c8102e]" />
       <span className="absolute left-0 top-1/2 h-[4px] w-full -translate-y-1/2 bg-[#c8102e]" />
     </span>
@@ -80,34 +84,44 @@ function Flag({ code }: { code: LanguageCode }) {
 }
 
 export default function LanguageSwitcher() {
-  const router = useRouter();
   const { lang, setLang } = useLanguage();
+
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onPointerDown = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
     };
 
     document.addEventListener("mousedown", onPointerDown);
-    return () => document.removeEventListener("mousedown", onPointerDown);
+
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+    };
   }, []);
 
-  const current = languages.find((item) => item.code === lang) ?? languages[0];
+  const current =
+    languages.find((item) => item.code === lang) ?? languages[0];
 
-  function selectLanguage(code: LanguageCode) {
+  const selectLanguage = (code: LanguageCode) => {
+    if (code === lang) {
+      setOpen(false);
+      return;
+    }
+
     setLang(code);
     setOpen(false);
 
-    // Notify any legacy listeners that are not yet using LanguageProvider.
+    // Zostawiamy kompatybilność ze starszymi komponentami aplikacji.
     window.dispatchEvent(
-      new CustomEvent("fxtrade-language-change", { detail: code })
+      new CustomEvent("fxtrade-language-change", {
+        detail: code,
+      })
     );
-
-    // Server Components read the same language cookie written by LanguageProvider.
-    router.refresh();
-  }
+  };
 
   return (
     <div ref={rootRef} className="relative z-[200]">
@@ -119,19 +133,26 @@ export default function LanguageSwitcher() {
         className="group flex h-11 min-w-[116px] items-center gap-2.5 rounded-2xl border border-cyan-300/45 bg-[linear-gradient(180deg,rgba(7,44,78,.82),rgba(3,27,52,.76))] px-3.5 text-[12px] font-black text-white shadow-[0_0_0_1px_rgba(255,255,255,.03)_inset,0_0_18px_rgba(34,211,238,.12)] backdrop-blur-md transition duration-300 hover:border-cyan-200/85 hover:shadow-[0_0_0_1px_rgba(255,255,255,.05)_inset,0_0_28px_rgba(34,211,238,.24)] sm:min-w-[122px] sm:px-4"
       >
         <Flag code={current.code} />
-        <span className="leading-none">{current.short}</span>
+
+        <span className="leading-none">
+          {current.short}
+        </span>
+
         <ChevronDown
-          className={`ml-auto h-4 w-4 text-cyan-200 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+          className={`ml-auto h-4 w-4 text-cyan-200 transition-transform duration-200 ${
+            open ? "rotate-180" : ""
+          }`}
         />
       </button>
 
-      {open ? (
+      {open && (
         <div
           role="menu"
           className="absolute right-0 top-[52px] z-[250] w-[214px] space-y-1.5 bg-transparent p-0 shadow-none"
         >
           {languages.map((item) => {
             const active = item.code === lang;
+
             return (
               <button
                 key={item.code}
@@ -145,7 +166,11 @@ export default function LanguageSwitcher() {
                 }`}
               >
                 <Flag code={item.code} />
-                <span className="min-w-0 truncate">{item.label}</span>
+
+                <span className="min-w-0 truncate">
+                  {getLanguageName(item.code, lang)}
+                </span>
+
                 {active ? (
                   <Check className="h-4 w-4 text-cyan-300 drop-shadow-[0_0_6px_rgba(34,211,238,.55)]" />
                 ) : (
@@ -155,7 +180,7 @@ export default function LanguageSwitcher() {
             );
           })}
         </div>
-      ) : null}
+      )}
     </div>
   );
 }

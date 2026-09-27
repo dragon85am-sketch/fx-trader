@@ -12,6 +12,7 @@ import { getNextLessonId } from "@/components/course";
 
 export default function CourseQuiz({ lessonId }: { lessonId: string }) {
   const router = useRouter();
+
   const quiz = QUIZ_CONTENT[lessonId];
 
   const [answers, setAnswers] = React.useState<number[]>([]);
@@ -27,8 +28,11 @@ export default function CourseQuiz({ lessonId }: { lessonId: string }) {
     );
   }
 
-  const allAnswered = answers.length === quiz.questions.length &&
-    quiz.questions.every((_, index) => typeof answers[index] === "number");
+  const allAnswered =
+    answers.length === quiz.questions.length &&
+    quiz.questions.every(
+      (_, index) => typeof answers[index] === "number"
+    );
 
   function selectAnswer(questionIndex: number, optionIndex: number) {
     if (submitted) return;
@@ -55,17 +59,17 @@ export default function CourseQuiz({ lessonId }: { lessonId: string }) {
 
     setSubmitted(true);
 
-    const scoreNow = (() => {
-      let correct = 0;
+    let correct = 0;
 
-      quiz.questions.forEach((question, index) => {
-        if (answers[index] === question.correctIndex) {
-          correct++;
-        }
-      });
+    quiz.questions.forEach((question, index) => {
+      if (answers[index] === question.correctIndex) {
+        correct++;
+      }
+    });
 
-      return Math.round((correct / quiz.questions.length) * 100);
-    })();
+    const scoreNow = Math.round(
+      (correct / quiz.questions.length) * 100
+    );
 
     if (scoreNow >= quiz.passPercent) {
       markLessonCompleted(lessonId);
@@ -96,9 +100,13 @@ export default function CourseQuiz({ lessonId }: { lessonId: string }) {
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-2xl font-semibold">{quiz.title}</h2>
+        <h2 className="text-2xl font-semibold">
+          {quiz.title}
+        </h2>
+
         <div className="mt-2 text-sm text-zinc-400">
-          Aby zaliczyć quiz, musisz uzyskać minimum {quiz.passPercent}%.
+          Aby zaliczyć quiz, musisz uzyskać minimum{" "}
+          {quiz.passPercent}%.
         </div>
       </div>
 
@@ -113,24 +121,40 @@ export default function CourseQuiz({ lessonId }: { lessonId: string }) {
 
           <div className="space-y-2">
             {question.options.map((option, optionIndex) => {
-              const selected = answers[questionIndex] === optionIndex;
-              const isCorrect = question.correctIndex === optionIndex;
+              const selected =
+                answers[questionIndex] === optionIndex;
 
-              let optionClass = "border-white/10 hover:bg-white/5";
+              const isCorrect =
+                question.correctIndex === optionIndex;
+
+              let optionClass =
+                "border-white/10 hover:bg-white/5";
 
               if (submitted && isCorrect) {
-                optionClass = "border-emerald-500 bg-emerald-500/20";
-              } else if (submitted && selected && !isCorrect) {
-                optionClass = "border-red-500 bg-red-500/20";
+                optionClass =
+                  "border-emerald-500 bg-emerald-500/20";
+              } else if (
+                submitted &&
+                selected &&
+                !isCorrect
+              ) {
+                optionClass =
+                  "border-red-500 bg-red-500/20";
               } else if (selected) {
-                optionClass = "border-blue-500 bg-blue-500/20";
+                optionClass =
+                  "border-blue-500 bg-blue-500/20";
               }
 
               return (
                 <button
                   key={optionIndex}
                   type="button"
-                  onClick={() => selectAnswer(questionIndex, optionIndex)}
+                  onClick={() =>
+                    selectAnswer(
+                      questionIndex,
+                      optionIndex
+                    )
+                  }
                   className={`block w-full rounded-xl border px-4 py-3 text-left transition ${optionClass}`}
                 >
                   {option}
@@ -141,7 +165,9 @@ export default function CourseQuiz({ lessonId }: { lessonId: string }) {
 
           {submitted && question.explanation ? (
             <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-4 text-sm text-zinc-300">
-              <span className="font-medium text-zinc-100">Wyjaśnienie: </span>
+              <span className="font-medium text-zinc-100">
+                Wyjaśnienie:{" "}
+              </span>
               {question.explanation}
             </div>
           ) : null}
@@ -165,20 +191,26 @@ export default function CourseQuiz({ lessonId }: { lessonId: string }) {
 
           {!allAnswered ? (
             <div className="text-sm text-zinc-500">
-              Odpowiedz na wszystkie pytania, aby sprawdzić wynik.
+              Odpowiedz na wszystkie pytania, aby
+              sprawdzić wynik.
             </div>
           ) : null}
         </div>
       ) : (
         <div className="space-y-4">
           <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
-            <div className="text-lg font-semibold">Twój wynik: {score}%</div>
+            <div className="text-lg font-semibold">
+              Twój wynik: {score}%
+            </div>
 
             {passed ? (
-              <div className="mt-2 text-emerald-400">Quiz zaliczony ✅</div>
+              <div className="mt-2 text-emerald-400">
+                Quiz zaliczony ✅
+              </div>
             ) : (
               <div className="mt-2 text-red-400">
-                Quiz niezaliczony ❌ (min. {quiz.passPercent}%)
+                Quiz niezaliczony ❌ (min.{" "}
+                {quiz.passPercent}%)
               </div>
             )}
           </div>
@@ -196,7 +228,9 @@ export default function CourseQuiz({ lessonId }: { lessonId: string }) {
               <>
                 <button
                   type="button"
-                  onClick={() => router.push("/education/kurs")}
+                  onClick={() =>
+                    router.push("/education/kurs")
+                  }
                   className="rounded-2xl bg-emerald-600 px-6 py-3 font-semibold hover:bg-emerald-500"
                 >
                   Wróć do kursu
