@@ -1,4 +1,4 @@
-import { cookies } from "next/headers";
+﻿import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -493,65 +493,24 @@ function BigStat({
 }
 
 function FeatureCard({
-  id,
   icon,
   title,
-  description,
-  image,
-  preview,
-  href,
-  button,
+  text,
 }: {
-  id?: string;
   icon: React.ReactNode;
   title: string;
-  description: string;
-  image?: string;
-  preview?: React.ReactNode;
-  href: string;
-  button: string;
+  text: string;
 }) {
   return (
-    <article
-      id={id}
-      className="group flex min-h-[340px] min-w-0 flex-col rounded-[14px] border border-sky-400/30 bg-[linear-gradient(180deg,rgba(5,35,66,.96),rgba(2,23,44,.98))] p-3 transition duration-300 hover:-translate-y-0.5 hover:border-cyan-300/50 hover:shadow-[0_14px_34px_rgba(2,12,27,.26)] sm:h-[372px]"
-    >
-      <div className="flex min-h-[54px] gap-2.5">
-        <div className="shrink-0 text-sky-400 [&_svg]:h-5 [&_svg]:w-5">
-          {icon}
-        </div>
-        <div className="min-w-0">
-          <h2 className="text-[12px] font-bold leading-4 text-white">{title}</h2>
-          <p className="mt-1 line-clamp-2 text-[8px] leading-3 text-slate-400">
-            {description}
-          </p>
-        </div>
+    <div className="group flex min-h-[92px] min-w-0 items-start gap-3 border-r border-cyan-300/10 p-4 transition duration-300 hover:bg-cyan-400/[0.04]">
+      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-cyan-300/30 bg-cyan-400/[0.05] text-cyan-300 shadow-[0_0_18px_rgba(34,211,238,.10)] [&_svg]:h-5 [&_svg]:w-5">
+        {icon}
       </div>
-
-      <div className="relative mt-3 h-[180px] w-full min-w-0 overflow-hidden rounded-lg border border-sky-200/25 bg-[#02172c] p-2 sm:h-[198px]">
-        <div className="relative h-full w-full overflow-hidden rounded-md">
-          {preview ? (
-            preview
-          ) : image ? (
-            <Image
-              src={image}
-              alt={title}
-              fill
-              sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 20vw"
-              className="object-contain object-center"
-            />
-          ) : null}
-        </div>
+      <div className="min-w-0">
+        <h3 className="text-[11px] font-bold leading-4 text-white sm:text-[12px]">{title}</h3>
+        <p className="mt-1 text-[8px] leading-3 text-slate-400 sm:text-[9px] sm:leading-4">{text}</p>
       </div>
-
-      <Link
-        href={href}
-        className="mt-auto flex h-[38px] items-center justify-between rounded-lg border border-sky-400/38 bg-sky-500/[0.04] px-3 text-[9px] font-semibold text-sky-400 transition hover:bg-sky-500/[0.08]"
-      >
-        {button}
-        <ArrowRight className="h-3 w-3" />
-      </Link>
-    </article>
+    </div>
   );
 }
 
