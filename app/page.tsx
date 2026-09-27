@@ -176,7 +176,7 @@ export default async function HomePage() {
             </Link>
 
             <Link
-              href="/checkout"
+              href="/register?next=/checkout"
               className="group relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-cyan-200/55 bg-[linear-gradient(135deg,#22d3ee_0%,#0ea5e9_28%,#2563eb_65%,#4f46e5_100%)] text-[10px] font-black text-white shadow-[0_0_0_1px_rgba(255,255,255,.08)_inset,0_10px_30px_rgba(37,99,235,.34),0_0_28px_rgba(34,211,238,.24)] transition duration-300 hover:-translate-y-0.5 hover:border-cyan-100/80 hover:brightness-110 hover:shadow-[0_0_0_1px_rgba(255,255,255,.10)_inset,0_14px_38px_rgba(37,99,235,.42),0_0_38px_rgba(34,211,238,.34)] active:translate-y-0 min-[430px]:w-auto min-[430px]:gap-2 min-[430px]:px-3.5 sm:h-11 sm:gap-2.5 sm:px-4 sm:text-[12px]"
               aria-label={t.buyFull}
             >
@@ -231,7 +231,7 @@ export default async function HomePage() {
               <p className="mt-6 max-w-[560px] text-[12px] leading-6 text-slate-200/80 sm:text-[13px]">{t.heroDesc}</p>
 
               <div className="mt-7 flex flex-col gap-3 min-[460px]:flex-row">
-                <Link href="/checkout" className="group relative flex min-h-[58px] min-w-[205px] items-center justify-center gap-3 overflow-hidden rounded-xl border border-cyan-200/55 bg-[linear-gradient(135deg,#16d9f4_0%,#0ea5e9_32%,#2563eb_68%,#4f46e5_100%)] px-6 text-[13px] font-black text-white shadow-[0_0_32px_rgba(34,211,238,.32),0_14px_38px_rgba(37,99,235,.28)] transition hover:-translate-y-1 hover:brightness-110">
+                <Link href="/register?next=/checkout" className="group relative flex min-h-[58px] min-w-[205px] items-center justify-center gap-3 overflow-hidden rounded-xl border border-cyan-200/55 bg-[linear-gradient(135deg,#16d9f4_0%,#0ea5e9_32%,#2563eb_68%,#4f46e5_100%)] px-6 text-[13px] font-black text-white shadow-[0_0_32px_rgba(34,211,238,.32),0_14px_38px_rgba(37,99,235,.28)] transition hover:-translate-y-1 hover:brightness-110">
                   <span className="absolute inset-x-0 top-0 h-px bg-white/80" />
                   {t.buyShort}<ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" />
                 </Link>

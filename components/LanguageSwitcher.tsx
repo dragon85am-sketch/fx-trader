@@ -130,7 +130,7 @@ export default function LanguageSwitcher() {
   };
 
   return (
-    <div ref={rootRef} className="relative z-[200]">
+    <div ref={rootRef} data-i18n-skip="true" className="relative z-[200]">
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}

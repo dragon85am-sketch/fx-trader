@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Image from "next/image";
 import { useState } from "react";
@@ -83,6 +83,11 @@ export default function CheckoutPage() {
       });
 
       const data = await res.json();
+
+      if (res.status === 401) {
+        window.location.href = "/register?next=/checkout";
+        return;
+      }
 
       if (!res.ok || !data?.url) {
         alert(data?.error || "Nie udało się uruchomić płatności");
