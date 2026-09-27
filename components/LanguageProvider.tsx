@@ -38,12 +38,11 @@ export function LanguageProvider({
     const storedRaw =
       localStorage.getItem("fxtrade-language") ?? localStorage.getItem("lang");
 
-    if (storedRaw) {
-      const stored = normalizeLanguage(storedRaw);
-      if (stored !== lang) setLangState(stored);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    const stored = normalizeLanguage(storedRaw ?? initialLanguage);
+    setLangState(stored);
+    document.documentElement.lang = stored;
+    persistLanguage(stored);
+  }, [initialLanguage]);
 
   const setLang = React.useCallback((nextLang: AppLanguage) => {
     persistLanguage(nextLang);

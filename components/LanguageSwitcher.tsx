@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useLanguage } from "@/components/LanguageProvider";
 import { useRouter } from "next/navigation";
 import { Check, ChevronDown } from "lucide-react";
 
@@ -20,7 +21,6 @@ const languages: Language[] = [
   { code: "es", short: "ES", label: "Español" },
 ];
 
-const STORAGE_KEY = "fxtrade-language";
 
 function Flag({ code }: { code: LanguageCode }) {
   const base =
@@ -81,16 +81,11 @@ function Flag({ code }: { code: LanguageCode }) {
 
 export default function LanguageSwitcher() {
   const router = useRouter();
+  const { lang, setLang } = useLanguage();
   const [open, setOpen] = useState(false);
-  const [language, setLanguage] = useState<LanguageCode>("pl");
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY) as LanguageCode | null;
-    if (saved && languages.some((item) => item.code === saved)) {
-      setLanguage(saved);
-    }
-
     const onPointerDown = (event: MouseEvent) => {
       if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
     };
@@ -99,21 +94,18 @@ export default function LanguageSwitcher() {
     return () => document.removeEventListener("mousedown", onPointerDown);
   }, []);
 
-  const current = languages.find((item) => item.code === language) ?? languages[0];
+  const current = languages.find((item) => item.code === lang) ?? languages[0];
 
   function selectLanguage(code: LanguageCode) {
-    setLanguage(code);
-    localStorage.setItem(STORAGE_KEY, code);
-    localStorage.setItem("lang", code);
-    document.cookie = `fxtrade-language=${code}; path=/; max-age=31536000; samesite=lax`;
+    setLang(code);
     setOpen(false);
 
+    // Notify any legacy listeners that are not yet using LanguageProvider.
     window.dispatchEvent(
       new CustomEvent("fxtrade-language-change", { detail: code })
     );
 
-    // HomePage is a Server Component and reads the language cookie.
-    // Refresh rerenders it immediately without a full browser reload.
+    // Server Components read the same language cookie written by LanguageProvider.
     router.refresh();
   }
 
@@ -139,7 +131,7 @@ export default function LanguageSwitcher() {
           className="absolute right-0 top-[52px] z-[250] w-[214px] space-y-1.5 bg-transparent p-0 shadow-none"
         >
           {languages.map((item) => {
-            const active = item.code === language;
+            const active = item.code === lang;
             return (
               <button
                 key={item.code}
