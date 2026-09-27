@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 
 import { useLanguage } from "@/components/LanguageProvider";
-import { getLanguageName } from "@/lib/i18n/catalog";
 
 type LanguageCode = "pl" | "en" | "de" | "nl" | "es";
 
@@ -168,7 +167,8 @@ export default function LanguageSwitcher() {
                 <Flag code={item.code} />
 
                 <span className="min-w-0 truncate">
-                  {getLanguageName(item.code, lang)}
+                  {item.label}
+                  <span className="ml-2 text-cyan-300/90">{item.short}</span>
                 </span>
 
                 {active ? (
