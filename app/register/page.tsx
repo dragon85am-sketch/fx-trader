@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { setCurrentStorageUser } from "@/lib/userScopedStorage";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
@@ -23,9 +22,6 @@ import {
 } from "lucide-react";
 
 export default function RegisterPage() {
-  const searchParams = useSearchParams();
-  const requestedNext = searchParams.get("next");
-  const nextPath = requestedNext && requestedNext.startsWith("/") && !requestedNext.startsWith("//") ? requestedNext : "/checkout";
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
@@ -94,7 +90,7 @@ export default function RegisterPage() {
       if (data?.user?.id) setCurrentStorageUser(String(data.user.id));
       setMsg("Konto utworzone. Przekierowanie do płatności...");
 
-      window.location.href = data?.redirectTo || nextPath;
+      window.location.href = "/checkout";
     } catch {
       setMsg("Błąd serwera");
     } finally {

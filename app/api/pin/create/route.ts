@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
+import { createPinDeviceToken, PIN_DEVICE_COOKIE, pinDeviceCookieOptions } from "@/lib/pinDevice";
 
 export async function POST(req: Request) {
   try {
@@ -24,7 +25,9 @@ export async function POST(req: Request) {
       data: { pinHash, pinFailedAttempts: 0, pinLockedUntil: null },
     });
 
-    return NextResponse.json({ ok: true, message: "Kod PIN został utworzony" });
+    const response = NextResponse.json({ ok: true, message: "Kod PIN został utworzony" });
+    response.cookies.set(PIN_DEVICE_COOKIE, createPinDeviceToken(user.id), pinDeviceCookieOptions);
+    return response;
   } catch (error) {
     console.error("CREATE PIN ERROR:", error);
     return NextResponse.json({ error: "Nie udało się utworzyć PIN-u" }, { status: 500 });

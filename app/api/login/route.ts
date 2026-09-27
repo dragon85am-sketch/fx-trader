@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { NextResponse } from "next/server";
+import { createPinDeviceToken, PIN_DEVICE_COOKIE, pinDeviceCookieOptions } from "@/lib/pinDevice";
 
 export async function POST(req: Request) {
   try {
@@ -102,6 +103,7 @@ process.env.JWT_SECRET,
       path: "/",
       maxAge: 60 * 60 * 24 * 7,
     });
+    response.cookies.set(PIN_DEVICE_COOKIE, createPinDeviceToken(user.id), pinDeviceCookieOptions);
 
     return response;
   } catch (error) {

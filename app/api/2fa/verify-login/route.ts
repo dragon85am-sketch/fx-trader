@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import jwt, { JsonWebTokenError, TokenExpiredError } from "jsonwebtoken";
 import { decryptSecret, verifyTotp } from "@/lib/twoFactor";
+import { createPinDeviceToken, PIN_DEVICE_COOKIE, pinDeviceCookieOptions } from "@/lib/pinDevice";
 
 type Challenge = { userId: string; purpose: string; iat?: number; exp?: number };
 
@@ -116,6 +117,7 @@ export async function POST(req: Request) {
       path: "/",
       maxAge: 60 * 60 * 24 * 7,
     });
+    response.cookies.set(PIN_DEVICE_COOKIE, createPinDeviceToken(user.id), pinDeviceCookieOptions);
     response.cookies.set("two_factor_challenge", "", {
       httpOnly: true,
       sameSite: "lax",

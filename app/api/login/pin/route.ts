@@ -2,20 +2,27 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import { PIN_DEVICE_COOKIE, readPinDeviceToken } from "@/lib/pinDevice";
 
 const MAX_ATTEMPTS = 5;
 const LOCK_MINUTES = 15;
 
 export async function POST(req: Request) {
   try {
-    const { email, pin } = await req.json();
-    const normalizedEmail = String(email || "").trim().toLowerCase();
+    const { pin } = await req.json();
     const rawPin = String(pin || "");
-    if (!normalizedEmail || !/^\d{4}$/.test(rawPin)) {
-      return NextResponse.json({ error: "Podaj e-mail i 4-cyfrowy PIN" }, { status: 400 });
+    if (!/^\d{4}$/.test(rawPin)) {
+      return NextResponse.json({ error: "Podaj 4-cyfrowy PIN" }, { status: 400 });
     }
 
-    const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+    const cookieHeader = req.headers.get("cookie") || "";
+    const rawDeviceCookie = cookieHeader.match(new RegExp(`(?:^|; )${PIN_DEVICE_COOKIE}=([^;]+)`))?.[1];
+    const device = readPinDeviceToken(rawDeviceCookie ? decodeURIComponent(rawDeviceCookie) : null);
+    if (!device) {
+      return NextResponse.json({ error: "To urządzenie nie jest jeszcze powiązane z kontem. Zaloguj się najpierw e-mailem i hasłem." }, { status: 401 });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: device.userId } });
     if (!user?.pinHash) return NextResponse.json({ error: "Dla tego konta nie ustawiono PIN-u" }, { status: 401 });
     if (user.isBanned) return NextResponse.json({ error: "Konto jest zablokowane" }, { status: 403 });
 

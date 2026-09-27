@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Check, ChevronDown } from "lucide-react";
 
 import { useLanguage } from "@/components/LanguageProvider";
@@ -86,7 +85,6 @@ function Flag({ code }: { code: LanguageCode }) {
 
 export default function LanguageSwitcher() {
   const { lang, setLang } = useLanguage();
-  const router = useRouter();
 
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -123,14 +121,10 @@ export default function LanguageSwitcher() {
         detail: code,
       })
     );
-
-    // Odśwież Server Components po zapisaniu cookie, aby cała strona
-    // zmieniła język natychmiast — bez ręcznego F5.
-    router.refresh();
   };
 
   return (
-    <div ref={rootRef} data-i18n-skip="true" className="relative z-[200]">
+    <div ref={rootRef} className="relative z-[200]">
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
