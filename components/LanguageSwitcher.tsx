@@ -116,15 +116,16 @@ export default function LanguageSwitcher() {
     setLang(code);
     setOpen(false);
 
-    // Natychmiast odświeża Server Components po zmianie cookie języka.
-    router.refresh();
-
     // Zostawiamy kompatybilność ze starszymi komponentami aplikacji.
     window.dispatchEvent(
       new CustomEvent("fxtrade-language-change", {
         detail: code,
       })
     );
+
+    // Cookie jest już zapisane przez setLang(), więc Server Components
+    // dostają ten sam język co selektor.
+    router.refresh();
   };
 
   return (

@@ -35,13 +35,13 @@ export function LanguageProvider({
   const [lang, setLangState] = React.useState<AppLanguage>(initialLanguage);
 
   React.useEffect(() => {
-    const storedRaw =
-      localStorage.getItem("fxtrade-language") ?? localStorage.getItem("lang");
-
-    const stored = normalizeLanguage(storedRaw ?? initialLanguage);
-    setLangState(stored);
-    document.documentElement.lang = stored;
-    persistLanguage(stored);
+    // initialLanguage comes from the server cookie.
+    // After router.refresh() it is the authoritative value and must not
+    // be overwritten by a stale client-side value.
+    const next = normalizeLanguage(initialLanguage);
+    setLangState(next);
+    document.documentElement.lang = next;
+    persistLanguage(next);
   }, [initialLanguage]);
 
   const setLang = React.useCallback((nextLang: AppLanguage) => {
