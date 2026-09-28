@@ -3398,7 +3398,7 @@ const signal: Signal = supertrendEnabled
     let tp1Hit = r.tp1Hit ?? false;
     let tp2Hit = r.tp2Hit ?? false;
     let openedTradeThisRefresh = false;
-    const cs = candlesCache.current.get(r.symbol) ?? [];
+    const cs = candlesCache.current.get(candleCacheKey(r.symbol, tf)) ?? [];
     const tick = getTickSize(r.symbol);
 
     const emaWmaDirection = getEmaWmaSignal(cs);
