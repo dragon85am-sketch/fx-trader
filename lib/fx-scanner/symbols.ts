@@ -7,7 +7,7 @@ export const FX_SCANNER_SYMBOLS = [
   "EURUSD","EURCHF","EURCAD","EURGBP","EURAUD","EURNZD","EURJPY","EURPLN",
   "USDCAD","USDPLN","USDCHF","USDJPY","NZDUSD",
   "AUDCAD","AUDUSD","AUDHUF","AUDZAR","AUDNZD","AUDJPY","AUDCHF",
-  "BTCUSD","NASUSD","USOUSD","XAGUSD","US30",
+  "BTCUSD","NASUSD","USOUSD","XAGUSD","US30","XAUUSD",
 ] as const;
 
 // Provider/database aliases used by the current Master Collector universe.
