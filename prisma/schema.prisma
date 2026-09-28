@@ -196,3 +196,32 @@ model AlphaTrade {
   @@index([instrument, tf, status])
   @@index([openedAt])
 }
+
+model FxScannerTrade {
+  id             String   @id
+  instrument     String
+  storageSymbol  String
+  tf             String
+  side           String
+  confirmation   Int      @default(4)
+  signalTime     DateTime
+  entry          Float
+  sl             Float
+  tp1            Float
+  tp2            Float
+  tp3            Float
+  rr             Float    @default(2)
+  status         String   @default("ACTIVE")
+  tp1Hit         Boolean  @default(false)
+  tp2Hit         Boolean  @default(false)
+  tp3Hit         Boolean  @default(false)
+  telegramSignal Boolean  @default(false)
+  telegramClosed Boolean  @default(false)
+  openedAt       DateTime @default(now())
+  closedAt       DateTime?
+  updatedAt      DateTime @updatedAt
+
+  @@unique([storageSymbol, tf, side, signalTime])
+  @@index([status, openedAt])
+  @@index([instrument, tf, status])
+}

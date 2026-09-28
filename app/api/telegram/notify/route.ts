@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
@@ -267,6 +267,12 @@ async function sendPhoto(args: {
 
 export async function POST(req: NextRequest) {
   try {
+    // Telegram is server-worker only. Browser/user sessions must never send alerts.
+    const expected = process.env.FX_SCANNER_WORKER_KEY;
+    const supplied = req.headers.get("x-fx-scanner-worker-key");
+    if (!expected || supplied !== expected) {
+      return NextResponse.json({ error: "Worker authorization required" }, { status: 403 });
+    }
     const payload = (await req.json()) as TelegramPayload;
 
     const type = payload.type ?? "SIGNAL";
