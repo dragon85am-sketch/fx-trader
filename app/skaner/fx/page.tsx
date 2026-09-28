@@ -2,7 +2,7 @@
 
 import type { DrawTool } from "@/components/DrawingsLayer";
 import React from "react";
-import { MASTER_MARKET_SYMBOLS } from "@/lib/market/master-symbols";
+import { FX_SCANNER_SYMBOLS } from "@/lib/fx-scanner/symbols";
 import * as XLSX from "xlsx-js-style";
 import { createPortal } from "react-dom";
 import { Card, CardContent, Pill, cn, Button } from "@/components/ui";
@@ -165,7 +165,7 @@ type Candle = {
 // One source of truth for Market Watch: the same 150-symbol universe used by
 // the Railway Master Collector. Adding/removing a symbol in master-symbols.ts
 // automatically updates this scanner as well.
-const MARKET_WATCH_SYMBOLS = [...MASTER_MARKET_SYMBOLS];
+const MARKET_WATCH_SYMBOLS = [...FX_SCANNER_SYMBOLS];
 
 const COINBASE_MAP: Record<string, string> = {
   BTCUSDT: "BTC-USD",
@@ -2602,7 +2602,7 @@ export default function MarketScannerPage() {
 
 
 
-  const TELEGRAM_ON = true;
+  const TELEGRAM_ON = false; // Telegram is sent only by the 24/7 server worker.
   const REFRESH_MS = 300000;
 
   const [heikinAshi, setHeikinAshi] = React.useState(false);
@@ -2723,9 +2723,7 @@ export default function MarketScannerPage() {
   const [loading, setLoading] = React.useState(false);
   const [lastSync, setLastSync] = React.useState<number | null>(null);
   const [error, setError] = React.useState<string | null>(null);
-  const [closedTrades, setClosedTrades] = React.useState<ClosedTrade[]>(() =>
-  typeof window !== "undefined" ? loadClosedTradesFromStorage() : []
-);
+  const [closedTrades, setClosedTrades] = React.useState<ClosedTrade[]>([]);
   
   const closedTradesLoadedRef = React.useRef(false);
 
@@ -2890,55 +2888,68 @@ higherTfSignal: (savedRow?.higherTfSignal ?? "NONE") as Signal,
   }
 });
 React.useEffect(() => {
-  try {
-    const raw = localStorage.getItem(CLOSED_TRADES_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      setClosedTrades(Array.isArray(parsed) ? parsed : []);
-    }
-  } catch {
-    setClosedTrades([]);
-  }
-}, []);
+    // Central AUTO SCANNER is the only source of Active/Closed trades.
+    // Users only read these records; opening the UI never sends Telegram.
+    let alive = true;
 
+    const syncCentralTrades = async () => {
+      try {
+        const [activeRes, closedRes] = await Promise.all([
+          fetch("/api/fx-scanner/trades?status=ACTIVE&limit=300", { cache: "no-store" }),
+          fetch("/api/fx-scanner/trades?status=CLOSED&limit=1000", { cache: "no-store" }),
+        ]);
+        if (!activeRes.ok || !closedRes.ok) return;
+        const activeJson = await activeRes.json();
+        const closedJson = await closedRes.json();
+        if (!alive) return;
 
+        const closed: ClosedTrade[] = (closedJson.trades ?? []).map((t: any) => ({
+          id: t.id,
+          date: t.signalTime,
+          closedAt: t.closedAt,
+          instrument: t.instrument,
+          direction: t.side,
+          tf: t.tf,
+          entry: Number(t.entry),
+          tp1: Number(t.tp1), tp2: Number(t.tp2), tp3: Number(t.tp3),
+          sl: Number(t.sl),
+          status: t.status,
+          tp1Hit: !!t.tp1Hit, tp2Hit: !!t.tp2Hit, tp3Hit: !!t.tp3Hit,
+        }));
+        setClosedTrades(closed);
 
-  React.useEffect(() => {
-    try {
-      const raw = localStorage.getItem(ACTIVE_TRADES_KEY);
-      if (raw) {
-        const arr = JSON.parse(raw) as Array<[string, Partial<Row>]>;
-        tradesMemoryRef.current = new Map(arr);
-      }
+        const activeBySymbol = new Map<string, any>();
+        for (const t of activeJson.trades ?? []) {
+          // Current chart TF gets the central zone for that instrument.
+          if (t.tf === tf) activeBySymbol.set(String(t.instrument).toUpperCase(), t);
+        }
+        setRows(prev => prev.map(row => {
+          const t = activeBySymbol.get(row.symbol.toUpperCase());
+          if (!t) {
+            return {
+              ...row,
+              tradeActive: false,
+              side: undefined,
+              levels: undefined,
+              signalCandleTime: undefined,
+              confirmationCount: 0,
+              confirmationSide: null,
+              status: "CLOSE" as Status,
+              tp1Hit: false,
+              tp2Hit: false,
+            };
+          }
+          const entry=Number(t.entry), sl=Number(t.sl), tp1=Number(t.tp1), tp2=Number(t.tp2), tp3=Number(t.tp3);
+          const pad=Math.max(getTickSize(row.symbol)*2,Math.abs(entry-sl)*0.04);
+          return {...row,tradeActive:true,side:t.side,signalCandleTime:(Math.floor(new Date(t.signalTime).getTime()/1000) as UTCTimestamp),confirmationCount:4,confirmationSide:t.side,status:"READY" as Status,levels:{side:t.side,entry,sl,tps:[tp1,tp2,tp3],rr:Number(t.rr),zones:[{label:"ENTRY",from:entry-pad,to:entry+pad},{label:"TP1",from:tp1-pad,to:tp1+pad},{label:"TP2",from:tp2-pad,to:tp2+pad},{label:"TP3",from:tp3-pad,to:tp3+pad},{label:"SL",from:sl-pad,to:sl+pad}]}};
+        }));
+      } catch {}
+    };
 
-      const closedRaw = localStorage.getItem(CLOSED_TRADES_KEY);
-      if (closedRaw) {
-        const parsed = JSON.parse(closedRaw);
-        setClosedTrades(Array.isArray(parsed) ? parsed : []);
-      }
-    } catch {
-      setClosedTrades([]);
-    } finally {
-      closedTradesLoadedRef.current = true;
-    }
-  }, []);
-
-  React.useEffect(() => {
-    try {
-      localStorage.setItem(
-        ACTIVE_TRADES_KEY,
-        JSON.stringify(Array.from(tradesMemoryRef.current.entries()))
-      );
-    } catch {}
-  }, [rows]);
-
-  React.useEffect(() => {
-    if (!closedTradesLoadedRef.current) return;
-
-    try {
-      localStorage.setItem(CLOSED_TRADES_KEY, JSON.stringify(closedTrades));
-    } catch {}
-  }, [closedTrades]);
+    void syncCentralTrades();
+    const id = window.setInterval(syncCentralTrades, 15_000);
+    return () => { alive = false; window.clearInterval(id); };
+  }, [tf]);
 
   React.useEffect(() => {
     const syncViewport = () => {
@@ -3433,261 +3444,9 @@ const signal: Signal = supertrendEnabled
     const setupReadyPrev = setupPrevRef.current.get(r.symbol) ?? false;
     setupPrevRef.current.set(r.symbol, setupReadyNow);
 
-    if (!tradeActive && setupReadyNow && setupSide && cs.length >= 5) {
-      const signalTime = cs[cs.length - 2]?.time;
-
-      if (signalTime) {
-        const lv = buildLevelsLiquidityOnly({
-          
-          candles: cs,
-          tickSize: tick,
-          zoneTicks: ZONE_TICKS,
-          side: setupSide,
-          signalTime,
-        });
-
-       if (lv) {
-  const signalCandle = cs.find((c) => Number(c.time) === Number(signalTime));
-  const buffer = tick * 2;
-
-  const newSL =
-    signalCandle && setupSide === "BUY"
-      ? signalCandle.low - buffer
-      : signalCandle && setupSide === "SELL"
-      ? signalCandle.high + buffer
-      : lv.sl;
-
-  
-    
-const entryPrice = lv.entry;
-
-const atr = calcATR(cs, targetSettings.atrPeriod);
-
-let slPrice = lv.sl;
-
-let tp1Price = lv.tps?.[0] ?? entryPrice;
-let tp2Price = lv.tps?.[1] ?? entryPrice;
-let tp3Price = lv.tps?.[2] ?? entryPrice;
-
-if (atr && Number.isFinite(atr)) {
-  if (setupSide === "BUY") {
-    const signalCandle = cs.find(
-  (c) => Number(c.time) === Number(signalTime)
-);
-
-if (setupSide === "BUY") {
-  tp1Price = entryPrice + atr * targetSettings.tp1Multiplier;
-  tp2Price = entryPrice + atr * targetSettings.tp2Multiplier;
-  tp3Price = entryPrice + atr * targetSettings.tp3Multiplier;
-
-  // SL niezależny od TP1 — odległość sterowana mnożnikiem ATR.
-  slPrice = entryPrice - atr * targetSettings.slMultiplier;
-}
-
-    tp1Price = entryPrice + atr * targetSettings.tp1Multiplier;
-    tp2Price = entryPrice + atr * targetSettings.tp2Multiplier;
-    tp3Price = entryPrice + atr * targetSettings.tp3Multiplier;
-  }
-
-  if (setupSide === "SELL") {
-    if (setupSide === "SELL") {
-  tp1Price = entryPrice - atr * targetSettings.tp1Multiplier;
-  tp2Price = entryPrice - atr * targetSettings.tp2Multiplier;
-  tp3Price = entryPrice - atr * targetSettings.tp3Multiplier;
-
-  // SL niezależny od TP1 — odległość sterowana mnożnikiem ATR.
-  slPrice = entryPrice + atr * targetSettings.slMultiplier;
-}
-
-    tp1Price = entryPrice - atr * targetSettings.tp1Multiplier;
-    tp2Price = entryPrice - atr * targetSettings.tp2Multiplier;
-    tp3Price = entryPrice - atr * targetSettings.tp3Multiplier;
-  }
-}
-
-levels = {
-  ...lv,
-  side: setupSide,
-
-  entry: round(entryPrice, 6),
-
-  sl: round(slPrice, 6),
-
-  tps: [
-    round(tp1Price, 6),
-    round(tp2Price, 6),
-    round(tp3Price, 6),
-  ],
-
-  rr: 2,
-
-  zones: (() => {
-    const entryPad = Math.max(
-      tick * 2,
-      Math.abs(entryPrice - slPrice) * 0.04
-    );
-
-    return [
-      {
-        label: "ENTRY" as const,
-        from: round(entryPrice - entryPad, 6),
-        to: round(entryPrice + entryPad, 6),
-      },
-      {
-        label: "TP1" as const,
-        from: round(tp1Price - entryPad, 6),
-        to: round(tp1Price + entryPad, 6),
-      },
-      {
-        label: "TP2" as const,
-        from: round(tp2Price - entryPad, 6),
-        to: round(tp2Price + entryPad, 6),
-      },
-      {
-        label: "TP3" as const,
-        from: round(tp3Price - entryPad, 6),
-        to: round(tp3Price + entryPad, 6),
-      },
-      {
-        label: "SL" as const,
-        from: round(slPrice - entryPad, 6),
-        to: round(slPrice + entryPad, 6),
-      },
-    ];
-  })(),
-};
-
-          tradeActive = true;
-openedTradeThisRefresh = true;
-sideOut = setupSide;
-hammerTime = signalTime;
-signalCandleTime = signalTime;
-signalPattern = setupPattern;
-patternSignalMode = detectedPatternMode ?? "STANDARD";
-tp1Hit = false;
-tp2Hit = false;
-
-          if (!setupReadyPrev) {
-            const now = new Date();
-
-            void sendTelegram({
-              type: "SIGNAL",
-              instrument: r.symbol,
-              side: setupSide,
-              tf,
-              liquidity: Math.round(nextLiquidity),
-              rr: Number((levels.rr ?? 0).toFixed(2)),
-              entry: Number(levels.entry),
-              sl: Number(levels.sl),
-              tp1: Number(levels.tps?.[0] ?? 0) || undefined,
-              tp2: Number(levels.tps?.[1] ?? 0) || undefined,
-              tp3: Number(levels.tps?.[2] ?? 0) || undefined,
-              timeISO: now.toISOString(),
-            });
-          }
-        }
-      }
-    }
-
-    // Jeżeli po EARLY kolejna świeca się zamknie i potwierdzi setup,
-    // podnosimy etykietę aktywnego trade'u do BUY/SELL albo STRONG BUY/SELL.
-    // Nie zmieniamy ceny wejścia ani poziomów otwartej pozycji.
-    if (
-      tradeActive &&
-      sideOut &&
-      hammerTime
-    ) {
-      const modeRank = (mode?: PatternSignalMode) => {
-        if (mode === "BOLLINGER_STRONG") return 3;
-        if (mode === "BOLLINGER_CONFIRMED") return 2;
-        if (mode === "BOLLINGER_EARLY") return 1;
-        return 0;
-      };
-    }
-
-    if (
-      tradeActive &&
-      !openedTradeThisRefresh &&
-      levels &&
-      signalCandleTime &&
-      (sideOut === "BUY" || sideOut === "SELL")
-    ) {
-      const activeLevels = levels;
-      const activeSide = sideOut;
-
-      const closedResult = detectClosedTradeStatus({
-  candles: cs,
-  side: activeSide,
-  levels: activeLevels,
-  signalTime: signalCandleTime,
-  tp1Hit,
-  tp2Hit,
-});
-
-const tp1WasHit = tp1Hit;
-tp1Hit = closedResult.tp1Hit;
-tp2Hit = closedResult.tp2Hit;
-const closedStatus = closedResult.status;
-
-// Po TP1 NIE przesuwamy wizualnego SL na Entry.
-// Entry / SL / TP1 / TP2 / TP3 pozostają zamrożone od chwili READY.
-// Break Even jest obsługiwany wewnętrznie przez detectClosedTradeStatus(),
-// ale nie nadpisuje oryginalnego poziomu SL ani jego strefy na wykresie.
-
-      if (closedStatus) {
-  const tradeId = `${r.symbol}-${tf}-${activeSide}-${Number(signalCandleTime)}`;
-
-  const closedAt = new Date().toISOString();
-  const finalTp1Hit = closedStatus === "TP3" || closedStatus === "TP1_BE" || tp1Hit;
-  const finalTp2Hit = closedStatus === "TP3" || tp2Hit;
-  const finalTp3Hit = closedStatus === "TP3";
-
-  closedNow.push({
-    id: tradeId,
-    date: new Date(Number(signalCandleTime) * 1000).toISOString(),
-    closedAt,
-    instrument: r.symbol,
-    direction: activeSide,
-    tf,
-    entry: Number(activeLevels.entry),
-    tp1: activeLevels.tps?.[0] ? Number(activeLevels.tps[0]) : undefined,
-    tp2: activeLevels.tps?.[1] ? Number(activeLevels.tps[1]) : undefined,
-    tp3: activeLevels.tps?.[2] ? Number(activeLevels.tps[2]) : undefined,
-    sl: Number((levels ?? activeLevels).sl),
-    status: closedStatus,
-    tp1Hit: finalTp1Hit,
-    tp2Hit: finalTp2Hit,
-    tp3Hit: finalTp3Hit,
-  });
-
-  // Drugie powiadomienie Telegram: tylko po FINALNYM zamknięciu trade'u.
-  // Pokazuje dokładnie które TP zostały zaliczone i końcowy wynik.
-  void sendTelegram({
-    type: "CLOSED",
-    instrument: r.symbol,
-    side: activeSide,
-    tf,
-    entry: Number(activeLevels.entry),
-    sl: Number((levels ?? activeLevels).sl),
-    tp1: activeLevels.tps?.[0] ? Number(activeLevels.tps[0]) : undefined,
-    tp2: activeLevels.tps?.[1] ? Number(activeLevels.tps[1]) : undefined,
-    tp3: activeLevels.tps?.[2] ? Number(activeLevels.tps[2]) : undefined,
-    status: closedStatus,
-    tp1Hit: finalTp1Hit,
-    tp2Hit: finalTp2Hit,
-    tp3Hit: finalTp3Hit,
-    timeISO: closedAt,
-  });
-
-  tradeActive = false;
-  sideOut = undefined;
-  levels = undefined;
-  hammerTime = undefined;
-  signalCandleTime = undefined;
-  signalPattern = "NONE";
-  patternSignalMode = undefined;
-}
-    }
+    // IMPORTANT: trade lifecycle is owned by the central Railway worker.
+    // The browser scanner may calculate live confirmations for UI only, but it must
+    // never open/close/replace a trade received from /api/fx-scanner/trades.
 
     if (tradeActive && levels && (sideOut === "BUY" || sideOut === "SELL")) {
       tradesMemoryRef.current.set(tradeKey(r.symbol, tf), {
@@ -3705,7 +3464,7 @@ const closedStatus = closedResult.status;
       tradesMemoryRef.current.delete(tradeKey(r.symbol, tf));
     }
 
-    const rowStatus: Status = setupReadyNow ? "READY" : "CLOSE";
+    const rowStatus: Status = tradeActive ? "READY" : "CLOSE";
 
     return {
       ...r,
@@ -3722,8 +3481,8 @@ const closedStatus = closedResult.status;
       patternSignalMode,
       tp1Hit,
       tp2Hit,
-      confirmationCount: best.count,
-      confirmationSide: best.side,
+      confirmationCount: tradeActive ? 4 : best.count,
+      confirmationSide: tradeActive ? sideOut ?? null : best.side,
       higherTfSignal: r.higherTfSignal ?? "NONE",
     };
   });
