@@ -2758,7 +2758,7 @@ export default function MarketScannerPage() {
       }
 
       try {
-        const res = await fetch(`${baseUrl}/health`, { cache: "no-store" });
+        const res = await fetch("/api/market-health", { cache: "no-store" });
         if (!res.ok) throw new Error(`Master health HTTP ${res.status}`);
 
         const data = await res.json();

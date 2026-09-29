@@ -13,7 +13,7 @@
     "fx:scanner": "tsx scripts/fx-scanner-worker.ts"
   },
   "dependencies": {
-    "@prisma/client": "^6.16.2",
+    "@prisma/client": "^6.19.3",
     "@supabase/supabase-js": "^2.108.1",
     "bcryptjs": "^3.0.3",
     "dotenv": "^17.3.1",
@@ -27,7 +27,7 @@
     "lucide-react": "^0.577.0",
     "next": "^15.5.11",
     "pg": "^8.20.0",
-    "prisma": "^6.16.2",
+    "prisma": "^6.19.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "recharts": "^2.15.4",
