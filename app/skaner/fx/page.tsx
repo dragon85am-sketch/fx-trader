@@ -2918,15 +2918,11 @@ React.useEffect(() => {
         setRows(prev => prev.map(row => {
           const t = activeBySymbol.get(row.symbol.toUpperCase());
           if (!t) {
+            // No ACTIVE central trade. Keep the browser's 4/4 READY preview
+            // (zones + confirmations); only clear the ACTIVE lifecycle flag.
             return {
               ...row,
               tradeActive: false,
-              side: undefined,
-              levels: undefined,
-              signalCandleTime: undefined,
-              confirmationCount: 0,
-              confirmationSide: null,
-              status: "CLOSE" as Status,
               tp1Hit: false,
               tp2Hit: false,
             };
@@ -3424,6 +3420,33 @@ const signal: Signal = supertrendEnabled
     // Liquidity % pozostaje informacją UI. Sam READY wynika wyłącznie z 4/4.
     const setupReadyNow = !!setupSide && classicReady;
 
+    // 4/4 only prepares the setup. Draw zones as PREVIEW, but do not mark
+    // the trade active until the Railway worker confirms a CLOSED candle
+    // beyond ENTRY and returns it from /api/fx-scanner/trades.
+    if (!tradeActive) {
+      if (setupReadyNow && setupSide) {
+        const closed = lastClosedCandle(cs);
+        if (closed) {
+          const preview = buildLevelsLiquidityOnly({
+            candles: cs,
+            tickSize: tick,
+            zoneTicks: 2,
+            side: setupSide,
+            signalTime: closed.time,
+          });
+          if (preview) {
+            levels = preview;
+            sideOut = setupSide;
+            signalCandleTime = closed.time;
+          }
+        }
+      } else {
+        levels = undefined;
+        sideOut = undefined;
+        signalCandleTime = undefined;
+      }
+    }
+
     const wasOn = scannerPrevRef.current.get(r.symbol) ?? false;
     scannerPrevRef.current.set(r.symbol, setupReadyNow);
 
@@ -3456,7 +3479,7 @@ const signal: Signal = supertrendEnabled
       tradesMemoryRef.current.delete(tradeKey(r.symbol, tf));
     }
 
-    const rowStatus: Status = tradeActive ? "READY" : "CLOSE";
+    const rowStatus: Status = tradeActive || setupReadyNow ? "READY" : "CLOSE";
 
     return {
       ...r,
@@ -3782,7 +3805,7 @@ if (closedNow.length) {
   }, [renkoSource, tf, selectedCandles, renkoCandles, liveCandle]);
 
   const highlightTime: UTCTimestamp | null = selected.tradeActive ? selected.hammerTime ?? null : null;
-  const hasTrade = !!selected.tradeActive && !!selected.levels;
+  const hasTrade = !!selected.levels && (!!selected.tradeActive || (selected.confirmationCount ?? 0) === 4);
 
   const exportClosedTradesToXlsx = React.useCallback(() => {
     if (!closedTrades.length) return;
