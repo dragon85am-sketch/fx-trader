@@ -2753,20 +2753,43 @@ React.useEffect(() => {
         const closedJson = await closedRes.json();
         if (!alive) return;
 
-        const closed: ClosedTrade[] = (closedJson.trades ?? []).map((t: any) => ({
-          id: t.id,
-          date: t.signalTime,
-          closedAt: t.closedAt,
-          instrument: t.instrument,
-          direction: t.side,
-          tf: t.tf,
-          entry: Number(t.entry),
-          tp1: Number(t.tp1), tp2: Number(t.tp2), tp3: Number(t.tp3),
-          sl: Number(t.sl),
-          status: t.status,
-          tp1Hit: !!t.tp1Hit, tp2Hit: !!t.tp2Hit, tp3Hit: !!t.tp3Hit,
-        }));
+        // Closed Trades: użytkownik widzi ruchomą historię ostatnich 72 godzin.
+        // Starsze rekordy pozostają w centralnej bazie, ale znikają z panelu.
+        const CLOSED_TRADES_RETENTION_MS = 3 * 24 * 60 * 60 * 1000;
+        const now = Date.now();
+
+        const closed: ClosedTrade[] = (closedJson.trades ?? [])
+          .map((t: any) => ({
+            id: t.id,
+            date: t.signalTime,
+            closedAt: t.closedAt,
+            instrument: t.instrument,
+            direction: t.side,
+            tf: t.tf,
+            entry: Number(t.entry),
+            tp1: Number(t.tp1),
+            tp2: Number(t.tp2),
+            tp3: Number(t.tp3),
+            sl: Number(t.sl),
+            status: t.status,
+            tp1Hit: !!t.tp1Hit,
+            tp2Hit: !!t.tp2Hit,
+            tp3Hit: !!t.tp3Hit,
+          }))
+          .filter((trade: ClosedTrade) => {
+            const tradeTime = new Date(trade.closedAt ?? trade.date).getTime();
+            return Number.isFinite(tradeTime) &&
+              tradeTime <= now &&
+              now - tradeTime < CLOSED_TRADES_RETENTION_MS;
+          })
+          .sort((a: ClosedTrade, b: ClosedTrade) => {
+            const aTime = new Date(a.closedAt ?? a.date).getTime();
+            const bTime = new Date(b.closedAt ?? b.date).getTime();
+            return bTime - aTime;
+          });
+
         setClosedTrades(closed);
+        saveClosedTradesToStorage(closed);
 
         const activeBySymbol = new Map<string, any>();
         for (const t of activeJson.trades ?? []) {
