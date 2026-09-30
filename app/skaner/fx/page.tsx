@@ -2748,17 +2748,9 @@ export default function MarketScannerPage() {
     let alive = true;
 
     const refreshMasterHealth = async () => {
-      const baseUrl = (process.env.NEXT_PUBLIC_US30_LIVE_URL ?? "").replace(/\/$/, "");
-      if (!baseUrl) {
-        if (alive) {
-          setMasterLiveSymbols(new Set());
-          setMasterHealthLoaded(true);
-        }
-        return;
-      }
-
       try {
-        const res = await fetch("/api/market-health", { cache: "no-store" });
+        // Same-origin Next.js proxy -> Railway collector. This avoids browser CORS.
+        const res = await fetch("/api/market_health", { cache: "no-store" });
         if (!res.ok) throw new Error(`Master health HTTP ${res.status}`);
 
         const data = await res.json();
@@ -3141,9 +3133,10 @@ React.useEffect(() => {
     if (directionFilter) {
       base = base.filter(
         (r) =>
-          r.tradeActive === true &&
           r.status === "READY" &&
-          r.side === directionFilter
+          r.confirmationSide === directionFilter &&
+          (r.confirmationCount ?? 0) === 4 &&
+          r.liquidity >= LIQ_THRESHOLD_HIGH
       );
     }
 
@@ -3621,9 +3614,8 @@ if (closedNow.length) {
     [rows, selectedSymbol]
   );
 
-  // Master Collector: każdy obsługiwany instrument tickuje przez wspólny SSE hub.
-  // Historyczne świece nadal są pobierane normalnie, a liveCandle aktualizuje tylko
-  // aktualnie otwartą świecę wybranego interwału.
+  // Live candle from the same-origin health proxy. The collector currently exposes
+  // latestTicks in /health, while the old per-symbol SSE URL returns 404/CORS.
   const [liveCandle, setLiveCandle] = React.useState<Candle | null>(null);
 
   React.useEffect(() => {
@@ -3632,9 +3624,7 @@ if (closedNow.length) {
     const symbol = selected?.symbol?.toUpperCase();
     if (!symbol) return;
 
-    const baseUrl = (process.env.NEXT_PUBLIC_US30_LIVE_URL ?? "").replace(/\/$/, "");
-    if (!baseUrl) return;
-
+    let alive = true;
     const intervalSeconds: Record<Timeframe, number> = {
       M1: 60,
       M5: 300,
@@ -3644,86 +3634,59 @@ if (closedNow.length) {
       H4: 14400,
       D1: 86400,
     };
-
     const bucketSize = intervalSeconds[tf];
-    const source = new EventSource(`${baseUrl}/api/market/${symbol.toLowerCase()}/stream`);
 
-    source.addEventListener("tick", (event) => {
+    const applyTick = (price: number, timestampMs: number) => {
+      const tickSeconds = Math.floor(timestampMs / 1000);
+      const bucketTime = (Math.floor(tickSeconds / bucketSize) * bucketSize) as UTCTimestamp;
+
+      setLiveCandle((prev) => {
+        const cacheKey = candleCacheKey(symbol, tf);
+        const history = candlesCache.current.get(cacheKey) ?? [];
+
+        if (prev && Number(prev.time) === Number(bucketTime)) {
+          return { ...prev, high: Math.max(prev.high, price), low: Math.min(prev.low, price), close: price };
+        }
+
+        if (prev && Number(prev.time) < Number(bucketTime)) {
+          const withoutPrev = history.filter((c) => Number(c.time) !== Number(prev.time));
+          candlesCache.current.set(
+            cacheKey,
+            [...withoutPrev, prev].sort((a, b) => Number(a.time) - Number(b.time)).slice(-300)
+          );
+        }
+
+        const currentHistory = candlesCache.current.get(cacheKey) ?? history;
+        const last = currentHistory[currentHistory.length - 1];
+        if (last && Number(last.time) === Number(bucketTime)) {
+          return { ...last, high: Math.max(last.high, price), low: Math.min(last.low, price), close: price };
+        }
+
+        return { time: bucketTime, open: price, high: price, low: price, close: price, volume: 0 };
+      });
+    };
+
+    const refreshLiveTick = async () => {
       try {
-        const tick = JSON.parse((event as MessageEvent).data) as {
-          symbol?: string;
-          price?: number;
-          timestamp?: number;
-        };
-
-        // Collector może rozsyłać ticki wielu instrumentów — filtr jest obowiązkowy.
-        if (tick.symbol?.toUpperCase() !== symbol) return;
-
-        const price = Number(tick.price);
-        const timestampMs = Number(tick.timestamp);
-        if (!Number.isFinite(price) || price <= 0 || !Number.isFinite(timestampMs)) return;
-
-        const tickSeconds = Math.floor(timestampMs / 1000);
-        const bucketTime = (Math.floor(tickSeconds / bucketSize) * bucketSize) as UTCTimestamp;
-
-        setLiveCandle((prev) => {
-          const cacheKey = candleCacheKey(symbol, tf);
-          const history = candlesCache.current.get(cacheKey) ?? [];
-
-          if (prev && Number(prev.time) === Number(bucketTime)) {
-            return {
-              ...prev,
-              high: Math.max(prev.high, price),
-              low: Math.min(prev.low, price),
-              close: price,
-            };
-          }
-
-          // MASTER 150: gdy tick otwiera nowy bucket, poprzednia live świeca staje się
-          // świecą historyczną w cache danego SYMBOLU + TIMEFRAME. Dzięki temu wykres
-          // nie czeka na kolejny polling REST i działa jak TradingView.
-          if (prev && Number(prev.time) < Number(bucketTime)) {
-            const withoutPrev = history.filter(
-              (c) => Number(c.time) !== Number(prev.time)
-            );
-            candlesCache.current.set(
-              cacheKey,
-              [...withoutPrev, prev]
-                .sort((a, b) => Number(a.time) - Number(b.time))
-                .slice(-300)
-            );
-          }
-
-          // Jeżeli REST ma już świecę dla aktualnego bucketu, zachowujemy jej OPEN/HIGH/LOW
-          // i podmieniamy tylko dane wynikające z najnowszego ticka.
-          const currentHistory = candlesCache.current.get(cacheKey) ?? history;
-          const last = currentHistory[currentHistory.length - 1];
-          if (last && Number(last.time) === Number(bucketTime)) {
-            return {
-              ...last,
-              high: Math.max(last.high, price),
-              low: Math.min(last.low, price),
-              close: price,
-            };
-          }
-
-          // Nowa świeca dokładnie w granicy wybranego TF: M1/M5/M15/M30/H1/H4/D1.
-          return {
-            time: bucketTime,
-            open: price,
-            high: price,
-            low: price,
-            close: price,
-            volume: 0,
-          };
-        });
+        const res = await fetch("/api/market_health", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json();
+        const rawTick = data?.latestTicks?.[symbol];
+        const price = Number(rawTick?.price);
+        const timestampMs = Number(rawTick?.timestamp);
+        if (!alive || !Number.isFinite(price) || price <= 0 || !Number.isFinite(timestampMs)) return;
+        applyTick(price, timestampMs);
       } catch {
-        // Pojedynczy błędny frame SSE nie może zatrzymać wykresu.
+        // A temporary health failure must not break the chart.
       }
-    });
+    };
+
+    void refreshLiveTick();
+    const id = window.setInterval(() => void refreshLiveTick(), 1000);
 
     return () => {
-      source.close();
+      alive = false;
+      window.clearInterval(id);
     };
   }, [selected?.symbol, tf]);
 
@@ -3818,26 +3781,8 @@ if (closedNow.length) {
     return next;
   }, [renkoSource, tf, selectedCandles, renkoCandles, liveCandle]);
 
-  const highlightTime: UTCTimestamp | null =
-    selected.tradeActive && selected.status === "READY" && selected.confirmationCount === 4
-      ? selected.signalCandleTime ?? null
-      : null;
+  const highlightTime: UTCTimestamp | null = selected.tradeActive ? selected.hammerTime ?? null : null;
   const hasTrade = !!selected.tradeActive && !!selected.levels;
-
-  const formatLocalTradeDate = React.useCallback((value?: string) => {
-    if (!value) return "—";
-    const d = new Date(value);
-    if (!Number.isFinite(d.getTime())) return String(value);
-
-    return new Intl.DateTimeFormat("pl-PL", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    }).format(d);
-  }, []);
 
   const exportClosedTradesToXlsx = React.useCallback(() => {
     if (!closedTrades.length) return;
@@ -3902,7 +3847,7 @@ if (closedNow.length) {
 
       const dateValue = (() => {
         try {
-          return formatLocalTradeDate(t.closedAt ?? t.date);
+          return new Date(t.date).toISOString().slice(0, 16).replace("T", " ");
         } catch {
           return String(t.date ?? "");
         }
@@ -4396,16 +4341,14 @@ if (closedNow.length) {
               {filteredRows.map((r) => {
                 const active = r.symbol === selectedSymbol;
                 const isOffline = masterHealthLoaded && !masterLiveSymbols.has(r.symbol.toUpperCase());
-                // Railway worker / central ACTIVE trade is the only authority for READY/BUY/SELL.
-                // Liquidity and local 4/4 remain informational and can never create a signal in the browser.
-                const scannerOn = !isOffline && r.tradeActive === true && r.status === "READY" && !!r.side;
+                const scannerOn = !isOffline && r.liquidity >= LIQ_THRESHOLD_HIGH && (r.confirmationCount ?? 0) === 4 && !!r.confirmationSide;
                 const waitLiquidity =
                   !isOffline &&
-                  !r.tradeActive &&
                   (r.confirmationCount ?? 0) === 4 &&
-                  !!r.confirmationSide;
+                  !!r.confirmationSide &&
+                  r.liquidity < LIQ_THRESHOLD_HIGH;
                 const isFlashing = flashMapRef.current.has(r.symbol);
-                const rowSide = scannerOn ? r.side ?? null : null;
+                const rowSide = scannerOn ? r.confirmationSide : null;
 
                 return (
                   <div
@@ -5239,7 +5182,11 @@ if (closedNow.length) {
 closedTrades.map((t) => (
   <tr key={t.id} className="border-b border-sky-300/8 text-sky-50 transition hover:bg-sky-400/[0.05]">
     <td className="whitespace-nowrap px-3 py-2">
-      {formatLocalTradeDate(t.closedAt ?? t.date)}
+      {new Intl.DateTimeFormat("pl-PL", {
+        timeZone: "Europe/Amsterdam",
+        year: "numeric", month: "2-digit", day: "2-digit",
+        hour: "2-digit", minute: "2-digit", hour12: false,
+      }).format(new Date(t.closedAt ?? t.date)).replace(",", "")}
     </td>
 
     <td className="px-3 py-2">{t.instrument}</td>
