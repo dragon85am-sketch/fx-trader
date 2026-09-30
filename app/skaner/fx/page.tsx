@@ -2750,7 +2750,7 @@ export default function MarketScannerPage() {
     const refreshMasterHealth = async () => {
       try {
         // Same-origin Next.js proxy -> Railway collector. This avoids browser CORS.
-        const res = await fetch("/api/market-health", { cache: "no-store" });
+        const res = await fetch("/api/market_health", { cache: "no-store" });
         if (!res.ok) throw new Error(`Master health HTTP ${res.status}`);
 
         const data = await res.json();
@@ -3668,7 +3668,7 @@ if (closedNow.length) {
 
     const refreshLiveTick = async () => {
       try {
-        const res = await fetch("/api/market-health", { cache: "no-store" });
+        const res = await fetch("/api/market_health", { cache: "no-store" });
         if (!res.ok) return;
         const data = await res.json();
         const rawTick = data?.latestTicks?.[symbol];
