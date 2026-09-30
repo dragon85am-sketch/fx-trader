@@ -63,7 +63,7 @@ const DEFAULT_SUPERTREND_SETTINGS: SupertrendSettings = {
 const TIMEFRAMES = ["M1", "M5", "M15", "M30", "H1", "H4", "D1"] as const;
 type Timeframe = (typeof TIMEFRAMES)[number];
 
-const COLLECTOR_INTERVAL: Record<Timeframe, string> = {
+const TWELVE_INTERVAL: Record<Timeframe, string> = {
   M1: "1min",
   M5: "5min",
   M15: "15min",
@@ -1505,6 +1505,61 @@ function detectClosedTradeStatus(params: {
   return { status: null, tp1Hit, tp2Hit };
 }
 
+function toTwelveSymbol(symbol: string) {
+  const s = symbol.toUpperCase();
+
+  if (s === "XAUUSD") return "XAU/USD";
+  if (s === "XAGUSD") return "XAG/USD";
+  if (s.endsWith("USDT")) return `${s.slice(0, -4)}/USD`;
+  if (s.length === 6) return `${s.slice(0, 3)}/${s.slice(3)}`;
+
+  return s;
+}
+
+async function fetchTwelveCandles(symbol: string, tf: Timeframe): Promise<{ candles: Candle[]; volume: number }> {
+  const interval = TWELVE_INTERVAL[tf];
+  const tdSymbol = toTwelveSymbol(symbol);
+
+  const url = `/api/twelve-data?symbol=${encodeURIComponent(tdSymbol)}&interval=${encodeURIComponent(
+    interval
+  )}&outputsize=220&order=desc`;
+
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(await res.text());
+
+  const data = await res.json();
+  if (data?.status === "error") throw new Error(data.message);
+
+const candles: Candle[] = (data.values ?? [])
+  .slice()
+  .reverse()
+  .map((v: any) => ({
+    time: Math.floor(
+      new Date(v.datetime.replace(" ", "T") + "Z").getTime() / 1000
+    ) as UTCTimestamp,
+    open: Number(v.open),
+    high: Number(v.high),
+    low: Number(v.low),
+    close: Number(v.close),
+    volume: Number(v.volume ?? 0),
+  }))
+  .filter(
+    (c: Candle) =>
+      Number.isFinite(c.time) &&
+      c.open > 0 &&
+      c.high > 0 &&
+      c.low > 0 &&
+      c.close > 0
+  );
+  const volume = candles.reduce((sum, c) => sum + (c.volume ?? 0), 0);
+
+  return {
+    candles,
+    volume,
+  };
+}
+  
+
 async function fetchCoinbaseCandles(symbol: string, tf: Timeframe): Promise<{ candles: Candle[]; volume: number }> {
   const productId = COINBASE_MAP[symbol.toUpperCase()];
 
@@ -1583,7 +1638,7 @@ async function fetchFxTradeCandles(
   tf: Timeframe
 ): Promise<{ candles: Candle[]; volume: number }> {
   // Master Collector stores every supported timeframe directly.
-  const engineInterval = COLLECTOR_INTERVAL[tf];
+  const engineInterval = TWELVE_INTERVAL[tf];
   const params = new URLSearchParams({ symbol, interval: engineInterval, limit: "300" });
 
   const res = await fetch(`/api/market/candles?${params.toString()}`, {
@@ -1663,25 +1718,20 @@ function hasCorrectCandleCadence(candles: Candle[], tf: Timeframe): boolean {
   return exact >= Math.ceil(normal.length * 0.5);
 }
 
-async function fetchAutoCandles(
-  symbol: string,
-  tf: Timeframe,
-  _source: DataSource
-): Promise<{ candles: Candle[]; volume: number }> {
-  // Crypto keeps its existing Coinbase feed.
-  if (symbol.endsWith("USDT")) return fetchCoinbaseCandles(symbol, tf);
+async function fetchAutoCandles(symbol: string, tf: Timeframe, _source: DataSource): Promise<{ candles: Candle[]; volume: number }> {
+  // Prefer Master Collector only when its historical cadence really matches
+  // the requested timeframe. Never display M5-like history as M1.
+  try {
+    const master = await fetchFxTradeCandles(symbol, tf);
+    if (hasCorrectCandleCadence(master.candles, tf)) return master;
 
-  // FX / metals: one source of truth = Railway Master Collector,
-  // fed by Live Rates through the Railway collector.
-  const master = await fetchFxTradeCandles(symbol, tf);
-
-  if (!hasCorrectCandleCadence(master.candles, tf)) {
     console.warn(
-      `[CANDLE CADENCE] ${symbol} ${tf}: Master Collector returned sparse/invalid cadence; keeping Live Rates collector data`
+      `[CANDLE CADENCE] ${symbol} ${tf}: Master Collector returned invalid/sparse cadence; using provider fallback`
     );
-  }
+  } catch {}
 
-  return master;
+  if (symbol.endsWith("USDT")) return fetchCoinbaseCandles(symbol, tf);
+  return fetchTwelveCandles(symbol, tf);
 }
 
 // ======================================================
@@ -1707,6 +1757,26 @@ type PocScannerState = {
   error: string | null;
 };
 
+const POC_INTERVAL: Record<PocTimeframe, string> = {
+  M1: "1min",
+  M5: "5min",
+  M15: "15min",
+  M30: "30min",
+  H1: "1h",
+  H4: "4h",
+  D: "1day",
+};
+
+const POC_COINBASE_GRANULARITY: Record<PocTimeframe, number> = {
+  M1: 60,
+  M5: 300,
+  M15: 900,
+  M30: 1800,
+  H1: 3600,
+  H4: 14400,
+  D: 86400,
+};
+
 function calcVolumePoc(candles: Candle[], bins = 28): number | null {
   if (!candles.length) return null;
 
@@ -1726,7 +1796,7 @@ function calcVolumePoc(candles: Candle[], bins = 28): number | null {
     const rawIndex = Math.floor((typical - low) / step);
     const index = Math.max(0, Math.min(bins - 1, rawIndex));
 
-    // Feed FX może nie zawierać realnego wolumenu.
+    // Forex z Twelve Data czasem nie ma realnego wolumenu.
     // Wtedy każda świeca dostaje wagę 1, żeby POC nadal działał.
     const weight =
       Number.isFinite(candle.volume) && (candle.volume ?? 0) > 0
@@ -1768,17 +1838,89 @@ async function fetchPocCandles(
   symbol: string,
   tf: PocTimeframe
 ): Promise<Candle[]> {
-  // POC: Live Rates -> Railway Master Collector -> /api/market/candles
-  const liveTf: Timeframe = tf === "D" ? "D1" : tf;
-  const live = await fetchFxTradeCandles(symbol, liveTf);
+  if (symbol.endsWith("USDT")) {
+    const productId = COINBASE_MAP[symbol.toUpperCase()];
+    if (!productId) throw new Error(`Coinbase unsupported symbol: ${symbol}`);
 
-  if (!hasCorrectCandleCadence(live.candles, liveTf)) {
-    console.warn(
-      `[POC LIVE RATES] ${symbol} ${tf}: sparse/invalid cadence; using available Live Rates candles`
-    );
+    const granularity = POC_COINBASE_GRANULARITY[tf];
+    const url = `/api/coinbase?product_id=${encodeURIComponent(
+      productId
+    )}&granularity=${granularity}`;
+
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error(`POC Coinbase error: ${symbol} ${tf}`);
+
+    const data = await res.json();
+    const raw = Array.isArray(data)
+      ? data
+      : Array.isArray(data?.candles)
+        ? data.candles
+        : [];
+
+    return raw
+      .map((c: any) => ({
+        time: Number(c[0]) as UTCTimestamp,
+        low: Number(c[1]),
+        high: Number(c[2]),
+        open: Number(c[3]),
+        close: Number(c[4]),
+        volume: Number(c[5] ?? 0),
+      }))
+      .filter(
+        (c: Candle) =>
+          Number.isFinite(c.time) &&
+          Number.isFinite(c.open) &&
+          Number.isFinite(c.high) &&
+          Number.isFinite(c.low) &&
+          Number.isFinite(c.close) &&
+          c.open > 0 &&
+          c.high > 0 &&
+          c.low > 0 &&
+          c.close > 0
+      )
+      .sort((a: Candle, b: Candle) => Number(a.time) - Number(b.time));
   }
 
-  return live.candles;
+  const tdSymbol = toTwelveSymbol(symbol);
+  const interval = POC_INTERVAL[tf];
+
+  const url = `/api/twelve-data?symbol=${encodeURIComponent(
+    tdSymbol
+  )}&interval=${encodeURIComponent(interval)}&outputsize=220&order=desc`;
+
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`POC Twelve Data error: ${symbol} ${tf}`);
+
+  const data = await res.json();
+  if (data?.status === "error") {
+    throw new Error(data?.message ?? `POC Twelve Data error: ${symbol} ${tf}`);
+  }
+
+  return (data.values ?? [])
+    .slice()
+    .reverse()
+    .map((v: any) => ({
+      time: Math.floor(
+        new Date(v.datetime.replace(" ", "T") + "Z").getTime() / 1000
+      ) as UTCTimestamp,
+      open: Number(v.open),
+      high: Number(v.high),
+      low: Number(v.low),
+      close: Number(v.close),
+      volume: Number(v.volume ?? 0),
+    }))
+    .filter(
+      (c: Candle) =>
+        Number.isFinite(c.time) &&
+        Number.isFinite(c.open) &&
+        Number.isFinite(c.high) &&
+        Number.isFinite(c.low) &&
+        Number.isFinite(c.close) &&
+        c.open > 0 &&
+        c.high > 0 &&
+        c.low > 0 &&
+        c.close > 0
+    );
 }
 
 function getPocSummary(cells: PocCell[]) {
@@ -2606,9 +2748,17 @@ export default function MarketScannerPage() {
     let alive = true;
 
     const refreshMasterHealth = async () => {
+      const baseUrl = (process.env.NEXT_PUBLIC_US30_LIVE_URL ?? "").replace(/\/$/, "");
+      if (!baseUrl) {
+        if (alive) {
+          setMasterLiveSymbols(new Set());
+          setMasterHealthLoaded(true);
+        }
+        return;
+      }
+
       try {
-        // Same-origin Next.js proxy -> Railway collector. This avoids browser CORS.
-        const res = await fetch("/api/market_health", { cache: "no-store" });
+        const res = await fetch("/api/market-health", { cache: "no-store" });
         if (!res.ok) throw new Error(`Master health HTTP ${res.status}`);
 
         const data = await res.json();
@@ -2753,43 +2903,20 @@ React.useEffect(() => {
         const closedJson = await closedRes.json();
         if (!alive) return;
 
-        // Closed Trades: użytkownik widzi ruchomą historię ostatnich 72 godzin.
-        // Starsze rekordy pozostają w centralnej bazie, ale znikają z panelu.
-        const CLOSED_TRADES_RETENTION_MS = 3 * 24 * 60 * 60 * 1000;
-        const now = Date.now();
-
-        const closed: ClosedTrade[] = (closedJson.trades ?? [])
-          .map((t: any) => ({
-            id: t.id,
-            date: t.signalTime,
-            closedAt: t.closedAt,
-            instrument: t.instrument,
-            direction: t.side,
-            tf: t.tf,
-            entry: Number(t.entry),
-            tp1: Number(t.tp1),
-            tp2: Number(t.tp2),
-            tp3: Number(t.tp3),
-            sl: Number(t.sl),
-            status: t.status,
-            tp1Hit: !!t.tp1Hit,
-            tp2Hit: !!t.tp2Hit,
-            tp3Hit: !!t.tp3Hit,
-          }))
-          .filter((trade: ClosedTrade) => {
-            const tradeTime = new Date(trade.closedAt ?? trade.date).getTime();
-            return Number.isFinite(tradeTime) &&
-              tradeTime <= now &&
-              now - tradeTime < CLOSED_TRADES_RETENTION_MS;
-          })
-          .sort((a: ClosedTrade, b: ClosedTrade) => {
-            const aTime = new Date(a.closedAt ?? a.date).getTime();
-            const bTime = new Date(b.closedAt ?? b.date).getTime();
-            return bTime - aTime;
-          });
-
+        const closed: ClosedTrade[] = (closedJson.trades ?? []).map((t: any) => ({
+          id: t.id,
+          date: t.signalTime,
+          closedAt: t.closedAt,
+          instrument: t.instrument,
+          direction: t.side,
+          tf: t.tf,
+          entry: Number(t.entry),
+          tp1: Number(t.tp1), tp2: Number(t.tp2), tp3: Number(t.tp3),
+          sl: Number(t.sl),
+          status: t.status,
+          tp1Hit: !!t.tp1Hit, tp2Hit: !!t.tp2Hit, tp3Hit: !!t.tp3Hit,
+        }));
         setClosedTrades(closed);
-        saveClosedTradesToStorage(closed);
 
         const activeBySymbol = new Map<string, any>();
         for (const t of activeJson.trades ?? []) {
@@ -3014,10 +3141,9 @@ React.useEffect(() => {
     if (directionFilter) {
       base = base.filter(
         (r) =>
+          r.tradeActive === true &&
           r.status === "READY" &&
-          r.confirmationSide === directionFilter &&
-          (r.confirmationCount ?? 0) === 4 &&
-          r.liquidity >= LIQ_THRESHOLD_HIGH
+          r.side === directionFilter
       );
     }
 
@@ -3495,8 +3621,9 @@ if (closedNow.length) {
     [rows, selectedSymbol]
   );
 
-  // Live candle from the same-origin health proxy. The collector currently exposes
-  // latestTicks in /health, while the old per-symbol SSE URL returns 404/CORS.
+  // Master Collector: każdy obsługiwany instrument tickuje przez wspólny SSE hub.
+  // Historyczne świece nadal są pobierane normalnie, a liveCandle aktualizuje tylko
+  // aktualnie otwartą świecę wybranego interwału.
   const [liveCandle, setLiveCandle] = React.useState<Candle | null>(null);
 
   React.useEffect(() => {
@@ -3505,7 +3632,9 @@ if (closedNow.length) {
     const symbol = selected?.symbol?.toUpperCase();
     if (!symbol) return;
 
-    let alive = true;
+    const baseUrl = (process.env.NEXT_PUBLIC_US30_LIVE_URL ?? "").replace(/\/$/, "");
+    if (!baseUrl) return;
+
     const intervalSeconds: Record<Timeframe, number> = {
       M1: 60,
       M5: 300,
@@ -3515,59 +3644,86 @@ if (closedNow.length) {
       H4: 14400,
       D1: 86400,
     };
+
     const bucketSize = intervalSeconds[tf];
+    const source = new EventSource(`${baseUrl}/api/market/${symbol.toLowerCase()}/stream`);
 
-    const applyTick = (price: number, timestampMs: number) => {
-      const tickSeconds = Math.floor(timestampMs / 1000);
-      const bucketTime = (Math.floor(tickSeconds / bucketSize) * bucketSize) as UTCTimestamp;
-
-      setLiveCandle((prev) => {
-        const cacheKey = candleCacheKey(symbol, tf);
-        const history = candlesCache.current.get(cacheKey) ?? [];
-
-        if (prev && Number(prev.time) === Number(bucketTime)) {
-          return { ...prev, high: Math.max(prev.high, price), low: Math.min(prev.low, price), close: price };
-        }
-
-        if (prev && Number(prev.time) < Number(bucketTime)) {
-          const withoutPrev = history.filter((c) => Number(c.time) !== Number(prev.time));
-          candlesCache.current.set(
-            cacheKey,
-            [...withoutPrev, prev].sort((a, b) => Number(a.time) - Number(b.time)).slice(-300)
-          );
-        }
-
-        const currentHistory = candlesCache.current.get(cacheKey) ?? history;
-        const last = currentHistory[currentHistory.length - 1];
-        if (last && Number(last.time) === Number(bucketTime)) {
-          return { ...last, high: Math.max(last.high, price), low: Math.min(last.low, price), close: price };
-        }
-
-        return { time: bucketTime, open: price, high: price, low: price, close: price, volume: 0 };
-      });
-    };
-
-    const refreshLiveTick = async () => {
+    source.addEventListener("tick", (event) => {
       try {
-        const res = await fetch("/api/market_health", { cache: "no-store" });
-        if (!res.ok) return;
-        const data = await res.json();
-        const rawTick = data?.latestTicks?.[symbol];
-        const price = Number(rawTick?.price);
-        const timestampMs = Number(rawTick?.timestamp);
-        if (!alive || !Number.isFinite(price) || price <= 0 || !Number.isFinite(timestampMs)) return;
-        applyTick(price, timestampMs);
-      } catch {
-        // A temporary health failure must not break the chart.
-      }
-    };
+        const tick = JSON.parse((event as MessageEvent).data) as {
+          symbol?: string;
+          price?: number;
+          timestamp?: number;
+        };
 
-    void refreshLiveTick();
-    const id = window.setInterval(() => void refreshLiveTick(), 1000);
+        // Collector może rozsyłać ticki wielu instrumentów — filtr jest obowiązkowy.
+        if (tick.symbol?.toUpperCase() !== symbol) return;
+
+        const price = Number(tick.price);
+        const timestampMs = Number(tick.timestamp);
+        if (!Number.isFinite(price) || price <= 0 || !Number.isFinite(timestampMs)) return;
+
+        const tickSeconds = Math.floor(timestampMs / 1000);
+        const bucketTime = (Math.floor(tickSeconds / bucketSize) * bucketSize) as UTCTimestamp;
+
+        setLiveCandle((prev) => {
+          const cacheKey = candleCacheKey(symbol, tf);
+          const history = candlesCache.current.get(cacheKey) ?? [];
+
+          if (prev && Number(prev.time) === Number(bucketTime)) {
+            return {
+              ...prev,
+              high: Math.max(prev.high, price),
+              low: Math.min(prev.low, price),
+              close: price,
+            };
+          }
+
+          // MASTER 150: gdy tick otwiera nowy bucket, poprzednia live świeca staje się
+          // świecą historyczną w cache danego SYMBOLU + TIMEFRAME. Dzięki temu wykres
+          // nie czeka na kolejny polling REST i działa jak TradingView.
+          if (prev && Number(prev.time) < Number(bucketTime)) {
+            const withoutPrev = history.filter(
+              (c) => Number(c.time) !== Number(prev.time)
+            );
+            candlesCache.current.set(
+              cacheKey,
+              [...withoutPrev, prev]
+                .sort((a, b) => Number(a.time) - Number(b.time))
+                .slice(-300)
+            );
+          }
+
+          // Jeżeli REST ma już świecę dla aktualnego bucketu, zachowujemy jej OPEN/HIGH/LOW
+          // i podmieniamy tylko dane wynikające z najnowszego ticka.
+          const currentHistory = candlesCache.current.get(cacheKey) ?? history;
+          const last = currentHistory[currentHistory.length - 1];
+          if (last && Number(last.time) === Number(bucketTime)) {
+            return {
+              ...last,
+              high: Math.max(last.high, price),
+              low: Math.min(last.low, price),
+              close: price,
+            };
+          }
+
+          // Nowa świeca dokładnie w granicy wybranego TF: M1/M5/M15/M30/H1/H4/D1.
+          return {
+            time: bucketTime,
+            open: price,
+            high: price,
+            low: price,
+            close: price,
+            volume: 0,
+          };
+        });
+      } catch {
+        // Pojedynczy błędny frame SSE nie może zatrzymać wykresu.
+      }
+    });
 
     return () => {
-      alive = false;
-      window.clearInterval(id);
+      source.close();
     };
   }, [selected?.symbol, tf]);
 
@@ -3662,8 +3818,26 @@ if (closedNow.length) {
     return next;
   }, [renkoSource, tf, selectedCandles, renkoCandles, liveCandle]);
 
-  const highlightTime: UTCTimestamp | null = selected.tradeActive ? selected.hammerTime ?? null : null;
+  const highlightTime: UTCTimestamp | null =
+    selected.tradeActive && selected.status === "READY" && selected.confirmationCount === 4
+      ? selected.signalCandleTime ?? null
+      : null;
   const hasTrade = !!selected.tradeActive && !!selected.levels;
+
+  const formatLocalTradeDate = React.useCallback((value?: string) => {
+    if (!value) return "—";
+    const d = new Date(value);
+    if (!Number.isFinite(d.getTime())) return String(value);
+
+    return new Intl.DateTimeFormat("pl-PL", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(d);
+  }, []);
 
   const exportClosedTradesToXlsx = React.useCallback(() => {
     if (!closedTrades.length) return;
@@ -3728,7 +3902,7 @@ if (closedNow.length) {
 
       const dateValue = (() => {
         try {
-          return new Date(t.date).toISOString().slice(0, 16).replace("T", " ");
+          return formatLocalTradeDate(t.closedAt ?? t.date);
         } catch {
           return String(t.date ?? "");
         }
@@ -4222,14 +4396,16 @@ if (closedNow.length) {
               {filteredRows.map((r) => {
                 const active = r.symbol === selectedSymbol;
                 const isOffline = masterHealthLoaded && !masterLiveSymbols.has(r.symbol.toUpperCase());
-                const scannerOn = !isOffline && r.liquidity >= LIQ_THRESHOLD_HIGH && (r.confirmationCount ?? 0) === 4 && !!r.confirmationSide;
+                // Railway worker / central ACTIVE trade is the only authority for READY/BUY/SELL.
+                // Liquidity and local 4/4 remain informational and can never create a signal in the browser.
+                const scannerOn = !isOffline && r.tradeActive === true && r.status === "READY" && !!r.side;
                 const waitLiquidity =
                   !isOffline &&
+                  !r.tradeActive &&
                   (r.confirmationCount ?? 0) === 4 &&
-                  !!r.confirmationSide &&
-                  r.liquidity < LIQ_THRESHOLD_HIGH;
+                  !!r.confirmationSide;
                 const isFlashing = flashMapRef.current.has(r.symbol);
-                const rowSide = scannerOn ? r.confirmationSide : null;
+                const rowSide = scannerOn ? r.side ?? null : null;
 
                 return (
                   <div
@@ -5063,7 +5239,7 @@ if (closedNow.length) {
 closedTrades.map((t) => (
   <tr key={t.id} className="border-b border-sky-300/8 text-sky-50 transition hover:bg-sky-400/[0.05]">
     <td className="whitespace-nowrap px-3 py-2">
-      {new Date(t.date).toISOString().slice(0, 16).replace("T", " ")}
+      {formatLocalTradeDate(t.closedAt ?? t.date)}
     </td>
 
     <td className="px-3 py-2">{t.instrument}</td>
