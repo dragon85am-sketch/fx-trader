@@ -63,7 +63,7 @@ const DEFAULT_SUPERTREND_SETTINGS: SupertrendSettings = {
 const TIMEFRAMES = ["M1", "M5", "M15", "M30", "H1", "H4", "D1"] as const;
 type Timeframe = (typeof TIMEFRAMES)[number];
 
-const TWELVE_INTERVAL: Record<Timeframe, string> = {
+const COLLECTOR_INTERVAL: Record<Timeframe, string> = {
   M1: "1min",
   M5: "5min",
   M15: "15min",
@@ -1505,61 +1505,6 @@ function detectClosedTradeStatus(params: {
   return { status: null, tp1Hit, tp2Hit };
 }
 
-function toTwelveSymbol(symbol: string) {
-  const s = symbol.toUpperCase();
-
-  if (s === "XAUUSD") return "XAU/USD";
-  if (s === "XAGUSD") return "XAG/USD";
-  if (s.endsWith("USDT")) return `${s.slice(0, -4)}/USD`;
-  if (s.length === 6) return `${s.slice(0, 3)}/${s.slice(3)}`;
-
-  return s;
-}
-
-async function fetchTwelveCandles(symbol: string, tf: Timeframe): Promise<{ candles: Candle[]; volume: number }> {
-  const interval = TWELVE_INTERVAL[tf];
-  const tdSymbol = toTwelveSymbol(symbol);
-
-  const url = `/api/twelve-data?symbol=${encodeURIComponent(tdSymbol)}&interval=${encodeURIComponent(
-    interval
-  )}&outputsize=220&order=desc`;
-
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) throw new Error(await res.text());
-
-  const data = await res.json();
-  if (data?.status === "error") throw new Error(data.message);
-
-const candles: Candle[] = (data.values ?? [])
-  .slice()
-  .reverse()
-  .map((v: any) => ({
-    time: Math.floor(
-      new Date(v.datetime.replace(" ", "T") + "Z").getTime() / 1000
-    ) as UTCTimestamp,
-    open: Number(v.open),
-    high: Number(v.high),
-    low: Number(v.low),
-    close: Number(v.close),
-    volume: Number(v.volume ?? 0),
-  }))
-  .filter(
-    (c: Candle) =>
-      Number.isFinite(c.time) &&
-      c.open > 0 &&
-      c.high > 0 &&
-      c.low > 0 &&
-      c.close > 0
-  );
-  const volume = candles.reduce((sum, c) => sum + (c.volume ?? 0), 0);
-
-  return {
-    candles,
-    volume,
-  };
-}
-  
-
 async function fetchCoinbaseCandles(symbol: string, tf: Timeframe): Promise<{ candles: Candle[]; volume: number }> {
   const productId = COINBASE_MAP[symbol.toUpperCase()];
 
@@ -1638,7 +1583,7 @@ async function fetchFxTradeCandles(
   tf: Timeframe
 ): Promise<{ candles: Candle[]; volume: number }> {
   // Master Collector stores every supported timeframe directly.
-  const engineInterval = TWELVE_INTERVAL[tf];
+  const engineInterval = COLLECTOR_INTERVAL[tf];
   const params = new URLSearchParams({ symbol, interval: engineInterval, limit: "300" });
 
   const res = await fetch(`/api/market/candles?${params.toString()}`, {
@@ -1718,20 +1663,25 @@ function hasCorrectCandleCadence(candles: Candle[], tf: Timeframe): boolean {
   return exact >= Math.ceil(normal.length * 0.5);
 }
 
-async function fetchAutoCandles(symbol: string, tf: Timeframe, _source: DataSource): Promise<{ candles: Candle[]; volume: number }> {
-  // Prefer Master Collector only when its historical cadence really matches
-  // the requested timeframe. Never display M5-like history as M1.
-  try {
-    const master = await fetchFxTradeCandles(symbol, tf);
-    if (hasCorrectCandleCadence(master.candles, tf)) return master;
-
-    console.warn(
-      `[CANDLE CADENCE] ${symbol} ${tf}: Master Collector returned invalid/sparse cadence; using provider fallback`
-    );
-  } catch {}
-
+async function fetchAutoCandles(
+  symbol: string,
+  tf: Timeframe,
+  _source: DataSource
+): Promise<{ candles: Candle[]; volume: number }> {
+  // Crypto keeps its existing Coinbase feed.
   if (symbol.endsWith("USDT")) return fetchCoinbaseCandles(symbol, tf);
-  return fetchTwelveCandles(symbol, tf);
+
+  // FX / metals: one source of truth = Railway Master Collector,
+  // fed by Live Rates through the Railway collector.
+  const master = await fetchFxTradeCandles(symbol, tf);
+
+  if (!hasCorrectCandleCadence(master.candles, tf)) {
+    console.warn(
+      `[CANDLE CADENCE] ${symbol} ${tf}: Master Collector returned sparse/invalid cadence; keeping Live Rates collector data`
+    );
+  }
+
+  return master;
 }
 
 // ======================================================
@@ -1757,26 +1707,6 @@ type PocScannerState = {
   error: string | null;
 };
 
-const POC_INTERVAL: Record<PocTimeframe, string> = {
-  M1: "1min",
-  M5: "5min",
-  M15: "15min",
-  M30: "30min",
-  H1: "1h",
-  H4: "4h",
-  D: "1day",
-};
-
-const POC_COINBASE_GRANULARITY: Record<PocTimeframe, number> = {
-  M1: 60,
-  M5: 300,
-  M15: 900,
-  M30: 1800,
-  H1: 3600,
-  H4: 14400,
-  D: 86400,
-};
-
 function calcVolumePoc(candles: Candle[], bins = 28): number | null {
   if (!candles.length) return null;
 
@@ -1796,7 +1726,7 @@ function calcVolumePoc(candles: Candle[], bins = 28): number | null {
     const rawIndex = Math.floor((typical - low) / step);
     const index = Math.max(0, Math.min(bins - 1, rawIndex));
 
-    // Forex z Twelve Data czasem nie ma realnego wolumenu.
+    // Feed FX może nie zawierać realnego wolumenu.
     // Wtedy każda świeca dostaje wagę 1, żeby POC nadal działał.
     const weight =
       Number.isFinite(candle.volume) && (candle.volume ?? 0) > 0
@@ -1838,89 +1768,17 @@ async function fetchPocCandles(
   symbol: string,
   tf: PocTimeframe
 ): Promise<Candle[]> {
-  if (symbol.endsWith("USDT")) {
-    const productId = COINBASE_MAP[symbol.toUpperCase()];
-    if (!productId) throw new Error(`Coinbase unsupported symbol: ${symbol}`);
+  // POC: Live Rates -> Railway Master Collector -> /api/market/candles
+  const liveTf: Timeframe = tf === "D" ? "D1" : tf;
+  const live = await fetchFxTradeCandles(symbol, liveTf);
 
-    const granularity = POC_COINBASE_GRANULARITY[tf];
-    const url = `/api/coinbase?product_id=${encodeURIComponent(
-      productId
-    )}&granularity=${granularity}`;
-
-    const res = await fetch(url, { cache: "no-store" });
-    if (!res.ok) throw new Error(`POC Coinbase error: ${symbol} ${tf}`);
-
-    const data = await res.json();
-    const raw = Array.isArray(data)
-      ? data
-      : Array.isArray(data?.candles)
-        ? data.candles
-        : [];
-
-    return raw
-      .map((c: any) => ({
-        time: Number(c[0]) as UTCTimestamp,
-        low: Number(c[1]),
-        high: Number(c[2]),
-        open: Number(c[3]),
-        close: Number(c[4]),
-        volume: Number(c[5] ?? 0),
-      }))
-      .filter(
-        (c: Candle) =>
-          Number.isFinite(c.time) &&
-          Number.isFinite(c.open) &&
-          Number.isFinite(c.high) &&
-          Number.isFinite(c.low) &&
-          Number.isFinite(c.close) &&
-          c.open > 0 &&
-          c.high > 0 &&
-          c.low > 0 &&
-          c.close > 0
-      )
-      .sort((a: Candle, b: Candle) => Number(a.time) - Number(b.time));
-  }
-
-  const tdSymbol = toTwelveSymbol(symbol);
-  const interval = POC_INTERVAL[tf];
-
-  const url = `/api/twelve-data?symbol=${encodeURIComponent(
-    tdSymbol
-  )}&interval=${encodeURIComponent(interval)}&outputsize=220&order=desc`;
-
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) throw new Error(`POC Twelve Data error: ${symbol} ${tf}`);
-
-  const data = await res.json();
-  if (data?.status === "error") {
-    throw new Error(data?.message ?? `POC Twelve Data error: ${symbol} ${tf}`);
-  }
-
-  return (data.values ?? [])
-    .slice()
-    .reverse()
-    .map((v: any) => ({
-      time: Math.floor(
-        new Date(v.datetime.replace(" ", "T") + "Z").getTime() / 1000
-      ) as UTCTimestamp,
-      open: Number(v.open),
-      high: Number(v.high),
-      low: Number(v.low),
-      close: Number(v.close),
-      volume: Number(v.volume ?? 0),
-    }))
-    .filter(
-      (c: Candle) =>
-        Number.isFinite(c.time) &&
-        Number.isFinite(c.open) &&
-        Number.isFinite(c.high) &&
-        Number.isFinite(c.low) &&
-        Number.isFinite(c.close) &&
-        c.open > 0 &&
-        c.high > 0 &&
-        c.low > 0 &&
-        c.close > 0
+  if (!hasCorrectCandleCadence(live.candles, liveTf)) {
+    console.warn(
+      `[POC LIVE RATES] ${symbol} ${tf}: sparse/invalid cadence; using available Live Rates candles`
     );
+  }
+
+  return live.candles;
 }
 
 function getPocSummary(cells: PocCell[]) {
