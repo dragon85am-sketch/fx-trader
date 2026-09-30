@@ -17,21 +17,34 @@ const frames = [
   ["1min", 60_000],
   ["5min", 5 * 60_000],
   ["15min", 15 * 60_000],
+  ["30min", 30 * 60_000],
   ["1h", 60 * 60_000],
   ["4h", 4 * 60 * 60_000],
+  ["1day", 24 * 60 * 60_000],
 ] as const;
 
 type Tick = { symbol: string; price: number; timestamp: number };
 
-const PROVIDER_INSTRUMENTS = ["US30", "EURUSD", "GBPUSD", "XAUUSD"] as const;
-const SYMBOL_MAP: Record<string,string> = { US30:"US30", EURUSD:"EURUSD", GBPUSD:"GBPUSD", XAUUSD:"XAUUSD" };
+const PROVIDER_INSTRUMENTS = [
+  "GBPUSD","GBPCHF","GBPAUD","GBPCAD","GBPNZD",
+  "EURUSD","EURCHF","EURCAD","EURGBP","EURAUD","EURNZD","EURJPY","EURPLN",
+  "USDCAD","USDPLN","USDCHF","USDJPY",
+  "NZDUSD",
+  "AUDCAD","AUDUSD","AUDHUF","AUDZAR","AUDNZD","AUDJPY","AUDCHF",
+  "BTCUSD","NASUSD","USOUSD","XAGUSD","US30","XAUUSD",
+] as const;
+
+const SYMBOL_MAP: Record<string,string> =
+  Object.fromEntries(PROVIDER_INSTRUMENTS.map((symbol) => [symbol, symbol]));
+
 const latestTicks: Record<string, Tick> = {};
 let liveRatesConnected = false;
 let providerInfo = "";
 let providerError = "";
 
 let dbWriting = false;
-const pendingDbTicks = new Map<string, Tick>();
+const pendingDbTicks: Tick[] = [];
+const MAX_PENDING_DB_TICKS = 20_000;
 
 const clientsBySymbol = new Map<string, Set<http.ServerResponse>>(
   PROVIDER_INSTRUMENTS.map((symbol) => [symbol, new Set<http.ServerResponse>()])
@@ -65,25 +78,42 @@ async function upsertTick(symbol: string, price: number, ts: number) {
 }
 
 function queueDbTick(tick: Tick) {
-  pendingDbTicks.set(tick.symbol, tick);
+  pendingDbTicks.push(tick);
+
+  // Protect Railway memory during a temporary DB slowdown.
+  // We keep FIFO ordering; only in an extreme backlog do we discard the oldest ticks.
+  if (pendingDbTicks.length > MAX_PENDING_DB_TICKS) {
+    const drop = pendingDbTicks.length - MAX_PENDING_DB_TICKS;
+    pendingDbTicks.splice(0, drop);
+    console.warn(`[COLLECTOR] DB queue overflow: dropped ${drop} oldest ticks`);
+  }
+
   if (!dbWriting) void drainDbQueue();
 }
 
 async function drainDbQueue() {
   if (dbWriting) return;
   dbWriting = true;
+
   try {
-    while (pendingDbTicks.size > 0) {
-      const batch = Array.from(pendingDbTicks.values());
-      pendingDbTicks.clear();
+    while (pendingDbTicks.length > 0) {
+      const batch = pendingDbTicks.splice(0, Math.min(500, pendingDbTicks.length));
+
       for (const tick of batch) {
-        try { await upsertTick(tick.symbol, tick.price, tick.timestamp); }
-        catch (e: any) { console.error(`[${tick.symbol}] DB write error`, e?.code || "", e?.message || e); }
+        try {
+          await upsertTick(tick.symbol, tick.price, tick.timestamp);
+        } catch (e: any) {
+          console.error(
+            `[${tick.symbol}] DB write error`,
+            e?.code || "",
+            e?.message || e
+          );
+        }
       }
     }
   } finally {
     dbWriting = false;
-    if (pendingDbTicks.size > 0) void drainDbQueue();
+    if (pendingDbTicks.length > 0) void drainDbQueue();
   }
 }
 
@@ -262,8 +292,9 @@ const server = http.createServer((req, res) => {
       instruments: PROVIDER_INSTRUMENTS,
       latestTicks,
       dbWriting,
-      dbPending: pendingDbTicks.size > 0,
-      dbPendingSymbols: Array.from(pendingDbTicks.keys()),
+      dbPending: pendingDbTicks.length > 0,
+      dbPendingCount: pendingDbTicks.length,
+      dbPendingSymbols: Array.from(new Set(pendingDbTicks.map((tick) => tick.symbol))),
       providerInfo: providerInfo || null,
       providerError: providerError || null,
       socketId: socket.id || null,
@@ -273,9 +304,14 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  const streamMatch = url.pathname.match(/^\/api\/(us30|eurusd|gbpusd|xauusd)\/stream$/i);
+  const streamMatch = url.pathname.match(/^\/api\/([a-z0-9]+)\/stream$/i);
   if (streamMatch) {
     const streamSymbol = streamMatch[1].toUpperCase();
+    if (!PROVIDER_INSTRUMENTS.includes(streamSymbol as any)) {
+      res.writeHead(404, { "Content-Type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ ok: false, error: "Unknown instrument" }));
+      return;
+    }
     res.writeHead(200, {
       "Content-Type": "text/event-stream; charset=utf-8",
       "Cache-Control": "no-cache, no-transform",
@@ -324,7 +360,9 @@ const server = http.createServer((req, res) => {
     mode: "WS_SINGLE_CONNECTION",
     instruments: PROVIDER_INSTRUMENTS,
     health: "/health",
-    streams: { US30:"/api/us30/stream", EURUSD:"/api/eurusd/stream", GBPUSD:"/api/gbpusd/stream", XAUUSD:"/api/xauusd/stream" },
+    streams: Object.fromEntries(
+      PROVIDER_INSTRUMENTS.map((symbol) => [symbol, `/api/${symbol.toLowerCase()}/stream`])
+    ),
   }));
 });
 
