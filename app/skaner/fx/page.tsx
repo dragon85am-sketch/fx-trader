@@ -3842,11 +3842,11 @@ if (closedNow.length) {
         dateValue,
         t.instrument,
         t.direction,
-        Number(t.entry),
-        t.tp1 ?? "",
-        t.tp2 ?? "",
-        t.tp3 ?? "",
-        Number(t.sl),
+        formatTradePrice(t.instrument, t.entry),
+        formatTradePrice(t.instrument, t.tp1),
+        formatTradePrice(t.instrument, t.tp2),
+        formatTradePrice(t.instrument, t.tp3),
+        formatTradePrice(t.instrument, t.sl),
         result,
       ];
     });

@@ -144,7 +144,9 @@ const [objs, setObjs] = React.useState<AnyObj[]>([]);
   });
 
   const [draft, setDraft] = React.useState<Point | null>(null);
-  const [preview, setPreview] = React.useState<Point | null>(null);
+  // Preview is transient pointer data. Keeping it in a ref avoids a full React
+  // render on every mousemove; the canvas is repainted directly via rAF.
+  const previewRef = React.useRef<Point | null>(null);
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [hoverId, setHoverId] = React.useState<string | null>(null);
   const hoverIdRef = React.useRef<string | null>(null);
@@ -285,13 +287,31 @@ React.useEffect(() => {
 
       if (logical == null || price == null) return null;
 
-      const idx = Math.max(
-        0,
-        Math.min(Math.round(Number(logical)), candles.length - 1)
-      );
+      const logicalN = Number(logical);
+      if (!Number.isFinite(logicalN)) return null;
+
+      // IMPORTANT: do not clamp X to the last loaded candle. A drawing must be
+      // allowed to extend into the chart's right-side whitespace/future bars and
+      // to remain stable when the user pans back in history.
+      const rounded = Math.round(logicalN);
+      let time: number;
+
+      if (rounded >= 0 && rounded < candles.length) {
+        time = Number(candles[rounded].time);
+      } else {
+        const n = candles.length;
+        const first = Number(candles[0].time);
+        const last = Number(candles[n - 1].time);
+        const step = n > 1
+          ? Math.max(1, Math.round((last - first) / Math.max(1, n - 1)))
+          : 60;
+        time = rounded < 0
+          ? first + rounded * step
+          : last + (rounded - (n - 1)) * step;
+      }
 
       return {
-        t: candles[idx].time as UTCTimestamp,
+        t: time as UTCTimestamp,
         p: Number(price),
       };
     },
@@ -826,6 +846,7 @@ if (o.type === "FIBO") {
     drawTradeZones(ctx);
     objs.forEach((o) => drawObject(ctx, o, o.id === selectedId || o.id === hoverId));
 
+    const preview = previewRef.current;
     if (draft && preview && TWO_POINT_TOOLS.includes(activeDrawTool)) {
       drawObject(ctx, {
         id: "preview",
@@ -851,7 +872,7 @@ if (o.type === "FIBO") {
         createdAt: Date.now(),
       } as AnyObj);
     }
-  }, [objs, selectedId, hoverId, draft, preview, activeDrawTool, drawObject, drawTradeZones]);
+  }, [objs, selectedId, hoverId, draft, activeDrawTool, drawObject, drawTradeZones]);
 
   React.useEffect(() => {
     resize();
@@ -957,7 +978,7 @@ if (o.type === "FIBO") {
         e.clientY >= r.top &&
         e.clientY <= r.bottom;
 
-      if (!inside || syncing) return;
+      if (!inside || syncing || activeDrawTool !== "SELECT") return;
       syncing = true;
       draw();
       syncRaf = requestAnimationFrame(frame);
@@ -985,13 +1006,13 @@ if (o.type === "FIBO") {
       window.removeEventListener("pointercancel", stopSync, true);
       window.removeEventListener("blur", stopSync);
     };
-  }, [wrapRef, draw]);
+  }, [wrapRef, draw, activeDrawTool]);
 
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setDraft(null);
-        setPreview(null);
+        previewRef.current = null;
         onDrawToolChange?.("SELECT");
       }
 
@@ -1157,7 +1178,8 @@ if (o.type === "FIBO") {
     if (TWO_POINT_TOOLS.includes(activeDrawTool)) {
       if (!draft) {
         setDraft(p);
-        setPreview(p);
+        previewRef.current = p;
+        requestAnimationFrame(draw);
         return;
       }
 
@@ -1169,7 +1191,7 @@ if (o.type === "FIBO") {
       } as AnyObj);
 
       setDraft(null);
-      setPreview(null);
+      previewRef.current = null;
       onDrawToolChange?.("SELECT");
     }
   };
@@ -1235,8 +1257,7 @@ if (o.type === "FIBO") {
               from: range.from + shift,
               to: range.to + shift,
             });
-            // No extra draw() here: visible-range subscription and the active
-            // pointer-sync RAF already repaint the overlay. Avoids duplicate frames.
+            requestAnimationFrame(draw);
           }
 
           // PAN Y: przesuwanie wykresu góra/dół myszką w pustym miejscu.
@@ -1305,9 +1326,7 @@ if (o.type === "FIBO") {
             // pan/zoom powodowało to "latanie" i zmianę szerokości RECT/FIBO.
             const chart = chartRef.current;
             const series = candleSeriesRef.current;
-            // PERFORMANCE: reuse the per-frame candle cache instead of cloning/fetching
-            // the whole series on every drag event.
-            const candles = candlesCacheRef.current;
+            const candles = getCandles();
             const ts = chart?.timeScale();
 
             const startLocalX = dragRef.current.startClientX - rect.left;
@@ -1327,39 +1346,35 @@ if (o.type === "FIBO") {
                 : 0;
 
             const indexForTime = (t: UTCTimestamp) => {
-              // PERFORMANCE: candles are sorted, so nearest-time lookup is O(log n)
-              // instead of scanning the complete history for every moved point.
+              let best = 0;
+              let bestD = Infinity;
               const target = Number(t);
-              let lo = 0;
-              let hi = candles.length - 1;
-              while (lo < hi) {
-                const mid = (lo + hi) >> 1;
-                if (Number(candles[mid].time) < target) lo = mid + 1;
-                else hi = mid;
+              for (let i = 0; i < candles.length; i++) {
+                const d = Math.abs(Number(candles[i].time) - target);
+                if (d < bestD) { bestD = d; best = i; }
               }
-              if (lo <= 0) return 0;
-              const left = lo - 1;
-              return Math.abs(Number(candles[lo].time) - target) <
-                Math.abs(Number(candles[left].time) - target)
-                ? lo
-                : left;
+              return best;
             };
 
-            const shiftPointStable = (pt: Point): Point => {
-              if (!candles.length) return { t: pt.t, p: pt.p + priceDelta };
-              const idx = indexForTime(pt.t);
-              const next = Math.max(0, Math.min(candles.length - 1, idx + barDelta));
-              return {
-                t: candles[next].time as UTCTimestamp,
-                p: pt.p + priceDelta,
-              };
-            };
+            const barSeconds = (() => {
+              if (candles.length < 2) return 60;
+              const first = Number(candles[0].time);
+              const last = Number(candles[candles.length - 1].time);
+              return Math.max(1, Math.round((last - first) / Math.max(1, candles.length - 1)));
+            })();
+
+            const shiftPointStable = (pt: Point): Point => ({
+              // Shift absolute market time instead of clamping to loaded candles.
+              // This preserves RECT/FIBO width in the future and in old history.
+              t: (Number(pt.t) + barDelta * barSeconds) as UTCTimestamp,
+              p: pt.p + priceDelta,
+            });
 
             if (startObj.type === "VLINE") {
-              if (!candles.length) return o;
-              const idx = indexForTime(startObj.t);
-              const next = Math.max(0, Math.min(candles.length - 1, idx + barDelta));
-              return { ...o, t: candles[next].time as UTCTimestamp } as AnyObj;
+              return {
+                ...o,
+                t: (Number(startObj.t) + barDelta * barSeconds) as UTCTimestamp,
+              } as AnyObj;
             }
 
             if (
@@ -1395,7 +1410,8 @@ if (o.type === "FIBO") {
     }
 
     if (draft && TWO_POINT_TOOLS.includes(activeDrawTool)) {
-      setPreview(p);
+      previewRef.current = p;
+      requestAnimationFrame(draw);
     }
 
     if (
