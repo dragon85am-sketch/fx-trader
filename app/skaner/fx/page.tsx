@@ -3704,7 +3704,7 @@ if (closedNow.length) {
     };
 
     void refreshLiveTick();
-    const id = window.setInterval(() => void refreshLiveTick(), 1000);
+    const id = window.setInterval(() => void refreshLiveTick(), 500);
 
     return () => {
       alive = false;
