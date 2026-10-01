@@ -3131,8 +3131,7 @@ React.useEffect(() => {
         (r) =>
           r.status === "READY" &&
           r.confirmationSide === directionFilter &&
-          (r.confirmationCount ?? 0) === 4 &&
-          r.liquidity >= LIQ_THRESHOLD_HIGH
+          (r.confirmationCount ?? 0) === 4
       );
     }
 
@@ -4364,12 +4363,13 @@ if (closedNow.length) {
               {filteredRows.map((r) => {
                 const active = r.symbol === selectedSymbol;
                 const isOffline = masterHealthLoaded && !masterLiveSymbols.has(r.symbol.toUpperCase());
-                const scannerOn = !isOffline && r.liquidity >= LIQ_THRESHOLD_HIGH && (r.confirmationCount ?? 0) === 4 && !!r.confirmationSide;
-                const waitLiquidity =
+                // 4/4 decyduje o READY/BUY/SELL. Liquidity % jest tylko informacją UI
+                // i nie może zmieniać gotowego 4/4 z powrotem na WAIT.
+                const scannerOn =
                   !isOffline &&
                   (r.confirmationCount ?? 0) === 4 &&
-                  !!r.confirmationSide &&
-                  r.liquidity < LIQ_THRESHOLD_HIGH;
+                  !!r.confirmationSide;
+                const waitLiquidity = false;
                 const isFlashing = flashMapRef.current.has(r.symbol);
                 const rowSide = scannerOn ? r.confirmationSide : null;
 
