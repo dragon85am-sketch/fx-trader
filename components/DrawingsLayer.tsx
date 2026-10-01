@@ -53,6 +53,11 @@ const DEFAULT_FIBO_LEVELS: FiboLevel[] = [
   { id: "786", value: 0.786, enabled: true, color: "#0ea5e9" },
   { id: "1000", value: 1, enabled: true, color: "#94a3b8" },
 ];
+// Fibonacci: low -> high = 0..1; high -> low = 1..0.
+function fiboPositionFactor(a: Point, b: Point, level: number) {
+  return b.p < a.p ? 1 - level : level;
+}
+
 type BaseObj = {
   id: string;
   type: DrawTool;
@@ -509,7 +514,7 @@ React.useEffect(() => {
           const insideX = x >= x1 - 10 && x <= x2 + 10;
           if (insideX) {
             for (const level of fiboLevels.filter((level) => level.enabled)) {
-              const yy = a.y + (b.y - a.y) * level.value;
+              const yy = a.y + (b.y - a.y) * fiboPositionFactor(o.a, o.b, level.value);
               if (Math.abs(y - yy) < 10) return o.id;
             }
           }
@@ -673,7 +678,7 @@ if (o.type === "FIBO") {
   fiboLevels
     .filter((level) => level.enabled)
     .forEach((level) => {
-      const yy = a.y + (b.y - a.y) * level.value;
+      const yy = a.y + (b.y - a.y) * fiboPositionFactor(o.a, o.b, level.value);
 
       ctx.strokeStyle = level.color;
 
