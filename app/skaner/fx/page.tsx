@@ -1693,13 +1693,11 @@ const TIMEFRAME_SECONDS: Record<Timeframe, number> = {
 };
 
 function hasCorrectCandleCadence(candles: Candle[], tf: Timeframe): boolean {
-  if (candles.length < 20) return false;
+  // M1 and D1 may legitimately have only a few bars just after collector restart.
+  // Do not reject valid history only because there are fewer than 20 candles.
+  if (candles.length < 2) return false;
 
   const expected = TIMEFRAME_SECONDS[tf];
-
-  // Check recent history only. Market/weekend gaps are allowed, but the normal
-  // cadence must still be the selected timeframe. This catches e.g. 5-minute
-  // history accidentally returned for an M1 request.
   const recent = candles.slice(-120);
   const deltas: number[] = [];
 
@@ -1708,13 +1706,18 @@ function hasCorrectCandleCadence(candles: Candle[], tf: Timeframe): boolean {
     if (Number.isFinite(delta) && delta > 0) deltas.push(delta);
   }
 
-  if (deltas.length < 10) return false;
+  if (!deltas.length) return false;
 
-  const normal = deltas.filter((d) => d <= expected * 2);
-  if (normal.length < Math.max(5, Math.floor(deltas.length * 0.55))) return false;
+  // Weekend/session gaps are allowed. We only inspect deltas close to the normal TF.
+  // For D1 allow up to 3 days so Friday -> Monday does not invalidate the feed.
+  const maxNormal = tf === "D1" ? expected * 3 : expected * 2;
+  const normal = deltas.filter((d) => d <= maxNormal);
+  if (!normal.length) return false;
 
-  // At least half of the normal bars should be exactly one selected-TF bucket.
   const exact = normal.filter((d) => d === expected).length;
+
+  // With short history one exact bucket is enough. With longer history require >= 50%.
+  if (normal.length <= 4) return exact >= 1;
   return exact >= Math.ceil(normal.length * 0.5);
 }
 
@@ -3662,7 +3665,11 @@ if (closedNow.length) {
     };
     const bucketSize = intervalSeconds[tf];
 
-    const applyTick = (price: number, timestampMs: number) => {
+    const applyTick = (price: number, rawTimestamp: number) => {
+      // Collector normally sends milliseconds, but accept seconds too.
+      // This prevents M1/D1 from accidentally creating candles near 1970 when
+      // a provider returns a Unix timestamp in seconds.
+      const timestampMs = rawTimestamp < 10_000_000_000 ? rawTimestamp * 1000 : rawTimestamp;
       const tickSeconds = Math.floor(timestampMs / 1000);
       const bucketTime = (Math.floor(tickSeconds / bucketSize) * bucketSize) as UTCTimestamp;
 
@@ -3708,6 +3715,8 @@ if (closedNow.length) {
     };
 
     void refreshLiveTick();
+    // Price tick stays at 500 ms. Candle boundaries are derived from the tick timestamp:
+    // M1 -> a new OHLC candle every 60 s, D1 -> a new OHLC candle every UTC day.
     const id = window.setInterval(() => void refreshLiveTick(), 500);
 
     return () => {
