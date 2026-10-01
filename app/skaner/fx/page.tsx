@@ -3416,8 +3416,12 @@ const signal: Signal = supertrendEnabled
     const setupPattern: CandlePattern | "NONE" = "NONE";
     const detectedPatternMode: PatternSignalMode | null = null;
 
-    // Liquidity % pozostaje informacją UI. Sam READY wynika wyłącznie z 4/4.
-    const setupReadyNow = !!setupSide && classicReady;
+    // BUY/SELL dopiero gdy mamy komplet 4/4 ORAZ Setup Score >= 70%.
+    // Poniżej 70% pozostaje WAIT, nawet jeśli kierunek ma 4/4.
+    const setupReadyNow =
+      !!setupSide &&
+      classicReady &&
+      nextLiquidity >= LIQ_THRESHOLD_HIGH;
 
     // 4/4 only prepares the setup. Draw zones as PREVIEW, but do not mark
     // the trade active until the Railway worker confirms a CLOSED candle
@@ -3804,7 +3808,16 @@ if (closedNow.length) {
   }, [renkoSource, tf, selectedCandles, renkoCandles, liveCandle]);
 
   const highlightTime: UTCTimestamp | null = selected.tradeActive ? selected.hammerTime ?? null : null;
-  const hasTrade = !!selected.levels && (!!selected.tradeActive || (selected.confirmationCount ?? 0) === 4);
+  const hasTrade =
+    !!selected.levels &&
+    (
+      !!selected.tradeActive ||
+      (
+        (selected.confirmationCount ?? 0) === 4 &&
+        !!selected.confirmationSide &&
+        selected.liquidity >= LIQ_THRESHOLD_HIGH
+      )
+    );
 
   const exportClosedTradesToXlsx = React.useCallback(() => {
     if (!closedTrades.length) return;
@@ -4363,13 +4376,18 @@ if (closedNow.length) {
               {filteredRows.map((r) => {
                 const active = r.symbol === selectedSymbol;
                 const isOffline = masterHealthLoaded && !masterLiveSymbols.has(r.symbol.toUpperCase());
-                // 4/4 decyduje o READY/BUY/SELL. Liquidity % jest tylko informacją UI
-                // i nie może zmieniać gotowego 4/4 z powrotem na WAIT.
+                // BUY/SELL = komplet 4/4 + Setup Score minimum 70%.
+                // 4/4 przy wyniku poniżej 70% nadal pokazuje WAIT.
                 const scannerOn =
                   !isOffline &&
                   (r.confirmationCount ?? 0) === 4 &&
-                  !!r.confirmationSide;
-                const waitLiquidity = false;
+                  !!r.confirmationSide &&
+                  r.liquidity >= LIQ_THRESHOLD_HIGH;
+                const waitLiquidity =
+                  !isOffline &&
+                  (r.confirmationCount ?? 0) === 4 &&
+                  !!r.confirmationSide &&
+                  r.liquidity < LIQ_THRESHOLD_HIGH;
                 const isFlashing = flashMapRef.current.has(r.symbol);
                 const rowSide = scannerOn ? r.confirmationSide : null;
 
