@@ -201,6 +201,22 @@ function round(v: number, dp = 6) {
   return Math.round(v * p) / p;
 }
 
+// CLOSED TRADES: compact market-aware price formatting.
+// Keeps stored numeric values untouched; this changes display only.
+function formatTradePrice(symbol: string, value?: number | null) {
+  if (value == null || !Number.isFinite(Number(value))) return "—";
+  const s = String(symbol ?? "").toUpperCase();
+  const n = Number(value);
+  let digits = 5;
+  if (s === "XAUUSD") digits = 2;
+  else if (s.endsWith("JPY")) digits = 3;
+  else if (s.endsWith("USDT") || s.includes("BTC") || s.includes("ETH")) {
+    const a = Math.abs(n);
+    digits = a >= 1000 ? 2 : a >= 100 ? 3 : a >= 1 ? 4 : 6;
+  }
+  return n.toFixed(digits);
+}
+
 function calcATR(candles: Array<{ high: number; low: number; close: number }>, period = 14) {
   period = Math.max(2, Math.round(period));
   if (candles.length < period + 1) return 0;
@@ -5089,6 +5105,7 @@ if (closedNow.length) {
   ))}
 </div>
                 <MarketChart
+                  key={`${selected.symbol}-${tf}`}
                   symbol={selected.symbol}
                   tf={tf}
                   candles={selectedCandles as any}
@@ -5180,11 +5197,11 @@ closedTrades.map((t) => (
       </span>
     </td>
 
-    <td className="px-3 py-2">{t.entry}</td>
-    <td className="px-3 py-2">{t.tp1 ?? "—"}</td>
-    <td className="px-3 py-2">{t.tp2 ?? "—"}</td>
-    <td className="px-3 py-2">{t.tp3 ?? "—"}</td>
-    <td className="px-3 py-2">{t.sl}</td>
+    <td className="px-3 py-2">{formatTradePrice(t.instrument, t.entry)}</td>
+    <td className="px-3 py-2">{formatTradePrice(t.instrument, t.tp1)}</td>
+    <td className="px-3 py-2">{formatTradePrice(t.instrument, t.tp2)}</td>
+    <td className="px-3 py-2">{formatTradePrice(t.instrument, t.tp3)}</td>
+    <td className="px-3 py-2">{formatTradePrice(t.instrument, t.sl)}</td>
 
     {/* 🔥 STATUS */}
     <td className="px-3 py-2">
@@ -5240,17 +5257,8 @@ closedTrades.map((t) => (
                   Trade log
                 </Button>
 
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setClosedTrades([]);
-                    try {
-                      localStorage.removeItem(CLOSED_TRADES_KEY);
-                    } catch {}
-                  }}
-                >
-                  Clean log
-                </Button>
+                {/* Clean log intentionally hidden from the normal scanner UI.
+                    Destructive clearing should be exposed only from an authenticated admin surface. */}
               </div>
 
             </CardContent>

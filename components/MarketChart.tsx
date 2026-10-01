@@ -1161,26 +1161,9 @@ fullscreenMode = false,
   const zoneSvgRef = React.useRef<SVGSVGElement | null>(null);
   const zoneLabelsRef = React.useRef<HTMLDivElement | null>(null);
 
-  React.useEffect(() => {
-    let raf = 0;
-    const sync = () => {
-      const chart = chartRef.current;
-      const t = zoneAnchorTimeRef.current;
-      const baseX = zoneBaseXRef.current;
-      if (chart && t != null && baseX != null) {
-        const x = chart.timeScale().timeToCoordinate(t);
-        if (x != null && Number.isFinite(Number(x))) {
-          const dx = Number(x) + zoneGapPxRef.current - baseX;
-          const tr = `translate3d(${dx}px,0,0)`;
-          if (zoneSvgRef.current) zoneSvgRef.current.style.transform = tr;
-          if (zoneLabelsRef.current) zoneLabelsRef.current.style.transform = tr;
-        }
-      }
-      raf = requestAnimationFrame(sync);
-    };
-    raf = requestAnimationFrame(sync);
-    return () => cancelAnimationFrame(raf);
-  }, []);
+  // PERFORMANCE: do not run an idle 60 FPS loop just to reposition trade zones.
+  // Zone X is synchronized by the chart visible-range subscriptions below, and
+  // DrawingsLayer keeps overlays locked during active pointer interactions.
 
 
   const frozenAnchorKeyRef = React.useRef<string>("");
@@ -2925,9 +2908,9 @@ kineticScroll: {
       const prec = pricePrecision ?? guessPrecision(symbol, lastClose);
       const minMove = minMoveFromPrecision(prec);
       applyIndicators(ds, prec, minMove);
-      // Heavy overlays/pattern geometry do not need to recompute on every market tick.
-      // Refresh them together with indicators (max 4x/s); the candle itself still uses update().
-      setOverlayTick((v) => v + 1);
+      // Heavy overlays/pattern geometry do not need a synchronous React render
+      // inside the market-data callback. Coalesce the refresh with browser paint.
+      requestAnimationFrame(() => setOverlayTick((v) => v + 1));
     }
 
     if (followOnTick && !detached && !manualPanRef.current) {

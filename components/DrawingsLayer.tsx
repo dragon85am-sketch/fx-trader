@@ -1235,7 +1235,8 @@ if (o.type === "FIBO") {
               from: range.from + shift,
               to: range.to + shift,
             });
-            requestAnimationFrame(draw);
+            // No extra draw() here: visible-range subscription and the active
+            // pointer-sync RAF already repaint the overlay. Avoids duplicate frames.
           }
 
           // PAN Y: przesuwanie wykresu góra/dół myszką w pustym miejscu.
@@ -1304,7 +1305,9 @@ if (o.type === "FIBO") {
             // pan/zoom powodowało to "latanie" i zmianę szerokości RECT/FIBO.
             const chart = chartRef.current;
             const series = candleSeriesRef.current;
-            const candles = getCandles();
+            // PERFORMANCE: reuse the per-frame candle cache instead of cloning/fetching
+            // the whole series on every drag event.
+            const candles = candlesCacheRef.current;
             const ts = chart?.timeScale();
 
             const startLocalX = dragRef.current.startClientX - rect.left;
@@ -1324,14 +1327,22 @@ if (o.type === "FIBO") {
                 : 0;
 
             const indexForTime = (t: UTCTimestamp) => {
-              let best = 0;
-              let bestD = Infinity;
+              // PERFORMANCE: candles are sorted, so nearest-time lookup is O(log n)
+              // instead of scanning the complete history for every moved point.
               const target = Number(t);
-              for (let i = 0; i < candles.length; i++) {
-                const d = Math.abs(Number(candles[i].time) - target);
-                if (d < bestD) { bestD = d; best = i; }
+              let lo = 0;
+              let hi = candles.length - 1;
+              while (lo < hi) {
+                const mid = (lo + hi) >> 1;
+                if (Number(candles[mid].time) < target) lo = mid + 1;
+                else hi = mid;
               }
-              return best;
+              if (lo <= 0) return 0;
+              const left = lo - 1;
+              return Math.abs(Number(candles[lo].time) - target) <
+                Math.abs(Number(candles[left].time) - target)
+                ? lo
+                : left;
             };
 
             const shiftPointStable = (pt: Point): Point => {
