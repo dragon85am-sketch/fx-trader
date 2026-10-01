@@ -3715,9 +3715,9 @@ if (closedNow.length) {
     };
 
     void refreshLiveTick();
-    // Price tick stays at 500 ms. Candle boundaries are derived from the tick timestamp:
+    // Price tick stays at 1000 ms. Candle boundaries are derived from the tick timestamp:
     // M1 -> a new OHLC candle every 60 s, D1 -> a new OHLC candle every UTC day.
-    const id = window.setInterval(() => void refreshLiveTick(), 500);
+    const id = window.setInterval(() => void refreshLiveTick(), 1000);
 
     return () => {
       alive = false;
