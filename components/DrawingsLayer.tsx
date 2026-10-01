@@ -144,9 +144,7 @@ const [objs, setObjs] = React.useState<AnyObj[]>([]);
   });
 
   const [draft, setDraft] = React.useState<Point | null>(null);
-  // Preview is transient pointer data. Keeping it in a ref avoids a full React
-  // render on every mousemove; the canvas is repainted directly via rAF.
-  const previewRef = React.useRef<Point | null>(null);
+  const [preview, setPreview] = React.useState<Point | null>(null);
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [hoverId, setHoverId] = React.useState<string | null>(null);
   const hoverIdRef = React.useRef<string | null>(null);
@@ -287,31 +285,13 @@ React.useEffect(() => {
 
       if (logical == null || price == null) return null;
 
-      const logicalN = Number(logical);
-      if (!Number.isFinite(logicalN)) return null;
-
-      // IMPORTANT: do not clamp X to the last loaded candle. A drawing must be
-      // allowed to extend into the chart's right-side whitespace/future bars and
-      // to remain stable when the user pans back in history.
-      const rounded = Math.round(logicalN);
-      let time: number;
-
-      if (rounded >= 0 && rounded < candles.length) {
-        time = Number(candles[rounded].time);
-      } else {
-        const n = candles.length;
-        const first = Number(candles[0].time);
-        const last = Number(candles[n - 1].time);
-        const step = n > 1
-          ? Math.max(1, Math.round((last - first) / Math.max(1, n - 1)))
-          : 60;
-        time = rounded < 0
-          ? first + rounded * step
-          : last + (rounded - (n - 1)) * step;
-      }
+      const idx = Math.max(
+        0,
+        Math.min(Math.round(Number(logical)), candles.length - 1)
+      );
 
       return {
-        t: time as UTCTimestamp,
+        t: candles[idx].time as UTCTimestamp,
         p: Number(price),
       };
     },
@@ -846,7 +826,6 @@ if (o.type === "FIBO") {
     drawTradeZones(ctx);
     objs.forEach((o) => drawObject(ctx, o, o.id === selectedId || o.id === hoverId));
 
-    const preview = previewRef.current;
     if (draft && preview && TWO_POINT_TOOLS.includes(activeDrawTool)) {
       drawObject(ctx, {
         id: "preview",
@@ -872,7 +851,7 @@ if (o.type === "FIBO") {
         createdAt: Date.now(),
       } as AnyObj);
     }
-  }, [objs, selectedId, hoverId, draft, activeDrawTool, drawObject, drawTradeZones]);
+  }, [objs, selectedId, hoverId, draft, preview, activeDrawTool, drawObject, drawTradeZones]);
 
   React.useEffect(() => {
     resize();
@@ -978,7 +957,7 @@ if (o.type === "FIBO") {
         e.clientY >= r.top &&
         e.clientY <= r.bottom;
 
-      if (!inside || syncing || activeDrawTool !== "SELECT") return;
+      if (!inside || syncing) return;
       syncing = true;
       draw();
       syncRaf = requestAnimationFrame(frame);
@@ -1006,13 +985,13 @@ if (o.type === "FIBO") {
       window.removeEventListener("pointercancel", stopSync, true);
       window.removeEventListener("blur", stopSync);
     };
-  }, [wrapRef, draw, activeDrawTool]);
+  }, [wrapRef, draw]);
 
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setDraft(null);
-        previewRef.current = null;
+        setPreview(null);
         onDrawToolChange?.("SELECT");
       }
 
@@ -1178,8 +1157,7 @@ if (o.type === "FIBO") {
     if (TWO_POINT_TOOLS.includes(activeDrawTool)) {
       if (!draft) {
         setDraft(p);
-        previewRef.current = p;
-        requestAnimationFrame(draw);
+        setPreview(p);
         return;
       }
 
@@ -1191,7 +1169,7 @@ if (o.type === "FIBO") {
       } as AnyObj);
 
       setDraft(null);
-      previewRef.current = null;
+      setPreview(null);
       onDrawToolChange?.("SELECT");
     }
   };
@@ -1356,25 +1334,21 @@ if (o.type === "FIBO") {
               return best;
             };
 
-            const barSeconds = (() => {
-              if (candles.length < 2) return 60;
-              const first = Number(candles[0].time);
-              const last = Number(candles[candles.length - 1].time);
-              return Math.max(1, Math.round((last - first) / Math.max(1, candles.length - 1)));
-            })();
-
-            const shiftPointStable = (pt: Point): Point => ({
-              // Shift absolute market time instead of clamping to loaded candles.
-              // This preserves RECT/FIBO width in the future and in old history.
-              t: (Number(pt.t) + barDelta * barSeconds) as UTCTimestamp,
-              p: pt.p + priceDelta,
-            });
+            const shiftPointStable = (pt: Point): Point => {
+              if (!candles.length) return { t: pt.t, p: pt.p + priceDelta };
+              const idx = indexForTime(pt.t);
+              const next = Math.max(0, Math.min(candles.length - 1, idx + barDelta));
+              return {
+                t: candles[next].time as UTCTimestamp,
+                p: pt.p + priceDelta,
+              };
+            };
 
             if (startObj.type === "VLINE") {
-              return {
-                ...o,
-                t: (Number(startObj.t) + barDelta * barSeconds) as UTCTimestamp,
-              } as AnyObj;
+              if (!candles.length) return o;
+              const idx = indexForTime(startObj.t);
+              const next = Math.max(0, Math.min(candles.length - 1, idx + barDelta));
+              return { ...o, t: candles[next].time as UTCTimestamp } as AnyObj;
             }
 
             if (
@@ -1410,8 +1384,7 @@ if (o.type === "FIBO") {
     }
 
     if (draft && TWO_POINT_TOOLS.includes(activeDrawTool)) {
-      previewRef.current = p;
-      requestAnimationFrame(draw);
+      setPreview(p);
     }
 
     if (
@@ -1575,11 +1548,28 @@ if (o.type === "FIBO") {
 
   <button
     type="button"
-    onClick={() => {
-      localStorage.setItem(
-        "fibo_levels",
-        JSON.stringify(fiboLevels)
-      );
+    onClick={(e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Persist the exact values currently visible in the Fibonacci editor.
+      try {
+        localStorage.setItem(
+          "fibo_levels",
+          JSON.stringify(fiboLevels)
+        );
+      } catch {}
+
+      // Force the canvas to repaint immediately so enabled/disabled levels,
+      // values and colours are visible without another click.
+      // Save also finishes editing, matching the user's expectation that
+      // clicking the button actually commits the panel changes.
+      setSelectedId(null);
+    }}
+    onPointerDown={(e) => {
+      // Prevent the chart/drawing canvas underneath the floating panel from
+      // swallowing the click before React receives it.
+      e.stopPropagation();
     }}
     className="rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-3 py-2 text-sm font-bold text-emerald-100 hover:bg-emerald-500/20"
   >
