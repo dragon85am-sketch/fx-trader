@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
@@ -306,7 +306,9 @@ export async function POST(req: NextRequest) {
         ? Number(threadIdRaw)
         : undefined;
 
-    const defaultLogoUrl = process.env.FXTRADE_LOGO_URL;
+    const defaultLogoUrl =
+      process.env.FXTRADE_LOGO_URL?.trim() ||
+      "https://fx-trade.eu/images/scanner.png";
 
     // Osobny, stały obraz dla raportu tygodniowego.
     // Najpierw może być nadpisany przez FXTRADE_WEEKLY_IMAGE_URL.
@@ -347,9 +349,12 @@ export async function POST(req: NextRequest) {
           ? buildClosedMessage(payload)
           : buildSignalMessage(payload);
 
+    // SIGNAL i CLOSED zawsze używają bannera Scanner Alert.
+    // WEEKLY ma osobną grafikę raportu.
     const photoUrl =
-      payload.imageUrl ||
-      (type === "WEEKLY" ? weeklyReportImageUrl || defaultLogoUrl : defaultLogoUrl);
+      type === "WEEKLY"
+        ? payload.imageUrl || weeklyReportImageUrl || defaultLogoUrl
+        : defaultLogoUrl;
 
     if (!photoUrl) {
       const response = await sendText({
@@ -384,6 +389,12 @@ export async function POST(req: NextRequest) {
         : "🔵 <b>FxTrade Professional Trading</b>"
       : text;
 
+    console.log("[TELEGRAM] sendPhoto attempt", {
+      type,
+      photoUrl,
+      captionLength: safeCaption.length,
+    });
+
     const photoResponse = await sendPhoto({
       botToken,
       chatId,
@@ -393,6 +404,13 @@ export async function POST(req: NextRequest) {
     });
 
     const photoData = await photoResponse.json().catch(() => null);
+
+    console.log("[TELEGRAM] sendPhoto response", {
+      type,
+      ok: photoResponse.ok,
+      status: photoResponse.status,
+      description: photoData?.description ?? null,
+    });
 
     if (photoResponse.ok) {
       if (isLongMessage) {
