@@ -136,10 +136,23 @@ export default function DrawingsLayer({
 const [objs, setObjs] = React.useState<AnyObj[]>([]);
   const storageReadyRef = React.useRef(false);
 
+  // PERFORMANCE: cache candles used by coordinate conversion / hit-testing.
+  // getCandles() can otherwise be called many times inside one mouse frame.
+  const candlesCacheRef = React.useRef<CandlestickData[]>([]);
+  React.useEffect(() => {
+    candlesCacheRef.current = getCandles();
+  });
+
   const [draft, setDraft] = React.useState<Point | null>(null);
   const [preview, setPreview] = React.useState<Point | null>(null);
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [hoverId, setHoverId] = React.useState<string | null>(null);
+  const hoverIdRef = React.useRef<string | null>(null);
+  const setHoverIdFast = React.useCallback((next: string | null) => {
+    if (hoverIdRef.current === next) return;
+    hoverIdRef.current = next;
+    setHoverId(next);
+  }, []);
 const [fiboLevels, setFiboLevels] =
 
   React.useState<FiboLevel[]>(() => {
@@ -251,6 +264,9 @@ React.useEffect(() => {
 
     canvas.style.width = `${wrap.clientWidth}px`;
     canvas.style.height = `${wrap.clientHeight}px`;
+    // Keep the overlay on its own compositor layer during drawing/dragging.
+    canvas.style.willChange = "transform";
+    canvas.style.transform = "translateZ(0)";
 
     const ctx = canvas.getContext("2d");
     ctx?.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -260,7 +276,7 @@ React.useEffect(() => {
     (x: number, y: number): Point | null => {
       const chart = chartRef.current;
       const series = candleSeriesRef.current;
-      const candles = getCandles();
+      const candles = candlesCacheRef.current;
 
       if (!chart || !series || !candles.length) return null;
 
@@ -309,7 +325,7 @@ React.useEffect(() => {
       const exact = ts.timeToCoordinate(time as any);
       if (exact != null && Number.isFinite(Number(exact))) return Number(exact);
 
-      const candles = getCandles();
+      const candles = candlesCacheRef.current;
       if (!candles.length) return null;
 
       const target = Number(time);
@@ -1190,7 +1206,7 @@ if (o.type === "FIBO") {
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
       const hit = findHitHandle(x, y)?.id ?? findHitObject(x, y);
-      setHoverId((prev) => (prev === hit ? prev : hit));
+      setHoverIdFast(hit);
     }
 
     if (
@@ -1646,7 +1662,7 @@ if (o.type === "FIBO") {
   onMouseUp={handleMouseUp}
   onMouseLeave={() => {
     if (isMouseDownRef.current) handleMouseUp();
-    setHoverId(null);
+    setHoverIdFast(null);
   }}
 />
     </>
