@@ -841,14 +841,21 @@ if (o.type === "FIBO") {
     resize();
     draw();
 
+    let resizeRaf = 0;
     const ro = new ResizeObserver(() => {
-      resize();
-      draw();
+      if (resizeRaf) cancelAnimationFrame(resizeRaf);
+      resizeRaf = requestAnimationFrame(() => {
+        resize();
+        draw();
+      });
     });
 
     if (wrapRef.current) ro.observe(wrapRef.current);
 
-    return () => ro.disconnect();
+    return () => {
+      if (resizeRaf) cancelAnimationFrame(resizeRaf);
+      ro.disconnect();
+    };
   }, [resize, draw, wrapRef]);
 
   React.useEffect(() => {
@@ -858,10 +865,7 @@ if (o.type === "FIBO") {
   // Candles change on every timeframe, drawings do not. Re-project all saved
   // TIME + PRICE anchors onto the new candle spacing after a TF switch.
   React.useEffect(() => {
-    const raf1 = requestAnimationFrame(() => {
-      draw();
-      requestAnimationFrame(draw);
-    });
+    const raf1 = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf1);
   }, [timeframe, draw]);
 
@@ -1154,7 +1158,15 @@ if (o.type === "FIBO") {
     }
   };
 
+  // PERFORMANCE: pointer/mouse events can arrive far faster than the screen can render.
+  // Keep all existing drawing logic, but execute the expensive coordinate conversion,
+  // hit-testing and React updates at most once per animation frame (~60 FPS).
+  const lastMouseMoveAtRef = React.useRef(0);
+
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const now = performance.now();
+    if (now - lastMouseMoveAtRef.current < 16) return;
+    lastMouseMoveAtRef.current = now;
     const rect = e.currentTarget.getBoundingClientRect();
     const localX = e.clientX - rect.left;
     const localY = e.clientY - rect.top;
@@ -1350,7 +1362,8 @@ if (o.type === "FIBO") {
       }
 
       dragRef.current.last = p;
-      draw();
+      // setObjs() above schedules the React/canvas refresh; avoid a duplicate
+      // synchronous full draw in the same pointer event.
       return;
     }
 
