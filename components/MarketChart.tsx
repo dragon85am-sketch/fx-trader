@@ -1081,6 +1081,10 @@ fullscreenMode = false,
   const containerRef = React.useRef<HTMLDivElement | null>(null);
   const chartRef = React.useRef<IChartApi | null>(null);
   const candleSeriesRef = React.useRef<ISeriesApi<"Candlestick"> | null>(null);
+  // Invisible time-anchor series: keeps the chart time scale based on real candles
+  // even when RENKO displays fewer/synthetic bricks. This keeps all drawings fixed
+  // to the same market-time X position across CANDLES / HA / RENKO / indicators.
+  const drawingTimelineSeriesRef = React.useRef<ISeriesApi<"Line"> | null>(null);
 
   // Własne uchwyty osi — gwarantują skalowanie nawet wtedy,
   // gdy natywny hit-test osi Lightweight Charts jest przykryty przez layout.
@@ -2246,6 +2250,7 @@ fullscreenMode = false,
       } catch {}
       chartRef.current = null;
       candleSeriesRef.current = null;
+      drawingTimelineSeriesRef.current = null;
     }
 
     const chart = createChart(el, {
@@ -2343,8 +2348,20 @@ kineticScroll: {
       lastValueVisible: true,
     });
 
+    // Whitespace-only series contributes REAL candle timestamps to the shared
+    // time scale but draws nothing and does not affect price autoscale.
+    const drawingTimelineSeries = chart.addLineSeries({
+      visible: false,
+      lineVisible: false,
+      pointMarkersVisible: false,
+      priceLineVisible: false,
+      lastValueVisible: false,
+      crosshairMarkerVisible: false,
+    });
+
     chartRef.current = chart;
     candleSeriesRef.current = candleSeries;
+    drawingTimelineSeriesRef.current = drawingTimelineSeries;
 
     const onRangeChange = () => {
       try {
@@ -2427,6 +2444,7 @@ kineticScroll: {
 
       chartRef.current = null;
       candleSeriesRef.current = null;
+      drawingTimelineSeriesRef.current = null;
 
       setZoneRects([]);
       setOverlayLines([]);
@@ -2499,6 +2517,14 @@ kineticScroll: {
     }
 
     displayCacheRef.current = safeForChart;
+
+    // Keep X coordinates anchored to the real candle timeline in every mode.
+    // Whitespace data changes only the time scale; it renders no line/price.
+    try {
+      drawingTimelineSeriesRef.current?.setData(
+        safeRaw.map((c) => ({ time: c.time } as any))
+      );
+    } catch {}
 
     const chartData =
       renko && patternsEnabled
@@ -2861,6 +2887,13 @@ kineticScroll: {
     }
 
     const safeRaw = rawCacheRef.current;
+
+    // Extend the stable real-time X axis before updating RENKO/HA/CANDLES.
+    try {
+      drawingTimelineSeriesRef.current?.setData(
+        safeRaw.map((c) => ({ time: c.time } as any))
+      );
+    } catch {}
 
     if (renko) {
       if (!safeRaw.length) return;
@@ -3909,7 +3942,7 @@ kineticScroll: {
               wrapRef={containerRef}
               chartRef={chartRef}
               candleSeriesRef={candleSeriesRef}
-              getCandles={() => displayCacheRef.current}
+              getCandles={() => rawCacheRef.current.length ? rawCacheRef.current : displayCacheRef.current}
               activeDrawTool={activeDrawTool}
               onDrawToolChange={onDrawToolChange}
               symbol={symbol}
