@@ -290,13 +290,36 @@ React.useEffect(() => {
 
       if (logical == null || price == null) return null;
 
-      const idx = Math.max(
-        0,
-        Math.min(Math.round(Number(logical)), candles.length - 1)
-      );
+      const logicalNum = Number(logical);
+      const lastIndex = candles.length - 1;
+
+      // Inside loaded candles keep the canonical candle timestamp.
+      // Outside the loaded range (the empty future space to the right)
+      // extrapolate a market timestamp instead of clamping to the last tick.
+      // This lets RECT/FIBO/trend endpoints stay exactly where the user drops them.
+      let time: number;
+      if (logicalNum >= 0 && logicalNum <= lastIndex) {
+        const idx = Math.max(0, Math.min(Math.round(logicalNum), lastIndex));
+        time = Number(candles[idx].time);
+      } else {
+        const diffs: number[] = [];
+        const start = Math.max(1, candles.length - 40);
+        for (let i = start; i < candles.length; i++) {
+          const d = Number(candles[i].time) - Number(candles[i - 1].time);
+          if (d > 0 && Number.isFinite(d)) diffs.push(d);
+        }
+        diffs.sort((a, b) => a - b);
+        const step = diffs.length ? diffs[Math.floor(diffs.length / 2)] : 60;
+
+        if (logicalNum > lastIndex) {
+          time = Number(candles[lastIndex].time) + (logicalNum - lastIndex) * step;
+        } else {
+          time = Number(candles[0].time) + logicalNum * step;
+        }
+      }
 
       return {
-        t: candles[idx].time as UTCTimestamp,
+        t: Math.round(time) as UTCTimestamp,
         p: Number(price),
       };
     },
@@ -1435,6 +1458,50 @@ if (o.type === "FIBO") {
       onDrawToolChange?.("SELECT");
     }
   };
+  // Draggable Fibonacci editor. Position is UI-only and does not modify drawings.
+  const [fiboPanelPos, setFiboPanelPos] = React.useState({ x: 20, y: 20 });
+  const fiboPanelDragRef = React.useRef<{
+    active: boolean;
+    offsetX: number;
+    offsetY: number;
+  }>({ active: false, offsetX: 0, offsetY: 0 });
+
+  const startFiboPanelDrag = React.useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest("button,input")) return;
+    const panel = e.currentTarget.parentElement;
+    if (!panel) return;
+    const r = panel.getBoundingClientRect();
+    fiboPanelDragRef.current = {
+      active: true,
+      offsetX: e.clientX - r.left,
+      offsetY: e.clientY - r.top,
+    };
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  React.useEffect(() => {
+    const move = (e: MouseEvent) => {
+      if (!fiboPanelDragRef.current.active) return;
+      const wrap = wrapRef.current;
+      if (!wrap) return;
+      const r = wrap.getBoundingClientRect();
+      const panelW = 300;
+      const panelH = Math.min(620, r.height);
+      setFiboPanelPos({
+        x: Math.max(0, Math.min(r.width - panelW, e.clientX - r.left - fiboPanelDragRef.current.offsetX)),
+        y: Math.max(0, Math.min(r.height - panelH, e.clientY - r.top - fiboPanelDragRef.current.offsetY)),
+      });
+    };
+    const up = () => { fiboPanelDragRef.current.active = false; };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+    return () => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+    };
+  }, [wrapRef]);
+
   const selectedFibo = objs.find(
     (o) => o.id === selectedId && o.type === "FIBO"
   );
@@ -1443,10 +1510,15 @@ if (o.type === "FIBO") {
     <>
       {selectedFibo && (
         <div
-          className="absolute right-3 top-3 z-[100] w-[300px] rounded-2xl border border-white/10 bg-[#07111f]/95 p-4 text-white shadow-2xl backdrop-blur"
+          className="absolute z-[100] w-[300px] rounded-2xl border border-white/10 bg-[#07111f]/95 p-4 text-white shadow-2xl backdrop-blur"
+          style={{ left: fiboPanelPos.x, top: fiboPanelPos.y }}
           onMouseDown={(e) => e.stopPropagation()}
         >
-          <div className="mb-4 flex items-center justify-between">
+          <div
+            className="mb-4 flex cursor-move select-none items-center justify-between"
+            onMouseDown={startFiboPanelDrag}
+            title="Przeciągnij panel"
+          >
             <h3 className="text-lg font-black">FIBONACCI</h3>
 
             <button
