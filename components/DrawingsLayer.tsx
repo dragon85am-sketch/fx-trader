@@ -229,6 +229,15 @@ React.useEffect(() => {
   const drawingPathRef = React.useRef<Point[]>([]);
   const isMouseDownRef = React.useRef(false);
 
+  // High-frequency drawing engine.
+  // During pointer movement we mutate refs and repaint the canvas with RAF.
+  // React state is committed only when the interaction finishes.
+  const renderObjsRef = React.useRef<AnyObj[]>([]);
+  const previewRef = React.useRef<Point | null>(null);
+  const drawRafRef = React.useRef<number>(0);
+  const drawLatestRef = React.useRef<() => void>(() => {});
+
+
   // SELECT mode:
   // - drag on drawing => move/edit drawing
   // - drag on empty chart => pan chart horizontally AND vertically
@@ -245,6 +254,10 @@ React.useEffect(() => {
     priceMin: null,
     priceMax: null,
   });
+
+  React.useEffect(() => {
+    renderObjsRef.current = objs;
+  }, [objs]);
 
   React.useEffect(() => {
     if (!storageReadyRef.current) return;
@@ -852,14 +865,15 @@ if (o.type === "FIBO") {
     ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
 
     drawTradeZones(ctx);
-    objs.forEach((o) => drawObject(ctx, o, o.id === selectedId || o.id === hoverId));
+    renderObjsRef.current.forEach((o) => drawObject(ctx, o, o.id === selectedId || o.id === hoverId));
 
-    if (draft && preview && TWO_POINT_TOOLS.includes(activeDrawTool)) {
+    const livePreview = previewRef.current ?? preview;
+    if (draft && livePreview && TWO_POINT_TOOLS.includes(activeDrawTool)) {
       drawObject(ctx, {
         id: "preview",
         type: activeDrawTool as TwoPointObj["type"],
         a: draft,
-        b: preview,
+        b: livePreview,
         color: "#facc15",
         visible: true,
         createdAt: Date.now(),
@@ -879,7 +893,23 @@ if (o.type === "FIBO") {
         createdAt: Date.now(),
       } as AnyObj);
     }
-  }, [objs, selectedId, hoverId, draft, preview, activeDrawTool, drawObject, drawTradeZones]);
+  }, [selectedId, hoverId, draft, preview, activeDrawTool, drawObject, drawTradeZones]);
+
+  drawLatestRef.current = draw;
+
+  const scheduleCanvasDraw = React.useCallback(() => {
+    if (drawRafRef.current) return;
+    drawRafRef.current = requestAnimationFrame(() => {
+      drawRafRef.current = 0;
+      drawLatestRef.current();
+    });
+  }, []);
+
+  React.useEffect(() => {
+    return () => {
+      if (drawRafRef.current) cancelAnimationFrame(drawRafRef.current);
+    };
+  }, []);
 
   React.useEffect(() => {
     resize();
@@ -1185,6 +1215,7 @@ if (o.type === "FIBO") {
     if (TWO_POINT_TOOLS.includes(activeDrawTool)) {
       if (!draft) {
         setDraft(p);
+        previewRef.current = p;
         setPreview(p);
         return;
       }
@@ -1197,6 +1228,7 @@ if (o.type === "FIBO") {
       } as AnyObj);
 
       setDraft(null);
+      previewRef.current = null;
       setPreview(null);
       onDrawToolChange?.("SELECT");
     }
@@ -1310,8 +1342,7 @@ if (o.type === "FIBO") {
           return screenToData(sp.x + dx, sp.y + dy) ?? pointToData(sp.x + dx, sp.y + dy);
         };
 
-        setObjs((prev) =>
-          prev.map((o) => {
+        renderObjsRef.current = renderObjsRef.current.map((o) => {
             if (o.id !== id) return o;
 
             if (mode === "a" && "a" in o && "b" in o) {
@@ -1401,18 +1432,18 @@ if (o.type === "FIBO") {
             }
 
             return o;
-          })
-        );
+          });
+        scheduleCanvasDraw();
       }
 
       dragRef.current.last = p;
-      // setObjs() above schedules the React/canvas refresh; avoid a duplicate
-      // synchronous full draw in the same pointer event.
+      // No React state update here: canvas follows the pointer via RAF.
       return;
     }
 
     if (draft && TWO_POINT_TOOLS.includes(activeDrawTool)) {
-      setPreview(p);
+      previewRef.current = p;
+      scheduleCanvasDraw();
     }
 
     if (
@@ -1420,12 +1451,20 @@ if (o.type === "FIBO") {
       (activeDrawTool === "PATH" || activeDrawTool === "BRUSH")
     ) {
       drawingPathRef.current.push(p);
-      draw();
+      scheduleCanvasDraw();
     }
   };
 
   const handleMouseUp = () => {
     isMouseDownRef.current = false;
+
+    // Commit a drag/resize once, after the pointer interaction ends.
+    // This keeps persistence/localStorage and the rest of the app React-friendly
+    // without forcing React to render on every mousemove.
+    if (dragRef.current.id) {
+      const committed = renderObjsRef.current;
+      setObjs(committed);
+    }
 
     chartPanRef.current = {
       active: false,
