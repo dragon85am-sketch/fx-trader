@@ -150,6 +150,13 @@ const [objs, setObjs] = React.useState<AnyObj[]>([]);
 
   const [draft, setDraft] = React.useState<Point | null>(null);
   const [preview, setPreview] = React.useState<Point | null>(null);
+
+  // FAST DRAWING: live preview stays outside React state. Pointer movement only
+  // updates refs and schedules one canvas repaint per browser frame. This avoids
+  // a full React render for every mouse event while drawing RECT/FIBO/lines.
+  const draftFastRef = React.useRef<Point | null>(null);
+  const previewFastRef = React.useRef<Point | null>(null);
+  const pointerDrawRafRef = React.useRef<number>(0);
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [hoverId, setHoverId] = React.useState<string | null>(null);
   const hoverIdRef = React.useRef<string | null>(null);
@@ -229,19 +236,6 @@ React.useEffect(() => {
   const drawingPathRef = React.useRef<Point[]>([]);
   const isMouseDownRef = React.useRef(false);
 
-  // TradingView-like overlay crosshair: pixel based, so it can move freely
-  // through future/empty chart space instead of stopping at the last candle.
-  const crosshairRef = React.useRef({ x: 0, y: 0, visible: false });
-  const pointerDrawRafRef = React.useRef(0);
-  const drawRef = React.useRef<(() => void) | null>(null);
-  const scheduleDraw = React.useCallback(() => {
-    if (pointerDrawRafRef.current) return;
-    pointerDrawRafRef.current = requestAnimationFrame(() => {
-      pointerDrawRafRef.current = 0;
-      drawRef.current?.();
-    });
-  }, []);
-
   // SELECT mode:
   // - drag on drawing => move/edit drawing
   // - drag on empty chart => pan chart horizontally AND vertically
@@ -306,30 +300,29 @@ React.useEffect(() => {
       const logicalNum = Number(logical);
       const lastIndex = candles.length - 1;
 
-      // TradingView-like continuous X -> market time conversion. Do not snap
-      // the pointer to candle centers: snapping is what makes drawing/dragging
-      // feel stepped and makes the crosshair appear stuck on the latest tick.
-      const diffs: number[] = [];
-      const sampleStart = Math.max(1, candles.length - 80);
-      for (let i = sampleStart; i < candles.length; i++) {
-        const d = Number(candles[i].time) - Number(candles[i - 1].time);
-        if (d > 0 && Number.isFinite(d)) diffs.push(d);
-      }
-      diffs.sort((a, b) => a - b);
-      const step = diffs.length ? diffs[Math.floor(diffs.length / 2)] : 60;
-
+      // Inside loaded candles keep the canonical candle timestamp.
+      // Outside the loaded range (the empty future space to the right)
+      // extrapolate a market timestamp instead of clamping to the last tick.
+      // This lets RECT/FIBO/trend endpoints stay exactly where the user drops them.
       let time: number;
-      if (logicalNum <= 0) {
-        time = Number(candles[0].time) + logicalNum * step;
-      } else if (logicalNum >= lastIndex) {
-        time = Number(candles[lastIndex].time) + (logicalNum - lastIndex) * step;
+      if (logicalNum >= 0 && logicalNum <= lastIndex) {
+        const idx = Math.max(0, Math.min(Math.round(logicalNum), lastIndex));
+        time = Number(candles[idx].time);
       } else {
-        const i0 = Math.floor(logicalNum);
-        const i1 = Math.min(lastIndex, i0 + 1);
-        const f = logicalNum - i0;
-        const t0 = Number(candles[i0].time);
-        const t1 = Number(candles[i1].time);
-        time = t0 + (t1 - t0) * f;
+        const diffs: number[] = [];
+        const start = Math.max(1, candles.length - 40);
+        for (let i = start; i < candles.length; i++) {
+          const d = Number(candles[i].time) - Number(candles[i - 1].time);
+          if (d > 0 && Number.isFinite(d)) diffs.push(d);
+        }
+        diffs.sort((a, b) => a - b);
+        const step = diffs.length ? diffs[Math.floor(diffs.length / 2)] : 60;
+
+        if (logicalNum > lastIndex) {
+          time = Number(candles[lastIndex].time) + (logicalNum - lastIndex) * step;
+        } else {
+          time = Number(candles[0].time) + logicalNum * step;
+        }
       }
 
       return {
@@ -868,12 +861,14 @@ if (o.type === "FIBO") {
     drawTradeZones(ctx);
     objs.forEach((o) => drawObject(ctx, o, o.id === selectedId || o.id === hoverId));
 
-    if (draft && preview && TWO_POINT_TOOLS.includes(activeDrawTool)) {
+    const liveDraft = draftFastRef.current ?? draft;
+    const livePreview = previewFastRef.current ?? preview;
+    if (liveDraft && livePreview && TWO_POINT_TOOLS.includes(activeDrawTool)) {
       drawObject(ctx, {
         id: "preview",
         type: activeDrawTool as TwoPointObj["type"],
-        a: draft,
-        b: preview,
+        a: liveDraft,
+        b: livePreview,
         color: "#facc15",
         visible: true,
         createdAt: Date.now(),
@@ -893,27 +888,7 @@ if (o.type === "FIBO") {
         createdAt: Date.now(),
       } as AnyObj);
     }
-
-    // Pixel crosshair is intentionally independent from lightweight-charts time data.
-    // Therefore the vertical line follows the mouse across the WHOLE canvas, including
-    // the empty future area to the right of the newest candle.
-    const ch = crosshairRef.current;
-    if (ch.visible) {
-      ctx.save();
-      ctx.strokeStyle = "rgba(226,232,240,0.72)";
-      ctx.lineWidth = 1;
-      ctx.setLineDash([3, 4]);
-      ctx.beginPath();
-      ctx.moveTo(Math.round(ch.x) + 0.5, 0);
-      ctx.lineTo(Math.round(ch.x) + 0.5, canvas.clientHeight);
-      ctx.moveTo(0, Math.round(ch.y) + 0.5);
-      ctx.lineTo(canvas.clientWidth, Math.round(ch.y) + 0.5);
-      ctx.stroke();
-      ctx.restore();
-    }
   }, [objs, selectedId, hoverId, draft, preview, activeDrawTool, drawObject, drawTradeZones]);
-
-  drawRef.current = draw;
 
   React.useEffect(() => {
     resize();
@@ -939,6 +914,10 @@ if (o.type === "FIBO") {
   React.useEffect(() => {
     draw();
   }, [draw]);
+
+  React.useEffect(() => () => {
+    if (pointerDrawRafRef.current) cancelAnimationFrame(pointerDrawRafRef.current);
+  }, []);
 
   // Candles change on every timeframe, drawings do not. Re-project all saved
   // TIME + PRICE anchors onto the new candle spacing after a TF switch.
@@ -1052,6 +1031,8 @@ if (o.type === "FIBO") {
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        draftFastRef.current = null;
+        previewFastRef.current = null;
         setDraft(null);
         setPreview(null);
         onDrawToolChange?.("SELECT");
@@ -1067,11 +1048,6 @@ if (o.type === "FIBO") {
 
     return () => window.removeEventListener("keydown", onKey);
   }, [selectedId, onDrawToolChange]);
-
-
-  React.useEffect(() => () => {
-    if (pointerDrawRafRef.current) cancelAnimationFrame(pointerDrawRafRef.current);
-  }, []);
 
   const addObj = (obj: AnyObj) => {
     setObjs((prev) => [...prev, obj]);
@@ -1222,7 +1198,9 @@ if (o.type === "FIBO") {
     }
 
     if (TWO_POINT_TOOLS.includes(activeDrawTool)) {
-      if (!draft) {
+      if (!draftFastRef.current && !draft) {
+        draftFastRef.current = p;
+        previewFastRef.current = p;
         setDraft(p);
         setPreview(p);
         return;
@@ -1231,27 +1209,38 @@ if (o.type === "FIBO") {
       addObj({
         ...makeBase(activeDrawTool),
         type: activeDrawTool as TwoPointObj["type"],
-        a: draft,
+        a: (draftFastRef.current ?? draft)!,
         b: p,
       } as AnyObj);
 
+      draftFastRef.current = null;
+      previewFastRef.current = null;
       setDraft(null);
       setPreview(null);
       onDrawToolChange?.("SELECT");
     }
   };
 
+  // FAST POINTER PATH: do not add a fixed 16 ms delay here. The browser can deliver
+  // 120/144/240 Hz pointer input; canvas repaint itself is coalesced with RAF below.
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const localX = e.clientX - rect.left;
     const localY = e.clientY - rect.top;
-
-    // Update cursor position on every browser event, but paint only once per frame.
-    // No artificial 16 ms event dropping: high-refresh displays stay fluid.
-    crosshairRef.current = { x: localX, y: localY, visible: true };
-    scheduleDraw();
-
     const p = pointToData(localX, localY);
+
+    // Crosshair dokładnie jak w Alpha: pion + poziom śledzą kursor.
+    // Canvas Drawing Tools jest nad chartem, więc synchronizujemy crosshair ręcznie.
+    if (p && !dragRef.current.id && !chartPanRef.current.active) {
+      try {
+        (chartRef.current as any)?.setCrosshairPosition?.(
+          p.p,
+          p.t as any,
+          candleSeriesRef.current
+        );
+      } catch {}
+    }
+
     if (!p) return;
 
     if (activeDrawTool === "SELECT" && !isMouseDownRef.current) {
@@ -1351,20 +1340,79 @@ if (o.type === "FIBO") {
               return price == null ? o : ({ ...o, price: Number(price) } as AnyObj);
             }
 
-            // TradingView-like smooth MOVE: translate the original market anchors
-            // by the exact pointer pixel delta. No Math.round(barDelta), no nearest-
-            // candle clamp, so RECT/FIBO/lines do not jump one bar at a time.
-            const shiftPointSmooth = (pt: Point): Point => {
-              const sp = dataToPoint(pt);
-              if (!sp) return pt;
-              return pointToData(sp.x + dx, sp.y + dy) ?? pt;
+            // MOVE całego obiektu po BARACH + CENIE.
+            // Nie przeliczamy osobno punktów przez coordinateToTime(), bo przy
+            // pan/zoom powodowało to "latanie" i zmianę szerokości RECT/FIBO.
+            const chart = chartRef.current;
+            const series = candleSeriesRef.current;
+            const candles = getCandles();
+            const ts = chart?.timeScale();
+
+            const startLocalX = dragRef.current.startClientX - rect.left;
+            const startLocalY = dragRef.current.startClientY - rect.top;
+            const startLogical = ts?.coordinateToLogical(startLocalX);
+            const currentLogical = ts?.coordinateToLogical(localX);
+            const startPrice = series?.coordinateToPrice(startLocalY);
+            const currentPrice = series?.coordinateToPrice(localY);
+
+            const barDelta =
+              startLogical != null && currentLogical != null
+                ? Math.round(Number(currentLogical) - Number(startLogical))
+                : 0;
+            const priceDelta =
+              startPrice != null && currentPrice != null
+                ? Number(currentPrice) - Number(startPrice)
+                : 0;
+
+            const indexForTime = (t: UTCTimestamp) => {
+              let best = 0;
+              let bestD = Infinity;
+              const target = Number(t);
+              for (let i = 0; i < candles.length; i++) {
+                const d = Math.abs(Number(candles[i].time) - target);
+                if (d < bestD) { bestD = d; best = i; }
+              }
+              return best;
+            };
+
+            // TradingView-style future space: drawings are NOT clamped to the
+            // last Renko brick / current tick. Convert any logical index (also
+            // negative or beyond candles.length - 1) to a projected timestamp.
+            const timeForIndex = (logicalIndex: number): UTCTimestamp => {
+              if (!candles.length) return Math.floor(Date.now() / 1000) as UTCTimestamp;
+              const last = candles.length - 1;
+              if (logicalIndex >= 0 && logicalIndex <= last) {
+                return candles[Math.round(logicalIndex)].time as UTCTimestamp;
+              }
+
+              const diffs: number[] = [];
+              const from = Math.max(1, candles.length - 40);
+              for (let i = from; i < candles.length; i++) {
+                const d = Number(candles[i].time) - Number(candles[i - 1].time);
+                if (d > 0 && Number.isFinite(d)) diffs.push(d);
+              }
+              diffs.sort((a, b) => a - b);
+              const step = diffs.length ? diffs[Math.floor(diffs.length / 2)] : 60;
+
+              if (logicalIndex > last) {
+                return Math.round(Number(candles[last].time) + (logicalIndex - last) * step) as UTCTimestamp;
+              }
+              return Math.round(Number(candles[0].time) + logicalIndex * step) as UTCTimestamp;
+            };
+
+            const shiftPointStable = (pt: Point): Point => {
+              if (!candles.length) return { t: pt.t, p: pt.p + priceDelta };
+              const idx = indexForTime(pt.t);
+              return {
+                t: timeForIndex(idx + barDelta),
+                p: pt.p + priceDelta,
+              };
             };
 
             if (startObj.type === "VLINE") {
-              const x0 = marketTimeToX(startObj.t);
-              if (x0 == null) return o;
-              const moved = pointToData(Number(x0) + dx, localY);
-              return moved ? ({ ...o, t: moved.t } as AnyObj) : o;
+              if (!candles.length) return o;
+              const idx = indexForTime(startObj.t);
+              return { ...o, t: timeForIndex(idx + barDelta) } as AnyObj;
             }
 
             if (
@@ -1376,15 +1424,15 @@ if (o.type === "FIBO") {
             ) {
               return {
                 ...o,
-                a: shiftPointSmooth(startObj.a),
-                b: shiftPointSmooth(startObj.b),
+                a: shiftPointStable(startObj.a),
+                b: shiftPointStable(startObj.b),
               } as AnyObj;
             }
 
             if (startObj.type === "PATH" || startObj.type === "BRUSH") {
               return {
                 ...o,
-                points: startObj.points.map(shiftPointSmooth),
+                points: startObj.points.map(shiftPointStable),
               } as AnyObj;
             }
 
@@ -1399,8 +1447,14 @@ if (o.type === "FIBO") {
       return;
     }
 
-    if (draft && TWO_POINT_TOOLS.includes(activeDrawTool)) {
-      setPreview(p);
+    if ((draftFastRef.current || draft) && TWO_POINT_TOOLS.includes(activeDrawTool)) {
+      previewFastRef.current = p;
+      if (!pointerDrawRafRef.current) {
+        pointerDrawRafRef.current = requestAnimationFrame(() => {
+          pointerDrawRafRef.current = 0;
+          draw();
+        });
+      }
     }
 
     if (
@@ -1744,8 +1798,6 @@ if (o.type === "FIBO") {
   onMouseUp={handleMouseUp}
   onMouseLeave={() => {
     if (isMouseDownRef.current) handleMouseUp();
-    crosshairRef.current.visible = false;
-    scheduleDraw();
     setHoverIdFast(null);
   }}
 />
