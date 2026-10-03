@@ -2522,7 +2522,7 @@ kineticScroll: {
     // Whitespace data changes only the time scale; it renders no line/price.
     try {
       drawingTimelineSeriesRef.current?.setData(
-        safeRaw.map((c) => ({ time: c.time } as any))
+        renko ? [] : safeRaw.map((c) => ({ time: c.time } as any))
       );
     } catch {}
 
@@ -2891,7 +2891,7 @@ kineticScroll: {
     // Extend the stable real-time X axis before updating RENKO/HA/CANDLES.
     try {
       drawingTimelineSeriesRef.current?.setData(
-        safeRaw.map((c) => ({ time: c.time } as any))
+        renko ? [] : safeRaw.map((c) => ({ time: c.time } as any))
       );
     } catch {}
 
@@ -3942,7 +3942,11 @@ kineticScroll: {
               wrapRef={containerRef}
               chartRef={chartRef}
               candleSeriesRef={candleSeriesRef}
-              getCandles={() => rawCacheRef.current.length ? rawCacheRef.current : displayCacheRef.current}
+              getCandles={() =>
+                renko
+                  ? displayCacheRef.current
+                  : (rawCacheRef.current.length ? rawCacheRef.current : displayCacheRef.current)
+              }
               activeDrawTool={activeDrawTool}
               onDrawToolChange={onDrawToolChange}
               symbol={symbol}
