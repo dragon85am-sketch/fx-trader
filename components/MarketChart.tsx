@@ -493,61 +493,85 @@ function toRenkoCandles(safeRaw: CandlestickData[], boxSize: number): Candlestic
   const out: CandlestickData[] = [];
   const first = safeRaw[0] as any;
   let lastClose = Number(first.close);
-  let lastBrickTime = Number(first.time) || Math.floor(Date.now() / 1000);
 
-  // Cegła dostaje rzeczywisty czas świecy/ticku, który ją utworzył.
-  // Gdy jeden tick tworzy kilka cegieł, kolejne dostają +1 s tylko po to,
-  // by lightweight-charts zachował unikalny, rosnący timestamp.
-  const brickTime = (sourceTime: number) => {
-    const actual = Number.isFinite(sourceTime) ? Math.floor(sourceTime) : lastBrickTime + 1;
-    lastBrickTime = Math.max(actual, lastBrickTime + 1);
-    return lastBrickTime as UTCTimestamp;
-  };
-
+  // IMPORTANT: one timestamp per SOURCE candle.
+  // Lightweight Charts uses one shared logical time scale for every series.
+  // Creating several Renko bricks with synthetic +1s timestamps inserts extra
+  // logical bars and moves drawings/zones horizontally when CANDLES <-> RENKO
+  // is toggled. We therefore aggregate all bricks created by one source candle
+  // into one visual Renko candle at the source candle's real market timestamp.
+  // Price logic (box stepping) is unchanged; only presentation is aggregated.
   for (let i = 1; i < safeRaw.length; i++) {
     const c = safeRaw[i] as any;
     const price = Number(c.close);
     const sourceTime = Number(c.time);
+    if (!Number.isFinite(price) || !Number.isFinite(sourceTime)) continue;
+
+    const sourceOpen = lastClose;
+    let sourceClose = lastClose;
+    let moved = false;
 
     while (price >= lastClose + box) {
-      const open = lastClose;
-      const close = lastClose + box;
-      out.push({ time: brickTime(sourceTime), open, high: close, low: open, close });
-      lastClose = close;
+      lastClose += box;
+      sourceClose = lastClose;
+      moved = true;
     }
 
     while (price <= lastClose - box) {
-      const open = lastClose;
-      const close = lastClose - box;
-      out.push({ time: brickTime(sourceTime), open, high: open, low: close, close });
-      lastClose = close;
+      lastClose -= box;
+      sourceClose = lastClose;
+      moved = true;
+    }
+
+    if (moved) {
+      out.push({
+        time: Math.floor(sourceTime) as UTCTimestamp,
+        open: sourceOpen,
+        high: Math.max(sourceOpen, sourceClose),
+        low: Math.min(sourceOpen, sourceClose),
+        close: sourceClose,
+      });
     }
   }
 
-  // LIVE forming brick: pokazuje dokładnie aktualną cenę/tick nawet zanim cena
-  // przejdzie pełny Box Size. Dzięki temu RENKO i zwykłe candles mają tę samą
-  // bieżącą cenę i czas. EMA/BB/SuperTrend dostają ten sam safeForChart.
+  // LIVE forming brick stays on the REAL last source timestamp as well.
   const live = safeRaw[safeRaw.length - 1] as any;
   const livePrice = Number(live?.close);
   const liveTime = Number(live?.time);
-  if (Number.isFinite(livePrice)) {
+  if (Number.isFinite(livePrice) && Number.isFinite(liveTime)) {
+    const t = Math.floor(liveTime) as UTCTimestamp;
     const delta = livePrice - lastClose;
+
     if (Math.abs(delta) > 1e-12) {
-      const t = Math.max(Math.floor(liveTime || 0), lastBrickTime + 1) as UTCTimestamp;
-      out.push({
+      const forming: CandlestickData = {
         time: t,
         open: lastClose,
         high: Math.max(lastClose, livePrice),
         low: Math.min(lastClose, livePrice),
         close: livePrice,
-      });
+      };
+
+      // Replace instead of duplicating when the last closed Renko aggregate was
+      // produced by this same source candle.
+      if (out.length && Number(out[out.length - 1].time) === Number(t)) {
+        const prev = out[out.length - 1] as any;
+        out[out.length - 1] = {
+          time: t,
+          open: Number(prev.open),
+          high: Math.max(Number(prev.high), livePrice),
+          low: Math.min(Number(prev.low), livePrice),
+          close: livePrice,
+        } as CandlestickData;
+      } else {
+        out.push(forming);
+      }
     }
   }
 
   if (!out.length) {
     const p = Number(live?.close);
     out.push({
-      time: (Number(live?.time) || lastBrickTime) as UTCTimestamp,
+      time: (Number(live?.time) || Number(first.time)) as UTCTimestamp,
       open: p,
       high: p,
       low: p,
@@ -555,7 +579,7 @@ function toRenkoCandles(safeRaw: CandlestickData[], boxSize: number): Candlestic
     });
   }
 
-  return ensureStrictlyIncreasingTimes(out);
+  return normalizeCandles(out);
 }
 
 /* =========================
