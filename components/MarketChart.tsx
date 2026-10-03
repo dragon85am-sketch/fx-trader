@@ -487,82 +487,72 @@ function autoRenkoBoxSize(safeRaw: CandlestickData[]) {
 function toRenkoCandles(safeRaw: CandlestickData[], boxSize: number): CandlestickData[] {
   if (!safeRaw.length) return [];
 
-  const box = Math.abs(Number(boxSize) || 0);
-  if (!Number.isFinite(box) || box <= 0) return safeRaw;
+  const box = Math.max(Number(boxSize) || 0, 0);
+  if (!box || !Number.isFinite(box)) return safeRaw;
 
   const out: CandlestickData[] = [];
   const first = safeRaw[0] as any;
-  const firstClose = Number(first.close);
-  if (!Number.isFinite(firstClose)) return [];
+  let lastClose = Number(first.close);
+  let lastBrickTime = Number(first.time) || Math.floor(Date.now() / 1000);
 
-  // TRUE RENKO:
-  // - każda ZAMKNIĘTA cegła ma dokładnie jeden Box Size,
-  // - brak "live forming candle" o przypadkowej wysokości,
-  // - high/low == krawędzie cegły (bez knotów),
-  // - cena kotwiczona do stałej siatki boxów, więc Renko nie zmienia kształtu
-  //   przy każdym ticku ani po ponownym renderze.
-  let lastClose = Math.round(firstClose / box) * box;
-  let lastBrickTime = Math.floor(Number(first.time) || Date.now() / 1000) - 1;
-
-  const nextBrickTime = (sourceTime: number) => {
-    const actual = Number.isFinite(sourceTime)
-      ? Math.floor(sourceTime)
-      : lastBrickTime + 1;
+  // Cegła dostaje rzeczywisty czas świecy/ticku, który ją utworzył.
+  // Gdy jeden tick tworzy kilka cegieł, kolejne dostają +1 s tylko po to,
+  // by lightweight-charts zachował unikalny, rosnący timestamp.
+  const brickTime = (sourceTime: number) => {
+    const actual = Number.isFinite(sourceTime) ? Math.floor(sourceTime) : lastBrickTime + 1;
     lastBrickTime = Math.max(actual, lastBrickTime + 1);
     return lastBrickTime as UTCTimestamp;
-  };
-
-  const pushUp = (sourceTime: number) => {
-    const open = lastClose;
-    const close = open + box;
-    out.push({
-      time: nextBrickTime(sourceTime),
-      open,
-      high: close,
-      low: open,
-      close,
-    });
-    lastClose = close;
-  };
-
-  const pushDown = (sourceTime: number) => {
-    const open = lastClose;
-    const close = open - box;
-    out.push({
-      time: nextBrickTime(sourceTime),
-      open,
-      high: open,
-      low: close,
-      close,
-    });
-    lastClose = close;
   };
 
   for (let i = 1; i < safeRaw.length; i++) {
     const c = safeRaw[i] as any;
     const price = Number(c.close);
     const sourceTime = Number(c.time);
-    if (!Number.isFinite(price)) continue;
 
-    // Close-based Renko. Jeden ruch ceny może domknąć kilka pełnych cegieł.
-    while (price >= lastClose + box - box * 1e-10) pushUp(sourceTime);
-    while (price <= lastClose - box + box * 1e-10) pushDown(sourceTime);
+    while (price >= lastClose + box) {
+      const open = lastClose;
+      const close = lastClose + box;
+      out.push({ time: brickTime(sourceTime), open, high: close, low: open, close });
+      lastClose = close;
+    }
+
+    while (price <= lastClose - box) {
+      const open = lastClose;
+      const close = lastClose - box;
+      out.push({ time: brickTime(sourceTime), open, high: open, low: close, close });
+      lastClose = close;
+    }
   }
 
-  // Jeżeli historia jest krótsza niż jeden box, zostawiamy jeden neutralny punkt,
-  // żeby seria Lightweight Charts pozostała poprawna. Nie udajemy pełnej cegły.
-  if (!out.length) {
-    const live = safeRaw[safeRaw.length - 1] as any;
-    const p = Number(live?.close);
-    if (Number.isFinite(p)) {
+  // LIVE forming brick: pokazuje dokładnie aktualną cenę/tick nawet zanim cena
+  // przejdzie pełny Box Size. Dzięki temu RENKO i zwykłe candles mają tę samą
+  // bieżącą cenę i czas. EMA/BB/SuperTrend dostają ten sam safeForChart.
+  const live = safeRaw[safeRaw.length - 1] as any;
+  const livePrice = Number(live?.close);
+  const liveTime = Number(live?.time);
+  if (Number.isFinite(livePrice)) {
+    const delta = livePrice - lastClose;
+    if (Math.abs(delta) > 1e-12) {
+      const t = Math.max(Math.floor(liveTime || 0), lastBrickTime + 1) as UTCTimestamp;
       out.push({
-        time: (Number(live?.time) || lastBrickTime + 1) as UTCTimestamp,
-        open: p,
-        high: p,
-        low: p,
-        close: p,
+        time: t,
+        open: lastClose,
+        high: Math.max(lastClose, livePrice),
+        low: Math.min(lastClose, livePrice),
+        close: livePrice,
       });
     }
+  }
+
+  if (!out.length) {
+    const p = Number(live?.close);
+    out.push({
+      time: (Number(live?.time) || lastBrickTime) as UTCTimestamp,
+      open: p,
+      high: p,
+      low: p,
+      close: p,
+    });
   }
 
   return ensureStrictlyIncreasingTimes(out);
@@ -1091,6 +1081,10 @@ fullscreenMode = false,
   const containerRef = React.useRef<HTMLDivElement | null>(null);
   const chartRef = React.useRef<IChartApi | null>(null);
   const candleSeriesRef = React.useRef<ISeriesApi<"Candlestick"> | null>(null);
+  // Invisible time-anchor series: keeps the chart time scale based on real candles
+  // even when RENKO displays fewer/synthetic bricks. This keeps all drawings fixed
+  // to the same market-time X position across CANDLES / HA / RENKO / indicators.
+  const drawingTimelineSeriesRef = React.useRef<ISeriesApi<"Line"> | null>(null);
 
   // Własne uchwyty osi — gwarantują skalowanie nawet wtedy,
   // gdy natywny hit-test osi Lightweight Charts jest przykryty przez layout.
@@ -1171,9 +1165,26 @@ fullscreenMode = false,
   const zoneSvgRef = React.useRef<SVGSVGElement | null>(null);
   const zoneLabelsRef = React.useRef<HTMLDivElement | null>(null);
 
-  // PERFORMANCE: do not run an idle 60 FPS loop just to reposition trade zones.
-  // Zone X is synchronized by the chart visible-range subscriptions below, and
-  // DrawingsLayer keeps overlays locked during active pointer interactions.
+  React.useEffect(() => {
+    let raf = 0;
+    const sync = () => {
+      const chart = chartRef.current;
+      const t = zoneAnchorTimeRef.current;
+      const baseX = zoneBaseXRef.current;
+      if (chart && t != null && baseX != null) {
+        const x = chart.timeScale().timeToCoordinate(t);
+        if (x != null && Number.isFinite(Number(x))) {
+          const dx = Number(x) + zoneGapPxRef.current - baseX;
+          const tr = `translate3d(${dx}px,0,0)`;
+          if (zoneSvgRef.current) zoneSvgRef.current.style.transform = tr;
+          if (zoneLabelsRef.current) zoneLabelsRef.current.style.transform = tr;
+        }
+      }
+      raf = requestAnimationFrame(sync);
+    };
+    raf = requestAnimationFrame(sync);
+    return () => cancelAnimationFrame(raf);
+  }, []);
 
 
   const frozenAnchorKeyRef = React.useRef<string>("");
@@ -1216,6 +1227,12 @@ fullscreenMode = false,
   } | null>(null);
   const lastIndicatorLiveUpdateRef = React.useRef(0);
   const rightOffset = rightPadOn ? 28 : 10;
+
+  // Preserve the user's current chart viewport when only the presentation mode
+  // changes (normal candles <-> HA <-> Renko, or indicator overlays).
+  // Drawings are stored as market time + price, so keeping the same viewport
+  // prevents boxes/lines from visually jumping or disappearing during a mode switch.
+  const presentationModeRef = React.useRef<string>("");
 
   // FOLLOW LIVE: keep the current zoom/span and move only the logical window
   // so its right edge stays on the newest bar + configured right padding.
@@ -2233,6 +2250,7 @@ fullscreenMode = false,
       } catch {}
       chartRef.current = null;
       candleSeriesRef.current = null;
+      drawingTimelineSeriesRef.current = null;
     }
 
     const chart = createChart(el, {
@@ -2330,8 +2348,20 @@ kineticScroll: {
       lastValueVisible: true,
     });
 
+    // Whitespace-only series contributes REAL candle timestamps to the shared
+    // time scale but draws nothing and does not affect price autoscale.
+    const drawingTimelineSeries = chart.addLineSeries({
+      visible: false,
+      lineVisible: false,
+      pointMarkersVisible: false,
+      priceLineVisible: false,
+      lastValueVisible: false,
+      crosshairMarkerVisible: false,
+    });
+
     chartRef.current = chart;
     candleSeriesRef.current = candleSeries;
+    drawingTimelineSeriesRef.current = drawingTimelineSeries;
 
     const onRangeChange = () => {
       try {
@@ -2414,6 +2444,7 @@ kineticScroll: {
 
       chartRef.current = null;
       candleSeriesRef.current = null;
+      drawingTimelineSeriesRef.current = null;
 
       setZoneRects([]);
       setOverlayLines([]);
@@ -2487,12 +2518,46 @@ kineticScroll: {
 
     displayCacheRef.current = safeForChart;
 
+    // Keep X coordinates anchored to the real candle timeline in every mode.
+    // Whitespace data changes only the time scale; it renders no line/price.
+    try {
+      drawingTimelineSeriesRef.current?.setData(
+        safeRaw.map((c) => ({ time: c.time } as any))
+      );
+    } catch {}
+
     const chartData =
       renko && patternsEnabled
         ? highlightRenkoPatternBricks(safeForChart)
         : safeForChart;
 
+    const ts: any = chart.timeScale();
+    const modeNow = renko ? "RENKO" : heikinAshi ? "HA" : "CANDLES";
+    const modeChanged =
+      presentationModeRef.current !== "" &&
+      presentationModeRef.current !== modeNow;
+
+    // Snapshot the visible MARKET-TIME window before setData(). Lightweight Charts
+    // may otherwise recalculate logical indexes (especially for Renko) and the
+    // drawing overlay appears to jump.
+    let viewportBeforeModeChange: any = null;
+    if (modeChanged) {
+      try {
+        viewportBeforeModeChange = ts.getVisibleRange?.() ?? null;
+      } catch {}
+    }
+
     candleSeries.setData(chartData);
+    presentationModeRef.current = modeNow;
+
+    if (modeChanged && viewportBeforeModeChange) {
+      requestAnimationFrame(() => {
+        try {
+          ts.setVisibleRange?.(viewportBeforeModeChange);
+          setOverlayTick((v) => v + 1);
+        } catch {}
+      });
+    }
 
     lastBarTimeRef.current = safeForChart.length
       ? (safeForChart[safeForChart.length - 1].time as UTCTimestamp)
@@ -2504,9 +2569,10 @@ kineticScroll: {
 
     if (isNewSeries) {
       // Open a new symbol/TF at the LIVE edge instead of fitting the whole history.
-      // Keep a practical initial window while preserving the configured right pad.
       followLatestBar(Math.min(120, Math.max(40, safeForChart.length)));
-    } else if (followOnTick && !detached && !manualPanRef.current) {
+    } else if (!modeChanged && followOnTick && !detached && !manualPanRef.current) {
+      // A presentation switch restores the previous viewport above. Do not
+      // overwrite it in the same render by snapping to the newest bar.
       followLatestBar();
     }
 
@@ -2822,6 +2888,13 @@ kineticScroll: {
 
     const safeRaw = rawCacheRef.current;
 
+    // Extend the stable real-time X axis before updating RENKO/HA/CANDLES.
+    try {
+      drawingTimelineSeriesRef.current?.setData(
+        safeRaw.map((c) => ({ time: c.time } as any))
+      );
+    } catch {}
+
     if (renko) {
       if (!safeRaw.length) return;
       // RENKO LIVE: historia Renko może pochodzić z osobnego TF (np. M1),
@@ -2918,9 +2991,9 @@ kineticScroll: {
       const prec = pricePrecision ?? guessPrecision(symbol, lastClose);
       const minMove = minMoveFromPrecision(prec);
       applyIndicators(ds, prec, minMove);
-      // Heavy overlays/pattern geometry do not need a synchronous React render
-      // inside the market-data callback. Coalesce the refresh with browser paint.
-      requestAnimationFrame(() => setOverlayTick((v) => v + 1));
+      // Heavy overlays/pattern geometry do not need to recompute on every market tick.
+      // Refresh them together with indicators (max 4x/s); the candle itself still uses update().
+      setOverlayTick((v) => v + 1);
     }
 
     if (followOnTick && !detached && !manualPanRef.current) {
@@ -3555,12 +3628,26 @@ kineticScroll: {
           <button
             type="button"
             onClick={() => {
-              manualPanRef.current = false;
-              setDetached(false);
-              setFollowOnTick(true);
-              try {
-                followLatestBar();
-              } catch {}
+              setFollowOnTick((enabled) => {
+                const next = !enabled;
+
+                if (next) {
+                  manualPanRef.current = false;
+                  setDetached(false);
+                  requestAnimationFrame(() => {
+                    try {
+                      followLatestBar();
+                    } catch {}
+                  });
+                } else {
+                  // OFF really means OFF: do not let a new tick pull the chart
+                  // back to the live edge until the user enables this button again.
+                  manualPanRef.current = true;
+                  setDetached(true);
+                }
+
+                return next;
+              });
             }}
             aria-label="Przewiń wykres do końca wraz z pojawieniem się ticku"
             className={`flex h-8 w-9 items-center justify-center rounded-md border transition ${
@@ -3855,7 +3942,7 @@ kineticScroll: {
               wrapRef={containerRef}
               chartRef={chartRef}
               candleSeriesRef={candleSeriesRef}
-              getCandles={() => displayCacheRef.current}
+              getCandles={() => rawCacheRef.current.length ? rawCacheRef.current : displayCacheRef.current}
               activeDrawTool={activeDrawTool}
               onDrawToolChange={onDrawToolChange}
               symbol={symbol}

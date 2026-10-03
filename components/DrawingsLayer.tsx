@@ -20,7 +20,7 @@ export type DrawTool =
   | "BRUSH"
   | "PATH";
 
-type Point = { t: UTCTimestamp; p: number; logical?: number };
+type Point = { t: UTCTimestamp; p: number };
 
 function formatChartDateTime(time: UTCTimestamp) {
   try {
@@ -178,20 +178,7 @@ React.useEffect(() => {
     const raw = localStorage.getItem(key);
 
     if (raw) {
-      const parsed = JSON.parse(raw) as AnyObj[];
-      // Migration from the old RENKO implementation: logical bar indexes are not
-      // stable anchors. Strip them once so existing drawings stop jumping.
-      const stripLogical = (pt: Point): Point => ({ t: pt.t, p: pt.p });
-      const migrated = parsed.map((obj) => {
-        if ("a" in obj && "b" in obj) {
-          return { ...obj, a: stripLogical(obj.a), b: stripLogical(obj.b) } as AnyObj;
-        }
-        if (obj.type === "PATH" || obj.type === "BRUSH") {
-          return { ...obj, points: obj.points.map(stripLogical) } as AnyObj;
-        }
-        return obj;
-      });
-      setObjs(migrated);
+      setObjs(JSON.parse(raw));
     } else {
       // One-time migration: merge drawings previously saved separately on each TF.
       const merged: AnyObj[] = [];
@@ -242,15 +229,6 @@ React.useEffect(() => {
   const drawingPathRef = React.useRef<Point[]>([]);
   const isMouseDownRef = React.useRef(false);
 
-  // High-frequency drawing engine.
-  // During pointer movement we mutate refs and repaint the canvas with RAF.
-  // React state is committed only when the interaction finishes.
-  const renderObjsRef = React.useRef<AnyObj[]>([]);
-  const previewRef = React.useRef<Point | null>(null);
-  const drawRafRef = React.useRef<number>(0);
-  const drawLatestRef = React.useRef<() => void>(() => {});
-
-
   // SELECT mode:
   // - drag on drawing => move/edit drawing
   // - drag on empty chart => pan chart horizontally AND vertically
@@ -267,10 +245,6 @@ React.useEffect(() => {
     priceMin: null,
     priceMax: null,
   });
-
-  React.useEffect(() => {
-    renderObjsRef.current = objs;
-  }, [objs]);
 
   React.useEffect(() => {
     if (!storageReadyRef.current) return;
@@ -347,8 +321,6 @@ React.useEffect(() => {
       return {
         t: Math.round(time) as UTCTimestamp,
         p: Number(price),
-        // IMPORTANT: do not persist logicalNum. RENKO logical indexes are synthetic
-        // and can change when bricks are rebuilt. Market time is the stable anchor.
       };
     },
     [chartRef, candleSeriesRef, getCandles]
@@ -398,37 +370,27 @@ React.useEffect(() => {
       const rightIdx = Math.min(candles.length - 1, lo);
       const leftIdx = Math.max(0, rightIdx - 1);
 
-      // Outside loaded history use the SAME median bar step as pointToData().
-      // This is important for RENKO/irregular timestamps: using only the last two
-      // timestamps made future anchors collapse back toward the current tick.
-      const firstTime = Number(candles[0].time);
-      const lastTime = Number(candles[candles.length - 1].time);
-      let logical: number;
-
-      if (target > lastTime || target < firstTime) {
-        const diffs: number[] = [];
-        const start = Math.max(1, candles.length - 40);
-        for (let i = start; i < candles.length; i++) {
-          const d = Number(candles[i].time) - Number(candles[i - 1].time);
-          if (d > 0 && Number.isFinite(d)) diffs.push(d);
-        }
-        diffs.sort((a, b) => a - b);
-        const step = diffs.length ? diffs[Math.floor(diffs.length / 2)] : 60;
-        logical = target > lastTime
-          ? (candles.length - 1) + (target - lastTime) / step
-          : (target - firstTime) / step;
-      } else {
-        const i0 = leftIdx;
-        const i1 = rightIdx;
-        const t0 = Number(candles[i0].time);
-        const t1 = Number(candles[i1].time);
-        if (i0 === i1 || t1 === t0) {
-          logical = i0;
-        } else {
-          logical = i0 + (target - t0) / (t1 - t0);
-        }
+      // Outside the loaded history: extrapolate using the nearest two bars.
+      let i0 = leftIdx;
+      let i1 = rightIdx;
+      if (target < Number(candles[0].time) && candles.length > 1) {
+        i0 = 0;
+        i1 = 1;
+      } else if (target > Number(candles[candles.length - 1].time) && candles.length > 1) {
+        i0 = candles.length - 2;
+        i1 = candles.length - 1;
       }
 
+      const t0 = Number(candles[i0].time);
+      const t1 = Number(candles[i1].time);
+
+      if (i0 === i1 || t1 === t0) {
+        const x = ts.logicalToCoordinate(i0 as any);
+        return x == null ? null : Number(x);
+      }
+
+      const fraction = (target - t0) / (t1 - t0);
+      const logical = i0 + fraction;
       const x = ts.logicalToCoordinate(logical as any);
       return x == null || !Number.isFinite(Number(x)) ? null : Number(x);
     },
@@ -440,9 +402,6 @@ React.useEffect(() => {
       const series = candleSeriesRef.current;
       if (!series || !p) return null;
 
-      // Drawings are anchored to absolute market time, never to a logical bar index.
-      // A logical index is unstable for RENKO because rebuilding/appending bricks changes
-      // the synthetic bar sequence and used to make RECT/FIBO jump left/right.
       const x = marketTimeToX(p.t);
       const y = series.priceToCoordinate(p.p);
 
@@ -453,7 +412,7 @@ React.useEffect(() => {
         y: Number(y),
       };
     },
-    [chartRef, candleSeriesRef, marketTimeToX]
+    [candleSeriesRef, marketTimeToX]
   );
 
   function distance(
@@ -893,15 +852,14 @@ if (o.type === "FIBO") {
     ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
 
     drawTradeZones(ctx);
-    renderObjsRef.current.forEach((o) => drawObject(ctx, o, o.id === selectedId || o.id === hoverId));
+    objs.forEach((o) => drawObject(ctx, o, o.id === selectedId || o.id === hoverId));
 
-    const livePreview = previewRef.current ?? preview;
-    if (draft && livePreview && TWO_POINT_TOOLS.includes(activeDrawTool)) {
+    if (draft && preview && TWO_POINT_TOOLS.includes(activeDrawTool)) {
       drawObject(ctx, {
         id: "preview",
         type: activeDrawTool as TwoPointObj["type"],
         a: draft,
-        b: livePreview,
+        b: preview,
         color: "#facc15",
         visible: true,
         createdAt: Date.now(),
@@ -921,23 +879,7 @@ if (o.type === "FIBO") {
         createdAt: Date.now(),
       } as AnyObj);
     }
-  }, [selectedId, hoverId, draft, preview, activeDrawTool, drawObject, drawTradeZones]);
-
-  drawLatestRef.current = draw;
-
-  const scheduleCanvasDraw = React.useCallback(() => {
-    if (drawRafRef.current) return;
-    drawRafRef.current = requestAnimationFrame(() => {
-      drawRafRef.current = 0;
-      drawLatestRef.current();
-    });
-  }, []);
-
-  React.useEffect(() => {
-    return () => {
-      if (drawRafRef.current) cancelAnimationFrame(drawRafRef.current);
-    };
-  }, []);
+  }, [objs, selectedId, hoverId, draft, preview, activeDrawTool, drawObject, drawTradeZones]);
 
   React.useEffect(() => {
     resize();
@@ -1243,7 +1185,6 @@ if (o.type === "FIBO") {
     if (TWO_POINT_TOOLS.includes(activeDrawTool)) {
       if (!draft) {
         setDraft(p);
-        previewRef.current = p;
         setPreview(p);
         return;
       }
@@ -1256,7 +1197,6 @@ if (o.type === "FIBO") {
       } as AnyObj);
 
       setDraft(null);
-      previewRef.current = null;
       setPreview(null);
       onDrawToolChange?.("SELECT");
     }
@@ -1370,7 +1310,8 @@ if (o.type === "FIBO") {
           return screenToData(sp.x + dx, sp.y + dy) ?? pointToData(sp.x + dx, sp.y + dy);
         };
 
-        renderObjsRef.current = renderObjsRef.current.map((o) => {
+        setObjs((prev) =>
+          prev.map((o) => {
             if (o.id !== id) return o;
 
             if (mode === "a" && "a" in o && "b" in o) {
@@ -1401,25 +1342,41 @@ if (o.type === "FIBO") {
             const startPrice = series?.coordinateToPrice(startLocalY);
             const currentPrice = series?.coordinateToPrice(localY);
 
+            const barDelta =
+              startLogical != null && currentLogical != null
+                ? Math.round(Number(currentLogical) - Number(startLogical))
+                : 0;
             const priceDelta =
               startPrice != null && currentPrice != null
                 ? Number(currentPrice) - Number(startPrice)
                 : 0;
 
+            const indexForTime = (t: UTCTimestamp) => {
+              let best = 0;
+              let bestD = Infinity;
+              const target = Number(t);
+              for (let i = 0; i < candles.length; i++) {
+                const d = Math.abs(Number(candles[i].time) - target);
+                if (d < bestD) { bestD = d; best = i; }
+              }
+              return best;
+            };
+
             const shiftPointStable = (pt: Point): Point => {
-              // Move from the ORIGINAL screen anchor by the total pointer delta.
-              // pointToData() supports logical coordinates beyond the last candle,
-              // so RECT/FIBO/TREND can be moved freely into future chart space.
-              const sp = dataToPoint(pt);
-              if (!sp) return { t: pt.t, p: pt.p + priceDelta };
-              return pointToData(sp.x + dx, sp.y + dy) ?? { t: pt.t, p: pt.p + priceDelta };
+              if (!candles.length) return { t: pt.t, p: pt.p + priceDelta };
+              const idx = indexForTime(pt.t);
+              const next = Math.max(0, Math.min(candles.length - 1, idx + barDelta));
+              return {
+                t: candles[next].time as UTCTimestamp,
+                p: pt.p + priceDelta,
+              };
             };
 
             if (startObj.type === "VLINE") {
-              const sp = marketTimeToX(startObj.t);
-              if (sp == null) return o;
-              const moved = pointToData(Number(sp) + dx, localY);
-              return moved ? ({ ...o, t: moved.t } as AnyObj) : o;
+              if (!candles.length) return o;
+              const idx = indexForTime(startObj.t);
+              const next = Math.max(0, Math.min(candles.length - 1, idx + barDelta));
+              return { ...o, t: candles[next].time as UTCTimestamp } as AnyObj;
             }
 
             if (
@@ -1444,18 +1401,18 @@ if (o.type === "FIBO") {
             }
 
             return o;
-          });
-        scheduleCanvasDraw();
+          })
+        );
       }
 
       dragRef.current.last = p;
-      // No React state update here: canvas follows the pointer via RAF.
+      // setObjs() above schedules the React/canvas refresh; avoid a duplicate
+      // synchronous full draw in the same pointer event.
       return;
     }
 
     if (draft && TWO_POINT_TOOLS.includes(activeDrawTool)) {
-      previewRef.current = p;
-      scheduleCanvasDraw();
+      setPreview(p);
     }
 
     if (
@@ -1463,20 +1420,12 @@ if (o.type === "FIBO") {
       (activeDrawTool === "PATH" || activeDrawTool === "BRUSH")
     ) {
       drawingPathRef.current.push(p);
-      scheduleCanvasDraw();
+      draw();
     }
   };
 
   const handleMouseUp = () => {
     isMouseDownRef.current = false;
-
-    // Commit a drag/resize once, after the pointer interaction ends.
-    // This keeps persistence/localStorage and the rest of the app React-friendly
-    // without forcing React to render on every mousemove.
-    if (dragRef.current.id) {
-      const committed = renderObjsRef.current;
-      setObjs(committed);
-    }
 
     chartPanRef.current = {
       active: false,
