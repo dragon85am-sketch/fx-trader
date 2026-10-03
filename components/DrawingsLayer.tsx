@@ -20,7 +20,7 @@ export type DrawTool =
   | "BRUSH"
   | "PATH";
 
-type Point = { t: UTCTimestamp; p: number };
+type Point = { t: UTCTimestamp; p: number; logical?: number };
 
 function formatChartDateTime(time: UTCTimestamp) {
   try {
@@ -178,7 +178,20 @@ React.useEffect(() => {
     const raw = localStorage.getItem(key);
 
     if (raw) {
-      setObjs(JSON.parse(raw));
+      const parsed = JSON.parse(raw) as AnyObj[];
+      // Migration from the old RENKO implementation: logical bar indexes are not
+      // stable anchors. Strip them once so existing drawings stop jumping.
+      const stripLogical = (pt: Point): Point => ({ t: pt.t, p: pt.p });
+      const migrated = parsed.map((obj) => {
+        if ("a" in obj && "b" in obj) {
+          return { ...obj, a: stripLogical(obj.a), b: stripLogical(obj.b) } as AnyObj;
+        }
+        if (obj.type === "PATH" || obj.type === "BRUSH") {
+          return { ...obj, points: obj.points.map(stripLogical) } as AnyObj;
+        }
+        return obj;
+      });
+      setObjs(migrated);
     } else {
       // One-time migration: merge drawings previously saved separately on each TF.
       const merged: AnyObj[] = [];
@@ -334,6 +347,8 @@ React.useEffect(() => {
       return {
         t: Math.round(time) as UTCTimestamp,
         p: Number(price),
+        // IMPORTANT: do not persist logicalNum. RENKO logical indexes are synthetic
+        // and can change when bricks are rebuilt. Market time is the stable anchor.
       };
     },
     [chartRef, candleSeriesRef, getCandles]
@@ -425,6 +440,9 @@ React.useEffect(() => {
       const series = candleSeriesRef.current;
       if (!series || !p) return null;
 
+      // Drawings are anchored to absolute market time, never to a logical bar index.
+      // A logical index is unstable for RENKO because rebuilding/appending bricks changes
+      // the synthetic bar sequence and used to make RECT/FIBO jump left/right.
       const x = marketTimeToX(p.t);
       const y = series.priceToCoordinate(p.p);
 
@@ -435,7 +453,7 @@ React.useEffect(() => {
         y: Number(y),
       };
     },
-    [candleSeriesRef, marketTimeToX]
+    [chartRef, candleSeriesRef, marketTimeToX]
   );
 
   function distance(
