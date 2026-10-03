@@ -2320,14 +2320,16 @@ kineticScroll: {
       crosshair: {
         mode: CrosshairMode.Normal,
         vertLine: {
-          visible: true,
+          // DrawingsLayer renders the TradingView-like full-area crosshair.
+          // Native LWC crosshair is data-bound and stops at the latest tick.
+          visible: false,
           color: "rgba(226,232,240,0.85)",
           width: 1,
           style: LineStyle.Dashed,
           labelVisible: true,
         },
         horzLine: {
-          visible: true,
+          visible: false,
           color: "rgba(226,232,240,0.85)",
           width: 1,
           style: LineStyle.Dashed,

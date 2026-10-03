@@ -229,6 +229,19 @@ React.useEffect(() => {
   const drawingPathRef = React.useRef<Point[]>([]);
   const isMouseDownRef = React.useRef(false);
 
+  // TradingView-like overlay crosshair: pixel based, so it can move freely
+  // through future/empty chart space instead of stopping at the last candle.
+  const crosshairRef = React.useRef({ x: 0, y: 0, visible: false });
+  const pointerDrawRafRef = React.useRef(0);
+  const drawRef = React.useRef<(() => void) | null>(null);
+  const scheduleDraw = React.useCallback(() => {
+    if (pointerDrawRafRef.current) return;
+    pointerDrawRafRef.current = requestAnimationFrame(() => {
+      pointerDrawRafRef.current = 0;
+      drawRef.current?.();
+    });
+  }, []);
+
   // SELECT mode:
   // - drag on drawing => move/edit drawing
   // - drag on empty chart => pan chart horizontally AND vertically
@@ -293,29 +306,30 @@ React.useEffect(() => {
       const logicalNum = Number(logical);
       const lastIndex = candles.length - 1;
 
-      // Inside loaded candles keep the canonical candle timestamp.
-      // Outside the loaded range (the empty future space to the right)
-      // extrapolate a market timestamp instead of clamping to the last tick.
-      // This lets RECT/FIBO/trend endpoints stay exactly where the user drops them.
-      let time: number;
-      if (logicalNum >= 0 && logicalNum <= lastIndex) {
-        const idx = Math.max(0, Math.min(Math.round(logicalNum), lastIndex));
-        time = Number(candles[idx].time);
-      } else {
-        const diffs: number[] = [];
-        const start = Math.max(1, candles.length - 40);
-        for (let i = start; i < candles.length; i++) {
-          const d = Number(candles[i].time) - Number(candles[i - 1].time);
-          if (d > 0 && Number.isFinite(d)) diffs.push(d);
-        }
-        diffs.sort((a, b) => a - b);
-        const step = diffs.length ? diffs[Math.floor(diffs.length / 2)] : 60;
+      // TradingView-like continuous X -> market time conversion. Do not snap
+      // the pointer to candle centers: snapping is what makes drawing/dragging
+      // feel stepped and makes the crosshair appear stuck on the latest tick.
+      const diffs: number[] = [];
+      const sampleStart = Math.max(1, candles.length - 80);
+      for (let i = sampleStart; i < candles.length; i++) {
+        const d = Number(candles[i].time) - Number(candles[i - 1].time);
+        if (d > 0 && Number.isFinite(d)) diffs.push(d);
+      }
+      diffs.sort((a, b) => a - b);
+      const step = diffs.length ? diffs[Math.floor(diffs.length / 2)] : 60;
 
-        if (logicalNum > lastIndex) {
-          time = Number(candles[lastIndex].time) + (logicalNum - lastIndex) * step;
-        } else {
-          time = Number(candles[0].time) + logicalNum * step;
-        }
+      let time: number;
+      if (logicalNum <= 0) {
+        time = Number(candles[0].time) + logicalNum * step;
+      } else if (logicalNum >= lastIndex) {
+        time = Number(candles[lastIndex].time) + (logicalNum - lastIndex) * step;
+      } else {
+        const i0 = Math.floor(logicalNum);
+        const i1 = Math.min(lastIndex, i0 + 1);
+        const f = logicalNum - i0;
+        const t0 = Number(candles[i0].time);
+        const t1 = Number(candles[i1].time);
+        time = t0 + (t1 - t0) * f;
       }
 
       return {
@@ -879,7 +893,27 @@ if (o.type === "FIBO") {
         createdAt: Date.now(),
       } as AnyObj);
     }
+
+    // Pixel crosshair is intentionally independent from lightweight-charts time data.
+    // Therefore the vertical line follows the mouse across the WHOLE canvas, including
+    // the empty future area to the right of the newest candle.
+    const ch = crosshairRef.current;
+    if (ch.visible) {
+      ctx.save();
+      ctx.strokeStyle = "rgba(226,232,240,0.72)";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 4]);
+      ctx.beginPath();
+      ctx.moveTo(Math.round(ch.x) + 0.5, 0);
+      ctx.lineTo(Math.round(ch.x) + 0.5, canvas.clientHeight);
+      ctx.moveTo(0, Math.round(ch.y) + 0.5);
+      ctx.lineTo(canvas.clientWidth, Math.round(ch.y) + 0.5);
+      ctx.stroke();
+      ctx.restore();
+    }
   }, [objs, selectedId, hoverId, draft, preview, activeDrawTool, drawObject, drawTradeZones]);
+
+  drawRef.current = draw;
 
   React.useEffect(() => {
     resize();
@@ -1033,6 +1067,11 @@ if (o.type === "FIBO") {
 
     return () => window.removeEventListener("keydown", onKey);
   }, [selectedId, onDrawToolChange]);
+
+
+  React.useEffect(() => () => {
+    if (pointerDrawRafRef.current) cancelAnimationFrame(pointerDrawRafRef.current);
+  }, []);
 
   const addObj = (obj: AnyObj) => {
     setObjs((prev) => [...prev, obj]);
@@ -1202,32 +1241,17 @@ if (o.type === "FIBO") {
     }
   };
 
-  // PERFORMANCE: pointer/mouse events can arrive far faster than the screen can render.
-  // Keep all existing drawing logic, but execute the expensive coordinate conversion,
-  // hit-testing and React updates at most once per animation frame (~60 FPS).
-  const lastMouseMoveAtRef = React.useRef(0);
-
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const now = performance.now();
-    if (now - lastMouseMoveAtRef.current < 16) return;
-    lastMouseMoveAtRef.current = now;
     const rect = e.currentTarget.getBoundingClientRect();
     const localX = e.clientX - rect.left;
     const localY = e.clientY - rect.top;
+
+    // Update cursor position on every browser event, but paint only once per frame.
+    // No artificial 16 ms event dropping: high-refresh displays stay fluid.
+    crosshairRef.current = { x: localX, y: localY, visible: true };
+    scheduleDraw();
+
     const p = pointToData(localX, localY);
-
-    // Crosshair dokładnie jak w Alpha: pion + poziom śledzą kursor.
-    // Canvas Drawing Tools jest nad chartem, więc synchronizujemy crosshair ręcznie.
-    if (p && !dragRef.current.id && !chartPanRef.current.active) {
-      try {
-        (chartRef.current as any)?.setCrosshairPosition?.(
-          p.p,
-          p.t as any,
-          candleSeriesRef.current
-        );
-      } catch {}
-    }
-
     if (!p) return;
 
     if (activeDrawTool === "SELECT" && !isMouseDownRef.current) {
@@ -1327,56 +1351,20 @@ if (o.type === "FIBO") {
               return price == null ? o : ({ ...o, price: Number(price) } as AnyObj);
             }
 
-            // MOVE całego obiektu po BARACH + CENIE.
-            // Nie przeliczamy osobno punktów przez coordinateToTime(), bo przy
-            // pan/zoom powodowało to "latanie" i zmianę szerokości RECT/FIBO.
-            const chart = chartRef.current;
-            const series = candleSeriesRef.current;
-            const candles = getCandles();
-            const ts = chart?.timeScale();
-
-            const startLocalX = dragRef.current.startClientX - rect.left;
-            const startLocalY = dragRef.current.startClientY - rect.top;
-            const startLogical = ts?.coordinateToLogical(startLocalX);
-            const currentLogical = ts?.coordinateToLogical(localX);
-            const startPrice = series?.coordinateToPrice(startLocalY);
-            const currentPrice = series?.coordinateToPrice(localY);
-
-            const barDelta =
-              startLogical != null && currentLogical != null
-                ? Math.round(Number(currentLogical) - Number(startLogical))
-                : 0;
-            const priceDelta =
-              startPrice != null && currentPrice != null
-                ? Number(currentPrice) - Number(startPrice)
-                : 0;
-
-            const indexForTime = (t: UTCTimestamp) => {
-              let best = 0;
-              let bestD = Infinity;
-              const target = Number(t);
-              for (let i = 0; i < candles.length; i++) {
-                const d = Math.abs(Number(candles[i].time) - target);
-                if (d < bestD) { bestD = d; best = i; }
-              }
-              return best;
-            };
-
-            const shiftPointStable = (pt: Point): Point => {
-              if (!candles.length) return { t: pt.t, p: pt.p + priceDelta };
-              const idx = indexForTime(pt.t);
-              const next = Math.max(0, Math.min(candles.length - 1, idx + barDelta));
-              return {
-                t: candles[next].time as UTCTimestamp,
-                p: pt.p + priceDelta,
-              };
+            // TradingView-like smooth MOVE: translate the original market anchors
+            // by the exact pointer pixel delta. No Math.round(barDelta), no nearest-
+            // candle clamp, so RECT/FIBO/lines do not jump one bar at a time.
+            const shiftPointSmooth = (pt: Point): Point => {
+              const sp = dataToPoint(pt);
+              if (!sp) return pt;
+              return pointToData(sp.x + dx, sp.y + dy) ?? pt;
             };
 
             if (startObj.type === "VLINE") {
-              if (!candles.length) return o;
-              const idx = indexForTime(startObj.t);
-              const next = Math.max(0, Math.min(candles.length - 1, idx + barDelta));
-              return { ...o, t: candles[next].time as UTCTimestamp } as AnyObj;
+              const x0 = marketTimeToX(startObj.t);
+              if (x0 == null) return o;
+              const moved = pointToData(Number(x0) + dx, localY);
+              return moved ? ({ ...o, t: moved.t } as AnyObj) : o;
             }
 
             if (
@@ -1388,15 +1376,15 @@ if (o.type === "FIBO") {
             ) {
               return {
                 ...o,
-                a: shiftPointStable(startObj.a),
-                b: shiftPointStable(startObj.b),
+                a: shiftPointSmooth(startObj.a),
+                b: shiftPointSmooth(startObj.b),
               } as AnyObj;
             }
 
             if (startObj.type === "PATH" || startObj.type === "BRUSH") {
               return {
                 ...o,
-                points: startObj.points.map(shiftPointStable),
+                points: startObj.points.map(shiftPointSmooth),
               } as AnyObj;
             }
 
@@ -1756,6 +1744,8 @@ if (o.type === "FIBO") {
   onMouseUp={handleMouseUp}
   onMouseLeave={() => {
     if (isMouseDownRef.current) handleMouseUp();
+    crosshairRef.current.visible = false;
+    scheduleDraw();
     setHoverIdFast(null);
   }}
 />
