@@ -383,27 +383,37 @@ React.useEffect(() => {
       const rightIdx = Math.min(candles.length - 1, lo);
       const leftIdx = Math.max(0, rightIdx - 1);
 
-      // Outside the loaded history: extrapolate using the nearest two bars.
-      let i0 = leftIdx;
-      let i1 = rightIdx;
-      if (target < Number(candles[0].time) && candles.length > 1) {
-        i0 = 0;
-        i1 = 1;
-      } else if (target > Number(candles[candles.length - 1].time) && candles.length > 1) {
-        i0 = candles.length - 2;
-        i1 = candles.length - 1;
+      // Outside loaded history use the SAME median bar step as pointToData().
+      // This is important for RENKO/irregular timestamps: using only the last two
+      // timestamps made future anchors collapse back toward the current tick.
+      const firstTime = Number(candles[0].time);
+      const lastTime = Number(candles[candles.length - 1].time);
+      let logical: number;
+
+      if (target > lastTime || target < firstTime) {
+        const diffs: number[] = [];
+        const start = Math.max(1, candles.length - 40);
+        for (let i = start; i < candles.length; i++) {
+          const d = Number(candles[i].time) - Number(candles[i - 1].time);
+          if (d > 0 && Number.isFinite(d)) diffs.push(d);
+        }
+        diffs.sort((a, b) => a - b);
+        const step = diffs.length ? diffs[Math.floor(diffs.length / 2)] : 60;
+        logical = target > lastTime
+          ? (candles.length - 1) + (target - lastTime) / step
+          : (target - firstTime) / step;
+      } else {
+        const i0 = leftIdx;
+        const i1 = rightIdx;
+        const t0 = Number(candles[i0].time);
+        const t1 = Number(candles[i1].time);
+        if (i0 === i1 || t1 === t0) {
+          logical = i0;
+        } else {
+          logical = i0 + (target - t0) / (t1 - t0);
+        }
       }
 
-      const t0 = Number(candles[i0].time);
-      const t1 = Number(candles[i1].time);
-
-      if (i0 === i1 || t1 === t0) {
-        const x = ts.logicalToCoordinate(i0 as any);
-        return x == null ? null : Number(x);
-      }
-
-      const fraction = (target - t0) / (t1 - t0);
-      const logical = i0 + fraction;
       const x = ts.logicalToCoordinate(logical as any);
       return x == null || !Number.isFinite(Number(x)) ? null : Number(x);
     },
@@ -1373,41 +1383,25 @@ if (o.type === "FIBO") {
             const startPrice = series?.coordinateToPrice(startLocalY);
             const currentPrice = series?.coordinateToPrice(localY);
 
-            const barDelta =
-              startLogical != null && currentLogical != null
-                ? Math.round(Number(currentLogical) - Number(startLogical))
-                : 0;
             const priceDelta =
               startPrice != null && currentPrice != null
                 ? Number(currentPrice) - Number(startPrice)
                 : 0;
 
-            const indexForTime = (t: UTCTimestamp) => {
-              let best = 0;
-              let bestD = Infinity;
-              const target = Number(t);
-              for (let i = 0; i < candles.length; i++) {
-                const d = Math.abs(Number(candles[i].time) - target);
-                if (d < bestD) { bestD = d; best = i; }
-              }
-              return best;
-            };
-
             const shiftPointStable = (pt: Point): Point => {
-              if (!candles.length) return { t: pt.t, p: pt.p + priceDelta };
-              const idx = indexForTime(pt.t);
-              const next = Math.max(0, Math.min(candles.length - 1, idx + barDelta));
-              return {
-                t: candles[next].time as UTCTimestamp,
-                p: pt.p + priceDelta,
-              };
+              // Move from the ORIGINAL screen anchor by the total pointer delta.
+              // pointToData() supports logical coordinates beyond the last candle,
+              // so RECT/FIBO/TREND can be moved freely into future chart space.
+              const sp = dataToPoint(pt);
+              if (!sp) return { t: pt.t, p: pt.p + priceDelta };
+              return pointToData(sp.x + dx, sp.y + dy) ?? { t: pt.t, p: pt.p + priceDelta };
             };
 
             if (startObj.type === "VLINE") {
-              if (!candles.length) return o;
-              const idx = indexForTime(startObj.t);
-              const next = Math.max(0, Math.min(candles.length - 1, idx + barDelta));
-              return { ...o, t: candles[next].time as UTCTimestamp } as AnyObj;
+              const sp = marketTimeToX(startObj.t);
+              if (sp == null) return o;
+              const moved = pointToData(Number(sp) + dx, localY);
+              return moved ? ({ ...o, t: moved.t } as AnyObj) : o;
             }
 
             if (
