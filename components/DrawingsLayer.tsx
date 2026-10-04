@@ -431,16 +431,21 @@ React.useEffect(() => {
       const series = candleSeriesRef.current;
       if (!series || !p) return null;
 
-      // RENKO-safe X anchor: when a point was created from a logical chart
-      // position, keep that synthetic-bar position stable. Renko timestamps can
-      // be rebuilt on every tick, while logical brick positions remain stable.
+      // Stable market-time anchor. Do NOT prefer saved logical indexes here:
+      // Renko can add/remove/rebuild bricks, which shifts logical indexes and
+      // made RECT/FIBO jump left/right. The invisible real-candle timeline in
+      // MarketChart keeps p.t stable across every Renko rebuild. Logical X is
+      // only a fallback for legacy/future-space points.
       const chart = chartRef.current;
+      const marketX = marketTimeToX(p.t);
       const logicalX = p.l != null && Number.isFinite(Number(p.l))
         ? chart?.timeScale().logicalToCoordinate(Number(p.l) as any)
         : null;
-      const x = logicalX != null && Number.isFinite(Number(logicalX))
-        ? Number(logicalX)
-        : marketTimeToX(p.t);
+      const x = marketX != null && Number.isFinite(Number(marketX))
+        ? Number(marketX)
+        : logicalX != null && Number.isFinite(Number(logicalX))
+          ? Number(logicalX)
+          : null;
       const y = series.priceToCoordinate(p.p);
 
       if (x == null || y == null) return null;
