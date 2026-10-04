@@ -1081,6 +1081,15 @@ fullscreenMode = false,
   const containerRef = React.useRef<HTMLDivElement | null>(null);
   const chartRef = React.useRef<IChartApi | null>(null);
   const candleSeriesRef = React.useRef<ISeriesApi<"Candlestick"> | null>(null);
+
+  // Alpha-style pointer state used by movePlotPan / pointer leave.
+  // Kept independent from Lightweight Charts so future-space coordinates are valid.
+  const [, setAlphaCrosshair] = React.useState<{
+    x: number;
+    y: number;
+    price: number;
+    time: number;
+  } | null>(null);
   // Invisible time-anchor series: keeps the chart time scale based on real candles
   // even when RENKO displays fewer/synthetic bricks. This keeps all drawings fixed
   // to the same market-time X position across CANDLES / HA / RENKO / indicators.
@@ -1219,12 +1228,6 @@ fullscreenMode = false,
 
   const [detached, setDetached] = React.useState<boolean>(false);
   const [overlayTick, setOverlayTick] = React.useState(0);
-  const [alphaCrosshair, setAlphaCrosshair] = React.useState<{
-    x: number;
-    y: number;
-    price: number;
-    time: number;
-  } | null>(null);
   const lastIndicatorLiveUpdateRef = React.useRef(0);
   const rightOffset = rightPadOn ? 7 : 7;
 
@@ -2305,6 +2308,7 @@ handleScroll: {
 handleScale: {
   mouseWheel: true,
   pinch: true,
+  // TradingView/Alpha behaviour: LMB drag directly on either axis scales it.
   axisPressedMouseMove: {
     time: true,
     price: true,

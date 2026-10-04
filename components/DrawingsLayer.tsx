@@ -277,40 +277,73 @@ React.useEffect(() => {
     ctx?.setTransform(dpr, 0, 0, dpr, 0, 0);
   }, [wrapRef]);
 
+  // Stable X -> logical conversion for the whole chart pane, including empty
+  // future-space to the right of the newest tick. lightweight-charts can return
+  // null there in some pan/zoom states, so fall back to the visible logical range.
+  const xToLogicalFuture = React.useCallback((x: number): number | null => {
+    const chart = chartRef.current;
+    const canvas = canvasRef.current;
+    if (!chart || !canvas) return null;
+
+    const ts = chart.timeScale();
+    const direct = ts.coordinateToLogical(x);
+    if (direct != null && Number.isFinite(Number(direct))) return Number(direct);
+
+    const range = ts.getVisibleLogicalRange();
+    if (!range) return null;
+
+    // Prefer the actual time-scale width (plot pane without the price axis).
+    // Fall back to the overlay width only if the API does not expose width().
+    const apiWidth = Number((ts as any).width?.());
+    const paneWidth = Number.isFinite(apiWidth) && apiWidth > 0
+      ? apiWidth
+      : Math.max(1, canvas.clientWidth);
+    const clampedX = Math.max(0, Math.min(x, paneWidth));
+    const ratio = clampedX / paneWidth;
+    return Number(range.from) + (Number(range.to) - Number(range.from)) * ratio;
+  }, [chartRef]);
+
+  const candleStepSeconds = React.useCallback(() => {
+    const candles = candlesCacheRef.current;
+    if (candles.length < 2) return 60;
+    const diffs: number[] = [];
+    const start = Math.max(1, candles.length - 60);
+    for (let i = start; i < candles.length; i++) {
+      const diff = Number(candles[i].time) - Number(candles[i - 1].time);
+      if (diff > 0 && Number.isFinite(diff)) diffs.push(diff);
+    }
+    diffs.sort((a, b) => a - b);
+    return diffs.length ? diffs[Math.floor(diffs.length / 2)] : 60;
+  }, []);
+
   const pointToData = React.useCallback(
     (x: number, y: number): Point | null => {
-      const chart = chartRef.current;
       const series = candleSeriesRef.current;
       const candles = candlesCacheRef.current;
+      if (!series || !candles.length) return null;
 
-      if (!chart || !series || !candles.length) return null;
-
-      const logical = chart.timeScale().coordinateToLogical(x);
+      const logicalNum = xToLogicalFuture(x);
       const price = series.coordinateToPrice(y);
+      if (logicalNum == null || price == null || !Number.isFinite(Number(price))) return null;
 
-      if (logical == null || price == null) return null;
-
-      const logicalNum = Number(logical);
       const lastIndex = candles.length - 1;
-
-      // Inside loaded candles keep the canonical candle timestamp.
-      // Outside the loaded range (the empty future space to the right)
-      // extrapolate a market timestamp instead of clamping to the last tick.
-      // This lets RECT/FIBO/trend endpoints stay exactly where the user drops them.
       let time: number;
-      if (logicalNum >= 0 && logicalNum <= lastIndex) {
-        const idx = Math.max(0, Math.min(Math.round(logicalNum), lastIndex));
-        time = Number(candles[idx].time);
-      } else {
-        const diffs: number[] = [];
-        const start = Math.max(1, candles.length - 40);
-        for (let i = start; i < candles.length; i++) {
-          const d = Number(candles[i].time) - Number(candles[i - 1].time);
-          if (d > 0 && Number.isFinite(d)) diffs.push(d);
-        }
-        diffs.sort((a, b) => a - b);
-        const step = diffs.length ? diffs[Math.floor(diffs.length / 2)] : 60;
 
+      // Keep exact candle timestamps on real bars. In future-space preserve the
+      // fractional logical position instead of snapping/clamping to lastIndex.
+      if (logicalNum >= 0 && logicalNum <= lastIndex) {
+        const lo = Math.max(0, Math.min(Math.floor(logicalNum), lastIndex));
+        const hi = Math.max(0, Math.min(Math.ceil(logicalNum), lastIndex));
+        if (lo === hi) {
+          time = Number(candles[lo].time);
+        } else {
+          const frac = logicalNum - lo;
+          const t0 = Number(candles[lo].time);
+          const t1 = Number(candles[hi].time);
+          time = t0 + (t1 - t0) * frac;
+        }
+      } else {
+        const step = candleStepSeconds();
         if (logicalNum > lastIndex) {
           time = Number(candles[lastIndex].time) + (logicalNum - lastIndex) * step;
         } else {
@@ -318,12 +351,9 @@ React.useEffect(() => {
         }
       }
 
-      return {
-        t: Math.round(time) as UTCTimestamp,
-        p: Number(price),
-      };
+      return { t: Math.round(time) as UTCTimestamp, p: Number(price) };
     },
-    [chartRef, candleSeriesRef, getCandles]
+    [candleSeriesRef, xToLogicalFuture, candleStepSeconds]
   );
 
   const screenToData = React.useCallback(
@@ -347,7 +377,8 @@ React.useEffect(() => {
   const marketTimeToX = React.useCallback(
     (time: UTCTimestamp): number | null => {
       const chart = chartRef.current;
-      if (!chart) return null;
+      const canvas = canvasRef.current;
+      if (!chart || !canvas) return null;
 
       const ts = chart.timeScale();
       const exact = ts.timeToCoordinate(time as any);
@@ -355,46 +386,44 @@ React.useEffect(() => {
 
       const candles = candlesCacheRef.current;
       if (!candles.length) return null;
-
       const target = Number(time);
+      const lastIndex = candles.length - 1;
+      const firstTime = Number(candles[0].time);
+      const lastTime = Number(candles[lastIndex].time);
+      let logical: number;
 
-      // Binary search: first candle with time >= target.
-      let lo = 0;
-      let hi = candles.length;
-      while (lo < hi) {
-        const mid = (lo + hi) >> 1;
-        if (Number(candles[mid].time) < target) lo = mid + 1;
-        else hi = mid;
+      if (target > lastTime) {
+        logical = lastIndex + (target - lastTime) / candleStepSeconds();
+      } else if (target < firstTime) {
+        logical = (target - firstTime) / candleStepSeconds();
+      } else {
+        let lo = 0, hi = lastIndex;
+        while (lo < hi) {
+          const mid = (lo + hi) >> 1;
+          if (Number(candles[mid].time) < target) lo = mid + 1;
+          else hi = mid;
+        }
+        const i1 = Math.min(lastIndex, lo);
+        const i0 = Math.max(0, i1 - 1);
+        const t0 = Number(candles[i0].time);
+        const t1 = Number(candles[i1].time);
+        logical = i0 === i1 || t1 === t0 ? i0 : i0 + (target - t0) / (t1 - t0);
       }
 
-      const rightIdx = Math.min(candles.length - 1, lo);
-      const leftIdx = Math.max(0, rightIdx - 1);
+      const direct = ts.logicalToCoordinate(logical as any);
+      if (direct != null && Number.isFinite(Number(direct))) return Number(direct);
 
-      // Outside the loaded history: extrapolate using the nearest two bars.
-      let i0 = leftIdx;
-      let i1 = rightIdx;
-      if (target < Number(candles[0].time) && candles.length > 1) {
-        i0 = 0;
-        i1 = 1;
-      } else if (target > Number(candles[candles.length - 1].time) && candles.length > 1) {
-        i0 = candles.length - 2;
-        i1 = candles.length - 1;
-      }
-
-      const t0 = Number(candles[i0].time);
-      const t1 = Number(candles[i1].time);
-
-      if (i0 === i1 || t1 === t0) {
-        const x = ts.logicalToCoordinate(i0 as any);
-        return x == null ? null : Number(x);
-      }
-
-      const fraction = (target - t0) / (t1 - t0);
-      const logical = i0 + fraction;
-      const x = ts.logicalToCoordinate(logical as any);
-      return x == null || !Number.isFinite(Number(x)) ? null : Number(x);
+      // Last-resort inverse of xToLogicalFuture. This keeps saved RECT/FIBO
+      // stable even if lightweight-charts refuses a coordinate beyond last tick.
+      const range = ts.getVisibleLogicalRange();
+      if (!range || Number(range.to) === Number(range.from)) return null;
+      const apiWidth = Number((ts as any).width?.());
+      const paneWidth = Number.isFinite(apiWidth) && apiWidth > 0
+        ? apiWidth
+        : Math.max(1, canvas.clientWidth);
+      return ((logical - Number(range.from)) / (Number(range.to) - Number(range.from))) * paneWidth;
     },
-    [chartRef, getCandles]
+    [chartRef, candleStepSeconds]
   );
 
   const dataToPoint = React.useCallback(
@@ -1215,18 +1244,6 @@ if (o.type === "FIBO") {
     const localX = e.clientX - rect.left;
     const localY = e.clientY - rect.top;
     const p = pointToData(localX, localY);
-
-    // Crosshair dokładnie jak w Alpha: pion + poziom śledzą kursor.
-    // Canvas Drawing Tools jest nad chartem, więc synchronizujemy crosshair ręcznie.
-    if (p && !dragRef.current.id && !chartPanRef.current.active) {
-      try {
-        (chartRef.current as any)?.setCrosshairPosition?.(
-          p.p,
-          p.t as any,
-          candleSeriesRef.current
-        );
-      } catch {}
-    }
 
     if (!p) return;
 
