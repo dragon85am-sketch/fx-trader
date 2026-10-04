@@ -3379,6 +3379,51 @@ kineticScroll: {
     } catch {}
   }, [activeDrawTool, fullscreenMode]);
 
+  const updateAlphaCrosshairFromClient = React.useCallback((clientX: number, clientY: number) => {
+    const chart = chartRef.current;
+    const candleSeries = candleSeriesRef.current;
+    const wrap = containerRef.current;
+    if (!chart || !candleSeries || !wrap) return;
+    try {
+      const rect = wrap.getBoundingClientRect();
+      const x = Math.max(0, Math.min(rect.width, clientX - rect.left));
+      const y = Math.max(0, Math.min(rect.height, clientY - rect.top));
+      const price = Number((candleSeries as any).coordinateToPrice?.(y));
+      const ts: any = chart.timeScale();
+      let logical = Number(ts.coordinateToLogical?.(x));
+      if (!Number.isFinite(logical)) {
+        const range = ts.getVisibleLogicalRange?.();
+        if (range && rect.width > 0) {
+          logical = Number(range.from) + (x / rect.width) * (Number(range.to) - Number(range.from));
+        }
+      }
+      const cc: any[] = displayCacheRef.current ?? [];
+      if (!Number.isFinite(price) || !Number.isFinite(logical) || !cc.length) return;
+      const last = cc.length - 1;
+      const diffs: number[] = [];
+      for (let i = Math.max(1, cc.length - 40); i < cc.length; i++) {
+        const d = Number(cc[i].time) - Number(cc[i - 1].time);
+        if (d > 0 && Number.isFinite(d)) diffs.push(d);
+      }
+      diffs.sort((a, b) => a - b);
+      const step = diffs.length ? diffs[Math.floor(diffs.length / 2)] : 60;
+      let time: number;
+      if (logical >= 0 && logical <= last) {
+        const i0 = Math.max(0, Math.min(Math.floor(logical), last));
+        const i1 = Math.min(last, i0 + 1);
+        const frac = Math.max(0, Math.min(1, logical - i0));
+        const t0 = Number(cc[i0].time);
+        const t1 = Number(cc[i1].time);
+        time = i0 === i1 ? t0 : t0 + (t1 - t0) * frac;
+      } else if (logical > last) {
+        time = Number(cc[last].time) + (logical - last) * step;
+      } else {
+        time = Number(cc[0].time) + logical * step;
+      }
+      setAlphaCrosshair({ x, y, price, time });
+    } catch {}
+  }, []);
+
   const movePlotPan = React.useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     const state = plotPanRef.current;
     const chart = chartRef.current;
@@ -3757,7 +3802,10 @@ kineticScroll: {
           }
         `}</style>
 
-        <div className="relative">
+        <div className="relative"
+          onPointerMoveCapture={(e) => { if (e.pointerType !== "touch") updateAlphaCrosshairFromClient(e.clientX, e.clientY); }}
+          onPointerLeave={() => setAlphaCrosshair(null)}
+        >
           <div
             ref={containerRef}
             style={{
@@ -3837,7 +3885,7 @@ kineticScroll: {
             />
           ) : null}
 
-          {activeDrawTool === "SELECT" && alphaCrosshair ? (
+          {alphaCrosshair ? (
             <div className="pointer-events-none absolute inset-0 z-[44] overflow-hidden">
               <div
                 className="absolute top-0 border-l border-dashed border-slate-200/80"

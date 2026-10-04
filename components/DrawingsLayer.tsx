@@ -284,6 +284,38 @@ React.useEffect(() => {
     ctx?.setTransform(dpr, 0, 0, dpr, 0, 0);
   }, [wrapRef]);
 
+  // Extended logical mapping: Lightweight Charts can return null in the empty
+  // future area to the right of the last tick. Derive the logical index from
+  // the visible range instead, so cursor/drawings behave like TradingView.
+  const coordinateToLogicalExtended = React.useCallback((x: number): number | null => {
+    const chart = chartRef.current;
+    const wrap = wrapRef.current;
+    if (!chart || !wrap) return null;
+    const ts: any = chart.timeScale();
+    const direct = ts.coordinateToLogical?.(x);
+    if (direct != null && Number.isFinite(Number(direct))) return Number(direct);
+    const range = ts.getVisibleLogicalRange?.();
+    const width = Math.max(1, wrap.clientWidth);
+    if (!range || !Number.isFinite(Number(range.from)) || !Number.isFinite(Number(range.to))) return null;
+    const ratio = x / width;
+    return Number(range.from) + ratio * (Number(range.to) - Number(range.from));
+  }, [chartRef, wrapRef]);
+
+  const logicalToCoordinateExtended = React.useCallback((logical: number): number | null => {
+    const chart = chartRef.current;
+    const wrap = wrapRef.current;
+    if (!chart || !wrap) return null;
+    const ts: any = chart.timeScale();
+    const direct = ts.logicalToCoordinate?.(logical as any);
+    if (direct != null && Number.isFinite(Number(direct))) return Number(direct);
+    const range = ts.getVisibleLogicalRange?.();
+    const width = Math.max(1, wrap.clientWidth);
+    if (!range) return null;
+    const span = Number(range.to) - Number(range.from);
+    if (!Number.isFinite(span) || span === 0) return null;
+    return ((logical - Number(range.from)) / span) * width;
+  }, [chartRef, wrapRef]);
+
   const pointToData = React.useCallback(
     (x: number, y: number): Point | null => {
       const chart = chartRef.current;
@@ -292,7 +324,7 @@ React.useEffect(() => {
 
       if (!chart || !series || !candles.length) return null;
 
-      const logical = chart.timeScale().coordinateToLogical(x);
+      const logical = coordinateToLogicalExtended(x);
       const price = series.coordinateToPrice(y);
 
       if (logical == null || price == null) return null;
@@ -336,7 +368,7 @@ React.useEffect(() => {
         p: Number(price),
       };
     },
-    [chartRef, candleSeriesRef, getCandles]
+    [chartRef, candleSeriesRef, getCandles, coordinateToLogicalExtended]
   );
 
   const screenToData = React.useCallback(
@@ -398,16 +430,16 @@ React.useEffect(() => {
       const t1 = Number(candles[i1].time);
 
       if (i0 === i1 || t1 === t0) {
-        const x = ts.logicalToCoordinate(i0 as any);
+        const x = logicalToCoordinateExtended(i0);
         return x == null ? null : Number(x);
       }
 
       const fraction = (target - t0) / (t1 - t0);
       const logical = i0 + fraction;
-      const x = ts.logicalToCoordinate(logical as any);
+      const x = logicalToCoordinateExtended(logical);
       return x == null || !Number.isFinite(Number(x)) ? null : Number(x);
     },
-    [chartRef, getCandles]
+    [chartRef, getCandles, logicalToCoordinateExtended]
   );
 
   const dataToPoint = React.useCallback(
@@ -1356,8 +1388,8 @@ if (o.type === "FIBO") {
 
             const startLocalX = dragRef.current.startClientX - rect.left;
             const startLocalY = dragRef.current.startClientY - rect.top;
-            const startLogical = ts?.coordinateToLogical(startLocalX);
-            const currentLogical = ts?.coordinateToLogical(localX);
+            const startLogical = coordinateToLogicalExtended(startLocalX);
+            const currentLogical = coordinateToLogicalExtended(localX);
             const startPrice = series?.coordinateToPrice(startLocalY);
             const currentPrice = series?.coordinateToPrice(localY);
 
