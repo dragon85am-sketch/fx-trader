@@ -2317,21 +2317,18 @@ kineticScroll: {
   mouse: true,
   touch: true,
 },
+      // Native Lightweight Charts crosshair is disabled completely.
+      // We render one custom crosshair below, which is not clamped to the last bar
+      // and therefore can move freely through future/empty chart space.
       crosshair: {
         mode: CrosshairMode.Normal,
         vertLine: {
-          visible: true,
-          color: "rgba(226,232,240,0.85)",
-          width: 1,
-          style: LineStyle.Dashed,
-          labelVisible: true,
+          visible: false,
+          labelVisible: false,
         },
         horzLine: {
-          visible: true,
-          color: "rgba(226,232,240,0.85)",
-          width: 1,
-          style: LineStyle.Dashed,
-          labelVisible: true,
+          visible: false,
+          labelVisible: false,
         },
       },
     });
@@ -3386,15 +3383,17 @@ kineticScroll: {
     if (!chart || !candleSeries || !wrap) return;
     try {
       const rect = wrap.getBoundingClientRect();
-      const x = Math.max(0, Math.min(rect.width, clientX - rect.left));
-      const y = Math.max(0, Math.min(rect.height, clientY - rect.top));
+      const plotWidth = Math.max(1, rect.width - 86);
+      const plotHeight = Math.max(1, rect.height - 30);
+      const x = Math.max(0, Math.min(plotWidth, clientX - rect.left));
+      const y = Math.max(0, Math.min(plotHeight, clientY - rect.top));
       const price = Number((candleSeries as any).coordinateToPrice?.(y));
       const ts: any = chart.timeScale();
       let logical = Number(ts.coordinateToLogical?.(x));
       if (!Number.isFinite(logical)) {
         const range = ts.getVisibleLogicalRange?.();
-        if (range && rect.width > 0) {
-          logical = Number(range.from) + (x / rect.width) * (Number(range.to) - Number(range.from));
+        if (range && plotWidth > 0) {
+          logical = Number(range.from) + (x / plotWidth) * (Number(range.to) - Number(range.from));
         }
       }
       const cc: any[] = displayCacheRef.current ?? [];
@@ -3433,8 +3432,10 @@ kineticScroll: {
     if (chart && candleSeries && e.pointerType !== "touch") {
       try {
         const rect = e.currentTarget.getBoundingClientRect();
-        const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
-        const y = Math.max(0, Math.min(rect.height, e.clientY - rect.top));
+        const plotWidth = Math.max(1, rect.width - 86);
+        const plotHeight = Math.max(1, rect.height - 30);
+        const x = Math.max(0, Math.min(plotWidth, e.clientX - rect.left));
+        const y = Math.max(0, Math.min(plotHeight, e.clientY - rect.top));
         const price = Number((candleSeries as any).coordinateToPrice?.(y));
         const ts: any = chart.timeScale();
         const timeRaw = ts.coordinateToTime?.(x);
