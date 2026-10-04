@@ -20,7 +20,7 @@ export type DrawTool =
   | "BRUSH"
   | "PATH";
 
-type Point = { t: UTCTimestamp; p: number };
+type Point = { t: UTCTimestamp; p: number; l?: number };
 
 function formatChartDateTime(time: UTCTimestamp) {
   try {
@@ -351,7 +351,7 @@ React.useEffect(() => {
         }
       }
 
-      return { t: Math.round(time) as UTCTimestamp, p: Number(price) };
+      return { t: Math.round(time) as UTCTimestamp, p: Number(price), l: logicalNum };
     },
     [candleSeriesRef, xToLogicalFuture, candleStepSeconds]
   );
@@ -431,7 +431,16 @@ React.useEffect(() => {
       const series = candleSeriesRef.current;
       if (!series || !p) return null;
 
-      const x = marketTimeToX(p.t);
+      // RENKO-safe X anchor: when a point was created from a logical chart
+      // position, keep that synthetic-bar position stable. Renko timestamps can
+      // be rebuilt on every tick, while logical brick positions remain stable.
+      const chart = chartRef.current;
+      const logicalX = p.l != null && Number.isFinite(Number(p.l))
+        ? chart?.timeScale().logicalToCoordinate(Number(p.l) as any)
+        : null;
+      const x = logicalX != null && Number.isFinite(Number(logicalX))
+        ? Number(logicalX)
+        : marketTimeToX(p.t);
       const y = series.priceToCoordinate(p.p);
 
       if (x == null || y == null) return null;
@@ -441,7 +450,7 @@ React.useEffect(() => {
         y: Number(y),
       };
     },
-    [candleSeriesRef, marketTimeToX]
+    [candleSeriesRef, chartRef, marketTimeToX]
   );
 
   function distance(
@@ -1380,12 +1389,35 @@ if (o.type === "FIBO") {
             };
 
             const shiftPointStable = (pt: Point): Point => {
-              if (!candles.length) return { t: pt.t, p: pt.p + priceDelta };
-              const idx = indexForTime(pt.t);
-              const next = Math.max(0, Math.min(candles.length - 1, idx + barDelta));
+              // Never clamp a drawing to the last Renko brick. Preserve its
+              // logical X so RECT/FIBO can live in future-space and cannot jump
+              // left/right when the forming Renko brick is rebuilt.
+              const baseLogical =
+                pt.l != null && Number.isFinite(Number(pt.l))
+                  ? Number(pt.l)
+                  : (() => {
+                      const x0 = marketTimeToX(pt.t);
+                      const l0 = x0 == null ? null : ts?.coordinateToLogical(x0);
+                      return l0 == null ? null : Number(l0);
+                    })();
+              const nextLogical = baseLogical == null ? null : baseLogical + barDelta;
+              let nextTime = Number(pt.t);
+              if (nextLogical != null && candles.length) {
+                const last = candles.length - 1;
+                const step = candleStepSeconds();
+                if (nextLogical >= 0 && nextLogical <= last) {
+                  const idx = Math.max(0, Math.min(last, Math.round(nextLogical)));
+                  nextTime = Number(candles[idx].time);
+                } else if (nextLogical > last) {
+                  nextTime = Number(candles[last].time) + (nextLogical - last) * step;
+                } else {
+                  nextTime = Number(candles[0].time) + nextLogical * step;
+                }
+              }
               return {
-                t: candles[next].time as UTCTimestamp,
+                t: Math.round(nextTime) as UTCTimestamp,
                 p: pt.p + priceDelta,
+                ...(nextLogical != null ? { l: nextLogical } : {}),
               };
             };
 
