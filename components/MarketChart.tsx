@@ -1226,7 +1226,7 @@ fullscreenMode = false,
     time: number;
   } | null>(null);
   const lastIndicatorLiveUpdateRef = React.useRef(0);
-  const rightOffset = rightPadOn ? 28 : 10;
+  const rightOffset = rightPadOn ? 7 : 7;
 
   // Preserve the user's current chart viewport when only the presentation mode
   // changes (normal candles <-> HA <-> Renko, or indicator overlays).
@@ -2295,12 +2295,11 @@ fullscreenMode = false,
         tickMarkFormatter: (time: any) => formatChartAxisTime(time),
       },
 handleScroll: {
-  // Pan lewo/prawo obsługujemy własnym pointer handlerem poniżej.
-  // Wyłączenie natywnego drag usuwa podwójne/przeciwne przesuwanie.
-  pressedMouseMove: false,
-  horzTouchDrag: false,
-  vertTouchDrag: false,
+  // Alpha-style native interaction: lightweight-charts owns pan/scroll in SELECT.
   mouseWheel: true,
+  pressedMouseMove: true,
+  horzTouchDrag: true,
+  vertTouchDrag: false,
 },
 
 handleScale: {
@@ -2317,18 +2316,21 @@ kineticScroll: {
   mouse: true,
   touch: true,
 },
-      // Native Lightweight Charts crosshair is disabled completely.
-      // We render one custom crosshair below, which is not clamped to the last bar
-      // and therefore can move freely through future/empty chart space.
       crosshair: {
         mode: CrosshairMode.Normal,
         vertLine: {
-          visible: false,
-          labelVisible: false,
+          visible: true,
+          color: "rgba(226,232,240,0.85)",
+          width: 1,
+          style: LineStyle.Dashed,
+          labelVisible: true,
         },
         horzLine: {
-          visible: false,
-          labelVisible: false,
+          visible: true,
+          color: "rgba(226,232,240,0.85)",
+          width: 1,
+          style: LineStyle.Dashed,
+          labelVisible: true,
         },
       },
     });
@@ -3376,53 +3378,6 @@ kineticScroll: {
     } catch {}
   }, [activeDrawTool, fullscreenMode]);
 
-  const updateAlphaCrosshairFromClient = React.useCallback((clientX: number, clientY: number) => {
-    const chart = chartRef.current;
-    const candleSeries = candleSeriesRef.current;
-    const wrap = containerRef.current;
-    if (!chart || !candleSeries || !wrap) return;
-    try {
-      const rect = wrap.getBoundingClientRect();
-      const plotWidth = Math.max(1, rect.width - 86);
-      const plotHeight = Math.max(1, rect.height - 30);
-      const x = Math.max(0, Math.min(plotWidth, clientX - rect.left));
-      const y = Math.max(0, Math.min(plotHeight, clientY - rect.top));
-      const price = Number((candleSeries as any).coordinateToPrice?.(y));
-      const ts: any = chart.timeScale();
-      let logical = Number(ts.coordinateToLogical?.(x));
-      if (!Number.isFinite(logical)) {
-        const range = ts.getVisibleLogicalRange?.();
-        if (range && plotWidth > 0) {
-          logical = Number(range.from) + (x / plotWidth) * (Number(range.to) - Number(range.from));
-        }
-      }
-      const cc: any[] = displayCacheRef.current ?? [];
-      if (!Number.isFinite(price) || !Number.isFinite(logical) || !cc.length) return;
-      const last = cc.length - 1;
-      const diffs: number[] = [];
-      for (let i = Math.max(1, cc.length - 40); i < cc.length; i++) {
-        const d = Number(cc[i].time) - Number(cc[i - 1].time);
-        if (d > 0 && Number.isFinite(d)) diffs.push(d);
-      }
-      diffs.sort((a, b) => a - b);
-      const step = diffs.length ? diffs[Math.floor(diffs.length / 2)] : 60;
-      let time: number;
-      if (logical >= 0 && logical <= last) {
-        const i0 = Math.max(0, Math.min(Math.floor(logical), last));
-        const i1 = Math.min(last, i0 + 1);
-        const frac = Math.max(0, Math.min(1, logical - i0));
-        const t0 = Number(cc[i0].time);
-        const t1 = Number(cc[i1].time);
-        time = i0 === i1 ? t0 : t0 + (t1 - t0) * frac;
-      } else if (logical > last) {
-        time = Number(cc[last].time) + (logical - last) * step;
-      } else {
-        time = Number(cc[0].time) + logical * step;
-      }
-      setAlphaCrosshair({ x, y, price, time });
-    } catch {}
-  }, []);
-
   const movePlotPan = React.useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     const state = plotPanRef.current;
     const chart = chartRef.current;
@@ -3432,35 +3387,11 @@ kineticScroll: {
     if (chart && candleSeries && e.pointerType !== "touch") {
       try {
         const rect = e.currentTarget.getBoundingClientRect();
-        const plotWidth = Math.max(1, rect.width - 86);
-        const plotHeight = Math.max(1, rect.height - 30);
-        const x = Math.max(0, Math.min(plotWidth, e.clientX - rect.left));
-        const y = Math.max(0, Math.min(plotHeight, e.clientY - rect.top));
+        const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+        const y = Math.max(0, Math.min(rect.height, e.clientY - rect.top));
         const price = Number((candleSeries as any).coordinateToPrice?.(y));
-        const ts: any = chart.timeScale();
-        const timeRaw = ts.coordinateToTime?.(x);
-        let time = typeof timeRaw === "number" ? timeRaw : toUTCTimestamp(timeRaw);
-
-        // Lightweight Charts returns null in empty future space. Project X from
-        // the logical scale so our custom crosshair can move over the WHOLE plot.
-        if (!Number.isFinite(time)) {
-          const logicalRaw = ts.coordinateToLogical?.(x);
-          const logical = Number(logicalRaw);
-          const cc: any[] = displayCacheRef.current ?? [];
-          if (Number.isFinite(logical) && cc.length) {
-            const last = cc.length - 1;
-            const diffs: number[] = [];
-            for (let i = Math.max(1, cc.length - 40); i < cc.length; i++) {
-              const d = Number(cc[i].time) - Number(cc[i - 1].time);
-              if (d > 0 && Number.isFinite(d)) diffs.push(d);
-            }
-            diffs.sort((a, b) => a - b);
-            const step = diffs.length ? diffs[Math.floor(diffs.length / 2)] : 60;
-            if (logical > last) time = Number(cc[last].time) + (logical - last) * step;
-            else if (logical < 0) time = Number(cc[0].time) + logical * step;
-          }
-        }
-
+        const timeRaw = (chart.timeScale() as any).coordinateToTime?.(x);
+        const time = typeof timeRaw === "number" ? timeRaw : toUTCTimestamp(timeRaw);
         if (Number.isFinite(price) && Number.isFinite(time)) {
           setAlphaCrosshair({ x, y, price, time });
         }
@@ -3803,10 +3734,7 @@ kineticScroll: {
           }
         `}</style>
 
-        <div className="relative"
-          onPointerMoveCapture={(e) => { if (e.pointerType !== "touch") updateAlphaCrosshairFromClient(e.clientX, e.clientY); }}
-          onPointerLeave={() => setAlphaCrosshair(null)}
-        >
+        <div className="relative">
           <div
             ref={containerRef}
             style={{
@@ -3821,9 +3749,9 @@ kineticScroll: {
 
           {/* Pełny obszar PAN dla SELECT — obsługuje mouse/touch/pen.
               Osi ceny i czasu nie przykrywamy, bo mają własne uchwyty. */}
-          {activeDrawTool === "SELECT" ? (
+          {false && activeDrawTool === "SELECT" ? (
             <div
-              className="absolute left-0 top-0 z-[10]"
+              className="absolute left-0 top-0 z-[10] pointer-events-none"
               style={{
                 right: 86,
                 bottom: 30,
@@ -3846,7 +3774,7 @@ kineticScroll: {
 
           {/* Własny uchwyt PRAWEJ OSI CENY.
               Jest aktywny tylko w SELECT i ma prawdziwy kursor ns-resize. */}
-          {activeDrawTool === "SELECT" ? (
+          {false && activeDrawTool === "SELECT" ? (
             <div
               className="absolute right-0 top-0 z-[45]"
               style={{
@@ -3867,7 +3795,7 @@ kineticScroll: {
 
           {/* Własny uchwyt DOLNEJ OSI CZASU.
               Ostatnie 72 px zostawiamy osi ceny. */}
-          {activeDrawTool === "SELECT" ? (
+          {false && activeDrawTool === "SELECT" ? (
             <div
               className="absolute bottom-0 left-0 z-[45]"
               style={{
@@ -3886,37 +3814,7 @@ kineticScroll: {
             />
           ) : null}
 
-          {alphaCrosshair ? (
-            <div className="pointer-events-none absolute inset-0 z-[44] overflow-hidden">
-              <div
-                className="absolute top-0 border-l border-dashed border-slate-200/80"
-                style={{ left: alphaCrosshair.x, bottom: 30 }}
-              />
-              <div
-                className="absolute left-0 border-t border-dashed border-slate-200/80"
-                style={{ top: alphaCrosshair.y, right: 86 }}
-              />
-              <div
-                className="absolute right-0 -translate-y-1/2 rounded bg-slate-600 px-2 py-1 text-[11px] font-bold text-white shadow"
-                style={{ top: alphaCrosshair.y }}
-              >
-                {formatPrice(alphaCrosshair.price, pricePrecision ?? guessPrecision(symbol, alphaCrosshair.price))}
-              </div>
-              <div
-                className="absolute bottom-0 -translate-x-1/2 rounded bg-slate-600 px-2 py-1 text-[11px] font-bold text-white shadow"
-                style={{ left: alphaCrosshair.x }}
-              >
-                {new Date(alphaCrosshair.time * 1000).toLocaleString("pl-PL", {
-                  day: "2-digit",
-                  month: "2-digit",
-                  year: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  hour12: false,
-                })}
-              </div>
-            </div>
-          ) : null}
+
 
           {patternsEnabled && patternLabels.length ? (
             <div className="pointer-events-none absolute inset-0 z-[18] overflow-hidden">
@@ -4004,7 +3902,7 @@ kineticScroll: {
             Drawing tools re-enable the drawing overlay.
           */}
           <div
-            className="absolute inset-0 z-[40] pointer-events-auto"
+            className={`absolute inset-0 z-[40] ${activeDrawTool === "SELECT" ? "pointer-events-none" : "pointer-events-auto"}`}
             style={{
               cursor: activeDrawTool === "SELECT" ? "default" : "crosshair",
             }}

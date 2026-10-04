@@ -150,13 +150,6 @@ const [objs, setObjs] = React.useState<AnyObj[]>([]);
 
   const [draft, setDraft] = React.useState<Point | null>(null);
   const [preview, setPreview] = React.useState<Point | null>(null);
-
-  // FAST DRAWING: live preview stays outside React state. Pointer movement only
-  // updates refs and schedules one canvas repaint per browser frame. This avoids
-  // a full React render for every mouse event while drawing RECT/FIBO/lines.
-  const draftFastRef = React.useRef<Point | null>(null);
-  const previewFastRef = React.useRef<Point | null>(null);
-  const pointerDrawRafRef = React.useRef<number>(0);
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [hoverId, setHoverId] = React.useState<string | null>(null);
   const hoverIdRef = React.useRef<string | null>(null);
@@ -284,38 +277,6 @@ React.useEffect(() => {
     ctx?.setTransform(dpr, 0, 0, dpr, 0, 0);
   }, [wrapRef]);
 
-  // Extended logical mapping: Lightweight Charts can return null in the empty
-  // future area to the right of the last tick. Derive the logical index from
-  // the visible range instead, so cursor/drawings behave like TradingView.
-  const coordinateToLogicalExtended = React.useCallback((x: number): number | null => {
-    const chart = chartRef.current;
-    const wrap = wrapRef.current;
-    if (!chart || !wrap) return null;
-    const ts: any = chart.timeScale();
-    const direct = ts.coordinateToLogical?.(x);
-    if (direct != null && Number.isFinite(Number(direct))) return Number(direct);
-    const range = ts.getVisibleLogicalRange?.();
-    const width = Math.max(1, wrap.clientWidth);
-    if (!range || !Number.isFinite(Number(range.from)) || !Number.isFinite(Number(range.to))) return null;
-    const ratio = x / width;
-    return Number(range.from) + ratio * (Number(range.to) - Number(range.from));
-  }, [chartRef, wrapRef]);
-
-  const logicalToCoordinateExtended = React.useCallback((logical: number): number | null => {
-    const chart = chartRef.current;
-    const wrap = wrapRef.current;
-    if (!chart || !wrap) return null;
-    const ts: any = chart.timeScale();
-    const direct = ts.logicalToCoordinate?.(logical as any);
-    if (direct != null && Number.isFinite(Number(direct))) return Number(direct);
-    const range = ts.getVisibleLogicalRange?.();
-    const width = Math.max(1, wrap.clientWidth);
-    if (!range) return null;
-    const span = Number(range.to) - Number(range.from);
-    if (!Number.isFinite(span) || span === 0) return null;
-    return ((logical - Number(range.from)) / span) * width;
-  }, [chartRef, wrapRef]);
-
   const pointToData = React.useCallback(
     (x: number, y: number): Point | null => {
       const chart = chartRef.current;
@@ -324,7 +285,7 @@ React.useEffect(() => {
 
       if (!chart || !series || !candles.length) return null;
 
-      const logical = coordinateToLogicalExtended(x);
+      const logical = chart.timeScale().coordinateToLogical(x);
       const price = series.coordinateToPrice(y);
 
       if (logical == null || price == null) return null;
@@ -338,14 +299,8 @@ React.useEffect(() => {
       // This lets RECT/FIBO/trend endpoints stay exactly where the user drops them.
       let time: number;
       if (logicalNum >= 0 && logicalNum <= lastIndex) {
-        // Keep fractional X instead of snapping every pointer move to a candle.
-        // This is important for TradingView-like smooth RECT/FIBO previews.
-        const i0 = Math.max(0, Math.min(Math.floor(logicalNum), lastIndex));
-        const i1 = Math.max(0, Math.min(i0 + 1, lastIndex));
-        const frac = Math.max(0, Math.min(1, logicalNum - i0));
-        const t0 = Number(candles[i0].time);
-        const t1 = Number(candles[i1].time);
-        time = i0 === i1 ? t0 : t0 + (t1 - t0) * frac;
+        const idx = Math.max(0, Math.min(Math.round(logicalNum), lastIndex));
+        time = Number(candles[idx].time);
       } else {
         const diffs: number[] = [];
         const start = Math.max(1, candles.length - 40);
@@ -368,7 +323,7 @@ React.useEffect(() => {
         p: Number(price),
       };
     },
-    [chartRef, candleSeriesRef, getCandles, coordinateToLogicalExtended]
+    [chartRef, candleSeriesRef, getCandles]
   );
 
   const screenToData = React.useCallback(
@@ -430,16 +385,16 @@ React.useEffect(() => {
       const t1 = Number(candles[i1].time);
 
       if (i0 === i1 || t1 === t0) {
-        const x = logicalToCoordinateExtended(i0);
+        const x = ts.logicalToCoordinate(i0 as any);
         return x == null ? null : Number(x);
       }
 
       const fraction = (target - t0) / (t1 - t0);
       const logical = i0 + fraction;
-      const x = logicalToCoordinateExtended(logical);
+      const x = ts.logicalToCoordinate(logical as any);
       return x == null || !Number.isFinite(Number(x)) ? null : Number(x);
     },
-    [chartRef, getCandles, logicalToCoordinateExtended]
+    [chartRef, getCandles]
   );
 
   const dataToPoint = React.useCallback(
@@ -899,14 +854,12 @@ if (o.type === "FIBO") {
     drawTradeZones(ctx);
     objs.forEach((o) => drawObject(ctx, o, o.id === selectedId || o.id === hoverId));
 
-    const liveDraft = draftFastRef.current ?? draft;
-    const livePreview = previewFastRef.current ?? preview;
-    if (liveDraft && livePreview && TWO_POINT_TOOLS.includes(activeDrawTool)) {
+    if (draft && preview && TWO_POINT_TOOLS.includes(activeDrawTool)) {
       drawObject(ctx, {
         id: "preview",
         type: activeDrawTool as TwoPointObj["type"],
-        a: liveDraft,
-        b: livePreview,
+        a: draft,
+        b: preview,
         color: "#facc15",
         visible: true,
         createdAt: Date.now(),
@@ -952,10 +905,6 @@ if (o.type === "FIBO") {
   React.useEffect(() => {
     draw();
   }, [draw]);
-
-  React.useEffect(() => () => {
-    if (pointerDrawRafRef.current) cancelAnimationFrame(pointerDrawRafRef.current);
-  }, []);
 
   // Candles change on every timeframe, drawings do not. Re-project all saved
   // TIME + PRICE anchors onto the new candle spacing after a TF switch.
@@ -1069,8 +1018,6 @@ if (o.type === "FIBO") {
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        draftFastRef.current = null;
-        previewFastRef.current = null;
         setDraft(null);
         setPreview(null);
         onDrawToolChange?.("SELECT");
@@ -1236,9 +1183,7 @@ if (o.type === "FIBO") {
     }
 
     if (TWO_POINT_TOOLS.includes(activeDrawTool)) {
-      if (!draftFastRef.current && !draft) {
-        draftFastRef.current = p;
-        previewFastRef.current = p;
+      if (!draft) {
         setDraft(p);
         setPreview(p);
         return;
@@ -1247,21 +1192,25 @@ if (o.type === "FIBO") {
       addObj({
         ...makeBase(activeDrawTool),
         type: activeDrawTool as TwoPointObj["type"],
-        a: (draftFastRef.current ?? draft)!,
+        a: draft,
         b: p,
       } as AnyObj);
 
-      draftFastRef.current = null;
-      previewFastRef.current = null;
       setDraft(null);
       setPreview(null);
       onDrawToolChange?.("SELECT");
     }
   };
 
-  // FAST POINTER PATH: do not add a fixed 16 ms delay here. The browser can deliver
-  // 120/144/240 Hz pointer input; canvas repaint itself is coalesced with RAF below.
+  // PERFORMANCE: pointer/mouse events can arrive far faster than the screen can render.
+  // Keep all existing drawing logic, but execute the expensive coordinate conversion,
+  // hit-testing and React updates at most once per animation frame (~60 FPS).
+  const lastMouseMoveAtRef = React.useRef(0);
+
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const now = performance.now();
+    if (now - lastMouseMoveAtRef.current < 16) return;
+    lastMouseMoveAtRef.current = now;
     const rect = e.currentTarget.getBoundingClientRect();
     const localX = e.clientX - rect.left;
     const localY = e.clientY - rect.top;
@@ -1388,14 +1337,14 @@ if (o.type === "FIBO") {
 
             const startLocalX = dragRef.current.startClientX - rect.left;
             const startLocalY = dragRef.current.startClientY - rect.top;
-            const startLogical = coordinateToLogicalExtended(startLocalX);
-            const currentLogical = coordinateToLogicalExtended(localX);
+            const startLogical = ts?.coordinateToLogical(startLocalX);
+            const currentLogical = ts?.coordinateToLogical(localX);
             const startPrice = series?.coordinateToPrice(startLocalY);
             const currentPrice = series?.coordinateToPrice(localY);
 
             const barDelta =
               startLogical != null && currentLogical != null
-                ? Number(currentLogical) - Number(startLogical)
+                ? Math.round(Number(currentLogical) - Number(startLogical))
                 : 0;
             const priceDelta =
               startPrice != null && currentPrice != null
@@ -1403,64 +1352,22 @@ if (o.type === "FIBO") {
                 : 0;
 
             const indexForTime = (t: UTCTimestamp) => {
+              let best = 0;
+              let bestD = Infinity;
               const target = Number(t);
-              if (!candles.length) return 0;
-              if (candles.length === 1) return 0;
-              if (target <= Number(candles[0].time)) {
-                const dt = Number(candles[1].time) - Number(candles[0].time) || 1;
-                return (target - Number(candles[0].time)) / dt;
+              for (let i = 0; i < candles.length; i++) {
+                const d = Math.abs(Number(candles[i].time) - target);
+                if (d < bestD) { bestD = d; best = i; }
               }
-              const last = candles.length - 1;
-              if (target >= Number(candles[last].time)) {
-                const dt = Number(candles[last].time) - Number(candles[last - 1].time) || 1;
-                return last + (target - Number(candles[last].time)) / dt;
-              }
-              let lo = 0, hi = last;
-              while (lo + 1 < hi) {
-                const mid = (lo + hi) >> 1;
-                if (Number(candles[mid].time) <= target) lo = mid;
-                else hi = mid;
-              }
-              const t0 = Number(candles[lo].time);
-              const t1 = Number(candles[hi].time);
-              return lo + (target - t0) / Math.max(1, t1 - t0);
-            };
-
-            // TradingView-style future space: drawings are NOT clamped to the
-            // last Renko brick / current tick. Convert any logical index (also
-            // negative or beyond candles.length - 1) to a projected timestamp.
-            const timeForIndex = (logicalIndex: number): UTCTimestamp => {
-              if (!candles.length) return Math.floor(Date.now() / 1000) as UTCTimestamp;
-              const last = candles.length - 1;
-              if (logicalIndex >= 0 && logicalIndex <= last) {
-                const i0 = Math.floor(logicalIndex);
-                const i1 = Math.min(last, i0 + 1);
-                const frac = logicalIndex - i0;
-                const t0 = Number(candles[i0].time);
-                const t1 = Number(candles[i1].time);
-                return Math.round(t0 + (t1 - t0) * frac) as UTCTimestamp;
-              }
-
-              const diffs: number[] = [];
-              const from = Math.max(1, candles.length - 40);
-              for (let i = from; i < candles.length; i++) {
-                const d = Number(candles[i].time) - Number(candles[i - 1].time);
-                if (d > 0 && Number.isFinite(d)) diffs.push(d);
-              }
-              diffs.sort((a, b) => a - b);
-              const step = diffs.length ? diffs[Math.floor(diffs.length / 2)] : 60;
-
-              if (logicalIndex > last) {
-                return Math.round(Number(candles[last].time) + (logicalIndex - last) * step) as UTCTimestamp;
-              }
-              return Math.round(Number(candles[0].time) + logicalIndex * step) as UTCTimestamp;
+              return best;
             };
 
             const shiftPointStable = (pt: Point): Point => {
               if (!candles.length) return { t: pt.t, p: pt.p + priceDelta };
               const idx = indexForTime(pt.t);
+              const next = Math.max(0, Math.min(candles.length - 1, idx + barDelta));
               return {
-                t: timeForIndex(idx + barDelta),
+                t: candles[next].time as UTCTimestamp,
                 p: pt.p + priceDelta,
               };
             };
@@ -1468,7 +1375,8 @@ if (o.type === "FIBO") {
             if (startObj.type === "VLINE") {
               if (!candles.length) return o;
               const idx = indexForTime(startObj.t);
-              return { ...o, t: timeForIndex(idx + barDelta) } as AnyObj;
+              const next = Math.max(0, Math.min(candles.length - 1, idx + barDelta));
+              return { ...o, t: candles[next].time as UTCTimestamp } as AnyObj;
             }
 
             if (
@@ -1503,14 +1411,8 @@ if (o.type === "FIBO") {
       return;
     }
 
-    if ((draftFastRef.current || draft) && TWO_POINT_TOOLS.includes(activeDrawTool)) {
-      previewFastRef.current = p;
-      if (!pointerDrawRafRef.current) {
-        pointerDrawRafRef.current = requestAnimationFrame(() => {
-          pointerDrawRafRef.current = 0;
-          draw();
-        });
-      }
+    if (draft && TWO_POINT_TOOLS.includes(activeDrawTool)) {
+      setPreview(p);
     }
 
     if (
