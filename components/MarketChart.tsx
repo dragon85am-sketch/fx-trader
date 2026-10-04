@@ -3391,8 +3391,30 @@ kineticScroll: {
         const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
         const y = Math.max(0, Math.min(rect.height, e.clientY - rect.top));
         const price = Number((candleSeries as any).coordinateToPrice?.(y));
-        const timeRaw = (chart.timeScale() as any).coordinateToTime?.(x);
-        const time = typeof timeRaw === "number" ? timeRaw : toUTCTimestamp(timeRaw);
+        const ts: any = chart.timeScale();
+        const timeRaw = ts.coordinateToTime?.(x);
+        let time = typeof timeRaw === "number" ? timeRaw : toUTCTimestamp(timeRaw);
+
+        // Lightweight Charts returns null in empty future space. Project X from
+        // the logical scale so our custom crosshair can move over the WHOLE plot.
+        if (!Number.isFinite(time)) {
+          const logicalRaw = ts.coordinateToLogical?.(x);
+          const logical = Number(logicalRaw);
+          const cc: any[] = displayCacheRef.current ?? [];
+          if (Number.isFinite(logical) && cc.length) {
+            const last = cc.length - 1;
+            const diffs: number[] = [];
+            for (let i = Math.max(1, cc.length - 40); i < cc.length; i++) {
+              const d = Number(cc[i].time) - Number(cc[i - 1].time);
+              if (d > 0 && Number.isFinite(d)) diffs.push(d);
+            }
+            diffs.sort((a, b) => a - b);
+            const step = diffs.length ? diffs[Math.floor(diffs.length / 2)] : 60;
+            if (logical > last) time = Number(cc[last].time) + (logical - last) * step;
+            else if (logical < 0) time = Number(cc[0].time) + logical * step;
+          }
+        }
+
         if (Number.isFinite(price) && Number.isFinite(time)) {
           setAlphaCrosshair({ x, y, price, time });
         }
@@ -3752,7 +3774,7 @@ kineticScroll: {
               Osi ceny i czasu nie przykrywamy, bo mają własne uchwyty. */}
           {activeDrawTool === "SELECT" ? (
             <div
-              className="absolute left-0 top-0 z-[10] pointer-events-none"
+              className="absolute left-0 top-0 z-[10]"
               style={{
                 right: 86,
                 bottom: 30,

@@ -306,8 +306,14 @@ React.useEffect(() => {
       // This lets RECT/FIBO/trend endpoints stay exactly where the user drops them.
       let time: number;
       if (logicalNum >= 0 && logicalNum <= lastIndex) {
-        const idx = Math.max(0, Math.min(Math.round(logicalNum), lastIndex));
-        time = Number(candles[idx].time);
+        // Keep fractional X instead of snapping every pointer move to a candle.
+        // This is important for TradingView-like smooth RECT/FIBO previews.
+        const i0 = Math.max(0, Math.min(Math.floor(logicalNum), lastIndex));
+        const i1 = Math.max(0, Math.min(i0 + 1, lastIndex));
+        const frac = Math.max(0, Math.min(1, logicalNum - i0));
+        const t0 = Number(candles[i0].time);
+        const t1 = Number(candles[i1].time);
+        time = i0 === i1 ? t0 : t0 + (t1 - t0) * frac;
       } else {
         const diffs: number[] = [];
         const start = Math.max(1, candles.length - 40);
@@ -1357,7 +1363,7 @@ if (o.type === "FIBO") {
 
             const barDelta =
               startLogical != null && currentLogical != null
-                ? Math.round(Number(currentLogical) - Number(startLogical))
+                ? Number(currentLogical) - Number(startLogical)
                 : 0;
             const priceDelta =
               startPrice != null && currentPrice != null
@@ -1365,14 +1371,27 @@ if (o.type === "FIBO") {
                 : 0;
 
             const indexForTime = (t: UTCTimestamp) => {
-              let best = 0;
-              let bestD = Infinity;
               const target = Number(t);
-              for (let i = 0; i < candles.length; i++) {
-                const d = Math.abs(Number(candles[i].time) - target);
-                if (d < bestD) { bestD = d; best = i; }
+              if (!candles.length) return 0;
+              if (candles.length === 1) return 0;
+              if (target <= Number(candles[0].time)) {
+                const dt = Number(candles[1].time) - Number(candles[0].time) || 1;
+                return (target - Number(candles[0].time)) / dt;
               }
-              return best;
+              const last = candles.length - 1;
+              if (target >= Number(candles[last].time)) {
+                const dt = Number(candles[last].time) - Number(candles[last - 1].time) || 1;
+                return last + (target - Number(candles[last].time)) / dt;
+              }
+              let lo = 0, hi = last;
+              while (lo + 1 < hi) {
+                const mid = (lo + hi) >> 1;
+                if (Number(candles[mid].time) <= target) lo = mid;
+                else hi = mid;
+              }
+              const t0 = Number(candles[lo].time);
+              const t1 = Number(candles[hi].time);
+              return lo + (target - t0) / Math.max(1, t1 - t0);
             };
 
             // TradingView-style future space: drawings are NOT clamped to the
@@ -1382,7 +1401,12 @@ if (o.type === "FIBO") {
               if (!candles.length) return Math.floor(Date.now() / 1000) as UTCTimestamp;
               const last = candles.length - 1;
               if (logicalIndex >= 0 && logicalIndex <= last) {
-                return candles[Math.round(logicalIndex)].time as UTCTimestamp;
+                const i0 = Math.floor(logicalIndex);
+                const i1 = Math.min(last, i0 + 1);
+                const frac = logicalIndex - i0;
+                const t0 = Number(candles[i0].time);
+                const t1 = Number(candles[i1].time);
+                return Math.round(t0 + (t1 - t0) * frac) as UTCTimestamp;
               }
 
               const diffs: number[] = [];
