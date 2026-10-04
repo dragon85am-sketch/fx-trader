@@ -3778,9 +3778,9 @@ kineticScroll: {
 
           {/* Własny uchwyt PRAWEJ OSI CENY.
               Jest aktywny tylko w SELECT i ma prawdziwy kursor ns-resize. */}
-          {false && activeDrawTool === "SELECT" ? (
+          {activeDrawTool === "SELECT" ? (
             <div
-              className="absolute right-0 top-0 z-[45]"
+              className="absolute right-0 top-0 z-[60]"
               style={{
                 width: 86,
                 bottom: 30,
