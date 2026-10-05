@@ -1,5 +1,7 @@
 "use client";
 
+// FX TRADE VANTAGE-SMOOTH V1: canvas-hot-path drawing + stable RENKO anchors.
+
 import React from "react";
 import {
   type IChartApi,
@@ -20,7 +22,7 @@ export type DrawTool =
   | "BRUSH"
   | "PATH";
 
-type Point = { t: UTCTimestamp; p: number; l?: number };
+type Point = { t: UTCTimestamp; p: number; logical?: number };
 
 function formatChartDateTime(time: UTCTimestamp) {
   try {
@@ -139,6 +141,12 @@ export default function DrawingsLayer({
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
 
 const [objs, setObjs] = React.useState<AnyObj[]>([]);
+  // VANTAGE-SMOOTH: the canvas renders from refs during pointer movement.
+  // React state is committed only when an interaction finishes, avoiding a full
+  // component render on every mouse pixel.
+  const objsRef = React.useRef<AnyObj[]>([]);
+  const dragDirtyRef = React.useRef(false);
+  React.useEffect(() => { objsRef.current = objs; }, [objs]);
   const storageReadyRef = React.useRef(false);
 
   // PERFORMANCE: cache candles used by coordinate conversion / hit-testing.
@@ -150,6 +158,8 @@ const [objs, setObjs] = React.useState<AnyObj[]>([]);
 
   const [draft, setDraft] = React.useState<Point | null>(null);
   const [preview, setPreview] = React.useState<Point | null>(null);
+  const previewRef = React.useRef<Point | null>(null);
+  React.useEffect(() => { previewRef.current = preview; }, [preview]);
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [hoverId, setHoverId] = React.useState<string | null>(null);
   const hoverIdRef = React.useRef<string | null>(null);
@@ -178,7 +188,7 @@ React.useEffect(() => {
     const raw = localStorage.getItem(key);
 
     if (raw) {
-      setObjs(JSON.parse(raw));
+      { const parsed = JSON.parse(raw) as AnyObj[]; objsRef.current = parsed; setObjs(parsed); }
     } else {
       // One-time migration: merge drawings previously saved separately on each TF.
       const merged: AnyObj[] = [];
@@ -351,7 +361,7 @@ React.useEffect(() => {
         }
       }
 
-      return { t: Math.round(time) as UTCTimestamp, p: Number(price), l: logicalNum };
+      return { t: Math.round(time) as UTCTimestamp, p: Number(price), logical: logicalNum };
     },
     [candleSeriesRef, xToLogicalFuture, candleStepSeconds]
   );
@@ -363,10 +373,16 @@ React.useEffect(() => {
       if (!chart || !series) return null;
 
       const price = series.coordinateToPrice(y);
-      const time = (chart.timeScale() as any).coordinateToTime?.(x);
+      const ts: any = chart.timeScale();
+      const time = ts.coordinateToTime?.(x);
+      const logical = Number(ts.coordinateToLogical?.(x));
       if (price == null || time == null) return null;
 
-      return { t: time as UTCTimestamp, p: Number(price) };
+      return {
+        t: time as UTCTimestamp,
+        p: Number(price),
+        logical: Number.isFinite(logical) ? logical : undefined,
+      };
     },
     [chartRef, candleSeriesRef]
   );
@@ -431,21 +447,19 @@ React.useEffect(() => {
       const series = candleSeriesRef.current;
       if (!series || !p) return null;
 
-      // Stable market-time anchor. Do NOT prefer saved logical indexes here:
-      // Renko can add/remove/rebuild bricks, which shifts logical indexes and
-      // made RECT/FIBO jump left/right. The invisible real-candle timeline in
-      // MarketChart keeps p.t stable across every Renko rebuild. Logical X is
-      // only a fallback for legacy/future-space points.
       const chart = chartRef.current;
-      const marketX = marketTimeToX(p.t);
-      const logicalX = p.l != null && Number.isFinite(Number(p.l))
-        ? chart?.timeScale().logicalToCoordinate(Number(p.l) as any)
-        : null;
-      const x = marketX != null && Number.isFinite(Number(marketX))
-        ? Number(marketX)
-        : logicalX != null && Number.isFinite(Number(logicalX))
-          ? Number(logicalX)
-          : null;
+      const logicalX = Number(p.logical);
+      let x: number | null = null;
+
+      // Drawings created by this version keep their exact logical X anchor.
+      // This is the same horizontal coordinate system used by Lightweight Charts,
+      // so pan/zoom/future-space do not re-interpolate X from RENKO timestamps.
+      if (chart && Number.isFinite(logicalX)) {
+        const direct = chart.timeScale().logicalToCoordinate(logicalX as any);
+        if (direct != null && Number.isFinite(Number(direct))) x = Number(direct);
+      }
+      // Backward compatibility for drawings saved before logical anchors existed.
+      if (x == null) x = marketTimeToX(p.t);
       const y = series.priceToCoordinate(p.p);
 
       if (x == null || y == null) return null;
@@ -455,7 +469,7 @@ React.useEffect(() => {
         y: Number(y),
       };
     },
-    [candleSeriesRef, chartRef, marketTimeToX]
+    [candleSeriesRef, marketTimeToX]
   );
 
   function distance(
@@ -895,14 +909,14 @@ if (o.type === "FIBO") {
     ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
 
     drawTradeZones(ctx);
-    objs.forEach((o) => drawObject(ctx, o, o.id === selectedId || o.id === hoverId));
+    objsRef.current.forEach((o) => drawObject(ctx, o, o.id === selectedId || o.id === hoverId));
 
-    if (draft && preview && TWO_POINT_TOOLS.includes(activeDrawTool)) {
+    if (draft && previewRef.current && TWO_POINT_TOOLS.includes(activeDrawTool)) {
       drawObject(ctx, {
         id: "preview",
         type: activeDrawTool as TwoPointObj["type"],
         a: draft,
-        b: preview,
+        b: previewRef.current,
         color: "#facc15",
         visible: true,
         createdAt: Date.now(),
@@ -1078,7 +1092,9 @@ if (o.type === "FIBO") {
   }, [selectedId, onDrawToolChange]);
 
   const addObj = (obj: AnyObj) => {
-    setObjs((prev) => [...prev, obj]);
+    const next = [...objsRef.current, obj];
+    objsRef.current = next;
+    setObjs(next);
   };
 
   const makeBase = (type: DrawTool): BaseObj => ({
@@ -1228,6 +1244,7 @@ if (o.type === "FIBO") {
     if (TWO_POINT_TOOLS.includes(activeDrawTool)) {
       if (!draft) {
         setDraft(p);
+        previewRef.current = p;
         setPreview(p);
         return;
       }
@@ -1240,6 +1257,7 @@ if (o.type === "FIBO") {
       } as AnyObj);
 
       setDraft(null);
+      previewRef.current = null;
       setPreview(null);
       onDrawToolChange?.("SELECT");
     }
@@ -1251,9 +1269,7 @@ if (o.type === "FIBO") {
   const lastMouseMoveAtRef = React.useRef(0);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const now = performance.now();
-    if (now - lastMouseMoveAtRef.current < 16) return;
-    lastMouseMoveAtRef.current = now;
+    lastMouseMoveAtRef.current = performance.now();
     const rect = e.currentTarget.getBoundingClientRect();
     const localX = e.clientX - rect.left;
     const localY = e.clientY - rect.top;
@@ -1341,8 +1357,7 @@ if (o.type === "FIBO") {
           return screenToData(sp.x + dx, sp.y + dy) ?? pointToData(sp.x + dx, sp.y + dy);
         };
 
-        setObjs((prev) =>
-          prev.map((o) => {
+        const nextObjs = objsRef.current.map((o) => {
             if (o.id !== id) return o;
 
             if (mode === "a" && "a" in o && "b" in o) {
@@ -1375,7 +1390,7 @@ if (o.type === "FIBO") {
 
             const barDelta =
               startLogical != null && currentLogical != null
-                ? Math.round(Number(currentLogical) - Number(startLogical))
+                ? Number(currentLogical) - Number(startLogical)
                 : 0;
             const priceDelta =
               startPrice != null && currentPrice != null
@@ -1394,36 +1409,33 @@ if (o.type === "FIBO") {
             };
 
             const shiftPointStable = (pt: Point): Point => {
-              // Never clamp a drawing to the last Renko brick. Preserve its
-              // logical X so RECT/FIBO can live in future-space and cannot jump
-              // left/right when the forming Renko brick is rebuilt.
-              const baseLogical =
-                pt.l != null && Number.isFinite(Number(pt.l))
-                  ? Number(pt.l)
-                  : (() => {
-                      const x0 = marketTimeToX(pt.t);
-                      const l0 = x0 == null ? null : ts?.coordinateToLogical(x0);
-                      return l0 == null ? null : Number(l0);
-                    })();
-              const nextLogical = baseLogical == null ? null : baseLogical + barDelta;
-              let nextTime = Number(pt.t);
-              if (nextLogical != null && candles.length) {
-                const last = candles.length - 1;
+              // Preserve the exact logical anchor while moving. Never clamp a BOX
+              // to the last RENKO brick; future-space must remain drawable.
+              const baseLogical = Number.isFinite(Number(pt.logical))
+                ? Number(pt.logical)
+                : Number(ts?.coordinateToLogical(dataToPoint(pt)?.x ?? 0));
+              const nextLogical = Number.isFinite(baseLogical) ? baseLogical + barDelta : NaN;
+              if (Number.isFinite(nextLogical)) {
                 const step = candleStepSeconds();
-                if (nextLogical >= 0 && nextLogical <= last) {
-                  const idx = Math.max(0, Math.min(last, Math.round(nextLogical)));
-                  nextTime = Number(candles[idx].time);
-                } else if (nextLogical > last) {
-                  nextTime = Number(candles[last].time) + (nextLogical - last) * step;
-                } else {
-                  nextTime = Number(candles[0].time) + nextLogical * step;
+                const last = candles.length - 1;
+                let nextTime = Number(pt.t);
+                if (candles.length) {
+                  if (nextLogical >= 0 && nextLogical <= last) {
+                    const lo = Math.max(0, Math.min(Math.floor(nextLogical), last));
+                    const hi = Math.max(0, Math.min(Math.ceil(nextLogical), last));
+                    const frac = nextLogical - lo;
+                    const t0 = Number(candles[lo].time);
+                    const t1 = Number(candles[hi].time);
+                    nextTime = lo === hi ? t0 : t0 + (t1 - t0) * frac;
+                  } else if (nextLogical > last) {
+                    nextTime = Number(candles[last].time) + (nextLogical - last) * step;
+                  } else {
+                    nextTime = Number(candles[0].time) + nextLogical * step;
+                  }
                 }
+                return { t: Math.round(nextTime) as UTCTimestamp, p: pt.p + priceDelta, logical: nextLogical };
               }
-              return {
-                t: Math.round(nextTime) as UTCTimestamp,
-                p: pt.p + priceDelta,
-                ...(nextLogical != null ? { l: nextLogical } : {}),
-              };
+              return { ...pt, p: pt.p + priceDelta };
             };
 
             if (startObj.type === "VLINE") {
@@ -1455,8 +1467,11 @@ if (o.type === "FIBO") {
             }
 
             return o;
-          })
-        );
+          });
+        objsRef.current = nextObjs;
+        dragDirtyRef.current = true;
+        // Canvas-only preview during drag: no React reconciliation in the hot path.
+        draw();
       }
 
       dragRef.current.last = p;
@@ -1466,7 +1481,8 @@ if (o.type === "FIBO") {
     }
 
     if (draft && TWO_POINT_TOOLS.includes(activeDrawTool)) {
-      setPreview(p);
+      previewRef.current = p;
+      draw();
     }
 
     if (
@@ -1480,6 +1496,12 @@ if (o.type === "FIBO") {
 
   const handleMouseUp = () => {
     isMouseDownRef.current = false;
+
+    if (dragDirtyRef.current) {
+      dragDirtyRef.current = false;
+      // One React/storage commit after the drag is finished.
+      setObjs([...objsRef.current]);
+    }
 
     chartPanRef.current = {
       active: false,

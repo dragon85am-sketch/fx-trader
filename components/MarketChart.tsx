@@ -1,5 +1,7 @@
 "use client";
 
+// FX TRADE VANTAGE-SMOOTH V1: stable RENKO geometry + shared append-only X timeline.
+
 import React from "react";
 import DrawingsLayer, { type DrawTool, type TradeZoneCanvasSpec } from "./DrawingsLayer";
 import {
@@ -1081,15 +1083,6 @@ fullscreenMode = false,
   const containerRef = React.useRef<HTMLDivElement | null>(null);
   const chartRef = React.useRef<IChartApi | null>(null);
   const candleSeriesRef = React.useRef<ISeriesApi<"Candlestick"> | null>(null);
-
-  // Alpha-style pointer state used by movePlotPan / pointer leave.
-  // Kept independent from Lightweight Charts so future-space coordinates are valid.
-  const [, setAlphaCrosshair] = React.useState<{
-    x: number;
-    y: number;
-    price: number;
-    time: number;
-  } | null>(null);
   // Invisible time-anchor series: keeps the chart time scale based on real candles
   // even when RENKO displays fewer/synthetic bricks. This keeps all drawings fixed
   // to the same market-time X position across CANDLES / HA / RENKO / indicators.
@@ -1228,8 +1221,14 @@ fullscreenMode = false,
 
   const [detached, setDetached] = React.useState<boolean>(false);
   const [overlayTick, setOverlayTick] = React.useState(0);
+  const [alphaCrosshair, setAlphaCrosshair] = React.useState<{
+    x: number;
+    y: number;
+    price: number;
+    time: number;
+  } | null>(null);
   const lastIndicatorLiveUpdateRef = React.useRef(0);
-  const rightOffset = rightPadOn ? 7 : 7;
+  const rightOffset = rightPadOn ? 28 : 10;
 
   // Preserve the user's current chart viewport when only the presentation mode
   // changes (normal candles <-> HA <-> Renko, or indicator overlays).
@@ -1838,9 +1837,10 @@ fullscreenMode = false,
     }
   }, [rightOffset, followOnTick, detached, followLatestBar]);
 
-  // Jedno źródło ustawień Renko:
-  // renkoBoxSize > 0 = MANUAL
-  // brak / 0 = AUTO ATR(14) × 0.8, minimum 0.1% ceny.
+  // Jedno źródło ustawień Renko. AUTO is LOCKED per symbol/timeframe.
+  // Recalculating ATR box-size on every incoming candle rebuilds the entire RENKO
+  // history and changes logical X positions, which makes drawings jump left/right.
+  const renkoAutoLockRef = React.useRef<{ key: string; box: number }>({ key: "", box: 0 });
   const currentRenkoBox = React.useMemo(() => {
     const source =
       renkoCandles && renkoCandles.length
@@ -1850,10 +1850,19 @@ fullscreenMode = false,
     if (!source.length) return 0;
 
     const manual = Number(renkoBoxSize);
-    if (Number.isFinite(manual) && manual > 0) return manual;
+    if (Number.isFinite(manual) && manual > 0) {
+      renkoAutoLockRef.current = { key: "", box: 0 };
+      return manual;
+    }
 
-    return autoRenkoBoxSize(source);
-  }, [renkoBoxSize, renkoCandles, candles]);
+    const key = `${symbol}|${tf ?? "default"}`;
+    if (renkoAutoLockRef.current.key === key && renkoAutoLockRef.current.box > 0) {
+      return renkoAutoLockRef.current.box;
+    }
+    const box = autoRenkoBoxSize(source);
+    if (box > 0 && Number.isFinite(box)) renkoAutoLockRef.current = { key, box };
+    return box;
+  }, [renkoBoxSize, renkoCandles, candles, symbol, tf]);
 
   const effectiveEmaConfigs = React.useMemo(() => {
     if (emaConfigs !== undefined) {
@@ -2298,17 +2307,17 @@ fullscreenMode = false,
         tickMarkFormatter: (time: any) => formatChartAxisTime(time),
       },
 handleScroll: {
-  // Alpha-style native interaction: lightweight-charts owns pan/scroll in SELECT.
-  mouseWheel: true,
-  pressedMouseMove: true,
-  horzTouchDrag: true,
+  // Pan lewo/prawo obsługujemy własnym pointer handlerem poniżej.
+  // Wyłączenie natywnego drag usuwa podwójne/przeciwne przesuwanie.
+  pressedMouseMove: false,
+  horzTouchDrag: false,
   vertTouchDrag: false,
+  mouseWheel: true,
 },
 
 handleScale: {
   mouseWheel: true,
   pinch: true,
-  // TradingView/Alpha behaviour: LMB drag directly on either axis scales it.
   axisPressedMouseMove: {
     time: true,
     price: true,
@@ -2512,7 +2521,7 @@ kineticScroll: {
       const box =
         Number.isFinite(manualBox) && manualBox > 0
           ? manualBox
-          : autoRenkoBoxSize(renkoRaw);
+          : (currentRenkoBox > 0 ? currentRenkoBox : autoRenkoBoxSize(renkoRaw));
 
       safeForChart = toRenkoCandles(renkoRaw, box);
     } else if (heikinAshi) {
@@ -3382,6 +3391,51 @@ kineticScroll: {
     } catch {}
   }, [activeDrawTool, fullscreenMode]);
 
+  const updateAlphaCrosshairFromClient = React.useCallback((clientX: number, clientY: number) => {
+    const chart = chartRef.current;
+    const candleSeries = candleSeriesRef.current;
+    const wrap = containerRef.current;
+    if (!chart || !candleSeries || !wrap) return;
+    try {
+      const rect = wrap.getBoundingClientRect();
+      const x = Math.max(0, Math.min(rect.width, clientX - rect.left));
+      const y = Math.max(0, Math.min(rect.height, clientY - rect.top));
+      const price = Number((candleSeries as any).coordinateToPrice?.(y));
+      const ts: any = chart.timeScale();
+      let logical = Number(ts.coordinateToLogical?.(x));
+      if (!Number.isFinite(logical)) {
+        const range = ts.getVisibleLogicalRange?.();
+        if (range && rect.width > 0) {
+          logical = Number(range.from) + (x / rect.width) * (Number(range.to) - Number(range.from));
+        }
+      }
+      const cc: any[] = displayCacheRef.current ?? [];
+      if (!Number.isFinite(price) || !Number.isFinite(logical) || !cc.length) return;
+      const last = cc.length - 1;
+      const diffs: number[] = [];
+      for (let i = Math.max(1, cc.length - 40); i < cc.length; i++) {
+        const d = Number(cc[i].time) - Number(cc[i - 1].time);
+        if (d > 0 && Number.isFinite(d)) diffs.push(d);
+      }
+      diffs.sort((a, b) => a - b);
+      const step = diffs.length ? diffs[Math.floor(diffs.length / 2)] : 60;
+      let time: number;
+      if (logical >= 0 && logical <= last) {
+        const i0 = Math.max(0, Math.min(Math.floor(logical), last));
+        const i1 = Math.min(last, i0 + 1);
+        const frac = Math.max(0, Math.min(1, logical - i0));
+        const t0 = Number(cc[i0].time);
+        const t1 = Number(cc[i1].time);
+        time = i0 === i1 ? t0 : t0 + (t1 - t0) * frac;
+      } else if (logical > last) {
+        time = Number(cc[last].time) + (logical - last) * step;
+      } else {
+        time = Number(cc[0].time) + logical * step;
+      }
+      setAlphaCrosshair({ x, y, price, time });
+    } catch {}
+  }, []);
+
   const movePlotPan = React.useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     const state = plotPanRef.current;
     const chart = chartRef.current;
@@ -3394,8 +3448,30 @@ kineticScroll: {
         const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
         const y = Math.max(0, Math.min(rect.height, e.clientY - rect.top));
         const price = Number((candleSeries as any).coordinateToPrice?.(y));
-        const timeRaw = (chart.timeScale() as any).coordinateToTime?.(x);
-        const time = typeof timeRaw === "number" ? timeRaw : toUTCTimestamp(timeRaw);
+        const ts: any = chart.timeScale();
+        const timeRaw = ts.coordinateToTime?.(x);
+        let time = typeof timeRaw === "number" ? timeRaw : toUTCTimestamp(timeRaw);
+
+        // Lightweight Charts returns null in empty future space. Project X from
+        // the logical scale so our custom crosshair can move over the WHOLE plot.
+        if (!Number.isFinite(time)) {
+          const logicalRaw = ts.coordinateToLogical?.(x);
+          const logical = Number(logicalRaw);
+          const cc: any[] = displayCacheRef.current ?? [];
+          if (Number.isFinite(logical) && cc.length) {
+            const last = cc.length - 1;
+            const diffs: number[] = [];
+            for (let i = Math.max(1, cc.length - 40); i < cc.length; i++) {
+              const d = Number(cc[i].time) - Number(cc[i - 1].time);
+              if (d > 0 && Number.isFinite(d)) diffs.push(d);
+            }
+            diffs.sort((a, b) => a - b);
+            const step = diffs.length ? diffs[Math.floor(diffs.length / 2)] : 60;
+            if (logical > last) time = Number(cc[last].time) + (logical - last) * step;
+            else if (logical < 0) time = Number(cc[0].time) + logical * step;
+          }
+        }
+
         if (Number.isFinite(price) && Number.isFinite(time)) {
           setAlphaCrosshair({ x, y, price, time });
         }
@@ -3738,7 +3814,10 @@ kineticScroll: {
           }
         `}</style>
 
-        <div className="relative">
+        <div className="relative"
+          onPointerMoveCapture={(e) => { if (e.pointerType !== "touch") updateAlphaCrosshairFromClient(e.clientX, e.clientY); }}
+          onPointerLeave={() => setAlphaCrosshair(null)}
+        >
           <div
             ref={containerRef}
             style={{
@@ -3753,9 +3832,9 @@ kineticScroll: {
 
           {/* Pełny obszar PAN dla SELECT — obsługuje mouse/touch/pen.
               Osi ceny i czasu nie przykrywamy, bo mają własne uchwyty. */}
-          {false && activeDrawTool === "SELECT" ? (
+          {activeDrawTool === "SELECT" ? (
             <div
-              className="absolute left-0 top-0 z-[10] pointer-events-none"
+              className="absolute left-0 top-0 z-[10]"
               style={{
                 right: 86,
                 bottom: 30,
@@ -3780,7 +3859,7 @@ kineticScroll: {
               Jest aktywny tylko w SELECT i ma prawdziwy kursor ns-resize. */}
           {activeDrawTool === "SELECT" ? (
             <div
-              className="absolute right-0 top-0 z-[60]"
+              className="absolute right-0 top-0 z-[45]"
               style={{
                 width: 86,
                 bottom: 30,
@@ -3799,7 +3878,7 @@ kineticScroll: {
 
           {/* Własny uchwyt DOLNEJ OSI CZASU.
               Ostatnie 72 px zostawiamy osi ceny. */}
-          {false && activeDrawTool === "SELECT" ? (
+          {activeDrawTool === "SELECT" ? (
             <div
               className="absolute bottom-0 left-0 z-[45]"
               style={{
@@ -3818,7 +3897,37 @@ kineticScroll: {
             />
           ) : null}
 
-
+          {alphaCrosshair ? (
+            <div className="pointer-events-none absolute inset-0 z-[44] overflow-hidden">
+              <div
+                className="absolute top-0 border-l border-dashed border-slate-200/80"
+                style={{ left: alphaCrosshair.x, bottom: 30 }}
+              />
+              <div
+                className="absolute left-0 border-t border-dashed border-slate-200/80"
+                style={{ top: alphaCrosshair.y, right: 86 }}
+              />
+              <div
+                className="absolute right-0 -translate-y-1/2 rounded bg-slate-600 px-2 py-1 text-[11px] font-bold text-white shadow"
+                style={{ top: alphaCrosshair.y }}
+              >
+                {formatPrice(alphaCrosshair.price, pricePrecision ?? guessPrecision(symbol, alphaCrosshair.price))}
+              </div>
+              <div
+                className="absolute bottom-0 -translate-x-1/2 rounded bg-slate-600 px-2 py-1 text-[11px] font-bold text-white shadow"
+                style={{ left: alphaCrosshair.x }}
+              >
+                {new Date(alphaCrosshair.time * 1000).toLocaleString("pl-PL", {
+                  day: "2-digit",
+                  month: "2-digit",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hour12: false,
+                })}
+              </div>
+            </div>
+          ) : null}
 
           {patternsEnabled && patternLabels.length ? (
             <div className="pointer-events-none absolute inset-0 z-[18] overflow-hidden">
@@ -3906,7 +4015,7 @@ kineticScroll: {
             Drawing tools re-enable the drawing overlay.
           */}
           <div
-            className={`absolute inset-0 z-[40] ${activeDrawTool === "SELECT" ? "pointer-events-none" : "pointer-events-auto"}`}
+            className="absolute inset-0 z-[40] pointer-events-auto"
             style={{
               cursor: activeDrawTool === "SELECT" ? "default" : "crosshair",
             }}
@@ -3916,7 +4025,9 @@ kineticScroll: {
               chartRef={chartRef}
               candleSeriesRef={candleSeriesRef}
               getCandles={() =>
-                rawCacheRef.current.length ? rawCacheRef.current : displayCacheRef.current
+                renko
+                  ? displayCacheRef.current
+                  : (rawCacheRef.current.length ? rawCacheRef.current : displayCacheRef.current)
               }
               activeDrawTool={activeDrawTool}
               onDrawToolChange={onDrawToolChange}
