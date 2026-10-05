@@ -3022,10 +3022,11 @@ kineticScroll: {
 
     // Candles/HA keep the real market-time timeline. This is intentionally after
     // the RENKO early-return above so raw timestamps can never create RENKO gaps.
+    // V3 SMOOTH LIVE: do not rebuild the hidden drawing timeline on every tick.
+    // The live candle only needs the newest timestamp appended/updated. Repeated
+    // setData(safeRaw.map(...)) was rebuilding hundreds of points per market tick.
     try {
-      drawingTimelineSeriesRef.current?.setData(
-        safeRaw.map((c) => ({ time: c.time } as any))
-      );
+      drawingTimelineSeriesRef.current?.update({ time: lc.time } as any);
     } catch {}
 
     if (heikinAshi) {

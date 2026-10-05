@@ -3647,10 +3647,14 @@ if (closedNow.length) {
     };
     const bucketSize = intervalSeconds[tf];
 
-    const applyTick = (price: number, rawTimestamp: number) => {
-      // Collector normally sends milliseconds, but accept seconds too.
-      // This prevents M1/D1 from accidentally creating candles near 1970 when
-      // a provider returns a Unix timestamp in seconds.
+    // V3 SMOOTH LIVE: coalesce a burst of provider ticks into at most one React
+    // state update per animation frame. The newest price is never delayed by a
+    // polling timer and SSE stays fully real-time; this only prevents the huge
+    // scanner page from re-rendering multiple times inside the same browser frame.
+    let rafId: number | null = null;
+    let queuedTick: { price: number; rawTimestamp: number } | null = null;
+
+    const commitTick = (price: number, rawTimestamp: number) => {
       const timestampMs = rawTimestamp < 10_000_000_000 ? rawTimestamp * 1000 : rawTimestamp;
       const tickSeconds = Math.floor(timestampMs / 1000);
       const bucketTime = (Math.floor(tickSeconds / bucketSize) * bucketSize) as UTCTimestamp;
@@ -3681,6 +3685,18 @@ if (closedNow.length) {
       });
     };
 
+    const applyTick = (price: number, rawTimestamp: number) => {
+      queuedTick = { price, rawTimestamp };
+      if (rafId != null) return;
+      rafId = window.requestAnimationFrame(() => {
+        rafId = null;
+        const tick = queuedTick;
+        queuedTick = null;
+        if (!alive || !tick) return;
+        commitTick(tick.price, tick.rawTimestamp);
+      });
+    };
+
     // Live chart data comes directly from the Railway Master Collector over SSE.
     // This replaces the old /api/market_health polling every 500 ms (120 Vercel requests/minute).
     const baseUrl = (process.env.NEXT_PUBLIC_US30_LIVE_URL ?? "").replace(/\/$/, "");
@@ -3704,6 +3720,9 @@ if (closedNow.length) {
     return () => {
       alive = false;
       source?.close();
+      if (rafId != null) window.cancelAnimationFrame(rafId);
+      rafId = null;
+      queuedTick = null;
     };
   }, [selected?.symbol, tf]);
 
