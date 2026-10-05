@@ -48,27 +48,61 @@ function queueDbTick(t: Tick) {
   if (!flushTimer) flushTimer=setTimeout(()=>{ flushTimer=null; void flushDb(); },5000);
 }
 
-async function writeBatch(b: TickBatch) {
-  for (const [interval,size] of frames) {
-    const bucket = new Date(Math.floor(b.timestamp/size)*size);
-    await prisma.$executeRaw`
-      INSERT INTO "MarketCandle" ("id","symbol","interval","bucket","open","high","low","close","ticks","createdAt","updatedAt")
-      VALUES (${crypto.randomUUID()},${b.symbol},${interval},${bucket},${b.open},${b.high},${b.low},${b.close},${b.ticks},NOW(),NOW())
-      ON CONFLICT ("symbol","interval","bucket") DO UPDATE SET
-        "high"=GREATEST("MarketCandle"."high",EXCLUDED."high"),
-        "low"=LEAST("MarketCandle"."low",EXCLUDED."low"),
-        "close"=EXCLUDED."close",
-        "ticks"="MarketCandle"."ticks"+EXCLUDED."ticks",
-        "updatedAt"=NOW();`;
+async function writeBatches(batches: TickBatch[]) {
+  if (!batches.length) return;
+
+  // V4: all symbols x all timeframes are written in ONE PostgreSQL round-trip.
+  // This keeps the exact candle/upsert behaviour while drastically reducing
+  // Railway <-> Supabase Shared Pooler chatter.
+  const rows: Array<{
+    id: string; symbol: string; interval: string; bucket: Date;
+    open: number; high: number; low: number; close: number; ticks: number;
+  }> = [];
+
+  for (const b of batches) {
+    for (const [interval, size] of frames) {
+      rows.push({
+        id: crypto.randomUUID(),
+        symbol: b.symbol,
+        interval,
+        bucket: new Date(Math.floor(b.timestamp / size) * size),
+        open: b.open,
+        high: b.high,
+        low: b.low,
+        close: b.close,
+        ticks: b.ticks,
+      });
+    }
   }
+
+  const params: unknown[] = [];
+  const values = rows.map((r) => {
+    const base = params.length;
+    params.push(r.id, r.symbol, r.interval, r.bucket, r.open, r.high, r.low, r.close, r.ticks);
+    const p = Array.from({ length: 9 }, (_, i) => `$${base + i + 1}`);
+    return `(${p.join(",")},NOW(),NOW())`;
+  }).join(",");
+
+  await prisma.$executeRawUnsafe(
+    `INSERT INTO "MarketCandle" ("id","symbol","interval","bucket","open","high","low","close","ticks","createdAt","updatedAt")
+     VALUES ${values}
+     ON CONFLICT ("symbol","interval","bucket") DO UPDATE SET
+       "high"=GREATEST("MarketCandle"."high",EXCLUDED."high"),
+       "low"=LEAST("MarketCandle"."low",EXCLUDED."low"),
+       "close"=EXCLUDED."close",
+       "ticks"="MarketCandle"."ticks"+EXCLUDED."ticks",
+       "updatedAt"=NOW()`,
+    ...params
+  );
 }
+
 async function flushDb() {
   if (dbWriting) return;
   dbWriting=true;
   try {
     while (pending.size) {
       const batch=[...pending.values()]; pending.clear();
-      for (const b of batch) try { await writeBatch(b); } catch(e:any) { console.error(`[${b.symbol}] DB`,e?.message||e); }
+      try { await writeBatches(batch); } catch(e:any) { console.error(`[MASTER] DB batch (${batch.length} symbols)`,e?.message||e); }
     }
   } finally { dbWriting=false; if (pending.size && !flushTimer) flushTimer=setTimeout(()=>{flushTimer=null;void flushDb();},5000); }
 }
