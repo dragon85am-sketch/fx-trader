@@ -2532,9 +2532,13 @@ kineticScroll: {
 
     // Keep X coordinates anchored to the real candle timeline in every mode.
     // Whitespace data changes only the time scale; it renders no line/price.
+    // Keep one compact logical timeline in RENKO. Feeding every raw candle into a
+    // hidden series creates empty time points between bricks and produces the
+    // visible horizontal gaps. Normal candles/HA still use the raw market timeline.
     try {
+      const timelineData = renko ? safeForChart : safeRaw;
       drawingTimelineSeriesRef.current?.setData(
-        safeRaw.map((c) => ({ time: c.time } as any))
+        timelineData.map((c) => ({ time: c.time } as any))
       );
     } catch {}
 
@@ -2900,13 +2904,6 @@ kineticScroll: {
 
     const safeRaw = rawCacheRef.current;
 
-    // Extend the stable real-time X axis before updating RENKO/HA/CANDLES.
-    try {
-      drawingTimelineSeriesRef.current?.setData(
-        safeRaw.map((c) => ({ time: c.time } as any))
-      );
-    } catch {}
-
     if (renko) {
       if (!safeRaw.length) return;
       // RENKO LIVE: historia Renko może pochodzić z osobnego TF (np. M1),
@@ -2945,6 +2942,7 @@ kineticScroll: {
           ? currentRenkoBox
           : autoRenkoBoxSize(renkoRaw);
       const renkoData = toRenkoCandles(renkoRaw, box);
+      const prevRenko = displayCacheRef.current;
       displayCacheRef.current = renkoData;
 
       const renkoChartData =
@@ -2952,7 +2950,38 @@ kineticScroll: {
           ? highlightRenkoPatternBricks(renkoData)
           : renkoData;
 
-      candleSeries.setData(renkoChartData);
+      // VANTAGE-SMOOTH V2: do not rebuild the whole RENKO series on every tick.
+      // setData() forces Lightweight Charts to rebuild the time scale and was the
+      // main source of lag / viewport kick-back. If history is unchanged, update
+      // only the forming/new bricks. Fall back to setData only after a real rebuild.
+      let canAppend = prevRenko.length > 0 && renkoData.length >= prevRenko.length;
+      if (canAppend) {
+        const stableCount = Math.max(0, prevRenko.length - 1);
+        for (let i = 0; i < stableCount; i++) {
+          if (Number(prevRenko[i]?.time) !== Number(renkoData[i]?.time)) {
+            canAppend = false;
+            break;
+          }
+        }
+      }
+
+      if (canAppend) {
+        const start = Math.max(0, prevRenko.length - 1);
+        for (let i = start; i < renkoChartData.length; i++) {
+          candleSeries.update(renkoChartData[i] as any);
+        }
+      } else {
+        candleSeries.setData(renkoChartData);
+      }
+
+      // In RENKO the hidden timeline must contain bricks only. Raw candle times
+      // would insert whitespace points and visually separate adjacent bricks.
+      try {
+        drawingTimelineSeriesRef.current?.setData(
+          renkoData.map((c) => ({ time: c.time } as any))
+        );
+      } catch {}
+
       lastBarTimeRef.current = renkoData[renkoData.length - 1]?.time as UTCTimestamp;
 
       const lastClose = toNum((renkoData[renkoData.length - 1] as any)?.close);
@@ -2967,6 +2996,14 @@ kineticScroll: {
       }
       return;
     }
+
+    // Candles/HA keep the real market-time timeline. This is intentionally after
+    // the RENKO early-return above so raw timestamps can never create RENKO gaps.
+    try {
+      drawingTimelineSeriesRef.current?.setData(
+        safeRaw.map((c) => ({ time: c.time } as any))
+      );
+    } catch {}
 
     if (heikinAshi) {
       const ha = toHeikinAshi(safeRaw);
@@ -3719,10 +3756,26 @@ kineticScroll: {
                     } catch {}
                   });
                 } else {
-                  // OFF really means OFF: do not let a new tick pull the chart
-                  // back to the live edge until the user enables this button again.
+                  // OFF really means OFF. Freeze the exact logical viewport before
+                  // changing React state, then restore it on the next frame so the
+                  // button itself can never kick the chart left/right.
+                  let frozenRange: { from: number; to: number } | null = null;
+                  try {
+                    const r: any = chartRef.current?.timeScale().getVisibleLogicalRange?.();
+                    if (r && Number.isFinite(Number(r.from)) && Number.isFinite(Number(r.to))) {
+                      frozenRange = { from: Number(r.from), to: Number(r.to) };
+                    }
+                  } catch {}
                   manualPanRef.current = true;
                   setDetached(true);
+                  if (frozenRange) {
+                    requestAnimationFrame(() => {
+                      try {
+                        chartRef.current?.timeScale().setVisibleLogicalRange(frozenRange!);
+                        setOverlayTick((x) => x + 1);
+                      } catch {}
+                    });
+                  }
                 }
 
                 return next;
