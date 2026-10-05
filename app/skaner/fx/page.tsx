@@ -1684,6 +1684,43 @@ function hasCorrectCandleCadence(candles: Candle[], tf: Timeframe): boolean {
   return exact >= Math.ceil(normal.length * 0.5);
 }
 
+async function fetchBatchAutoCandles(
+  symbols: string[],
+  tf: Timeframe
+): Promise<Array<{ symbol: string; candles: Candle[]; volume: number }>> {
+  if (!symbols.length) return [];
+
+  const params = new URLSearchParams({
+    symbols: symbols.join(","),
+    interval: MARKET_INTERVAL[tf],
+    limit: "300",
+  });
+  const res = await fetch(`/api/market/candles?${params.toString()}`, {
+    cache: "no-store",
+    headers: { Accept: "application/json" },
+  });
+  if (!res.ok) throw new Error(`FX Trade Candle batch: ${await res.text()}`);
+
+  const data = await res.json();
+  if (data?.status !== "ok" || !data?.symbols) {
+    throw new Error(data?.message || "Brak danych Candle Engine batch");
+  }
+
+  return symbols.flatMap((symbol) => {
+    const payload = data.symbols[symbol];
+    if (!payload || !Array.isArray(payload.values)) return [];
+    const candles: Candle[] = payload.values
+      .map((v: any) => ({
+        time: Math.floor(new Date(String(v.datetime).replace(" ", "T") + "Z").getTime() / 1000) as UTCTimestamp,
+        open: Number(v.open), high: Number(v.high), low: Number(v.low), close: Number(v.close),
+        volume: Number(v.volume ?? 0),
+      }))
+      .filter((c: Candle) => Number.isFinite(c.time) && Number.isFinite(c.open) && Number.isFinite(c.high) && Number.isFinite(c.low) && Number.isFinite(c.close))
+      .sort((a: Candle, b: Candle) => Number(a.time) - Number(b.time));
+    return [{ symbol, candles, volume: candles.reduce((sum, c) => sum + (c.volume ?? 0), 0) }];
+  });
+}
+
 async function fetchAutoCandles(
   symbol: string,
   tf: Timeframe,
@@ -3249,12 +3286,13 @@ React.useEffect(() => {
           ? instruments.filter((symbol) => masterLiveSymbols.has(symbol.toUpperCase()))
           : [];
 
-        const results = await Promise.allSettled(
-          scanSymbols.map(async (symbol) => {
-            const { candles, volume } = await fetchAutoCandles(symbol, tf, source);
-            return { symbol, candles, volume };
-          })
-        );
+        // V2: load all Market Watch histories in one CDN request.
+        // The API keeps the same 300-candle history per symbol for indicators.
+        const batchRows = await fetchBatchAutoCandles(scanSymbols, tf);
+        const results = batchRows.map((value) => ({
+          status: "fulfilled" as const,
+          value,
+        }));
 
         const metrics: Array<{
           symbol: string;
@@ -3574,7 +3612,7 @@ if (closedNow.length) {
 
     const id = window.setInterval(() => {
       void refreshPoc();
-    }, REFRESH_MS);
+    }, 15 * 60 * 1000);
 
     return () => {
       alive = false;
@@ -3718,10 +3756,10 @@ if (closedNow.length) {
 
     void refreshRenkoCandles();
 
-    // Odświeżenie razem ze skanerem.
+    // SSE drives live price; full alternate-TF Renko history only needs periodic resync.
     const id = window.setInterval(() => {
       void refreshRenkoCandles();
-    }, REFRESH_MS);
+    }, 15 * 60 * 1000);
 
     return () => {
       alive = false;
