@@ -1221,12 +1221,35 @@ fullscreenMode = false,
 
   const [detached, setDetached] = React.useState<boolean>(false);
   const [overlayTick, setOverlayTick] = React.useState(0);
+  // VANTAGE-SMOOTH V3: collapse high-frequency pointer work to one React
+  // update per animation frame. Lightweight Charts itself is updated directly;
+  // React only refreshes overlays at the display refresh rate.
+  const overlayRafRef = React.useRef<number | null>(null);
+  const scheduleOverlayRefresh = React.useCallback(() => {
+    if (overlayRafRef.current != null) return;
+    overlayRafRef.current = requestAnimationFrame(() => {
+      overlayRafRef.current = null;
+      setOverlayTick((v) => v + 1);
+    });
+  }, []);
+
   const [alphaCrosshair, setAlphaCrosshair] = React.useState<{
     x: number;
     y: number;
     price: number;
     time: number;
   } | null>(null);
+  const alphaCrosshairRafRef = React.useRef<number | null>(null);
+  const pendingAlphaCrosshairRef = React.useRef<{ x: number; y: number; price: number; time: number } | null>(null);
+  const queueAlphaCrosshair = React.useCallback((next: { x: number; y: number; price: number; time: number }) => {
+    pendingAlphaCrosshairRef.current = next;
+    if (alphaCrosshairRafRef.current != null) return;
+    alphaCrosshairRafRef.current = requestAnimationFrame(() => {
+      alphaCrosshairRafRef.current = null;
+      const value = pendingAlphaCrosshairRef.current;
+      if (value) setAlphaCrosshair(value);
+    });
+  }, []);
   const lastIndicatorLiveUpdateRef = React.useRef(0);
   const rightOffset = rightPadOn ? 28 : 10;
 
@@ -1829,7 +1852,7 @@ fullscreenMode = false,
     const chart = chartRef.current;
     if (!chart) return;
     chart.applyOptions({ timeScale: { rightOffset } });
-    setOverlayTick((v) => v + 1);
+    scheduleOverlayRefresh();
     if (followOnTick && !detached && !manualPanRef.current) {
       try {
         followLatestBar();
@@ -2377,7 +2400,7 @@ kineticScroll: {
 
     const onRangeChange = () => {
       try {
-        setOverlayTick((v) => v + 1);
+        scheduleOverlayRefresh();
 
         // Boxy są HTML/SVG overlayem, więc lightweight-charts nie przesuwa ich
         // automatycznie razem ze świecami. Przy każdym pan/zoom/fit przeliczamy
@@ -2424,7 +2447,7 @@ kineticScroll: {
 
     const ro = new ResizeObserver(() => {
       chart.applyOptions({ width: el.clientWidth || 800, height });
-      setOverlayTick((v) => v + 1);
+      scheduleOverlayRefresh();
       requestAnimationFrame(onRangeChange);
     });
     ro.observe(el);
@@ -2570,7 +2593,7 @@ kineticScroll: {
       requestAnimationFrame(() => {
         try {
           ts.setVisibleRange?.(viewportBeforeModeChange);
-          setOverlayTick((v) => v + 1);
+          scheduleOverlayRefresh();
         } catch {}
       });
     }
@@ -3042,7 +3065,7 @@ kineticScroll: {
       applyIndicators(ds, prec, minMove);
       // Heavy overlays/pattern geometry do not need to recompute on every market tick.
       // Refresh them together with indicators (max 4x/s); the candle itself still uses update().
-      setOverlayTick((v) => v + 1);
+      scheduleOverlayRefresh();
     }
 
     if (followOnTick && !detached && !manualPanRef.current) {
@@ -3248,7 +3271,7 @@ kineticScroll: {
           autoScale: true,
         });
 
-        setOverlayTick((v) => v + 1);
+        scheduleOverlayRefresh();
 
         e.preventDefault();
         e.stopPropagation();
@@ -3284,7 +3307,7 @@ kineticScroll: {
         autoScale: true,
       });
 
-      setOverlayTick((v) => v + 1);
+      scheduleOverlayRefresh();
     } catch {}
   }, []);
 
@@ -3338,7 +3361,7 @@ kineticScroll: {
           to: center + span / 2,
         });
 
-        setOverlayTick((v) => v + 1);
+        scheduleOverlayRefresh();
         e.preventDefault();
         e.stopPropagation();
       } catch {}
@@ -3365,9 +3388,39 @@ kineticScroll: {
       manualPanRef.current = true;
       setDetached(true);
       setFollowOnTick(false);
-      setOverlayTick((v) => v + 1);
+      scheduleOverlayRefresh();
     } catch {}
   }, []);
+
+  // CENTER VIEW: one-shot reset similar to broker/TradingView chart controls.
+  // It never changes drawing anchors and it never toggles Follow Live.
+  const centerChartView = React.useCallback(() => {
+    const chart = chartRef.current;
+    const series = candleSeriesRef.current;
+    const data = displayCacheRef.current;
+    if (!chart || !series || !data?.length) return;
+
+    try {
+      const ts: any = chart.timeScale();
+      const lastIndex = Math.max(0, data.length - 1);
+      const visibleBars = Math.min(110, Math.max(40, data.length));
+      const futureBars = Math.max(10, Math.round(visibleBars * 0.20));
+      const to = lastIndex + futureBars;
+      ts.setVisibleLogicalRange?.({ from: to - visibleBars, to });
+
+      // Remove any manual Y transform left by price-axis dragging/panning and
+      // let Lightweight Charts fit the newly visible market range.
+      series.applyOptions({ autoscaleInfoProvider: undefined } as any);
+      chart.priceScale("right").applyOptions({ autoScale: true });
+
+      // Center is a one-shot action: preserve current Follow Live state.
+      if (!followOnTick || detached || manualPanRef.current) {
+        manualPanRef.current = true;
+        setDetached(true);
+      }
+      scheduleOverlayRefresh();
+    } catch {}
+  }, [detached, followOnTick, scheduleOverlayRefresh]);
 
   const beginPlotPan = React.useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (activeDrawTool !== "SELECT") return;
@@ -3469,7 +3522,7 @@ kineticScroll: {
       } else {
         time = Number(cc[0].time) + logical * step;
       }
-      setAlphaCrosshair({ x, y, price, time });
+      queueAlphaCrosshair({ x, y, price, time });
     } catch {}
   }, []);
 
@@ -3510,7 +3563,7 @@ kineticScroll: {
         }
 
         if (Number.isFinite(price) && Number.isFinite(time)) {
-          setAlphaCrosshair({ x, y, price, time });
+          queueAlphaCrosshair({ x, y, price, time });
         }
       } catch {}
     }
@@ -3571,7 +3624,7 @@ kineticScroll: {
         chart.priceScale("right").applyOptions({ autoScale: true });
       }
 
-      setOverlayTick((v) => v + 1);
+      scheduleOverlayRefresh();
       e.preventDefault();
       e.stopPropagation();
     } catch {}
@@ -3672,7 +3725,7 @@ kineticScroll: {
         chart.priceScale("right").applyOptions({ autoScale: true });
       }
 
-      setOverlayTick((v) => v + 1);
+      scheduleOverlayRefresh();
       e.preventDefault();
       e.stopPropagation();
     } catch {}
@@ -3712,7 +3765,7 @@ kineticScroll: {
       const nextTo = nextFrom + nextSpan;
 
       ts.setVisibleLogicalRange?.({ from: nextFrom, to: nextTo });
-      setOverlayTick((v) => v + 1);
+      scheduleOverlayRefresh();
 
       e.preventDefault();
       e.stopPropagation();
@@ -3772,7 +3825,7 @@ kineticScroll: {
                     requestAnimationFrame(() => {
                       try {
                         chartRef.current?.timeScale().setVisibleLogicalRange(frozenRange!);
-                        setOverlayTick((x) => x + 1);
+                        scheduleOverlayRefresh();
                       } catch {}
                     });
                   }
@@ -3805,7 +3858,7 @@ kineticScroll: {
                   chartRef.current?.applyOptions({
                     timeScale: { rightOffset: next ? 28 : 10 },
                   });
-                  setOverlayTick((x) => x + 1);
+                  scheduleOverlayRefresh();
                   if (followOnTick && !detached && !manualPanRef.current) {
                     requestAnimationFrame(() => followLatestBar());
                   }
@@ -3825,6 +3878,20 @@ kineticScroll: {
               <path d="M9 5v14M11 12h16m-12-4-4 4 4 4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
               <path d="M23 7v10M27 4v16M31 8v8" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
               <path d="M21 10h4v4h-4zM25 7h4v8h-4zM29 10h4v4h-4z" fill="currentColor" opacity=".35" />
+            </svg>
+          </button>
+
+          <button
+            type="button"
+            onClick={centerChartView}
+            aria-label="Wycentruj wykres"
+            className="flex h-8 w-9 items-center justify-center rounded-md border border-violet-400/35 bg-violet-500/10 text-violet-300 transition hover:border-violet-300/60 hover:bg-violet-500/20 hover:text-white"
+            title="Wycentruj wykres"
+          >
+            <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true">
+              <circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" strokeWidth="1.7" />
+              <circle cx="12" cy="12" r="1.6" fill="currentColor" />
+              <path d="M12 2v4M12 18v4M2 12h4M18 12h4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
             </svg>
           </button>
         </div>

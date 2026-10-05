@@ -1268,18 +1268,21 @@ if (o.type === "FIBO") {
   // hit-testing and React updates at most once per animation frame (~60 FPS).
   const lastMouseMoveAtRef = React.useRef(0);
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  // VANTAGE-SMOOTH V4: the browser may deliver 100-500 mousemove events/sec.
+  // Keep only the newest pointer sample and render once per display frame.
+  // This keeps BOX/drag/pan visually glued to the pointer without flooding React.
+  const processMouseMove = (clientX: number, clientY: number, canvas: HTMLCanvasElement) => {
     lastMouseMoveAtRef.current = performance.now();
-    const rect = e.currentTarget.getBoundingClientRect();
-    const localX = e.clientX - rect.left;
-    const localY = e.clientY - rect.top;
+    const rect = canvas.getBoundingClientRect();
+    const localX = clientX - rect.left;
+    const localY = clientY - rect.top;
     const p = pointToData(localX, localY);
 
     if (!p) return;
 
     if (activeDrawTool === "SELECT" && !isMouseDownRef.current) {
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
+      const x = clientX - rect.left;
+      const y = clientY - rect.top;
       const hit = findHitHandle(x, y)?.id ?? findHitObject(x, y);
       setHoverIdFast(hit);
     }
@@ -1292,17 +1295,17 @@ if (o.type === "FIBO") {
       const chart = chartRef.current;
 
       if (chart) {
-        const dx = e.clientX - chartPanRef.current.lastClientX;
-        const dy = e.clientY - chartPanRef.current.lastClientY;
-        chartPanRef.current.lastClientX = e.clientX;
-        chartPanRef.current.lastClientY = e.clientY;
+        const dx = clientX - chartPanRef.current.lastClientX;
+        const dy = clientY - chartPanRef.current.lastClientY;
+        chartPanRef.current.lastClientX = clientX;
+        chartPanRef.current.lastClientY = clientY;
 
         try {
           const timeScale = chart.timeScale();
           const range = timeScale.getVisibleLogicalRange();
 
           if (range) {
-            const canvasWidth = e.currentTarget.clientWidth || 1;
+            const canvasWidth = canvas.clientWidth || 1;
             const logicalPerPixel = (range.to - range.from) / canvasWidth;
             const shift = -dx * logicalPerPixel;
 
@@ -1319,7 +1322,7 @@ if (o.type === "FIBO") {
           const max = chartPanRef.current.priceMax;
 
           if (series && min != null && max != null && max > min) {
-            const canvasHeight = e.currentTarget.clientHeight || 1;
+            const canvasHeight = canvas.clientHeight || 1;
             const span = max - min;
             const priceShift = (dy / canvasHeight) * span;
             const nextMin = min + priceShift;
@@ -1347,8 +1350,8 @@ if (o.type === "FIBO") {
       const id = dragRef.current.id;
       const mode = dragRef.current.mode;
       const startObj = dragRef.current.startObj;
-      const dx = e.clientX - dragRef.current.startClientX;
-      const dy = e.clientY - dragRef.current.startClientY;
+      const dx = clientX - dragRef.current.startClientX;
+      const dy = clientY - dragRef.current.startClientY;
 
       if (startObj) {
         const movePoint = (pt: Point): Point | null => {
@@ -1493,6 +1496,26 @@ if (o.type === "FIBO") {
       draw();
     }
   };
+
+
+  const pointerMoveRafRef = React.useRef<number | null>(null);
+  const pendingPointerRef = React.useRef<{ clientX: number; clientY: number; canvas: HTMLCanvasElement } | null>(null);
+
+  const handleMouseMove = React.useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    pendingPointerRef.current = {
+      clientX: e.clientX,
+      clientY: e.clientY,
+      canvas: e.currentTarget,
+    };
+    if (pointerMoveRafRef.current != null) return;
+    pointerMoveRafRef.current = requestAnimationFrame(() => {
+      pointerMoveRafRef.current = null;
+      const next = pendingPointerRef.current;
+      pendingPointerRef.current = null;
+      if (!next) return;
+      processMouseMove(next.clientX, next.clientY, next.canvas);
+    });
+  }, [activeDrawTool, draft, hoverId]);
 
   const handleMouseUp = () => {
     isMouseDownRef.current = false;
@@ -1750,6 +1773,8 @@ if (o.type === "FIBO") {
   className="absolute inset-0 z-[20]"
   style={{
     pointerEvents: "auto",
+    touchAction: "none",
+    willChange: "transform",
     // Bez „łapki”. SELECT ma taki sam kursor/crosshair jak Alpha.
     cursor: activeDrawTool === "SELECT"
       ? dragRef.current.id || chartPanRef.current.active
@@ -1758,7 +1783,6 @@ if (o.type === "FIBO") {
           ? "grab"
           : "crosshair"
       : "crosshair",
-    touchAction: "none",
   }}
   onWheel={(e) => {
     e.preventDefault();
