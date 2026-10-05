@@ -2754,7 +2754,7 @@ export default function MarketScannerPage() {
     };
 
     void refreshMasterHealth();
-    const id = window.setInterval(() => void refreshMasterHealth(), 15_000);
+    const id = window.setInterval(() => void refreshMasterHealth(), 60_000);
 
     return () => {
       alive = false;
@@ -2830,29 +2830,10 @@ React.useEffect(() => {
 
     const syncCentralTrades = async () => {
       try {
-        const [activeRes, closedRes] = await Promise.all([
-          fetch("/api/fx-scanner/trades?status=ACTIVE&limit=300", { cache: "no-store" }),
-          fetch("/api/fx-scanner/trades?status=CLOSED&limit=1000", { cache: "no-store" }),
-        ]);
-        if (!activeRes.ok || !closedRes.ok) return;
+        const activeRes = await fetch("/api/fx-scanner/trades?status=ACTIVE&limit=300", { cache: "no-store" });
+        if (!activeRes.ok) return;
         const activeJson = await activeRes.json();
-        const closedJson = await closedRes.json();
         if (!alive) return;
-
-        const closed: ClosedTrade[] = (closedJson.trades ?? []).map((t: any) => ({
-          id: t.id,
-          date: t.signalTime,
-          closedAt: t.closedAt,
-          instrument: t.instrument,
-          direction: t.side,
-          tf: t.tf,
-          entry: Number(t.entry),
-          tp1: Number(t.tp1), tp2: Number(t.tp2), tp3: Number(t.tp3),
-          sl: Number(t.sl),
-          status: t.status,
-          tp1Hit: !!t.tp1Hit, tp2Hit: !!t.tp2Hit, tp3Hit: !!t.tp3Hit,
-        }));
-        setClosedTrades(closed);
 
         const activeBySymbol = new Map<string, any>();
         for (const t of activeJson.trades ?? []) {
@@ -2878,9 +2859,31 @@ React.useEffect(() => {
       } catch {}
     };
 
+    const syncClosedTrades = async () => {
+      try {
+        const res = await fetch("/api/fx-scanner/trades?status=CLOSED&limit=1000", { cache: "no-store" });
+        if (!res.ok) return;
+        const json = await res.json();
+        if (!alive) return;
+        const closed: ClosedTrade[] = (json.trades ?? []).map((t: any) => ({
+          id: t.id, date: t.signalTime, closedAt: t.closedAt, instrument: t.instrument,
+          direction: t.side, tf: t.tf, entry: Number(t.entry),
+          tp1: Number(t.tp1), tp2: Number(t.tp2), tp3: Number(t.tp3), sl: Number(t.sl),
+          status: t.status, tp1Hit: !!t.tp1Hit, tp2Hit: !!t.tp2Hit, tp3Hit: !!t.tp3Hit,
+        }));
+        setClosedTrades(closed);
+      } catch {}
+    };
+
     void syncCentralTrades();
-    const id = window.setInterval(syncCentralTrades, 15_000);
-    return () => { alive = false; window.clearInterval(id); };
+    void syncClosedTrades();
+    const activeId = window.setInterval(syncCentralTrades, 30_000);
+    const closedId = window.setInterval(syncClosedTrades, 300_000);
+    return () => {
+      alive = false;
+      window.clearInterval(activeId);
+      window.clearInterval(closedId);
+    };
   }, [tf]);
 
   React.useEffect(() => {
@@ -3640,29 +3643,29 @@ if (closedNow.length) {
       });
     };
 
-    const refreshLiveTick = async () => {
-      try {
-        const res = await fetch("/api/market_health", { cache: "no-store" });
-        if (!res.ok) return;
-        const data = await res.json();
-        const rawTick = data?.latestTicks?.[symbol];
-        const price = Number(rawTick?.price);
-        const timestampMs = Number(rawTick?.timestamp);
-        if (!alive || !Number.isFinite(price) || price <= 0 || !Number.isFinite(timestampMs)) return;
-        applyTick(price, timestampMs);
-      } catch {
-        // A temporary health failure must not break the chart.
-      }
-    };
+    // Live chart data comes directly from the Railway Master Collector over SSE.
+    // This replaces the old /api/market_health polling every 500 ms (120 Vercel requests/minute).
+    const baseUrl = (process.env.NEXT_PUBLIC_US30_LIVE_URL ?? "").replace(/\/$/, "");
+    let source: EventSource | null = null;
 
-    void refreshLiveTick();
-    // Price tick stays at 500 ms. Candle boundaries are derived from the tick timestamp:
-    // M1 -> a new OHLC candle every 60 s, D1 -> a new OHLC candle every UTC day.
-    const id = window.setInterval(() => void refreshLiveTick(), 500);
+    if (baseUrl) {
+      source = new EventSource(`${baseUrl}/api/market/${symbol.toLowerCase()}/stream`);
+      source.addEventListener("tick", (event) => {
+        try {
+          const rawTick = JSON.parse((event as MessageEvent).data);
+          const price = Number(rawTick?.price);
+          const timestampMs = Number(rawTick?.timestamp);
+          if (!alive || !Number.isFinite(price) || price <= 0 || !Number.isFinite(timestampMs)) return;
+          applyTick(price, timestampMs);
+        } catch {
+          // Ignore a malformed tick; EventSource will keep the stream alive/reconnect automatically.
+        }
+      });
+    }
 
     return () => {
       alive = false;
-      window.clearInterval(id);
+      source?.close();
     };
   }, [selected?.symbol, tf]);
 

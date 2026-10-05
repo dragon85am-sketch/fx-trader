@@ -45,7 +45,7 @@ function queueDbTick(t: Tick) {
   const p = pending.get(t.symbol);
   if (!p) pending.set(t.symbol,{symbol:t.symbol,open:t.price,high:t.price,low:t.price,close:t.price,timestamp:t.timestamp,ticks:1});
   else { p.high=Math.max(p.high,t.price); p.low=Math.min(p.low,t.price); p.close=t.price; p.timestamp=t.timestamp; p.ticks+=1; }
-  if (!flushTimer) flushTimer=setTimeout(()=>{ flushTimer=null; void flushDb(); },250);
+  if (!flushTimer) flushTimer=setTimeout(()=>{ flushTimer=null; void flushDb(); },5000);
 }
 
 async function writeBatch(b: TickBatch) {
@@ -70,7 +70,7 @@ async function flushDb() {
       const batch=[...pending.values()]; pending.clear();
       for (const b of batch) try { await writeBatch(b); } catch(e:any) { console.error(`[${b.symbol}] DB`,e?.message||e); }
     }
-  } finally { dbWriting=false; if (pending.size && !flushTimer) flushTimer=setTimeout(()=>{flushTimer=null;void flushDb();},250); }
+  } finally { dbWriting=false; if (pending.size && !flushTimer) flushTimer=setTimeout(()=>{flushTimer=null;void flushDb();},5000); }
 }
 
 function broadcastTick(t: Tick) {
