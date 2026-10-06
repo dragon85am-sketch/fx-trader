@@ -1,6 +1,6 @@
 "use client";
 
-// FX TRADE VANTAGE-SMOOTH V1: stable RENKO geometry + shared append-only X timeline.
+// FX TRADE VANTAGE-SMOOTH V5.1: stable viewport/RENKO + low-latency interaction.
 
 import React from "react";
 import DrawingsLayer, { type DrawTool, type TradeZoneCanvasSpec } from "./DrawingsLayer";

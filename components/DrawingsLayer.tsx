@@ -1,6 +1,6 @@
 "use client";
 
-// FX TRADE VANTAGE-SMOOTH V1: canvas-hot-path drawing + stable RENKO anchors.
+// FX TRADE VANTAGE-SMOOTH V5.1: low-latency canvas interaction + stable RENKO anchors.
 
 import React from "react";
 import {
@@ -506,8 +506,9 @@ React.useEffect(() => {
   function findHitHandle(x: number, y: number) {
     const mouse = { x, y };
 
-    for (let i = objs.length - 1; i >= 0; i--) {
-      const o = objs[i];
+    const hitObjs = objsRef.current;
+    for (let i = hitObjs.length - 1; i >= 0; i--) {
+      const o = hitObjs[i];
 
       if (
         o.type === "TREND" ||
@@ -537,8 +538,9 @@ React.useEffect(() => {
   function findHitObject(x: number, y: number) {
     const mouse = { x, y };
 
-    for (let i = objs.length - 1; i >= 0; i--) {
-      const o = objs[i];
+    const hitObjs = objsRef.current;
+    for (let i = hitObjs.length - 1; i >= 0; i--) {
+      const o = hitObjs[i];
 
       if (o.type === "HLINE") {
         const yy = candleSeriesRef.current?.priceToCoordinate(o.price);
@@ -1183,7 +1185,7 @@ if (o.type === "FIBO") {
 
       try {
         const chart = chartRef.current;
-        const candles = getCandles();
+        const candles = candlesCacheRef.current;
         const range = chart?.timeScale().getVisibleLogicalRange();
 
         if (range && candles.length) {
@@ -1268,7 +1270,7 @@ if (o.type === "FIBO") {
   // hit-testing and React updates at most once per animation frame (~60 FPS).
   const lastMouseMoveAtRef = React.useRef(0);
 
-  // VANTAGE-SMOOTH V4: the browser may deliver 100-500 mousemove events/sec.
+  // VANTAGE-SMOOTH V5.1: the browser may deliver 100-500 mousemove events/sec.
   // Keep only the newest pointer sample and render once per display frame.
   // This keeps BOX/drag/pan visually glued to the pointer without flooding React.
   const processMouseMove = (clientX: number, clientY: number, canvas: HTMLCanvasElement) => {
@@ -1276,10 +1278,10 @@ if (o.type === "FIBO") {
     const rect = canvas.getBoundingClientRect();
     const localX = clientX - rect.left;
     const localY = clientY - rect.top;
-    const p = pointToData(localX, localY);
 
-    if (!p) return;
-
+    // V5.1: chart pan does not need X->time / Y->price conversion. Keep that
+    // expensive work out of the hottest path and resolve a data point only when
+    // a drawing tool or drawing drag actually needs it.
     if (activeDrawTool === "SELECT" && !isMouseDownRef.current) {
       const x = clientX - rect.left;
       const y = clientY - rect.top;
@@ -1313,7 +1315,8 @@ if (o.type === "FIBO") {
               from: range.from + shift,
               to: range.to + shift,
             });
-            requestAnimationFrame(draw);
+            // visibleLogicalRange subscription redraws the overlay once; do not
+            // schedule a second canvas frame here.
           }
 
           // PAN Y: przesuwanie wykresu góra/dół myszką w pustym miejscu.
@@ -1345,6 +1348,9 @@ if (o.type === "FIBO") {
 
       return;
     }
+
+    const p = pointToData(localX, localY);
+    if (!p) return;
 
     if (activeDrawTool === "SELECT" && dragRef.current.id && dragRef.current.last) {
       const id = dragRef.current.id;
@@ -1381,7 +1387,7 @@ if (o.type === "FIBO") {
             // pan/zoom powodowało to "latanie" i zmianę szerokości RECT/FIBO.
             const chart = chartRef.current;
             const series = candleSeriesRef.current;
-            const candles = getCandles();
+            const candles = candlesCacheRef.current;
             const ts = chart?.timeScale();
 
             const startLocalX = dragRef.current.startClientX - rect.left;
@@ -1444,7 +1450,7 @@ if (o.type === "FIBO") {
             if (startObj.type === "VLINE") {
               if (!candles.length) return o;
               const idx = indexForTime(startObj.t);
-              const next = Math.max(0, Math.min(candles.length - 1, idx + barDelta));
+              const next = Math.max(0, Math.min(candles.length - 1, Math.round(idx + barDelta)));
               return { ...o, t: candles[next].time as UTCTimestamp } as AnyObj;
             }
 
