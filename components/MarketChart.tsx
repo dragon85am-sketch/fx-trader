@@ -1118,6 +1118,29 @@ fullscreenMode = false,
     priceMax: number;
   } | null>(null);
   const manualPanRef = React.useRef(false);
+  // VANTAGE-SMOOTH V5: live ticks must never rebuild the hidden X timeline.
+  // Rebuilding it with setData() can recalculate logical indexes and kick a
+  // manually positioned viewport backwards. Keep only the last published time.
+  const drawingTimelineLastTimeRef = React.useRef<number | null>(null);
+
+  const snapshotLogicalViewport = React.useCallback(() => {
+    try {
+      const r: any = chartRef.current?.timeScale().getVisibleLogicalRange?.();
+      if (r && Number.isFinite(Number(r.from)) && Number.isFinite(Number(r.to))) {
+        return { from: Number(r.from), to: Number(r.to) };
+      }
+    } catch {}
+    return null;
+  }, []);
+
+  const restoreLogicalViewport = React.useCallback((range: { from: number; to: number } | null) => {
+    if (!range) return;
+    requestAnimationFrame(() => {
+      try {
+        chartRef.current?.timeScale().setVisibleLogicalRange(range);
+      } catch {}
+    });
+  }, []);
 
   // TOUCH: dwa palce na środku wykresu.
   // - przesunięcie obu palców góra/dół = PAN ceny Y
@@ -2563,6 +2586,9 @@ kineticScroll: {
       drawingTimelineSeriesRef.current?.setData(
         timelineData.map((c) => ({ time: c.time } as any))
       );
+      drawingTimelineLastTimeRef.current = timelineData.length
+        ? Number(timelineData[timelineData.length - 1].time)
+        : null;
     } catch {}
 
     const chartData =
@@ -2994,15 +3020,29 @@ kineticScroll: {
           candleSeries.update(renkoChartData[i] as any);
         }
       } else {
+        // A real RENKO rebuild is rare, but setData() can recalculate the logical
+        // scale. When Follow Live is OFF preserve the user's exact X viewport.
+        const lockedViewport = (!followOnTick || detached || manualPanRef.current)
+          ? snapshotLogicalViewport()
+          : null;
         candleSeries.setData(renkoChartData);
+        restoreLogicalViewport(lockedViewport);
       }
 
-      // In RENKO the hidden timeline must contain bricks only. Raw candle times
-      // would insert whitespace points and visually separate adjacent bricks.
+      // V5: never call setData() on the hidden timeline for every market tick.
+      // Publish only new/final RENKO time points. This removes the remaining
+      // time-scale rebuild that could pull the chart back while the user pans.
       try {
-        drawingTimelineSeriesRef.current?.setData(
-          renkoData.map((c) => ({ time: c.time } as any))
-        );
+        const timeline = drawingTimelineSeriesRef.current;
+        if (timeline && renkoData.length) {
+          const start = Math.max(0, prevRenko.length - 1);
+          for (let i = start; i < renkoData.length; i++) {
+            const t = Number(renkoData[i].time);
+            if (!Number.isFinite(t)) continue;
+            timeline.update({ time: renkoData[i].time } as any);
+            drawingTimelineLastTimeRef.current = t;
+          }
+        }
       } catch {}
 
       lastBarTimeRef.current = renkoData[renkoData.length - 1]?.time as UTCTimestamp;
@@ -3020,19 +3060,25 @@ kineticScroll: {
       return;
     }
 
-    // Candles/HA keep the real market-time timeline. This is intentionally after
-    // the RENKO early-return above so raw timestamps can never create RENKO gaps.
-    // V3 SMOOTH LIVE: do not rebuild the hidden drawing timeline on every tick.
-    // The live candle only needs the newest timestamp appended/updated. Repeated
-    // setData(safeRaw.map(...)) was rebuilding hundreds of points per market tick.
+    // Candles/HA: live ticks update only the newest hidden time point. Rebuilding
+    // the complete whitespace series on every tick can move the logical viewport.
     try {
-      drawingTimelineSeriesRef.current?.update({ time: lc.time } as any);
+      const lastRaw = safeRaw[safeRaw.length - 1];
+      if (lastRaw && drawingTimelineSeriesRef.current) {
+        const t = Number(lastRaw.time);
+        drawingTimelineSeriesRef.current.update({ time: lastRaw.time } as any);
+        if (Number.isFinite(t)) drawingTimelineLastTimeRef.current = t;
+      }
     } catch {}
 
     if (heikinAshi) {
       const ha = toHeikinAshi(safeRaw);
       displayCacheRef.current = ha;
+      const lockedViewport = (!followOnTick || detached || manualPanRef.current)
+        ? snapshotLogicalViewport()
+        : null;
       candleSeries.setData(ha);
+      restoreLogicalViewport(lockedViewport);
       lastBarTimeRef.current = ha[ha.length - 1]?.time as UTCTimestamp;
 
       const lastClose = toNum((ha[ha.length - 1] as any)?.close);
@@ -3087,6 +3133,8 @@ kineticScroll: {
     applyIndicators,
     pricePrecision,
     followLatestBar,
+    snapshotLogicalViewport,
+    restoreLogicalViewport,
   ]);
 
   const bandStyle = (kind: "TP1" | "TP2" | "TP3" | "SL" | "ENTRY") => {
