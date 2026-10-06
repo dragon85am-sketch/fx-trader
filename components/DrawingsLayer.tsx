@@ -237,6 +237,8 @@ React.useEffect(() => {
   });
 
   const drawingPathRef = React.useRef<Point[]>([]);
+  // V5.2 BRUSH: screen-space sampling keeps freehand strokes light and smooth.
+  const lastBrushScreenRef = React.useRef<{ x: number; y: number } | null>(null);
   const isMouseDownRef = React.useRef(false);
 
   // SELECT mode:
@@ -1240,6 +1242,7 @@ if (o.type === "FIBO") {
 
     if (activeDrawTool === "PATH" || activeDrawTool === "BRUSH") {
       drawingPathRef.current = [p];
+      lastBrushScreenRef.current = { x, y };
       return;
     }
 
@@ -1498,8 +1501,14 @@ if (o.type === "FIBO") {
       isMouseDownRef.current &&
       (activeDrawTool === "PATH" || activeDrawTool === "BRUSH")
     ) {
-      drawingPathRef.current.push(p);
-      draw();
+      const last = lastBrushScreenRef.current;
+      const minPx = activeDrawTool === "BRUSH" ? 1.5 : 2.5;
+      const moved = !last || Math.hypot(localX - last.x, localY - last.y) >= minPx;
+      if (moved) {
+        drawingPathRef.current.push(p);
+        lastBrushScreenRef.current = { x: localX, y: localY };
+        draw();
+      }
     }
   };
 
@@ -1525,6 +1534,7 @@ if (o.type === "FIBO") {
 
   const handleMouseUp = () => {
     isMouseDownRef.current = false;
+    lastBrushScreenRef.current = null;
 
     if (dragDirtyRef.current) {
       dragDirtyRef.current = false;
