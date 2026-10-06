@@ -241,6 +241,10 @@ React.useEffect(() => {
   const lastBrushScreenRef = React.useRef<{ x: number; y: number } | null>(null);
   // V5.3: lightweight screen-space preview while moving an existing drawing.
   const fastDragPreviewRef = React.useRef<{ id: string; dx: number; dy: number } | null>(null);
+  // V5.4: cache the static overlay once at drag start. During BOX/BRUSH/PATH move
+  // we only blit this bitmap + draw the moving object, avoiding a full redraw of
+  // every drawing/trade-zone on each animation frame.
+  const fastDragStaticCanvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const isMouseDownRef = React.useRef(false);
 
   // SELECT mode:
@@ -914,14 +918,26 @@ if (o.type === "FIBO") {
 
     ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
 
-    drawTradeZones(ctx);
     const fastPreview = fastDragPreviewRef.current;
-    objsRef.current.forEach((o) => {
-      if (fastPreview && o.id === fastPreview.id) {
+    const staticCanvas = fastDragStaticCanvasRef.current;
+    if (fastPreview && staticCanvas) {
+      // Pixel-perfect cached background. Reset transform only for the bitmap copy,
+      // then restore CSS-pixel transform for the moving drawing.
+      const dpr = window.devicePixelRatio || 1;
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(staticCanvas, 0, 0);
+      ctx.restore();
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const moving = objsRef.current.find((o) => o.id === fastPreview.id);
+      if (moving) {
         ctx.save(); ctx.translate(fastPreview.dx, fastPreview.dy);
-        drawObject(ctx, o, true); ctx.restore();
-      } else drawObject(ctx, o, o.id === selectedId || o.id === hoverId);
-    });
+        drawObject(ctx, moving, true); ctx.restore();
+      }
+    } else {
+      drawTradeZones(ctx);
+      objsRef.current.forEach((o) => drawObject(ctx, o, o.id === selectedId || o.id === hoverId));
+    }
 
     if (draft && previewRef.current && TWO_POINT_TOOLS.includes(activeDrawTool)) {
       drawObject(ctx, {
@@ -1109,6 +1125,26 @@ if (o.type === "FIBO") {
     setObjs(next);
   };
 
+  const prepareFastDragStatic = React.useCallback((movingId: string) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    let off = fastDragStaticCanvasRef.current;
+    if (!off) off = document.createElement("canvas");
+    off.width = canvas.width;
+    off.height = canvas.height;
+    fastDragStaticCanvasRef.current = off;
+    const octx = off.getContext("2d");
+    if (!octx) return;
+    octx.setTransform(1, 0, 0, 1, 0, 0);
+    octx.clearRect(0, 0, off.width, off.height);
+    octx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawTradeZones(octx);
+    objsRef.current.forEach((o) => {
+      if (o.id !== movingId) drawObject(octx, o, o.id === selectedId || o.id === hoverId);
+    });
+  }, [drawTradeZones, drawObject, selectedId, hoverId]);
+
   const makeBase = (type: DrawTool): BaseObj => ({
     id: crypto.randomUUID(),
     type,
@@ -1164,8 +1200,12 @@ if (o.type === "FIBO") {
           mode: "move",
           startClientX: e.clientX,
           startClientY: e.clientY,
-          startObj: objs.find((o) => o.id === hitId) ?? null,
+          startObj: objsRef.current.find((o) => o.id === hitId) ?? null,
         };
+        const movingObj = dragRef.current.startObj;
+        if (movingObj && (movingObj.type === "RECT" || movingObj.type === "BRUSH" || movingObj.type === "PATH")) {
+          prepareFastDragStatic(hitId);
+        }
 
         chartPanRef.current = {
           active: false,
@@ -1575,6 +1615,7 @@ if (o.type === "FIBO") {
         return o;
       });
       fastDragPreviewRef.current = null;
+      fastDragStaticCanvasRef.current = null;
       dragDirtyRef.current = true;
     }
 
@@ -1583,6 +1624,8 @@ if (o.type === "FIBO") {
       // One React/storage commit after the drag is finished.
       setObjs([...objsRef.current]);
     }
+
+    fastDragStaticCanvasRef.current = null;
 
     chartPanRef.current = {
       active: false,
