@@ -239,6 +239,8 @@ React.useEffect(() => {
   const drawingPathRef = React.useRef<Point[]>([]);
   // V5.2 BRUSH: screen-space sampling keeps freehand strokes light and smooth.
   const lastBrushScreenRef = React.useRef<{ x: number; y: number } | null>(null);
+  // V5.3: lightweight screen-space preview while moving an existing drawing.
+  const fastDragPreviewRef = React.useRef<{ id: string; dx: number; dy: number } | null>(null);
   const isMouseDownRef = React.useRef(false);
 
   // SELECT mode:
@@ -913,7 +915,13 @@ if (o.type === "FIBO") {
     ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
 
     drawTradeZones(ctx);
-    objsRef.current.forEach((o) => drawObject(ctx, o, o.id === selectedId || o.id === hoverId));
+    const fastPreview = fastDragPreviewRef.current;
+    objsRef.current.forEach((o) => {
+      if (fastPreview && o.id === fastPreview.id) {
+        ctx.save(); ctx.translate(fastPreview.dx, fastPreview.dy);
+        drawObject(ctx, o, true); ctx.restore();
+      } else drawObject(ctx, o, o.id === selectedId || o.id === hoverId);
+    });
 
     if (draft && previewRef.current && TWO_POINT_TOOLS.includes(activeDrawTool)) {
       drawObject(ctx, {
@@ -1352,6 +1360,14 @@ if (o.type === "FIBO") {
       return;
     }
 
+    if (activeDrawTool === "SELECT" && dragRef.current.id && dragRef.current.last) {
+      const startObj = dragRef.current.startObj;
+      if (dragRef.current.mode === "move" && startObj && (startObj.type === "RECT" || startObj.type === "BRUSH" || startObj.type === "PATH")) {
+        fastDragPreviewRef.current = { id: startObj.id, dx: clientX - dragRef.current.startClientX, dy: clientY - dragRef.current.startClientY };
+        dragDirtyRef.current = true; draw(); return;
+      }
+    }
+
     const p = pointToData(localX, localY);
     if (!p) return;
 
@@ -1505,9 +1521,18 @@ if (o.type === "FIBO") {
       const minPx = activeDrawTool === "BRUSH" ? 1.5 : 2.5;
       const moved = !last || Math.hypot(localX - last.x, localY - last.y) >= minPx;
       if (moved) {
+        const prevPoint = drawingPathRef.current[drawingPathRef.current.length - 1] ?? null;
         drawingPathRef.current.push(p);
         lastBrushScreenRef.current = { x: localX, y: localY };
-        draw();
+        const ctx = canvas.getContext("2d");
+        const a = prevPoint ? dataToPoint(prevPoint) : null;
+        const b = dataToPoint(p);
+        if (ctx && a && b) {
+          ctx.save(); ctx.strokeStyle = "#facc15";
+          ctx.lineWidth = activeDrawTool === "BRUSH" ? 5 : 2;
+          ctx.lineCap = "round"; ctx.lineJoin = "round";
+          ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); ctx.restore();
+        } else draw();
       }
     }
   };
@@ -1535,6 +1560,23 @@ if (o.type === "FIBO") {
   const handleMouseUp = () => {
     isMouseDownRef.current = false;
     lastBrushScreenRef.current = null;
+
+    const fastPreview = fastDragPreviewRef.current;
+    const fastStartObj = dragRef.current.startObj;
+    if (fastPreview && fastStartObj && fastPreview.id === fastStartObj.id) {
+      const shiftPointOnce = (pt: Point): Point => {
+        const sp = dataToPoint(pt); if (!sp) return pt;
+        return screenToData(sp.x + fastPreview.dx, sp.y + fastPreview.dy) ?? pointToData(sp.x + fastPreview.dx, sp.y + fastPreview.dy) ?? pt;
+      };
+      objsRef.current = objsRef.current.map((o) => {
+        if (o.id !== fastPreview.id) return o;
+        if (fastStartObj.type === "RECT") return { ...fastStartObj, a: shiftPointOnce(fastStartObj.a), b: shiftPointOnce(fastStartObj.b) } as AnyObj;
+        if (fastStartObj.type === "BRUSH" || fastStartObj.type === "PATH") return { ...fastStartObj, points: fastStartObj.points.map(shiftPointOnce) } as AnyObj;
+        return o;
+      });
+      fastDragPreviewRef.current = null;
+      dragDirtyRef.current = true;
+    }
 
     if (dragDirtyRef.current) {
       dragDirtyRef.current = false;
