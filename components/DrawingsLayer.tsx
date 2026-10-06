@@ -245,6 +245,9 @@ React.useEffect(() => {
   // we only blit this bitmap + draw the moving object, avoiding a full redraw of
   // every drawing/trade-zone on each animation frame.
   const fastDragStaticCanvasRef = React.useRef<HTMLCanvasElement | null>(null);
+  // V5.5: selected drawing is rasterized once on pointerdown and then moved as a bitmap.
+  // No logical/price coordinate conversion is performed while the pointer is moving.
+  const fastDragMovingCanvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const isMouseDownRef = React.useRef(false);
 
   // SELECT mode:
@@ -929,10 +932,15 @@ if (o.type === "FIBO") {
       ctx.drawImage(staticCanvas, 0, 0);
       ctx.restore();
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const moving = objsRef.current.find((o) => o.id === fastPreview.id);
-      if (moving) {
-        ctx.save(); ctx.translate(fastPreview.dx, fastPreview.dy);
-        drawObject(ctx, moving, true); ctx.restore();
+      const movingCanvas = fastDragMovingCanvasRef.current;
+      if (movingCanvas) {
+        // V5.5 ULTRA DRAG: bitmap-only hot path. dx/dy are CSS pixels,
+        // therefore translate the already-DPR-sized bitmap in device pixels.
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.drawImage(movingCanvas, fastPreview.dx * dpr, fastPreview.dy * dpr);
+        ctx.restore();
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       }
     } else {
       drawTradeZones(ctx);
@@ -1143,6 +1151,21 @@ if (o.type === "FIBO") {
     objsRef.current.forEach((o) => {
       if (o.id !== movingId) drawObject(octx, o, o.id === selectedId || o.id === hoverId);
     });
+
+    // Rasterize the moving object once. During pointermove we only translate this bitmap.
+    let movingCanvas = fastDragMovingCanvasRef.current;
+    if (!movingCanvas) movingCanvas = document.createElement("canvas");
+    movingCanvas.width = canvas.width;
+    movingCanvas.height = canvas.height;
+    fastDragMovingCanvasRef.current = movingCanvas;
+    const mctx = movingCanvas.getContext("2d");
+    if (mctx) {
+      mctx.setTransform(1, 0, 0, 1, 0, 0);
+      mctx.clearRect(0, 0, movingCanvas.width, movingCanvas.height);
+      mctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const moving = objsRef.current.find((o) => o.id === movingId);
+      if (moving) drawObject(mctx, moving, true);
+    }
   }, [drawTradeZones, drawObject, selectedId, hoverId]);
 
   const makeBase = (type: DrawTool): BaseObj => ({
@@ -1616,6 +1639,7 @@ if (o.type === "FIBO") {
       });
       fastDragPreviewRef.current = null;
       fastDragStaticCanvasRef.current = null;
+      fastDragMovingCanvasRef.current = null;
       dragDirtyRef.current = true;
     }
 
@@ -1626,6 +1650,7 @@ if (o.type === "FIBO") {
     }
 
     fastDragStaticCanvasRef.current = null;
+    fastDragMovingCanvasRef.current = null;
 
     chartPanRef.current = {
       active: false,
