@@ -1598,11 +1598,14 @@ function aggregateToD1(candles: Candle[]): Candle[] {
 
 async function fetchFxTradeCandles(
   symbol: string,
-  tf: Timeframe
+  tf: Timeframe,
+  limit = 300
 ): Promise<{ candles: Candle[]; volume: number }> {
   // Live Rates / Master Collector stores every supported timeframe directly.
+  // Scanner requests stay at 300 bars. The actively opened chart may request
+  // a deeper history without multiplying traffic across the whole Market Watch.
   const engineInterval = MARKET_INTERVAL[tf];
-  const params = new URLSearchParams({ symbol, interval: engineInterval, limit: "300" });
+  const params = new URLSearchParams({ symbol, interval: engineInterval, limit: String(limit) });
 
   const res = await fetch(`/api/market/candles?${params.toString()}`, {
     cache: "no-store",
@@ -1724,12 +1727,13 @@ async function fetchBatchAutoCandles(
 async function fetchAutoCandles(
   symbol: string,
   tf: Timeframe,
-  _source: DataSource
+  _source: DataSource,
+  limit = 300
 ): Promise<{ candles: Candle[]; volume: number }> {
   // Single source of truth for all 31 Market Watch instruments:
   // Live Rates -> Master Collector -> /api/market/candles.
   // No Twelve Data and no provider fallback.
-  const liveRates = await fetchFxTradeCandles(symbol, tf);
+  const liveRates = await fetchFxTradeCandles(symbol, tf, limit);
 
   if (!liveRates.candles.length) {
     throw new Error(`${symbol} ${tf}: Live Rates returned no candles`);
@@ -2586,6 +2590,20 @@ export default function MarketScannerPage() {
   const TELEGRAM_ON = false; // Telegram is sent only by the 24/7 server worker.
   const REFRESH_MS = 300000;
 
+  // Deep history is loaded ONLY for the chart the user currently has open.
+  // M1 is capped around 7 days to keep drawing/live interactions responsive;
+  // M5+ targets roughly 30 calendar days (D1 keeps a wider 300-bar context).
+  const CHART_HISTORY_LIMIT: Record<Timeframe, number> = {
+    M1: 10_080,
+    M5: 8_640,
+    M15: 2_880,
+    M30: 1_440,
+    H1: 720,
+    H4: 180,
+    D1: 300,
+  };
+  const [chartHistoryVersion, setChartHistoryVersion] = React.useState(0);
+
   const [heikinAshi, setHeikinAshi] = React.useState(false);
   const [renko, setRenko] = React.useState(false);
   const [renkoBoxSize, setRenkoBoxSize] = React.useState<number>(0);
@@ -3305,7 +3323,25 @@ React.useEffect(() => {
           if (res.status !== "fulfilled") continue;
 
           const { symbol, candles, volume } = res.value;
-          candlesCache.current.set(candleCacheKey(symbol, tf), candles);
+          const cacheKey = candleCacheKey(symbol, tf);
+
+          // The 5-minute scanner refresh must not erase the deeper history of
+          // the chart that is currently open. Merge its fresh 300 bars into the
+          // existing deep cache; other Market Watch symbols remain lightweight.
+          if (symbol === selectedSymbol) {
+            const existing = candlesCache.current.get(cacheKey) ?? [];
+            const merged = new Map<number, Candle>();
+            for (const candle of existing) merged.set(Number(candle.time), candle);
+            for (const candle of candles) merged.set(Number(candle.time), candle);
+            candlesCache.current.set(
+              cacheKey,
+              [...merged.values()]
+                .sort((a, b) => Number(a.time) - Number(b.time))
+                .slice(-CHART_HISTORY_LIMIT[tf])
+            );
+          } else {
+            candlesCache.current.set(cacheKey, candles);
+          }
 
           if (!candles || candles.length < 30) {
             metrics.push({ symbol, atrPct: 0, volume: 0, candles: candles ?? [] });
@@ -3533,7 +3569,7 @@ if (closedNow.length) {
       alive = false;
       window.clearInterval(id);
     };
-  }, [source, tf, instruments, scannerEnabled, beep, triggerFlash, scrollToRow, sendTelegram, masterHealthLoaded, masterLiveSymbols]);
+  }, [source, tf, instruments, scannerEnabled, beep, triggerFlash, scrollToRow, sendTelegram, masterHealthLoaded, masterLiveSymbols, selectedSymbol]);
 
 
   React.useEffect(() => {
@@ -3625,6 +3661,46 @@ if (closedNow.length) {
     [rows, selectedSymbol]
   );
 
+  // Load a deeper history only for the chart currently opened by the user.
+  // This is intentionally separate from the 150-symbol scanner batch (300 bars).
+  React.useEffect(() => {
+    let alive = true;
+    const symbol = selected?.symbol?.toUpperCase();
+    if (!symbol) return;
+
+    async function loadChartHistory() {
+      try {
+        const limit = CHART_HISTORY_LIMIT[tf];
+        const result = await fetchAutoCandles(symbol, tf, source, limit);
+        if (!alive) return;
+
+        const cacheKey = candleCacheKey(symbol, tf);
+        const existing = candlesCache.current.get(cacheKey) ?? [];
+        const merged = new Map<number, Candle>();
+        for (const candle of result.candles ?? []) merged.set(Number(candle.time), candle);
+        for (const candle of existing) merged.set(Number(candle.time), candle);
+
+        candlesCache.current.set(
+          cacheKey,
+          [...merged.values()]
+            .sort((a, b) => Number(a.time) - Number(b.time))
+            .slice(-limit)
+        );
+
+        // candlesCache is a ref, so force one cheap render after deep history arrives.
+        setChartHistoryVersion((v) => v + 1);
+      } catch (error) {
+        // Keep the scanner's 300-bar history if a deep-history request is unavailable.
+        console.warn(`[CHART HISTORY] ${symbol} ${tf}:`, error);
+      }
+    }
+
+    void loadChartHistory();
+    return () => {
+      alive = false;
+    };
+  }, [selected?.symbol, tf, source]);
+
   // Live candle from the same-origin health proxy. The collector currently exposes
   // latestTicks in /health, while the old per-symbol SSE URL returns 404/CORS.
   const [liveCandle, setLiveCandle] = React.useState<Candle | null>(null);
@@ -3671,7 +3747,7 @@ if (closedNow.length) {
           const withoutPrev = history.filter((c) => Number(c.time) !== Number(prev.time));
           candlesCache.current.set(
             cacheKey,
-            [...withoutPrev, prev].sort((a, b) => Number(a.time) - Number(b.time)).slice(-300)
+            [...withoutPrev, prev].sort((a, b) => Number(a.time) - Number(b.time)).slice(-CHART_HISTORY_LIMIT[tf])
           );
         }
 
@@ -3733,6 +3809,7 @@ if (closedNow.length) {
   // candlesCache is a mutable ref and lastSync is not updated by refresh().
   // rows/tf changes already re-render this component, so the chart now receives
   // the freshly fetched OHLC for M1/M5/M15/M30/H1/H4/D1.
+  void chartHistoryVersion;
   const selectedCandles = candlesCache.current.get(candleCacheKey(selected.symbol, tf)) ?? [];
 
   // RENKO ma własne źródło danych niezależne od głównego interwału wykresu.

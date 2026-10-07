@@ -139,6 +139,8 @@ export default function DrawingsLayer({
   tradeZoneSpec?: TradeZoneCanvasSpec;
 }) {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
+  // V5.7 DIRECT DRAG: dedicated compositor canvas for the actively moved object.
+  const dragOverlayCanvasRef = React.useRef<HTMLCanvasElement | null>(null);
 
 const [objs, setObjs] = React.useState<AnyObj[]>([]);
   // VANTAGE-SMOOTH: the canvas renders from refs during pointer movement.
@@ -296,6 +298,17 @@ React.useEffect(() => {
 
     const ctx = canvas.getContext("2d");
     ctx?.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const dragCanvas = dragOverlayCanvasRef.current;
+    if (dragCanvas) {
+      dragCanvas.width = wrap.clientWidth * dpr;
+      dragCanvas.height = wrap.clientHeight * dpr;
+      dragCanvas.style.width = `${wrap.clientWidth}px`;
+      dragCanvas.style.height = `${wrap.clientHeight}px`;
+      dragCanvas.style.willChange = "transform";
+      dragCanvas.style.transform = "translate3d(0px,0px,0)";
+      dragCanvas.getContext("2d")?.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
   }, [wrapRef]);
 
   // Stable X -> logical conversion for the whole chart pane, including empty
@@ -932,16 +945,8 @@ if (o.type === "FIBO") {
       ctx.drawImage(staticCanvas, 0, 0);
       ctx.restore();
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const movingCanvas = fastDragMovingCanvasRef.current;
-      if (movingCanvas) {
-        // V5.5 ULTRA DRAG: bitmap-only hot path. dx/dy are CSS pixels,
-        // therefore translate the already-DPR-sized bitmap in device pixels.
-        ctx.save();
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.drawImage(movingCanvas, fastPreview.dx * dpr, fastPreview.dy * dpr);
-        ctx.restore();
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      }
+      // V5.7: the moving object lives on dragOverlayCanvasRef and is moved by
+      // CSS translate3d. The base canvas only paints the cached static scene.
     } else {
       drawTradeZones(ctx);
       objsRef.current.forEach((o) => drawObject(ctx, o, o.id === selectedId || o.id === hoverId));
@@ -1152,20 +1157,28 @@ if (o.type === "FIBO") {
       if (o.id !== movingId) drawObject(octx, o, o.id === selectedId || o.id === hoverId);
     });
 
-    // Rasterize the moving object once. During pointermove we only translate this bitmap.
-    let movingCanvas = fastDragMovingCanvasRef.current;
-    if (!movingCanvas) movingCanvas = document.createElement("canvas");
-    movingCanvas.width = canvas.width;
-    movingCanvas.height = canvas.height;
-    fastDragMovingCanvasRef.current = movingCanvas;
-    const mctx = movingCanvas.getContext("2d");
-    if (mctx) {
-      mctx.setTransform(1, 0, 0, 1, 0, 0);
-      mctx.clearRect(0, 0, movingCanvas.width, movingCanvas.height);
-      mctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const moving = objsRef.current.find((o) => o.id === movingId);
-      if (moving) drawObject(mctx, moving, true);
+    // V5.7: rasterize the selected object once onto a dedicated visible canvas.
+    // pointermove will only update its compositor transform; no Canvas redraw.
+    const movingCanvas = dragOverlayCanvasRef.current;
+    if (movingCanvas) {
+      movingCanvas.width = canvas.width;
+      movingCanvas.height = canvas.height;
+      movingCanvas.style.width = `${canvas.clientWidth}px`;
+      movingCanvas.style.height = `${canvas.clientHeight}px`;
+      movingCanvas.style.transform = "translate3d(0px,0px,0)";
+      movingCanvas.style.visibility = "visible";
+      const mctx = movingCanvas.getContext("2d");
+      if (mctx) {
+        mctx.setTransform(1, 0, 0, 1, 0, 0);
+        mctx.clearRect(0, 0, movingCanvas.width, movingCanvas.height);
+        mctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        const moving = objsRef.current.find((o) => o.id === movingId);
+        if (moving) drawObject(mctx, moving, true);
+      }
     }
+    // Force the base canvas to the cached scene without the selected object.
+    fastDragPreviewRef.current = { id: movingId, dx: 0, dy: 0 };
+    draw();
   }, [drawTradeZones, drawObject, selectedId, hoverId]);
 
   const makeBase = (type: DrawTool): BaseObj => ({
@@ -1426,8 +1439,14 @@ if (o.type === "FIBO") {
     if (activeDrawTool === "SELECT" && dragRef.current.id && dragRef.current.last) {
       const startObj = dragRef.current.startObj;
       if (dragRef.current.mode === "move" && startObj && (startObj.type === "RECT" || startObj.type === "BRUSH" || startObj.type === "PATH")) {
-        fastDragPreviewRef.current = { id: startObj.id, dx: clientX - dragRef.current.startClientX, dy: clientY - dragRef.current.startClientY };
-        dragDirtyRef.current = true; draw(); return;
+        const dx = clientX - dragRef.current.startClientX;
+        const dy = clientY - dragRef.current.startClientY;
+        fastDragPreviewRef.current = { id: startObj.id, dx, dy };
+        dragDirtyRef.current = true;
+        // V5.7 hot path: one compositor transform only. No draw(), no coordinate conversion.
+        const overlay = dragOverlayCanvasRef.current;
+        if (overlay) overlay.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
+        return;
       }
     }
 
@@ -1640,6 +1659,16 @@ if (o.type === "FIBO") {
       fastDragPreviewRef.current = null;
       fastDragStaticCanvasRef.current = null;
       fastDragMovingCanvasRef.current = null;
+      const overlay = dragOverlayCanvasRef.current;
+      if (overlay) {
+        overlay.style.transform = "translate3d(0px,0px,0)";
+        overlay.style.visibility = "hidden";
+        const octx = overlay.getContext("2d");
+        if (octx) {
+          octx.setTransform(1, 0, 0, 1, 0, 0);
+          octx.clearRect(0, 0, overlay.width, overlay.height);
+        }
+      }
       dragDirtyRef.current = true;
     }
 
@@ -1893,6 +1922,18 @@ if (o.type === "FIBO") {
           </button>
         </div>
       )}
+
+<canvas
+  ref={dragOverlayCanvasRef}
+  className="absolute inset-0 z-[21]"
+  style={{
+    pointerEvents: "none",
+    touchAction: "none",
+    visibility: "hidden",
+    willChange: "transform",
+    transform: "translate3d(0px,0px,0)",
+  }}
+/>
 
 <canvas
   ref={canvasRef}
