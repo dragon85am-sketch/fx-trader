@@ -225,3 +225,24 @@ model FxScannerTrade {
   @@index([status, openedAt])
   @@index([instrument, tf, status])
 }
+
+model FxScannerReadySetup {
+  id            String   @id @default(cuid())
+  instrument    String
+  storageSymbol String
+  tf            String
+  side          String
+  signalTime    DateTime
+  entry         Float
+  sl            Float
+  tp1           Float
+  tp2           Float
+  tp3           Float
+  rr            Float    @default(2)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([storageSymbol, tf])
+  @@index([instrument, tf])
+  @@index([updatedAt])
+}
