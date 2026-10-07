@@ -1135,11 +1135,13 @@ fullscreenMode = false,
 
   const restoreLogicalViewport = React.useCallback((range: { from: number; to: number } | null) => {
     if (!range) return;
-    requestAnimationFrame(() => {
-      try {
-        chartRef.current?.timeScale().setVisibleLogicalRange(range);
-      } catch {}
-    });
+    // V5.6 VIEWPORT HARD LOCK: restore synchronously after setData().
+    // Waiting only for requestAnimationFrame left one frame in which
+    // Lightweight Charts could expose its recalculated logical range and make
+    // the chart visibly kick backwards.
+    try {
+      chartRef.current?.timeScale().setVisibleLogicalRange(range);
+    } catch {}
   }, []);
 
   // TOUCH: dwa palce na środku wykresu.
@@ -2533,6 +2535,20 @@ kineticScroll: {
     const safeRaw = normalizeCandles(candles ?? []);
     rawCacheRef.current = safeRaw;
 
+    // V5.6 VIEWPORT HARD LOCK
+    // This effect can run whenever the parent publishes a refreshed candles
+    // array. Both the hidden timeline setData() and the visible series setData()
+    // may rebuild logical indexes. Capture the user's X viewport BEFORE either
+    // series is touched and restore it after the rebuild whenever Follow Live
+    // is not actively controlling the chart.
+    const incomingSeriesKey = `${symbol}|${tf ?? ""}`;
+    const sameSeriesBeforeData =
+      seriesKeyRef.current !== "" && seriesKeyRef.current === incomingSeriesKey;
+    const hardLockedViewport =
+      sameSeriesBeforeData && (!followOnTick || detached || manualPanRef.current)
+        ? snapshotLogicalViewport()
+        : null;
+
     if (!safeRaw.length) {
       candleSeries.setData([]);
       setZoneRects([]);
@@ -2616,7 +2632,14 @@ kineticScroll: {
     candleSeries.setData(chartData);
     presentationModeRef.current = modeNow;
 
-    if (modeChanged && viewportBeforeModeChange) {
+    // Follow Live OFF / detached means data is allowed to change, viewport is not.
+    // Restore immediately, before overlays or indicators can observe the rebuilt
+    // logical scale. This is intentionally independent from the mode-change path.
+    if (hardLockedViewport) {
+      restoreLogicalViewport(hardLockedViewport);
+    }
+
+    if (modeChanged && viewportBeforeModeChange && !hardLockedViewport) {
       requestAnimationFrame(() => {
         try {
           ts.setVisibleRange?.(viewportBeforeModeChange);
@@ -2924,6 +2947,8 @@ kineticScroll: {
     applyIndicators,
     clearTradeLineSeries,
     followLatestBar,
+    snapshotLogicalViewport,
+    restoreLogicalViewport,
   ]);
 
   React.useEffect(() => {
