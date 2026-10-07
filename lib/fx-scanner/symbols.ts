@@ -1,12 +1,12 @@
 import { normalizeMarketSymbol } from "@/lib/market/master-symbols";
 
-// Test universe requested for the first effectiveness run.
-// The worker automatically skips symbols that do not yet have MarketCandle data.
+// Scanner universe aligned with the default Master Collector universe.
+// AUDHUF/AUDZAR were removed because they are not present in MASTER_MARKET_SYMBOLS.
 export const FX_SCANNER_SYMBOLS = [
   "GBPUSD","GBPCHF","GBPAUD","GBPCAD","GBPNZD",
   "EURUSD","EURCHF","EURCAD","EURGBP","EURAUD","EURNZD","EURJPY","EURPLN",
   "USDCAD","USDPLN","USDCHF","USDJPY","NZDUSD",
-  "AUDCAD","AUDUSD","AUDHUF","AUDZAR","AUDNZD","AUDJPY","AUDCHF",
+  "AUDCAD","AUDUSD","AUDNZD","AUDJPY","AUDCHF",
   "BTCUSD","NASUSD","USOUSD","XAGUSD","US30","XAUUSD",
 ] as const;
 
