@@ -10,7 +10,8 @@
     "lint": "next lint",
     "us30:collector": "tsx scripts/master-market-collector.ts",
     "market:collector": "tsx scripts/master-market-collector.ts",
-    "fx:scanner": "tsx scripts/fx-scanner-worker.ts"
+    "fx:scanner": "tsx scripts/fx-scanner-worker.ts",
+    "d1:backfill": "tsx scripts/live-rates-daily-close-backfill.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
@@ -41,6 +42,7 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.10.0",
+    "@types/pg": "^8.23.1",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "autoprefixer": "^10.4.20",
