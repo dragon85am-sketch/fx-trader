@@ -25,7 +25,10 @@ export const MASTER_MARKET_SYMBOLS = [
 export type MasterMarketSymbol = (typeof MASTER_MARKET_SYMBOLS)[number];
 
 export function normalizeMarketSymbol(value: string) {
-  return value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  const cleaned = value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (cleaned === "NASUSD" || cleaned === "NAS100" || cleaned === "NASDAQ100") return "US100";
+  if (cleaned === "USOUSD" || cleaned === "USOIL" || cleaned === "WTI") return "WTIUSD";
+  return cleaned;
 }
 
 export function getCollectorSymbols(envValue?: string) {
