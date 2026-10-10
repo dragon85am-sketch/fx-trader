@@ -27,11 +27,20 @@ export type MasterMarketSymbol = (typeof MASTER_MARKET_SYMBOLS)[number];
 export function normalizeMarketSymbol(value: string) {
   const cleaned = value.toUpperCase().replace(/[^A-Z0-9]/g, "");
   if (cleaned === "NASUSD" || cleaned === "NAS100" || cleaned === "NASDAQ100") return "US100";
-  if (cleaned === "USOUSD" || cleaned === "USOIL" || cleaned === "WTI") return "WTIUSD";
+  if (cleaned === "USOUSD" || cleaned === "USOIL" || cleaned === "WTI" || cleaned === "WTIUSD") return "WTIUSD";
   return cleaned;
 }
 
 export function getCollectorSymbols(envValue?: string) {
   if (!envValue?.trim()) return [...MASTER_MARKET_SYMBOLS];
   return Array.from(new Set(envValue.split(",").map(normalizeMarketSymbol).filter(Boolean)));
+}
+
+// Live Rates uses provider-facing names different from internal FX TRADE symbols.
+// Confirmed in the user's Live Rates JSON: NAS100 and USOil.
+export function toLiveRatesSymbol(symbol: string) {
+  const canonical = normalizeMarketSymbol(symbol);
+  if (canonical === "US100") return "NAS100";
+  if (canonical === "WTIUSD") return "USOil";
+  return canonical;
 }
