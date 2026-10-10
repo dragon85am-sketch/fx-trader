@@ -36,6 +36,34 @@ let providerError = "";
 const unrecognizedSymbols = new Map<string, number>();
 const receivedCount = new Map<string, number>();
 let failedDbWrites = 0;
+// Bounded, sanitized diagnostics; never expose API keys or complete raw payloads.
+const rawEventCounts = new Map<string, number>();
+const rawSymbolCounts = new Map<string, number>();
+const rawMessageShapes = new Map<string, number>();
+let lastRateAt: number | null = null;
+let lastConnectAt: number | null = null;
+let lastDisconnectAt: number | null = null;
+const forexSlashSubscriptions = process.env.LIVE_RATES_FOREX_SLASH === "true";
+function summarizeRawRate(raw: unknown) {
+  const msg = typeof raw === "string" ? JSON.parse(raw) : raw;
+  if (Array.isArray(msg)) { rawMessageShapes.set("array", (rawMessageShapes.get("array") || 0) + 1); return msg; }
+  if (!msg || typeof msg !== "object") { rawMessageShapes.set(typeof msg, (rawMessageShapes.get(typeof msg) || 0) + 1); return []; }
+  const shape = Object.keys(msg).filter(k => !/key|token|secret|auth/i.test(k)).sort().join(",").slice(0, 180);
+  rawMessageShapes.set(shape, (rawMessageShapes.get(shape) || 0) + 1);
+  return [msg];
+}
+function logRawSymbol(rawSymbol: string) {
+  const safe = rawSymbol.slice(0, 40).replace(/[^A-Za-z0-9/_-]/g, "");
+  if (!safe) return;
+  const count = (rawSymbolCounts.get(safe) || 0) + 1;
+  rawSymbolCounts.set(safe, count);
+  if (count === 1) console.log(`[MASTER] incoming Live Rates symbol: ${safe} -> ${normalizeMarketSymbol(safe)}`);
+}
+function providerSubscriptions() {
+  if (!forexSlashSubscriptions) return LIVE_RATES_SUBSCRIPTIONS;
+  return LIVE_RATES_SUBSCRIPTIONS.map(s => /^[A-Z]{6}$/.test(s) && !["BTCUSD", "ETHUSD", "XAUUSD", "XAGUSD"].includes(s) ? `${s.slice(0, 3)}/${s.slice(3)}` : s);
+}
+
 
 function clientSet(symbol: string) {
   let set = clientsBySymbol.get(symbol);
@@ -131,16 +159,33 @@ function broadcastStatus(payload: unknown) {
 }
 
 const socket=io("https://wss.live-rates.com",{transports:["websocket"],reconnection:true,reconnectionAttempts:Infinity,reconnectionDelay:5000,reconnectionDelayMax:30000,randomizationFactor:.5,forceNew:true,multiplex:false,autoConnect:false,timeout:20000});
-socket.on("connect",()=>{ liveRatesConnected=true; providerError=""; console.log(`[MASTER] connected; subscribing ${LIVE_RATES_SUBSCRIPTIONS.length} symbols`); socket.emit("instruments",LIVE_RATES_SUBSCRIPTIONS); socket.emit("key",{key}); broadcastStatus({provider:"live-rates",connected:true,mode:"MASTER_150"}); });
-socket.on("rates",(raw:any)=>{ try { const msg=typeof raw==="string"?JSON.parse(raw):raw; if(msg?.info){providerInfo=String(msg.info);broadcastStatus({provider:"live-rates",connected:liveRatesConnected,info:providerInfo,mode:"MASTER_150"});return;} if(msg?.error){providerError=String(msg.error);broadcastStatus({provider:"live-rates",connected:liveRatesConnected,error:providerError,mode:"MASTER_150"});return;} const symbol=normalizeMarketSymbol(String(msg?.currency??msg?.symbol??"")); if(!PROVIDER_SET.has(symbol)){ const rawSymbol=String(msg?.currency??msg?.symbol??""); if(rawSymbol){const count=(unrecognizedSymbols.get(rawSymbol)||0)+1;unrecognizedSymbols.set(rawSymbol,count);if(count===1) console.warn(`[MASTER] ignored provider symbol ${rawSymbol} -> ${symbol} (not subscribed)`);} return; } receivedCount.set(symbol,(receivedCount.get(symbol)||0)+1); const price=Number(msg?.bid??msg?.price); if(!Number.isFinite(price)||price<=0)return; const tick={symbol,price,timestamp:normalizeTimestamp(msg?.timestamp)}; latestTicks[symbol]=tick; broadcastTick(tick); queueDbTick(tick); } catch(e){console.error("[MASTER] parse",e);} });
-socket.on("disconnect",reason=>{liveRatesConnected=false;broadcastStatus({provider:"live-rates",connected:false,reason,mode:"MASTER_150"});});
+socket.on("connect",()=>{ lastConnectAt=Date.now(); liveRatesConnected=true; providerError=""; console.log(`[MASTER] connected; subscribing ${providerSubscriptions().length} symbols (forexSlash=${forexSlashSubscriptions})`); socket.emit("instruments",providerSubscriptions()); socket.emit("key",{key}); broadcastStatus({provider:"live-rates",connected:true,mode:"MASTER_150"}); });
+socket.on("rates",(raw:any)=>{ try {
+  lastRateAt = Date.now();
+  for (const msg of summarizeRawRate(raw)) {
+    if (msg?.info) { providerInfo=String(msg.info);broadcastStatus({provider:"live-rates",connected:liveRatesConnected,info:providerInfo,mode:"MASTER_150"});continue; }
+    if (msg?.error) { providerError=String(msg.error);broadcastStatus({provider:"live-rates",connected:liveRatesConnected,error:providerError,mode:"MASTER_150"});continue; }
+    const rawSymbol=String(msg?.currency??msg?.symbol??"");
+    logRawSymbol(rawSymbol);
+    const symbol=normalizeMarketSymbol(rawSymbol);
+    if(!PROVIDER_SET.has(symbol)) { if(rawSymbol){const count=(unrecognizedSymbols.get(rawSymbol)||0)+1;unrecognizedSymbols.set(rawSymbol,count);if(count===1) console.warn(`[MASTER] ignored provider symbol ${rawSymbol.slice(0,40)} -> ${symbol} (not subscribed)`);} continue; }
+    receivedCount.set(symbol,(receivedCount.get(symbol)||0)+1);
+    const price=Number(msg?.bid??msg?.price);
+    if(!Number.isFinite(price)||price<=0)continue;
+    const tick={symbol,price,timestamp:normalizeTimestamp(msg?.timestamp)};
+    latestTicks[symbol]=tick;broadcastTick(tick);queueDbTick(tick);
+  }
+} catch(e){console.error("[MASTER] parse",e);} });
+// Count event names only, not raw payloads (which might contain credentials).
+socket.onAny((event:string)=>{ rawEventCounts.set(event,(rawEventCounts.get(event)||0)+1); });
+socket.on("disconnect",reason=>{lastDisconnectAt=Date.now();liveRatesConnected=false;broadcastStatus({provider:"live-rates",connected:false,reason,mode:"MASTER_150"});});
 socket.on("connect_error",e=>{liveRatesConnected=false;providerError=e.message;console.error("[MASTER] connect",e.message);});
 
 const server=http.createServer((req,res)=>{
   const origin=req.headers.origin||"*"; res.setHeader("Access-Control-Allow-Origin",origin);res.setHeader("Vary","Origin");res.setHeader("Access-Control-Allow-Methods","GET, OPTIONS");res.setHeader("Access-Control-Allow-Headers","Content-Type");
   if(req.method==="OPTIONS"){res.writeHead(204);res.end();return;}
   const url=new URL(req.url||"/",`http://${req.headers.host||"localhost"}`);
-  if(url.pathname==="/health"){res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});res.end(JSON.stringify({ok:true,mode:"MASTER_150",connected:liveRatesConnected,configured:PROVIDER_INSTRUMENTS.length,providerSubscriptions:LIVE_RATES_SUBSCRIPTIONS,clients:totalClients(),receivedSymbols:Object.keys(latestTicks).length,latestTicks,dbWriting,dbPending:[...pending.keys()],providerInfo:providerInfo||null,providerError:providerError||null,failedDbWrites,receivedCount:Object.fromEntries(receivedCount),unrecognizedSymbols:Object.fromEntries(unrecognizedSymbols),missingConfiguredSymbols:PROVIDER_INSTRUMENTS.filter(s=>!latestTicks[s])}));return;}
+  if(url.pathname==="/health"){res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});res.end(JSON.stringify({ok:true,mode:"MASTER_150",connected:liveRatesConnected,configured:PROVIDER_INSTRUMENTS.length,providerSubscriptions:providerSubscriptions(),forexSlashSubscriptions,diagnostics:{rawEventCounts:Object.fromEntries(rawEventCounts),rawSymbolCounts:Object.fromEntries(rawSymbolCounts),rawMessageShapes:Object.fromEntries(rawMessageShapes),lastRateAt,lastConnectAt,lastDisconnectAt},clients:totalClients(),receivedSymbols:Object.keys(latestTicks).length,latestTicks,dbWriting,dbPending:[...pending.keys()],providerInfo:providerInfo||null,providerError:providerError||null,failedDbWrites,receivedCount:Object.fromEntries(receivedCount),unrecognizedSymbols:Object.fromEntries(unrecognizedSymbols),missingConfiguredSymbols:PROVIDER_INSTRUMENTS.filter(s=>!latestTicks[s])}));return;}
   const m=url.pathname.match(/^\/api\/(?:market\/)?([a-z0-9]+)\/stream$/i);
   if(m){ const symbol=normalizeMarketSymbol(m[1]); if(!PROVIDER_SET.has(symbol)){res.writeHead(404,{"Content-Type":"application/json"});res.end(JSON.stringify({ok:false,error:"Unknown symbol"}));return;} res.writeHead(200,{"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache, no-transform",Connection:"keep-alive","X-Accel-Buffering":"no","Access-Control-Allow-Origin":origin,Vary:"Origin"});res.write("retry: 3000\n\n");res.write(`event: status\ndata: ${JSON.stringify({provider:"live-rates",connected:liveRatesConnected,symbol,mode:"MASTER_150"})}\n\n`);if(latestTicks[symbol])res.write(`event: tick\ndata: ${JSON.stringify(latestTicks[symbol])}\n\n`);const set=clientSet(symbol);set.add(res);const keep=setInterval(()=>{try{res.write(`: keepalive ${Date.now()}\n\n`);}catch{}},15000);req.on("close",()=>{clearInterval(keep);set.delete(res);});return; }
   res.writeHead(200,{"Content-Type":"application/json"});res.end(JSON.stringify({ok:true,service:"FX Trade Master Market Collector",mode:"MASTER_150",configured:PROVIDER_INSTRUMENTS.length,health:"/health",streamPattern:"/api/market/{symbol}/stream"}));
