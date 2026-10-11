@@ -23,7 +23,7 @@ const frames = [
 ] as const;
 
 type Tick = { symbol: string; price: number; timestamp: number };
-type TickBatch = { symbol: string; open: number; high: number; low: number; close: number; timestamp: number; ticks: number };
+type TickBatch = { symbol: string; interval: string; bucket: number; open: number; high: number; low: number; close: number; firstAt: number; lastAt: number; ticks: number };
 
 const latestTicks: Record<string, Tick> = {};
 const clientsBySymbol = new Map<string, Set<http.ServerResponse>>();
@@ -36,6 +36,15 @@ let providerError = "";
 const unrecognizedSymbols = new Map<string, number>();
 const receivedCount = new Map<string, number>();
 let failedDbWrites = 0;
+let successfulDbWrites = 0;
+let lastDbWriteMs: number | null = null;
+let lastDbSuccessAt: number | null = null;
+let lastDbFailureAt: number | null = null;
+let consecutiveDbFailures = 0;
+const DB_FLUSH_MS = 15000;
+const DB_CHUNK_ROWS = 14;
+const DB_RETRY_MAX_MS = 60000;
+let shuttingDown = false;
 // Bounded, sanitized diagnostics; never expose API keys or complete raw payloads.
 const rawEventCounts = new Map<string, number>();
 const rawSymbolCounts = new Map<string, number>();
@@ -73,48 +82,57 @@ function clientSet(symbol: string) {
 function totalClients() { let n=0; for (const s of clientsBySymbol.values()) n+=s.size; return n; }
 function normalizeTimestamp(value: unknown) { const n=Number(value); return !Number.isFinite(n)||n<=0 ? Date.now() : n<10_000_000_000 ? n*1000 : n; }
 
+function batchKey(b: Pick<TickBatch, "symbol" | "interval" | "bucket">) {
+  return `${b.symbol}|${b.interval}|${b.bucket}`;
+}
+
+function mergeBatch(a: TickBatch, b: TickBatch): TickBatch {
+  return {
+    ...a,
+    high: Math.max(a.high, b.high),
+    low: Math.min(a.low, b.low),
+    open: a.firstAt <= b.firstAt ? a.open : b.open,
+    close: a.lastAt >= b.lastAt ? a.close : b.close,
+    firstAt: Math.min(a.firstAt, b.firstAt),
+    lastAt: Math.max(a.lastAt, b.lastAt),
+    ticks: a.ticks + b.ticks,
+  };
+}
+
+function scheduleFlush(delayMs = DB_FLUSH_MS) {
+  if (!flushTimer && !shuttingDown) {
+    flushTimer = setTimeout(() => { flushTimer = null; void flushDb(); }, delayMs);
+  }
+}
+
 function queueDbTick(t: Tick) {
-  const p = pending.get(t.symbol);
-  if (!p) pending.set(t.symbol,{symbol:t.symbol,open:t.price,high:t.price,low:t.price,close:t.price,timestamp:t.timestamp,ticks:1});
-  else { p.high=Math.max(p.high,t.price); p.low=Math.min(p.low,t.price); p.close=t.price; p.timestamp=t.timestamp; p.ticks+=1; }
-  if (!flushTimer) flushTimer=setTimeout(()=>{ flushTimer=null; void flushDb(); },5000);
+  // Aggregate by the *actual* candle bucket, not just by symbol.
+  // A batch crossing 1m/5m/etc boundaries must never be assigned to one candle.
+  for (const [interval, size] of frames) {
+    const bucket = Math.floor(t.timestamp / size) * size;
+    const incoming: TickBatch = {
+      symbol: t.symbol, interval, bucket, open: t.price, high: t.price,
+      low: t.price, close: t.price, firstAt: t.timestamp,
+      lastAt: t.timestamp, ticks: 1,
+    };
+    const k = batchKey(incoming);
+    const existing = pending.get(k);
+    pending.set(k, existing ? mergeBatch(existing, incoming) : incoming);
+  }
+  scheduleFlush();
 }
 
 async function writeBatches(batches: TickBatch[]) {
   if (!batches.length) return;
-
-  // V4: all symbols x all timeframes are written in ONE PostgreSQL round-trip.
-  // This keeps the exact candle/upsert behaviour while drastically reducing
-  // Railway <-> Supabase Shared Pooler chatter.
-  const rows: Array<{
-    id: string; symbol: string; interval: string; bucket: Date;
-    open: number; high: number; low: number; close: number; ticks: number;
-  }> = [];
-
-  for (const b of batches) {
-    for (const [interval, size] of frames) {
-      rows.push({
-        id: crypto.randomUUID(),
-        symbol: b.symbol,
-        interval,
-        bucket: new Date(Math.floor(b.timestamp / size) * size),
-        open: b.open,
-        high: b.high,
-        low: b.low,
-        close: b.close,
-        ticks: b.ticks,
-      });
-    }
-  }
-
+  // Small, bounded upsert: prevents enormous SQL and limits lock duration.
   const params: unknown[] = [];
-  const values = rows.map((r) => {
+  const values = batches.map((b) => {
     const base = params.length;
-    params.push(r.id, r.symbol, r.interval, r.bucket, r.open, r.high, r.low, r.close, r.ticks);
+    params.push(crypto.randomUUID(), b.symbol, b.interval, new Date(b.bucket),
+      b.open, b.high, b.low, b.close, b.ticks);
     const p = Array.from({ length: 9 }, (_, i) => `$${base + i + 1}`);
     return `(${p.join(",")},NOW(),NOW())`;
   }).join(",");
-
   await prisma.$executeRawUnsafe(
     `INSERT INTO "MarketCandle" ("id","symbol","interval","bucket","open","high","low","close","ticks","createdAt","updatedAt")
      VALUES ${values}
@@ -130,23 +148,44 @@ async function writeBatches(batches: TickBatch[]) {
 
 async function flushDb() {
   if (dbWriting) return;
-  dbWriting=true;
+  dbWriting = true;
   try {
-    while (pending.size) {
-      const batch=[...pending.values()]; pending.clear();
-      try { await writeBatches(batch); } catch(e:any) {
+    // Snapshot once; new ticks stay in pending for the next cycle.
+    const snapshot = [...pending.entries()];
+    pending.clear();
+    for (let i = 0; i < snapshot.length; i += DB_CHUNK_ROWS) {
+      const part = snapshot.slice(i, i + DB_CHUNK_ROWS);
+      const started = Date.now();
+      try {
+        await writeBatches(part.map(([, b]) => b));
+        lastDbWriteMs = Date.now() - started;
+        lastDbSuccessAt = Date.now();
+        successfulDbWrites++;
+        consecutiveDbFailures = 0;
+        if (lastDbWriteMs > 5000) console.warn(`[MASTER] slow DB upsert: ${lastDbWriteMs}ms, rows=${part.length}`);
+      } catch (e: any) {
         failedDbWrites++;
-        // Preserve batches after a transient database failure. Merge with newer ticks.
-        for (const old of batch) {
-          const fresh = pending.get(old.symbol);
-          if (!fresh) pending.set(old.symbol, old);
-          else pending.set(old.symbol, { ...old, high: Math.max(old.high, fresh.high), low: Math.min(old.low, fresh.low), close: fresh.close, timestamp: fresh.timestamp, ticks: old.ticks + fresh.ticks });
+        consecutiveDbFailures++;
+        lastDbFailureAt = Date.now();
+        lastDbWriteMs = Date.now() - started;
+        // Requeue failed AND unattempted chunks; never drop them silently.
+        for (const [k, old] of snapshot.slice(i)) {
+          const fresh = pending.get(k);
+          pending.set(k, fresh ? mergeBatch(old, fresh) : old);
         }
-        console.error(`[MASTER] DB batch failed; queued retry (${batch.length} symbols)`,e?.message||e);
+        console.error(`[MASTER] DB batch failed; queued retry (${part.length} rows), duration=${lastDbWriteMs}ms`, e?.message || e);
         break;
       }
     }
-  } finally { dbWriting=false; if (pending.size && !flushTimer) flushTimer=setTimeout(()=>{flushTimer=null;void flushDb();},5000); }
+  } finally {
+    dbWriting = false;
+    if (pending.size) {
+      const retryMs = consecutiveDbFailures
+        ? Math.min(DB_RETRY_MAX_MS, DB_FLUSH_MS * 2 ** Math.min(consecutiveDbFailures - 1, 3))
+        : DB_FLUSH_MS;
+      scheduleFlush(retryMs);
+    }
+  }
 }
 
 function broadcastTick(t: Tick) {
@@ -185,11 +224,11 @@ const server=http.createServer((req,res)=>{
   const origin=req.headers.origin||"*"; res.setHeader("Access-Control-Allow-Origin",origin);res.setHeader("Vary","Origin");res.setHeader("Access-Control-Allow-Methods","GET, OPTIONS");res.setHeader("Access-Control-Allow-Headers","Content-Type");
   if(req.method==="OPTIONS"){res.writeHead(204);res.end();return;}
   const url=new URL(req.url||"/",`http://${req.headers.host||"localhost"}`);
-  if(url.pathname==="/health"){res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});res.end(JSON.stringify({ok:true,mode:"MASTER_150",connected:liveRatesConnected,configured:PROVIDER_INSTRUMENTS.length,providerSubscriptions:providerSubscriptions(),forexSlashSubscriptions,diagnostics:{rawEventCounts:Object.fromEntries(rawEventCounts),rawSymbolCounts:Object.fromEntries(rawSymbolCounts),rawMessageShapes:Object.fromEntries(rawMessageShapes),lastRateAt,lastConnectAt,lastDisconnectAt},clients:totalClients(),receivedSymbols:Object.keys(latestTicks).length,latestTicks,dbWriting,dbPending:[...pending.keys()],providerInfo:providerInfo||null,providerError:providerError||null,failedDbWrites,receivedCount:Object.fromEntries(receivedCount),unrecognizedSymbols:Object.fromEntries(unrecognizedSymbols),missingConfiguredSymbols:PROVIDER_INSTRUMENTS.filter(s=>!latestTicks[s])}));return;}
+  if(url.pathname==="/health"){res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});res.end(JSON.stringify({ok:true,mode:"MASTER_150",connected:liveRatesConnected,configured:PROVIDER_INSTRUMENTS.length,providerSubscriptions:providerSubscriptions(),forexSlashSubscriptions,diagnostics:{rawEventCounts:Object.fromEntries(rawEventCounts),rawSymbolCounts:Object.fromEntries(rawSymbolCounts),rawMessageShapes:Object.fromEntries(rawMessageShapes),lastRateAt,lastConnectAt,lastDisconnectAt},clients:totalClients(),receivedSymbols:Object.keys(latestTicks).length,latestTicks,dbWriting,dbPending:[...new Set([...pending.values()].map(b=>b.symbol))],dbPendingRows:pending.size,dbMetrics:{flushMs:DB_FLUSH_MS,chunkRows:DB_CHUNK_ROWS,successfulDbWrites,failedDbWrites,consecutiveDbFailures,lastDbWriteMs,lastDbSuccessAt,lastDbFailureAt},providerInfo:providerInfo||null,providerError:providerError||null,failedDbWrites,receivedCount:Object.fromEntries(receivedCount),unrecognizedSymbols:Object.fromEntries(unrecognizedSymbols),missingConfiguredSymbols:PROVIDER_INSTRUMENTS.filter(s=>!latestTicks[s])}));return;}
   const m=url.pathname.match(/^\/api\/(?:market\/)?([a-z0-9]+)\/stream$/i);
   if(m){ const symbol=normalizeMarketSymbol(m[1]); if(!PROVIDER_SET.has(symbol)){res.writeHead(404,{"Content-Type":"application/json"});res.end(JSON.stringify({ok:false,error:"Unknown symbol"}));return;} res.writeHead(200,{"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache, no-transform",Connection:"keep-alive","X-Accel-Buffering":"no","Access-Control-Allow-Origin":origin,Vary:"Origin"});res.write("retry: 3000\n\n");res.write(`event: status\ndata: ${JSON.stringify({provider:"live-rates",connected:liveRatesConnected,symbol,mode:"MASTER_150"})}\n\n`);if(latestTicks[symbol])res.write(`event: tick\ndata: ${JSON.stringify(latestTicks[symbol])}\n\n`);const set=clientSet(symbol);set.add(res);const keep=setInterval(()=>{try{res.write(`: keepalive ${Date.now()}\n\n`);}catch{}},15000);req.on("close",()=>{clearInterval(keep);set.delete(res);});return; }
   res.writeHead(200,{"Content-Type":"application/json"});res.end(JSON.stringify({ok:true,service:"FX Trade Master Market Collector",mode:"MASTER_150",configured:PROVIDER_INSTRUMENTS.length,health:"/health",streamPattern:"/api/market/{symbol}/stream"}));
 });
 server.listen(PORT,"0.0.0.0",()=>{console.log(`[MASTER] HTTP/SSE :${PORT}`);socket.connect();});
-async function shutdown(signal:string){console.log(`[MASTER] ${signal}`);if(flushTimer)clearTimeout(flushTimer);await flushDb();socket.removeAllListeners();socket.disconnect();for(const set of clientsBySymbol.values())for(const c of set)try{c.end();}catch{}await new Promise<void>(r=>server.close(()=>r()));await prisma.$disconnect();process.exit(0);}
+async function shutdown(signal:string){console.log(`[MASTER] ${signal}`);shuttingDown=true;if(flushTimer)clearTimeout(flushTimer);await flushDb();socket.removeAllListeners();socket.disconnect();for(const set of clientsBySymbol.values())for(const c of set)try{c.end();}catch{}await new Promise<void>(r=>server.close(()=>r()));await prisma.$disconnect();process.exit(0);}
 process.on("SIGINT",()=>void shutdown("SIGINT"));process.on("SIGTERM",()=>void shutdown("SIGTERM"));
