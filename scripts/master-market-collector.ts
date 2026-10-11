@@ -3,6 +3,8 @@ import { io } from "socket.io-client";
 import dotenv from "dotenv";
 import http from "node:http";
 import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
 import { getCollectorSymbols, normalizeMarketSymbol, toLiveRatesSymbol } from "../lib/market/master-symbols";
 
 dotenv.config({ path: ".env.local" });
@@ -39,6 +41,75 @@ const clientsBySymbol = new Map<string, Set<http.ServerResponse>>();
 const pending = new Map<string, TickBatch>();
 // Immutable failed chunks keep stable IDs for idempotent SQL retries.
 const retryChunks: Array<Array<{ id: string; batch: TickBatch }>> = [];
+// Synchronous, crash-safe checkpoint on the mounted Railway Volume.
+// Checkpoint BEFORE acknowledging a tick or submitting SQL, preserving stable ledger IDs.
+const QUEUE_DIR = process.env.OHLC_QUEUE_DIR || "/data/ohlc-queue";
+const QUEUE_FILE = path.join(QUEUE_DIR, "state.json");
+const MAX_QUEUE_BYTES = 64 * 1024 * 1024;
+let queueCheckpointAt: number | null = null;
+let queueCheckpointBytes = 0;
+let queueRecoveredRows = 0;
+let queueFatalError: string | null = null;
+
+function validateBatch(value: any): value is TickBatch {
+  return !!value && typeof value.symbol === "string" && typeof value.interval === "string" &&
+    [value.bucket, value.open, value.high, value.low, value.close, value.firstAt, value.lastAt, value.ticks]
+      .every((n: unknown) => typeof n === "number" && Number.isFinite(n)) &&
+    value.bucket > 0 && value.firstAt > 0 && value.lastAt >= value.firstAt &&
+    value.open > 0 && value.close > 0 && value.high >= Math.max(value.open, value.close) &&
+    value.low <= Math.min(value.open, value.close) && value.ticks > 0;
+}
+
+function saveQueue(): void {
+  const payload = JSON.stringify({ version: 1, pending: [...pending.entries()], retryChunks });
+  const bytes = Buffer.byteLength(payload);
+  if (bytes > MAX_QUEUE_BYTES) throw new Error(`OHLC queue exceeds 64 MiB (${bytes} bytes)`);
+  const tmp = `${QUEUE_FILE}.${process.pid}.tmp`;
+  try {
+    const fd = fs.openSync(tmp, "w", 0o600);
+    try { fs.writeFileSync(fd, payload); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+    fs.renameSync(tmp, QUEUE_FILE);
+    // Ensure the directory entry survives a host crash where supported.
+    const dirfd = fs.openSync(QUEUE_DIR, "r");
+    try { fs.fsyncSync(dirfd); } finally { fs.closeSync(dirfd); }
+    queueCheckpointAt = Date.now();
+    queueCheckpointBytes = bytes;
+  } catch (err) {
+    try { fs.unlinkSync(tmp); } catch {}
+    throw err;
+  }
+}
+
+function recoverQueue(): void {
+  fs.mkdirSync(QUEUE_DIR, { recursive: true });
+  if (!fs.existsSync(QUEUE_FILE)) { saveQueue(); return; }
+  const state = JSON.parse(fs.readFileSync(QUEUE_FILE, "utf8"));
+  if (state?.version !== 1 || !Array.isArray(state.pending) || !Array.isArray(state.retryChunks))
+    throw new Error("Invalid OHLC durable queue version or structure");
+  for (const entry of state.pending) {
+    if (!Array.isArray(entry) || entry.length !== 2 || typeof entry[0] !== "string" || !validateBatch(entry[1]) || entry[0] !== batchKey(entry[1]))
+      throw new Error("Corrupt OHLC pending entry");
+    pending.set(entry[0], entry[1]);
+  }
+  for (const chunk of state.retryChunks) {
+    if (!Array.isArray(chunk) || !chunk.every((row: any) => row && typeof row.id === "string" && validateBatch(row.batch)))
+      throw new Error("Corrupt OHLC retry chunk");
+    retryChunks.push(chunk);
+  }
+  queueRecoveredRows = pending.size + retryChunks.reduce((n, c) => n + c.length, 0);
+  queueCheckpointBytes = fs.statSync(QUEUE_FILE).size;
+  queueCheckpointAt = Date.now();
+  console.log(`[MASTER] durable OHLC queue recovered ${queueRecoveredRows} rows from ${QUEUE_FILE}`);
+}
+
+function fatalQueueError(error: unknown): never {
+  queueFatalError = error instanceof Error ? error.message : String(error);
+  console.error("[MASTER] FATAL durable OHLC queue error; stopping to avoid unprotected writes", queueFatalError);
+  // Do not process any further provider events after a failed durable write.
+  socket.disconnect();
+  process.exit(1);
+}
+
 let flushTimer: NodeJS.Timeout | null = null;
 let dbWriting = false;
 let liveRatesConnected = false;
@@ -136,6 +207,7 @@ function queueDbTick(t: Tick) {
     const existing = pending.get(k);
     pending.set(k, existing ? mergeBatch(existing, incoming) : incoming);
   }
+  try { saveQueue(); } catch (e) { fatalQueueError(e); }
   scheduleFlush();
 }
 
@@ -194,12 +266,16 @@ async function flushDb() {
       newChunks.push(snapshot.slice(i, i + DB_CHUNK_ROWS).map(([, batch]) => ({ id: crypto.randomUUID(), batch })));
     }
     retryChunks.push(...newChunks);
+    // Stable batch IDs must reach disk before any SQL request.
+    try { saveQueue(); } catch (e) { fatalQueueError(e); }
     while (retryChunks.length) {
       const part = retryChunks[0];
       const started = Date.now();
       try {
         await writeBatches(part);
         retryChunks.shift();
+        // SQL is committed. If we crash before checkpoint, ledger deduplicates replay.
+        try { saveQueue(); } catch (e) { fatalQueueError(e); }
         lastDbWriteMs = Date.now() - started;
         lastDbSuccessAt = Date.now();
         successfulDbWrites++;
@@ -267,12 +343,18 @@ const server=http.createServer((req,res)=>{
   const origin=req.headers.origin||"*"; res.setHeader("Access-Control-Allow-Origin",origin);res.setHeader("Vary","Origin");res.setHeader("Access-Control-Allow-Methods","GET, OPTIONS");res.setHeader("Access-Control-Allow-Headers","Content-Type");
   if(req.method==="OPTIONS"){res.writeHead(204);res.end();return;}
   const url=new URL(req.url||"/",`http://${req.headers.host||"localhost"}`);
-  if(url.pathname==="/health"){res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});res.end(JSON.stringify({ok:true,mode:"MASTER_150",connected:liveRatesConnected,configured:PROVIDER_INSTRUMENTS.length,providerSubscriptions:providerSubscriptions(),forexSlashSubscriptions,diagnostics:{rawEventCounts:Object.fromEntries(rawEventCounts),rawSymbolCounts:Object.fromEntries(rawSymbolCounts),rawMessageShapes:Object.fromEntries(rawMessageShapes),lastRateAt,lastConnectAt,lastDisconnectAt},clients:totalClients(),receivedSymbols:Object.keys(latestTicks).length,latestTicks,dbWriting,dbPending:[...new Set([...pending.values()].map(b=>b.symbol))],dbPendingRows:pending.size,dbRetryRows:retryChunks.reduce((n,c)=>n+c.length,0),dbMetrics:{flushMs:DB_FLUSH_MS,chunkRows:DB_CHUNK_ROWS,successfulDbWrites,failedDbWrites,consecutiveDbFailures,lastDbWriteMs,lastDbSuccessAt,lastDbFailureAt,shutdownFlushFailed},ohlcMetrics:{staleTicksRejected,invalidTimestampsRejected,futureTimestampsRejected,invalidPricesRejected,activeCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)>Date.now()).length,closedPendingCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)<=Date.now()).length},providerInfo:providerInfo||null,providerError:providerError||null,failedDbWrites,receivedCount:Object.fromEntries(receivedCount),unrecognizedSymbols:Object.fromEntries(unrecognizedSymbols),missingConfiguredSymbols:PROVIDER_INSTRUMENTS.filter(s=>!latestTicks[s])}));return;}
+  if(url.pathname==="/health"){res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});res.end(JSON.stringify({ok:true,mode:"MASTER_150",connected:liveRatesConnected,configured:PROVIDER_INSTRUMENTS.length,providerSubscriptions:providerSubscriptions(),forexSlashSubscriptions,diagnostics:{rawEventCounts:Object.fromEntries(rawEventCounts),rawSymbolCounts:Object.fromEntries(rawSymbolCounts),rawMessageShapes:Object.fromEntries(rawMessageShapes),lastRateAt,lastConnectAt,lastDisconnectAt},clients:totalClients(),receivedSymbols:Object.keys(latestTicks).length,latestTicks,dbWriting,dbPending:[...new Set([...pending.values()].map(b=>b.symbol))],dbPendingRows:pending.size,dbRetryRows:retryChunks.reduce((n,c)=>n+c.length,0),durableQueue:{directory:QUEUE_DIR,checkpointAt:queueCheckpointAt,checkpointBytes:queueCheckpointBytes,recoveredRows:queueRecoveredRows,fatalError:queueFatalError},dbMetrics:{flushMs:DB_FLUSH_MS,chunkRows:DB_CHUNK_ROWS,successfulDbWrites,failedDbWrites,consecutiveDbFailures,lastDbWriteMs,lastDbSuccessAt,lastDbFailureAt,shutdownFlushFailed},ohlcMetrics:{staleTicksRejected,invalidTimestampsRejected,futureTimestampsRejected,invalidPricesRejected,activeCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)>Date.now()).length,closedPendingCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)<=Date.now()).length},providerInfo:providerInfo||null,providerError:providerError||null,failedDbWrites,receivedCount:Object.fromEntries(receivedCount),unrecognizedSymbols:Object.fromEntries(unrecognizedSymbols),missingConfiguredSymbols:PROVIDER_INSTRUMENTS.filter(s=>!latestTicks[s])}));return;}
   const m=url.pathname.match(/^\/api\/(?:market\/)?([a-z0-9]+)\/stream$/i);
   if(m){ const symbol=normalizeMarketSymbol(m[1]); if(!PROVIDER_SET.has(symbol)){res.writeHead(404,{"Content-Type":"application/json"});res.end(JSON.stringify({ok:false,error:"Unknown symbol"}));return;} res.writeHead(200,{"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache, no-transform",Connection:"keep-alive","X-Accel-Buffering":"no","Access-Control-Allow-Origin":origin,Vary:"Origin"});res.write("retry: 3000\n\n");res.write(`event: status\ndata: ${JSON.stringify({provider:"live-rates",connected:liveRatesConnected,symbol,mode:"MASTER_150"})}\n\n`);if(latestTicks[symbol])res.write(`event: tick\ndata: ${JSON.stringify(latestTicks[symbol])}\n\n`);const set=clientSet(symbol);set.add(res);const keep=setInterval(()=>{try{res.write(`: keepalive ${Date.now()}\n\n`);}catch{}},15000);req.on("close",()=>{clearInterval(keep);set.delete(res);});return; }
   res.writeHead(200,{"Content-Type":"application/json"});res.end(JSON.stringify({ok:true,service:"FX Trade Master Market Collector",mode:"MASTER_150",configured:PROVIDER_INSTRUMENTS.length,health:"/health",streamPattern:"/api/market/{symbol}/stream"}));
 });
-server.listen(PORT,"0.0.0.0",()=>{console.log(`[MASTER] HTTP/SSE :${PORT}`);socket.connect();});
+// Fail startup if the persistent volume is absent, read-only, or contains invalid data.
+try { recoverQueue(); } catch (e) { fatalQueueError(e); }
+server.listen(PORT,"0.0.0.0",()=>{
+  console.log(`[MASTER] HTTP/SSE :${PORT}`);
+  if (pending.size || retryChunks.length) scheduleFlush(1000);
+  socket.connect();
+});
 async function shutdown(signal:string){
   console.log(`[MASTER] ${signal}: stopping new ticks and flushing pending candles`);
   shuttingDown=true;
@@ -284,7 +366,7 @@ async function shutdown(signal:string){
   while(dbWriting && Date.now()<waitUntil) await new Promise(r=>setTimeout(r,100));
   if(dbWriting){shutdownFlushFailed=true;console.error("[MASTER] shutdown: DB write still in progress");}
   else {
-    // Flush pending batches once; failed batches stay in RAM and cannot survive a container restart.
+    // Flush pending batches once; any failures remain durable on the mounted volume.
     await flushDb();
     if(pending.size || retryChunks.length){shutdownFlushFailed=true;console.error(`[MASTER] shutdown: ${pending.size} pending candles, ${retryChunks.length} retry chunks`);}
   }
