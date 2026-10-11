@@ -33,7 +33,7 @@ const client = new pg.Client({
   ssl: { ca, rejectUnauthorized: true },
   connectionTimeoutMillis: 20_000,
   query_timeout: 30_000,
-  application_name: 'fxtrade-d1-close-backfill-v2',
+  application_name: 'fxtrade-d1-close-backfill-v3',
 });
 
 function parseDay(value: string, name: string): number {
@@ -47,9 +47,9 @@ const start = parseDay(process.env.D1_BACKFILL_START || day(today - 7 * DAY), 'D
 const end = parseDay(process.env.D1_BACKFILL_END || day(today - DAY), 'D1_BACKFILL_END');
 if (start > end || end >= today) throw new Error('Date range must end before today UTC');
 
-// Default to the seven FX majors already verified in this project.
-// Expand explicitly via D1_BACKFILL_SYMBOLS after confirming Live-Rates coverage.
-const DEFAULT_SYMBOLS = 'EURUSD,GBPUSD,USDJPY,USDCHF,AUDUSD,USDCAD,NZDUSD';
+// Forex majors plus provider-confirmed precious metals.
+// D1_BACKFILL_SYMBOLS in Railway overrides this default.
+const DEFAULT_SYMBOLS = 'EURUSD,GBPUSD,USDJPY,USDCHF,AUDUSD,USDCAD,NZDUSD,XAUUSD,XAGUSD';
 const configured = process.env.D1_BACKFILL_SYMBOLS?.trim() || DEFAULT_SYMBOLS;
 const symbols = [...new Set(configured.split(/[\s,;]+/).map(s => s.trim().toUpperCase()).filter(Boolean))];
 if (!symbols.length) throw new Error('No symbols configured');
@@ -86,14 +86,14 @@ async function fetchWindow(symbol: string, from: number, to: number): Promise<Re
 }
 
 async function main() {
-  console.log(`D1 Backfill V2: ${day(start)}..${day(end)} | ${symbols.join(', ')}`);
+  console.log(`D1 Backfill V3: ${day(start)}..${day(end)} | ${symbols.join(', ')}`);
   console.log(`Database: ${dbUrl.hostname}:${dbUrl.port || 5432} | TLS certificate verified`);
   await client.connect();
   try {
     const result = await client.query(`SELECT to_regclass('public."MarketDailyClose"') AS name`);
     if (!result.rows[0]?.name) throw new Error('Missing public."MarketDailyClose"');
     for (const symbol of symbols) {
-      if (!/^[A-Z]{6}$/.test(symbol) || /^(XAU|XAG|XPT|XPD|WTI)/.test(symbol)) {
+      if (!/^[A-Z]{6}$/.test(symbol)) {
         skipped++;
         failures.push(`${symbol}: unsupported instrument format`);
         continue;
