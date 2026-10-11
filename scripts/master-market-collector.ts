@@ -37,6 +37,8 @@ const MAX_FUTURE_TICK_MS = 60_000;
 
 const clientsBySymbol = new Map<string, Set<http.ServerResponse>>();
 const pending = new Map<string, TickBatch>();
+// Immutable failed chunks keep stable IDs for idempotent SQL retries.
+const retryChunks: Array<Array<{ id: string; batch: TickBatch }>> = [];
 let flushTimer: NodeJS.Timeout | null = null;
 let dbWriting = false;
 let liveRatesConnected = false;
@@ -137,42 +139,67 @@ function queueDbTick(t: Tick) {
   scheduleFlush();
 }
 
-async function writeBatches(batches: TickBatch[]) {
-  if (!batches.length) return;
-  // Small, bounded upsert: prevents enormous SQL and limits lock duration.
+type DurableBatch = { id: string; batch: TickBatch };
+
+async function writeBatches(rows: DurableBatch[]) {
+  if (!rows.length) return;
   const params: unknown[] = [];
-  const values = batches.map((b) => {
+  const values = rows.map(({ id, batch: b }) => {
     const base = params.length;
-    params.push(crypto.randomUUID(), b.symbol, b.interval, new Date(b.bucket),
-      b.open, b.high, b.low, b.close, b.ticks);
-    const p = Array.from({ length: 9 }, (_, i) => `$${base + i + 1}`);
-    return `(${p.join(",")},NOW(),NOW())`;
+    params.push(id, crypto.randomUUID(), b.symbol, b.interval, new Date(b.bucket),
+      b.open, b.high, b.low, b.close, b.ticks, new Date(b.firstAt), new Date(b.lastAt));
+    const p = Array.from({ length: 12 }, (_, i) => `$${base + i + 1}`);
+    return `(${p.join(",")})`;
   }).join(",");
-  await prisma.$executeRawUnsafe(
-    `INSERT INTO "MarketCandle" ("id","symbol","interval","bucket","open","high","low","close","ticks","createdAt","updatedAt")
-     VALUES ${values}
-     ON CONFLICT ("symbol","interval","bucket") DO UPDATE SET
-       "high"=GREATEST("MarketCandle"."high",EXCLUDED."high"),
-       "low"=LEAST("MarketCandle"."low",EXCLUDED."low"),
-       "close"=EXCLUDED."close",
-       "ticks"="MarketCandle"."ticks"+EXCLUDED."ticks",
-       "updatedAt"=NOW()`,
-    ...params
-  );
+  // One atomic SQL statement: only previously unseen batch IDs may update candles.
+  // A timed-out but committed batch cannot be applied twice.
+  await prisma.$executeRawUnsafe(`
+    WITH incoming(batch_id, id, symbol, interval, bucket, open, high, low, close, ticks, first_at, last_at) AS
+      (VALUES ${values}),
+    accepted AS (
+      INSERT INTO public."MarketCandleBatchLedger" ("batchId")
+      SELECT batch_id::text FROM incoming
+      ON CONFLICT ("batchId") DO NOTHING
+      RETURNING "batchId"
+    )
+    INSERT INTO public."MarketCandle"
+      ("id","symbol","interval","bucket","open","high","low","close","ticks","firstAt","lastAt","createdAt","updatedAt")
+    SELECT i.id::text,i.symbol::text,i.interval::text,i.bucket::timestamptz,
+      i.open::float8,i.high::float8,i.low::float8,i.close::float8,i.ticks::integer,
+      i.first_at::timestamptz,i.last_at::timestamptz,NOW(),NOW()
+    FROM incoming i JOIN accepted a ON a."batchId" = i.batch_id::text
+    ON CONFLICT ("symbol","interval","bucket") DO UPDATE SET
+      "high"=GREATEST("MarketCandle"."high",EXCLUDED."high"),
+      "low"=LEAST("MarketCandle"."low",EXCLUDED."low"),
+      "open"=CASE WHEN "MarketCandle"."firstAt" IS NULL OR EXCLUDED."firstAt" < "MarketCandle"."firstAt"
+        THEN EXCLUDED."open" ELSE "MarketCandle"."open" END,
+      "close"=CASE WHEN "MarketCandle"."lastAt" IS NULL OR EXCLUDED."lastAt" >= "MarketCandle"."lastAt"
+        THEN EXCLUDED."close" ELSE "MarketCandle"."close" END,
+      "firstAt"=LEAST(COALESCE("MarketCandle"."firstAt", EXCLUDED."firstAt"), EXCLUDED."firstAt"),
+      "lastAt"=GREATEST(COALESCE("MarketCandle"."lastAt", EXCLUDED."lastAt"), EXCLUDED."lastAt"),
+      "ticks"="MarketCandle"."ticks"+EXCLUDED."ticks",
+      "updatedAt"=NOW()
+  `, ...params);
 }
 
 async function flushDb() {
   if (dbWriting) return;
   dbWriting = true;
   try {
-    // Snapshot once; new ticks stay in pending for the next cycle.
+    // Retry immutable failed chunks first. Never merge them with fresh ticks.
     const snapshot = [...pending.entries()];
     pending.clear();
+    const newChunks: DurableBatch[][] = [];
     for (let i = 0; i < snapshot.length; i += DB_CHUNK_ROWS) {
-      const part = snapshot.slice(i, i + DB_CHUNK_ROWS);
+      newChunks.push(snapshot.slice(i, i + DB_CHUNK_ROWS).map(([, batch]) => ({ id: crypto.randomUUID(), batch })));
+    }
+    retryChunks.push(...newChunks);
+    while (retryChunks.length) {
+      const part = retryChunks[0];
       const started = Date.now();
       try {
-        await writeBatches(part.map(([, b]) => b));
+        await writeBatches(part);
+        retryChunks.shift();
         lastDbWriteMs = Date.now() - started;
         lastDbSuccessAt = Date.now();
         successfulDbWrites++;
@@ -183,18 +210,13 @@ async function flushDb() {
         consecutiveDbFailures++;
         lastDbFailureAt = Date.now();
         lastDbWriteMs = Date.now() - started;
-        // Requeue failed AND unattempted chunks; never drop them silently.
-        for (const [k, old] of snapshot.slice(i)) {
-          const fresh = pending.get(k);
-          pending.set(k, fresh ? mergeBatch(old, fresh) : old);
-        }
         console.error(`[MASTER] DB batch failed; queued retry (${part.length} rows), duration=${lastDbWriteMs}ms`, e?.message || e);
         break;
       }
     }
   } finally {
     dbWriting = false;
-    if (pending.size) {
+    if (pending.size || retryChunks.length) {
       const retryMs = consecutiveDbFailures
         ? Math.min(DB_RETRY_MAX_MS, DB_FLUSH_MS * 2 ** Math.min(consecutiveDbFailures - 1, 3))
         : DB_FLUSH_MS;
@@ -245,7 +267,7 @@ const server=http.createServer((req,res)=>{
   const origin=req.headers.origin||"*"; res.setHeader("Access-Control-Allow-Origin",origin);res.setHeader("Vary","Origin");res.setHeader("Access-Control-Allow-Methods","GET, OPTIONS");res.setHeader("Access-Control-Allow-Headers","Content-Type");
   if(req.method==="OPTIONS"){res.writeHead(204);res.end();return;}
   const url=new URL(req.url||"/",`http://${req.headers.host||"localhost"}`);
-  if(url.pathname==="/health"){res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});res.end(JSON.stringify({ok:true,mode:"MASTER_150",connected:liveRatesConnected,configured:PROVIDER_INSTRUMENTS.length,providerSubscriptions:providerSubscriptions(),forexSlashSubscriptions,diagnostics:{rawEventCounts:Object.fromEntries(rawEventCounts),rawSymbolCounts:Object.fromEntries(rawSymbolCounts),rawMessageShapes:Object.fromEntries(rawMessageShapes),lastRateAt,lastConnectAt,lastDisconnectAt},clients:totalClients(),receivedSymbols:Object.keys(latestTicks).length,latestTicks,dbWriting,dbPending:[...new Set([...pending.values()].map(b=>b.symbol))],dbPendingRows:pending.size,dbMetrics:{flushMs:DB_FLUSH_MS,chunkRows:DB_CHUNK_ROWS,successfulDbWrites,failedDbWrites,consecutiveDbFailures,lastDbWriteMs,lastDbSuccessAt,lastDbFailureAt,shutdownFlushFailed},ohlcMetrics:{staleTicksRejected,invalidTimestampsRejected,futureTimestampsRejected,invalidPricesRejected,activeCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)>Date.now()).length,closedPendingCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)<=Date.now()).length},providerInfo:providerInfo||null,providerError:providerError||null,failedDbWrites,receivedCount:Object.fromEntries(receivedCount),unrecognizedSymbols:Object.fromEntries(unrecognizedSymbols),missingConfiguredSymbols:PROVIDER_INSTRUMENTS.filter(s=>!latestTicks[s])}));return;}
+  if(url.pathname==="/health"){res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});res.end(JSON.stringify({ok:true,mode:"MASTER_150",connected:liveRatesConnected,configured:PROVIDER_INSTRUMENTS.length,providerSubscriptions:providerSubscriptions(),forexSlashSubscriptions,diagnostics:{rawEventCounts:Object.fromEntries(rawEventCounts),rawSymbolCounts:Object.fromEntries(rawSymbolCounts),rawMessageShapes:Object.fromEntries(rawMessageShapes),lastRateAt,lastConnectAt,lastDisconnectAt},clients:totalClients(),receivedSymbols:Object.keys(latestTicks).length,latestTicks,dbWriting,dbPending:[...new Set([...pending.values()].map(b=>b.symbol))],dbPendingRows:pending.size,dbRetryRows:retryChunks.reduce((n,c)=>n+c.length,0),dbMetrics:{flushMs:DB_FLUSH_MS,chunkRows:DB_CHUNK_ROWS,successfulDbWrites,failedDbWrites,consecutiveDbFailures,lastDbWriteMs,lastDbSuccessAt,lastDbFailureAt,shutdownFlushFailed},ohlcMetrics:{staleTicksRejected,invalidTimestampsRejected,futureTimestampsRejected,invalidPricesRejected,activeCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)>Date.now()).length,closedPendingCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)<=Date.now()).length},providerInfo:providerInfo||null,providerError:providerError||null,failedDbWrites,receivedCount:Object.fromEntries(receivedCount),unrecognizedSymbols:Object.fromEntries(unrecognizedSymbols),missingConfiguredSymbols:PROVIDER_INSTRUMENTS.filter(s=>!latestTicks[s])}));return;}
   const m=url.pathname.match(/^\/api\/(?:market\/)?([a-z0-9]+)\/stream$/i);
   if(m){ const symbol=normalizeMarketSymbol(m[1]); if(!PROVIDER_SET.has(symbol)){res.writeHead(404,{"Content-Type":"application/json"});res.end(JSON.stringify({ok:false,error:"Unknown symbol"}));return;} res.writeHead(200,{"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache, no-transform",Connection:"keep-alive","X-Accel-Buffering":"no","Access-Control-Allow-Origin":origin,Vary:"Origin"});res.write("retry: 3000\n\n");res.write(`event: status\ndata: ${JSON.stringify({provider:"live-rates",connected:liveRatesConnected,symbol,mode:"MASTER_150"})}\n\n`);if(latestTicks[symbol])res.write(`event: tick\ndata: ${JSON.stringify(latestTicks[symbol])}\n\n`);const set=clientSet(symbol);set.add(res);const keep=setInterval(()=>{try{res.write(`: keepalive ${Date.now()}\n\n`);}catch{}},15000);req.on("close",()=>{clearInterval(keep);set.delete(res);});return; }
   res.writeHead(200,{"Content-Type":"application/json"});res.end(JSON.stringify({ok:true,service:"FX Trade Master Market Collector",mode:"MASTER_150",configured:PROVIDER_INSTRUMENTS.length,health:"/health",streamPattern:"/api/market/{symbol}/stream"}));
@@ -264,7 +286,7 @@ async function shutdown(signal:string){
   else {
     // Flush pending batches once; failed batches stay in RAM and cannot survive a container restart.
     await flushDb();
-    if(pending.size){shutdownFlushFailed=true;console.error(`[MASTER] shutdown: ${pending.size} unsaved OHLC batches`);}
+    if(pending.size || retryChunks.length){shutdownFlushFailed=true;console.error(`[MASTER] shutdown: ${pending.size} pending candles, ${retryChunks.length} retry chunks`);}
   }
   for(const set of clientsBySymbol.values())for(const c of set)try{c.end();}catch{}
   await new Promise<void>(r=>server.close(()=>r()));
