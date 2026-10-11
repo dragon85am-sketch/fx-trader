@@ -198,9 +198,27 @@ async function scanOne(display:string,tf:string,db:string,tfSeconds:number){if(i
   }
   const levels:Levels={side:active.side as Side,entry:active.entry,sl:active.sl,tps:[active.tp1,active.tp2,active.tp3],rr:active.rr};const r=advanceTrade(cs,active.side as Side,levels,Math.floor(active.signalTime.getTime()/1000),active.tp1Hit,active.tp2Hit);if(r.status){const closed=await prisma.fxScannerTrade.update({where:{id:active.id},data:{status:r.status,tp1Hit:r.tp1Hit,tp2Hit:r.tp2Hit,tp3Hit:r.status==="TP3",closedAt:new Date()}});if(!closed.telegramClosed){const ok=await telegram({type:"CLOSED",instrument:closed.instrument,side:closed.side,tf:closed.tf,entry:closed.entry,sl:closed.sl,tp1:closed.tp1,tp2:closed.tp2,tp3:closed.tp3,status:closed.status,tp1Hit:closed.tp1Hit,tp2Hit:closed.tp2Hit,tp3Hit:closed.tp3Hit,timeISO:closed.closedAt?.toISOString()});if(ok)await prisma.fxScannerTrade.update({where:{id:closed.id},data:{telegramClosed:true}});}}else if(r.tp1Hit!==active.tp1Hit||r.tp2Hit!==active.tp2Hit)await prisma.fxScannerTrade.update({where:{id:active.id},data:{tp1Hit:r.tp1Hit,tp2Hit:r.tp2Hit}});return;}
 const found=scan4of4(cs);if(found.count!==4||!found.side){await clearReadySetup(storage,tf);return;}const signal=cs[cs.length-1];if(!signal)return;let setup=await loadReadySetup(storage,tf);if(!setup||setup.side!==found.side){const lv=buildLevels(cs,found.side);if(!lv)return;setup={side:found.side,levels:lv,signalTime:signal.time};await saveReadySetup(display,storage,tf,setup);console.log(`[FX-WORKER] READY ${display} ${tf} ${found.side} entry=${lv.entry} — persisted, waiting for CLOSED candle confirmation`);return;}if(signal.time<=setup.signalTime)return;const confirmed=setup.side==="BUY"?signal.close>setup.levels.entry:signal.close<setup.levels.entry;if(!confirmed){console.log(`[FX-WORKER] WAIT ENTRY ${display} ${tf} ${setup.side} close=${signal.close} entry=${setup.levels.entry}`);return;}const lv=setup.levels;const signalTime=new Date(signal.time*1000),id=crypto.createHash("sha1").update(`${storage}|${tf}|${setup.side}|${signalTime.toISOString()}`).digest("hex");let trade;try{trade=await prisma.fxScannerTrade.create({data:{id,instrument:display,storageSymbol:storage,tf,side:setup.side,confirmation:4,signalTime,entry:lv.entry,sl:lv.sl,tp1:lv.tps[0],tp2:lv.tps[1],tp3:lv.tps[2],rr:lv.rr}});}catch(e:any){if(e?.code!=="P2002")console.error(`[FX-WORKER] TRADE CREATE ERROR ${display} ${tf}`,e?.message||e);return;}await clearReadySetup(storage,tf);const ok=await telegram({type:"SIGNAL",instrument:trade.instrument,side:trade.side,tf:trade.tf,rr:trade.rr,entry:trade.entry,sl:trade.sl,tp1:trade.tp1,tp2:trade.tp2,tp3:trade.tp3,timeISO:trade.openedAt.toISOString()});if(ok)await prisma.fxScannerTrade.update({where:{id:trade.id},data:{telegramSignal:true}});console.log(`[FX-WORKER] ACTIVE ${display} ${tf} ${setup.side} — candle CLOSED beyond ENTRY`);}
+// Limit catch-up notifications after a restart; never mark an unsent notification as sent.
+// This does not provide exactly-once delivery across crashes or multiple worker replicas.
+const CLOSED_RETRY_BATCH_SIZE = 2;
 async function retryClosedTelegram(){
-  const rows=await prisma.fxScannerTrade.findMany({where:{status:{in:["TP3","SL","TP1_BE"]},telegramClosed:false},orderBy:{closedAt:"asc"},take:10});
-  for(const t of rows){const ok=await telegram({type:"CLOSED",instrument:t.instrument,side:t.side,tf:t.tf,entry:t.entry,sl:t.sl,tp1:t.tp1,tp2:t.tp2,tp3:t.tp3,status:t.status,tp1Hit:t.tp1Hit,tp2Hit:t.tp2Hit,tp3Hit:t.tp3Hit,timeISO:t.closedAt?.toISOString()});if(ok)await prisma.fxScannerTrade.update({where:{id:t.id},data:{telegramClosed:true}});}
+  const rows=await prisma.fxScannerTrade.findMany({
+    where:{status:{in:["TP3","SL","TP1_BE"]},telegramClosed:false},
+    orderBy:{closedAt:"asc"},
+    take:CLOSED_RETRY_BATCH_SIZE,
+  });
+  for(const t of rows){
+    console.log(`[FX-WORKER] CLOSED RETRY attempt tradeId=${t.id} ${t.instrument} ${t.tf} status=${t.status}`);
+    const ok=await telegram({type:"CLOSED",instrument:t.instrument,side:t.side,tf:t.tf,entry:t.entry,sl:t.sl,tp1:t.tp1,tp2:t.tp2,tp3:t.tp3,status:t.status,tp1Hit:t.tp1Hit,tp2Hit:t.tp2Hit,tp3Hit:t.tp3Hit,timeISO:t.closedAt?.toISOString()});
+    if(ok){
+      await prisma.fxScannerTrade.update({where:{id:t.id},data:{telegramClosed:true}});
+      console.log(`[FX-WORKER] CLOSED RETRY marked sent tradeId=${t.id}`);
+    }else{
+      console.warn(`[FX-WORKER] CLOSED RETRY failed tradeId=${t.id}; will retry later`);
+      break;
+    }
+  }
 }
+
 async function cycle(){try{await retryClosedTelegram();}catch(e:any){console.error(`[FX-WORKER] CLOSED TELEGRAM RETRY ERROR`,e?.message||e);}try{await maybeSendWeeklyReport();}catch(e:any){console.error(`[FX-WORKER] WEEKLY ERROR`,e?.message||e);}for(const display of FX_SCANNER_SYMBOLS)for(const x of INTERVALS)try{await scanOne(display,x.tf,x.db,x.seconds)}catch(e:any){console.error(`[FX-WORKER] ${display} ${x.tf}`,e?.message||e);}}
 let running=false;async function run(){if(running)return;running=true;try{await cycle();}finally{running=false;}}console.log(`[FX-WORKER] 24/7 start: ${FX_SCANNER_SYMBOLS.length} configured symbols, ${INTERVALS.length} TF, every ${EVERY}ms`);void run();const timer=setInterval(()=>void run(),EVERY);async function stop(){clearInterval(timer);await prisma.$disconnect();process.exit(0);}process.on("SIGINT",()=>void stop());process.on("SIGTERM",()=>void stop());
