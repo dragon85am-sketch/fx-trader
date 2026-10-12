@@ -180,18 +180,25 @@ async function telegram(payload:any){
     return true;
   }catch(e:any){console.error(`[FX-WORKER] TELEGRAM ${tag} ERROR:`,e?.message||e);return false;}
 }
-// Weekend policy: only cryptocurrency instruments are scanned on Saturday/Sunday (UTC).
+// Weekly session policy: crypto continues 24/7; other instruments pause during the FX weekend.
 // Other markets are paused; existing positions and READY records are not deleted.
 const CRYPTO_BASES = new Set(["BTC", "ETH", "SOL", "XRP", "LTC", "BCH", "ADA", "DOGE", "DOT", "AVAX", "LINK"]);
 function isCryptoInstrument(symbol: string): boolean {
   const normalized = symbol.toUpperCase().replace(/[^A-Z0-9]/g, "");
   return [...CRYPTO_BASES].some(base => normalized.startsWith(base) && normalized.length > base.length);
 }
-function isWeekendUTC(date = new Date()): boolean {
-  const day = date.getUTCDay();
-  return day === 0 || day === 6;
+// Standard FX weekly session: Sunday 17:00 through Friday 17:00 New York time.
+// America/New_York handles US DST automatically (Polish clock can shift during DST mismatch weeks).
+// Fresh OHLC is still required before any signal; this is only a session gate.
+function isFxWeeklyClosed(date = new Date()): boolean {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York", weekday: "short", hour: "2-digit", hourCycle: "h23",
+  }).formatToParts(date);
+  const weekday = parts.find(p => p.type === "weekday")?.value;
+  const hour = Number(parts.find(p => p.type === "hour")?.value ?? "0");
+  return weekday === "Sat" || (weekday === "Fri" && hour >= 17) || (weekday === "Sun" && hour < 17);
 }
-async function scanOne(display:string,tf:string,db:string,tfSeconds:number){if(isWeekendUTC()&&!isCryptoInstrument(display)){logStaleOnce(`${display}|${tf}|MARKET_CLOSED`,`[FX-WORKER] MARKET CLOSED (WEEKEND UTC) ${display} ${tf} — scan paused; crypto only`);return;}const storage=fxScannerStorageSymbol(display),cs=await candles(storage,db,tfSeconds);if(cs.length<45){logStaleOnce(`${storage}|${tf}|NODATA`,`[FX-WORKER] NO DATA ${display} ${tf} candles=${cs.length}/45 — scan skipped`);return;}if(!isFresh(cs,tfSeconds)){const latest=cs[cs.length-1];const ageSec=Math.max(0,Math.floor(Date.now()/1000)-latest.time);logStaleOnce(`${storage}|${tf}|STALE`,`[FX-WORKER] STALE ${display} ${tf} age=${ageSec}s limit=${tfSeconds*(STALE_MULTIPLIER+1)}s — 4/4/READY/ENTRY skipped`);return;}const active=await prisma.fxScannerTrade.findFirst({where:{storageSymbol:storage,tf,status:"ACTIVE"},orderBy:{openedAt:"desc"}});if(active){
+async function scanOne(display:string,tf:string,db:string,tfSeconds:number){if(isFxWeeklyClosed()&&!isCryptoInstrument(display)){logStaleOnce(`${display}|${tf}|MARKET_CLOSED`,`[FX-WORKER] MARKET CLOSED (FX WEEKLY SESSION) ${display} ${tf} — scan paused; crypto only`);return;}const storage=fxScannerStorageSymbol(display),cs=await candles(storage,db,tfSeconds);if(cs.length<45){logStaleOnce(`${storage}|${tf}|NODATA`,`[FX-WORKER] NO DATA ${display} ${tf} candles=${cs.length}/45 — scan skipped`);return;}if(!isFresh(cs,tfSeconds)){const latest=cs[cs.length-1];const ageSec=Math.max(0,Math.floor(Date.now()/1000)-latest.time);logStaleOnce(`${storage}|${tf}|STALE`,`[FX-WORKER] STALE ${display} ${tf} age=${ageSec}s limit=${tfSeconds*(STALE_MULTIPLIER+1)}s — 4/4/READY/ENTRY skipped`);return;}const active=await prisma.fxScannerTrade.findFirst({where:{storageSymbol:storage,tf,status:"ACTIVE"},orderBy:{openedAt:"desc"}});if(active){
   if(!active.telegramSignal){
     const sent=await telegram({type:"SIGNAL",instrument:active.instrument,side:active.side,tf:active.tf,rr:active.rr,entry:active.entry,sl:active.sl,tp1:active.tp1,tp2:active.tp2,tp3:active.tp3,timeISO:active.openedAt.toISOString()});
     if(sent)await prisma.fxScannerTrade.update({where:{id:active.id},data:{telegramSignal:true}});
