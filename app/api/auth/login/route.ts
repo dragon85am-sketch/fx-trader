@@ -3,53 +3,65 @@ import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
+export const runtime = "nodejs";
+
 export async function POST(req: Request) {
   try {
-    const { email, password } = await req.json();
-
-    const user = await prisma.user.findUnique({
-      where: { email },
-    });
-
-    if (!user || !user.password) {
-      return NextResponse.json(
-        { error: "Nieprawidłowy email lub hasło" },
-        { status: 401 }
-      );
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Nieprawidłowe dane logowania" }, { status: 400 });
     }
 
-    const isValid = await bcrypt.compare(password, user.password);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Nieprawidłowe dane logowania" }, { status: 400 });
+    }
 
-    if (!isValid) {
-      return NextResponse.json(
-        { error: "Nieprawidłowy email lub hasło" },
-        { status: 401 }
-      );
+    const data = body as Record<string, unknown>;
+    const email = data.email;
+    const password = data.password;
+    if (typeof email !== "string" || typeof password !== "string" ||
+        !email.trim() || !password || email.length > 320) {
+      return NextResponse.json({ error: "Podaj email i hasło" }, { status: 400 });
+    }
+
+    // Keep email matching behavior consistent with the existing login route.
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user?.password || !(await bcrypt.compare(password, user.password))) {
+      return NextResponse.json({ error: "Nieprawidłowy email lub hasło" }, { status: 401 });
+    }
+
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      console.error("Login configuration error: JWT_SECRET missing");
+      return NextResponse.json({ error: "Logowanie chwilowo niedostępne" }, { status: 503 });
     }
 
     const token = jwt.sign(
-      {
-        userId: user.id,
-        email: user.email,
-        role: user.role,
-      },
-      process.env.JWT_SECRET!,
+      { userId: user.id, email: user.email, role: user.role },
+      secret,
       { expiresIn: "7d" }
     );
 
     const res = NextResponse.json({ ok: true });
-
     res.cookies.set("token", token, {
       httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
       path: "/",
+      // Preserves the existing session-cookie lifetime (browser session).
     });
-
     return res;
   } catch (error) {
     console.error("Login error:", error);
-    return NextResponse.json(
-      { error: "Błąd logowania" },
-      { status: 500 }
-    );
+    const message = error instanceof Error ? error.message : "";
+    if (/CHECKOUT_TIMEOUT|Timed out fetching a new connection|connection pool|P1001|P1002|P2024/i.test(message)) {
+      return NextResponse.json(
+        { error: "Baza danych jest chwilowo przeciążona. Spróbuj ponownie za chwilę." },
+        { status: 503, headers: { "Retry-After": "15" } }
+      );
+    }
+    return NextResponse.json({ error: "Błąd logowania" }, { status: 500 });
   }
 }
