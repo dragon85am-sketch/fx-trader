@@ -42,6 +42,32 @@ let lastProviderTickTimestamp: number | null = null;
 let maxProviderTickLagMs = 0;
 let lastProviderTickLagMs: number | null = null;
 const acceptedByMinute = new Map<number, Set<string>>();
+// FAZA 3.0.3: provider-arrival monitoring (independent of accepted tick timestamps).
+let lastProviderPriceArrivalAt: number | null = null;
+let marketDataGapEvents = 0;
+let longestProviderSilenceMs = 0;
+let lastProviderGapMs: number | null = null;
+const PROVIDER_GAP_THRESHOLD_MS = 30_000;
+let tickArrivalLagMs: number | null = null;
+let maxTickArrivalLagMs = 0;
+let negativeTickArrivalLagCount = 0;
+function observeProviderPrice(timestamp: number) {
+  const now = Date.now();
+  if (lastProviderPriceArrivalAt !== null) {
+    const gap = now - lastProviderPriceArrivalAt;
+    if (gap >= PROVIDER_GAP_THRESHOLD_MS) {
+      marketDataGapEvents++;
+      lastProviderGapMs = gap;
+      longestProviderSilenceMs = Math.max(longestProviderSilenceMs, gap);
+      console.warn(`[MASTER] provider price arrival gap: ${gap}ms`);
+    }
+  }
+  lastProviderPriceArrivalAt = now;
+  tickArrivalLagMs = now - timestamp;
+  maxTickArrivalLagMs = Math.max(maxTickArrivalLagMs, tickArrivalLagMs);
+  if (tickArrivalLagMs < 0) negativeTickArrivalLagCount++;
+}
+
 function recordAcceptedTick(t: Tick) {
   acceptedTicks++;
   lastAcceptedTickAt = Date.now();
@@ -64,6 +90,10 @@ function oldestQueueBucket() {
 function ingestionDiagnostics() {
   const oldest = oldestQueueBucket();
   return {
+    providerSilenceSeconds: lastProviderPriceArrivalAt === null ? null : Math.floor((Date.now() - lastProviderPriceArrivalAt) / 1000),
+    marketDataGapEvents, lastProviderGapMs, longestProviderSilenceMs,
+    tickArrivalLagMs, maxTickArrivalLagMs, negativeTickArrivalLagCount,
+    lastProviderPriceArrivalAt,
     acceptedTicks, lastAcceptedTickAt, lastProviderTickTimestamp,
     lastProviderTickLagMs, maxProviderTickLagMs,
     oldestQueuedBucket: oldest,
@@ -378,6 +408,7 @@ socket.on("rates",(raw:any)=>{ try {
     if(!Number.isFinite(price)||price<=0){ invalidPricesRejected++; continue; }
     const timestamp=normalizeTimestamp(msg?.timestamp);
     if(timestamp === null){ invalidTimestampsRejected++; continue; }
+    observeProviderPrice(timestamp);
     if(timestamp > Date.now() + MAX_FUTURE_TICK_MS){ futureTimestampsRejected++; continue; }
     const last=lastAcceptedTimestamp.get(symbol);
     if(last !== undefined && timestamp < last){ staleTicksRejected++; continue; }
