@@ -35,6 +35,43 @@ let invalidTimestampsRejected = 0;
 let futureTimestampsRejected = 0;
 let invalidPricesRejected = 0;
 let shutdownFlushFailed = false;
+// FAZA 3.0.1: passive diagnostics. No changes to tick acceptance or SQL writes.
+let acceptedTicks = 0;
+let lastAcceptedTickAt: number | null = null;
+let lastProviderTickTimestamp: number | null = null;
+let maxProviderTickLagMs = 0;
+let lastProviderTickLagMs: number | null = null;
+const acceptedByMinute = new Map<number, Set<string>>();
+function recordAcceptedTick(t: Tick) {
+  acceptedTicks++;
+  lastAcceptedTickAt = Date.now();
+  lastProviderTickTimestamp = t.timestamp;
+  lastProviderTickLagMs = Date.now() - t.timestamp;
+  maxProviderTickLagMs = Math.max(maxProviderTickLagMs, lastProviderTickLagMs);
+  const minute = Math.floor(t.timestamp / 60_000) * 60_000;
+  let symbols = acceptedByMinute.get(minute);
+  if (!symbols) { symbols = new Set<string>(); acceptedByMinute.set(minute, symbols); }
+  symbols.add(t.symbol);
+  const cutoff = Date.now() - 30 * 60_000;
+  for (const k of acceptedByMinute.keys()) if (k < cutoff) acceptedByMinute.delete(k);
+}
+function oldestQueueBucket() {
+  let oldest = Infinity;
+  for (const b of pending.values()) oldest = Math.min(oldest, b.bucket);
+  for (const chunk of retryChunks) for (const row of chunk) oldest = Math.min(oldest, row.batch.bucket);
+  return Number.isFinite(oldest) ? oldest : null;
+}
+function ingestionDiagnostics() {
+  const oldest = oldestQueueBucket();
+  return {
+    acceptedTicks, lastAcceptedTickAt, lastProviderTickTimestamp,
+    lastProviderTickLagMs, maxProviderTickLagMs,
+    oldestQueuedBucket: oldest,
+    oldestQueuedBucketAgeMs: oldest === null ? null : Date.now() - oldest,
+    acceptedMinuteCoverage: [...acceptedByMinute.entries()].sort((a,b)=>b[0]-a[0]).slice(0, 15)
+      .map(([minute, symbols]) => ({ minute, symbols: symbols.size })),
+  };
+}
 const MAX_FUTURE_TICK_MS = 60_000;
 
 const clientsBySymbol = new Map<string, Set<http.ServerResponse>>();
@@ -346,7 +383,7 @@ socket.on("rates",(raw:any)=>{ try {
     if(last !== undefined && timestamp < last){ staleTicksRejected++; continue; }
     lastAcceptedTimestamp.set(symbol,timestamp);
     const tick={symbol,price,timestamp};
-    latestTicks[symbol]=tick;broadcastTick(tick);queueDbTick(tick);
+    latestTicks[symbol]=tick;recordAcceptedTick(tick);broadcastTick(tick);queueDbTick(tick);
   }
 } catch(e){console.error("[MASTER] parse",e);} });
 // Count event names only, not raw payloads (which might contain credentials).
@@ -358,7 +395,7 @@ const server=http.createServer((req,res)=>{
   const origin=req.headers.origin||"*"; res.setHeader("Access-Control-Allow-Origin",origin);res.setHeader("Vary","Origin");res.setHeader("Access-Control-Allow-Methods","GET, OPTIONS");res.setHeader("Access-Control-Allow-Headers","Content-Type");
   if(req.method==="OPTIONS"){res.writeHead(204);res.end();return;}
   const url=new URL(req.url||"/",`http://${req.headers.host||"localhost"}`);
-  if(url.pathname==="/health"){res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});res.end(JSON.stringify({ok:true,mode:"MASTER_150",connected:liveRatesConnected,configured:PROVIDER_INSTRUMENTS.length,providerSubscriptions:providerSubscriptions(),forexSlashSubscriptions,diagnostics:{rawEventCounts:Object.fromEntries(rawEventCounts),rawSymbolCounts:Object.fromEntries(rawSymbolCounts),rawMessageShapes:Object.fromEntries(rawMessageShapes),lastRateAt,lastConnectAt,lastDisconnectAt},clients:totalClients(),receivedSymbols:Object.keys(latestTicks).length,latestTicks,dbWriting,dbPending:[...new Set([...pending.values()].map(b=>b.symbol))],dbPendingRows:pending.size,dbRetryRows:retryChunks.reduce((n,c)=>n+c.length,0),durableQueue:{directory:QUEUE_DIR,checkpointAt:queueCheckpointAt,checkpointBytes:queueCheckpointBytes,recoveredRows:queueRecoveredRows,fatalError:queueFatalError},dbMetrics:{flushMs:DB_FLUSH_MS,chunkRows:DB_CHUNK_ROWS,successfulDbWrites,failedDbWrites,consecutiveDbFailures,lastDbWriteMs,lastDbSqlMs,lastDbCheckpointMs,maxDbSqlMs,lastDbBatchRows,lastDbBatchAt,lastDbSuccessAt,lastDbFailureAt,shutdownFlushFailed},ohlcMetrics:{staleTicksRejected,invalidTimestampsRejected,futureTimestampsRejected,invalidPricesRejected,activeCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)>Date.now()).length,closedPendingCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)<=Date.now()).length},providerInfo:providerInfo||null,providerError:providerError||null,failedDbWrites,receivedCount:Object.fromEntries(receivedCount),unrecognizedSymbols:Object.fromEntries(unrecognizedSymbols),missingConfiguredSymbols:PROVIDER_INSTRUMENTS.filter(s=>!latestTicks[s])}));return;}
+  if(url.pathname==="/health"){res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});res.end(JSON.stringify({ok:true,mode:"MASTER_150",connected:liveRatesConnected,configured:PROVIDER_INSTRUMENTS.length,providerSubscriptions:providerSubscriptions(),forexSlashSubscriptions,diagnostics:{rawEventCounts:Object.fromEntries(rawEventCounts),rawSymbolCounts:Object.fromEntries(rawSymbolCounts),rawMessageShapes:Object.fromEntries(rawMessageShapes),lastRateAt,lastConnectAt,lastDisconnectAt},clients:totalClients(),receivedSymbols:Object.keys(latestTicks).length,latestTicks,dbWriting,dbPending:[...new Set([...pending.values()].map(b=>b.symbol))],dbPendingRows:pending.size,dbRetryRows:retryChunks.reduce((n,c)=>n+c.length,0),durableQueue:{directory:QUEUE_DIR,checkpointAt:queueCheckpointAt,checkpointBytes:queueCheckpointBytes,recoveredRows:queueRecoveredRows,fatalError:queueFatalError},dbMetrics:{flushMs:DB_FLUSH_MS,chunkRows:DB_CHUNK_ROWS,successfulDbWrites,failedDbWrites,consecutiveDbFailures,lastDbWriteMs,lastDbSqlMs,lastDbCheckpointMs,maxDbSqlMs,lastDbBatchRows,lastDbBatchAt,lastDbSuccessAt,lastDbFailureAt,shutdownFlushFailed},ingestionDiagnostics:ingestionDiagnostics(),ohlcMetrics:{staleTicksRejected,invalidTimestampsRejected,futureTimestampsRejected,invalidPricesRejected,activeCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)>Date.now()).length,closedPendingCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)<=Date.now()).length},providerInfo:providerInfo||null,providerError:providerError||null,failedDbWrites,receivedCount:Object.fromEntries(receivedCount),unrecognizedSymbols:Object.fromEntries(unrecognizedSymbols),missingConfiguredSymbols:PROVIDER_INSTRUMENTS.filter(s=>!latestTicks[s])}));return;}
   const m=url.pathname.match(/^\/api\/(?:market\/)?([a-z0-9]+)\/stream$/i);
   if(m){ const symbol=normalizeMarketSymbol(m[1]); if(!PROVIDER_SET.has(symbol)){res.writeHead(404,{"Content-Type":"application/json"});res.end(JSON.stringify({ok:false,error:"Unknown symbol"}));return;} res.writeHead(200,{"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache, no-transform",Connection:"keep-alive","X-Accel-Buffering":"no","Access-Control-Allow-Origin":origin,Vary:"Origin"});res.write("retry: 3000\n\n");res.write(`event: status\ndata: ${JSON.stringify({provider:"live-rates",connected:liveRatesConnected,symbol,mode:"MASTER_150"})}\n\n`);if(latestTicks[symbol])res.write(`event: tick\ndata: ${JSON.stringify(latestTicks[symbol])}\n\n`);const set=clientSet(symbol);set.add(res);const keep=setInterval(()=>{try{res.write(`: keepalive ${Date.now()}\n\n`);}catch{}},15000);req.on("close",()=>{clearInterval(keep);set.delete(res);});return; }
   res.writeHead(200,{"Content-Type":"application/json"});res.end(JSON.stringify({ok:true,service:"FX Trade Master Market Collector",mode:"MASTER_150",configured:PROVIDER_INSTRUMENTS.length,health:"/health",streamPattern:"/api/market/{symbol}/stream"}));
