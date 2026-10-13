@@ -57,6 +57,8 @@ const collectorSymbols = new Set(getCollectorSymbols(process.env.LIVE_RATES_INST
 console.log(`Collector symbols available: ${collectorSymbols.size}; requested: ${symbols.length}`);
 
 const REQUEST_GAP_MS = Math.max(1200, Number(process.env.D1_BACKFILL_REQUEST_GAP_MS) || 1200);
+const MAX_RETRIES = Math.min(4, Math.max(0, Number(process.env.D1_BACKFILL_MAX_RETRIES) || 2));
+const DRY_RUN = process.env.D1_BACKFILL_DRY_RUN === '1';
 const failures: string[] = [];
 let savedTotal = 0;
 let emptyWindows = 0;
@@ -71,10 +73,16 @@ async function fetchWindow(symbol: string, from: number, to: number): Promise<Re
   url.searchParams.set('start', day(from));
   url.searchParams.set('end', day(to));
   url.searchParams.set('key', apiKey!);
-  const response = await fetch(url, { signal: AbortSignal.timeout(25_000) });
-  if (response.status === 429 || response.status === 503) {
-    throw new Error(`RATE_LIMIT_${response.status}`);
+  let response: Response | undefined;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    response = await fetch(url, { signal: AbortSignal.timeout(25_000) });
+    if (response.status !== 429 && response.status !== 503) break;
+    if (attempt === MAX_RETRIES) throw new Error(`RATE_LIMIT_${response.status}`);
+    const waitMs = Math.min(30_000, 2500 * 2 ** attempt);
+    console.warn(`${symbol} ${day(from)}..${day(to)}: HTTP ${response.status}, retry ${attempt + 1}/${MAX_RETRIES} after ${waitMs}ms`);
+    await sleep(waitMs);
   }
+  if (!response) throw new Error('NO_HTTP_RESPONSE');
   if (!response.ok) throw new Error(`HTTP_${response.status}`);
   const payload: unknown = await response.json();
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error('INVALID_JSON_SHAPE');
@@ -86,7 +94,8 @@ async function fetchWindow(symbol: string, from: number, to: number): Promise<Re
 }
 
 async function main() {
-  console.log(`D1 Backfill V3: ${day(start)}..${day(end)} | ${symbols.join(', ')}`);
+  console.log(`D1 Backfill V3.1: ${day(start)}..${day(end)} | ${symbols.join(', ')} | dryRun=${DRY_RUN}`);
+  console.log(`Configured symbols: ${symbols.length}; collector overlap: ${symbols.filter(s => collectorSymbols.has(s)).length}`);
   console.log(`Database: ${dbUrl.hostname}:${dbUrl.port || 5432} | TLS certificate verified`);
   await client.connect();
   try {
@@ -109,16 +118,18 @@ async function main() {
               ? (raw as Record<string, unknown>)[symbol.slice(3)] : undefined;
             const close = typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : NaN;
             if (!Number.isFinite(close) || close <= 0) continue;
-            await client.query(
-              `INSERT INTO public."MarketDailyClose" ("symbol", "date", "close") VALUES ($1, $2::date, $3)
-               ON CONFLICT ("symbol", "date") DO UPDATE SET "close"=EXCLUDED."close", "updatedAt"=NOW()`,
-              [symbol, date, close],
-            );
+            if (!DRY_RUN) {
+              await client.query(
+                `INSERT INTO public."MarketDailyClose" ("symbol", "date", "close") VALUES ($1, $2::date, $3)
+                 ON CONFLICT ("symbol", "date") DO UPDATE SET "close"=EXCLUDED."close", "updatedAt"=NOW()`,
+                [symbol, date, close],
+              );
+            }
             saved++;
             savedTotal++;
           }
           if (!saved) emptyWindows++;
-          console.log(`${symbol} ${day(from)}..${day(to)}: ${saved} closes`);
+          console.log(`${symbol} ${day(from)}..${day(to)}: ${saved} ${DRY_RUN ? 'validated (DRY RUN)' : 'upserted'} closes`);
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           failures.push(`${symbol} ${day(from)}..${day(to)}: ${message}`);
@@ -131,7 +142,7 @@ async function main() {
         }
       }
     }
-    console.log(`FINISHED: ${savedTotal} upserts | ${emptyWindows} empty windows | ${skipped} invalid symbols | ${failures.length} failures`);
+    console.log(`FINISHED: ${savedTotal} ${DRY_RUN ? 'validated closes (NO WRITES)' : 'upserts'} | ${emptyWindows} empty windows | ${skipped} invalid symbols | ${failures.length} failures`);
     if (failures.length) console.log('Failures:\n' + failures.join('\n'));
     if (failures.length || emptyWindows) process.exitCode = 1;
   } finally {
