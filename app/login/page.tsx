@@ -25,7 +25,7 @@ export default function LoginPage() {
   return <main className="relative min-h-[100dvh] overflow-x-hidden bg-[#020e21] text-white">
     <div className="pointer-events-none fixed inset-0 z-0 bg-cover bg-center" style={{backgroundImage:"linear-gradient(90deg,rgba(1,9,24,.25),rgba(1,9,24,.08),rgba(1,9,24,.25)),url('/login/fxtrade-login-wallpaper.png')"}}/>
     <div className="relative z-10 flex min-h-[100dvh] items-center justify-center px-4 py-10 sm:py-14">
-      <div className="w-full max-w-[540px] rounded-[24px] border border-cyan-300/75 bg-[linear-gradient(145deg,rgba(4,30,65,.89),rgba(1,14,34,.94))] p-5 shadow-[0_0_0_1px_rgba(56,189,248,.12),0_0_65px_rgba(0,174,255,.32),0_28px_90px_rgba(0,0,0,.5)] backdrop-blur-2xl sm:p-9">
+      <div className="w-full max-w-[560px] rounded-[24px] border border-cyan-300/75 bg-[linear-gradient(145deg,rgba(4,30,65,.89),rgba(1,14,34,.94))] p-5 shadow-[0_0_0_1px_rgba(56,189,248,.12),0_0_65px_rgba(0,174,255,.32),0_28px_90px_rgba(0,0,0,.5)] backdrop-blur-2xl sm:p-9">
         <div className="mb-7 flex justify-center"><img src="/fx-trade-professional-trading.png" alt="FX Trade" className="h-auto w-full max-w-[310px] object-contain drop-shadow-[0_0_25px_rgba(37,99,235,.35)]"/></div>
 
         {mode==="password" && <>

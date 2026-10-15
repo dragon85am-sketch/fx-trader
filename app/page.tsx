@@ -194,10 +194,16 @@ export default async function HomePage() {
   ];
   return (
     <main className="relative min-h-screen overflow-x-hidden bg-[#03172b] text-white">
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0">
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(2,15,32,.38),rgba(2,15,32,.60))]" />
+        <div className="absolute inset-y-0 left-0 w-[48%] bg-[url('/home/side-left.png')] bg-left-top bg-repeat-y opacity-60" />
+        <div className="absolute inset-y-0 right-0 w-[48%] bg-[url('/home/side-right.png')] bg-right-top bg-repeat-y opacity-60" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(3,23,43,.15)_0%,rgba(3,23,43,.52)_80%)]" />
+      </div>
       <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_10%,rgba(12,82,130,.30),transparent_48%),linear-gradient(180deg,#061b30_0%,#031326_100%)]" />
       <div aria-hidden className="pointer-events-none absolute inset-0 opacity-20" style={{backgroundImage:"linear-gradient(90deg,transparent 49%,rgba(56,189,248,.12) 50%,transparent 51%)",backgroundSize:"88px 100%"}} />
       <header className="relative z-30 border-b border-cyan-300/15 bg-[#041a2e]/95 backdrop-blur-xl">
-        <div className="mx-auto flex min-h-[80px] max-w-[1390px] items-center justify-between gap-3 px-4 md:px-8">
+        <div className="mx-auto flex min-h-[80px] max-w-[1680px] items-center justify-between gap-3 px-4 md:px-8">
           <Link href="/" className="flex shrink-0 items-center gap-2" aria-label="FX TRADE">
             <span className="text-[40px] font-black italic leading-none tracking-[-.12em] text-white">F<span className="bg-gradient-to-br from-cyan-300 to-blue-600 bg-clip-text text-transparent">X</span></span>
             <span className="pl-2"><span className="block text-[17px] font-semibold tracking-[.22em]">TRADE</span><span className="block text-[7px] tracking-[.12em] text-slate-400">PROFESSIONAL TRADING</span></span>
@@ -212,7 +218,7 @@ export default async function HomePage() {
         </div>
         <nav className="flex justify-center gap-5 overflow-x-auto border-t border-white/5 px-4 py-2 text-[11px] text-slate-300 lg:hidden"><a href="#scanner">{t.scannerShort}</a><a href="#strategie">{t.strategies}</a><a href="#edukacja">{t.education}</a><Link href="/trading-room">Trading Room</Link></nav>
       </header>
-      <div className="relative z-10 mx-auto max-w-[1390px] px-4 pb-8 md:px-8">
+      <div className="relative z-10 mx-auto w-full max-w-[1680px] px-4 pb-8 md:px-8">
         <section className="relative grid min-h-[450px] items-center gap-8 py-10 lg:grid-cols-[1.04fr_.96fr] lg:py-14">
           <div className="relative z-10">
             <div className="mb-5 inline-flex rounded-full border border-sky-300/25 bg-sky-200/5 px-4 py-2 text-[10px] uppercase tracking-[.16em] text-slate-300">{t.badge}</div>
