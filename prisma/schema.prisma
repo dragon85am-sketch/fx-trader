@@ -224,6 +224,10 @@ model FxScannerTrade {
   @@unique([storageSymbol, tf, side, signalTime])
   @@index([status, openedAt])
   @@index([instrument, tf, status])
+  exitPrice   Float?
+  resultR     Float?
+  closeReason String?
+
 }
 
 model FxScannerReadySetup {
@@ -246,3 +250,4 @@ model FxScannerReadySetup {
   @@index([instrument, tf])
   @@index([updatedAt])
 }
+
