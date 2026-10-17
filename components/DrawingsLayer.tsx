@@ -1868,10 +1868,11 @@ if (o.type === "FIBO") {
     };
   }, [wrapRef]);
 
+  // Only the actually selected Fibonacci object may open this editor.
+  // Previously LONG/SHORT matched regardless of selectedId (operator precedence),
+  // making the panel impossible to close when a position drawing existed.
   const selectedFibo = objs.find(
-    (o) => o.id === selectedId && o.type === "FIBO" ||
-        o.type === "LONG" ||
-        o.type === "SHORT"
+    (o) => o.id === selectedId && o.type === "FIBO"
   );
 
   return (
@@ -1891,7 +1892,12 @@ if (o.type === "FIBO") {
 
             <button
               type="button"
-              onClick={() => setSelectedId(null)}
+              onClick={(e) => {
+                e.stopPropagation();
+                fiboPanelDragRef.current.active = false;
+                setSelectedId(null);
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
               className="rounded-lg px-2 py-1 text-white/60 hover:bg-white/10 hover:text-white"
             >
               ✕
