@@ -20,7 +20,9 @@ export type DrawTool =
   | "RECT"
   | "FIBO"
   | "BRUSH"
-  | "PATH";
+  | "PATH"
+  | "LONG"
+  | "SHORT";
 
 type Point = { t: UTCTimestamp; p: number; logical?: number };
 
@@ -77,12 +79,14 @@ type TwoPointObj = BaseObj & {
   b: Point;
 };
 
+type PositionObj = BaseObj & { type: "LONG" | "SHORT"; a: Point; b: Point; sl: number };
+
 type PathObj = BaseObj & {
   type: "PATH" | "BRUSH";
   points: Point[];
 };
 
-type AnyObj = HLineObj | VLineObj | TwoPointObj | PathObj;
+type AnyObj = HLineObj | VLineObj | TwoPointObj | PathObj | PositionObj;
 
 export type TradeLevelsCanvas = {
   side?: "BUY" | "SELL";
@@ -115,6 +119,8 @@ const TWO_POINT_TOOLS: DrawTool[] = [
   "HORIZONTAL_RAY",
   "RECT",
   "FIBO",
+  "LONG",
+  "SHORT",
 ];
 
 export default function DrawingsLayer({
@@ -225,7 +231,7 @@ React.useEffect(() => {
   const dragRef = React.useRef<{
     id: string | null;
     last: Point | null;
-    mode: "move" | "a" | "b";
+    mode: "move" | "a" | "b" | "sl";
     startClientX: number;
     startClientY: number;
     startObj: AnyObj | null;
@@ -255,12 +261,20 @@ React.useEffect(() => {
   // SELECT mode:
   // - drag on drawing => move/edit drawing
   // - drag on empty chart => pan chart horizontally AND vertically
+  // V5.9: Vertical pan needs a canvas redraw; horizontal pan is covered by the
+  // Lightweight Charts visible-range subscription.
+  const panVerticalDirtyRef = React.useRef(false);
+  // V6.0: cache canvas geometry for a full pan gesture; avoid layout reads every frame.
+  const panCanvasRectRef = React.useRef<{ left: number; top: number; width: number; height: number } | null>(null);
   const chartPanRef = React.useRef<{
     active: boolean;
     lastClientX: number;
     lastClientY: number;
     priceMin: number | null;
     priceMax: number | null;
+    startClientX?: number;
+    startScrollPosition?: number;
+    startBarSpacing?: number;
   }>({
     active: false,
     lastClientX: 0,
@@ -539,12 +553,21 @@ React.useEffect(() => {
         o.type === "RAY" ||
         o.type === "HORIZONTAL_RAY" ||
         o.type === "RECT" ||
-        o.type === "FIBO"
+        o.type === "FIBO" ||
+        o.type === "LONG" ||
+        o.type === "SHORT"
       ) {
         const a = dataToPoint(o.a);
         const b = dataToPoint(o.b);
 
         if (!a || !b) continue;
+
+        if ((o.type === "LONG" || o.type === "SHORT")) {
+          const sy = candleSeriesRef.current?.priceToCoordinate(o.sl);
+          if (sy != null && Math.abs(y-Number(sy)) < 9 && x >= Math.min(a.x,b.x)-10 && x <= Math.max(a.x,b.x)+10) {
+            return { id:o.id, mode:"sl" as const };
+          }
+        }
 
         if (distance(mouse, a) < 10) {
           return { id: o.id, mode: "a" as const };
@@ -581,7 +604,9 @@ React.useEffect(() => {
         o.type === "RAY" ||
         o.type === "HORIZONTAL_RAY" ||
         o.type === "RECT" ||
-        o.type === "FIBO"
+        o.type === "FIBO" ||
+        o.type === "LONG" ||
+        o.type === "SHORT"
       ) {
         const a = dataToPoint(o.a);
         const b = dataToPoint(o.b);
@@ -727,7 +752,9 @@ React.useEffect(() => {
         o.type === "RAY" ||
         o.type === "HORIZONTAL_RAY" ||
         o.type === "RECT" ||
-        o.type === "FIBO"
+        o.type === "FIBO" ||
+        o.type === "LONG" ||
+        o.type === "SHORT"
       ) {
         const a = dataToPoint(o.a);
         const b = dataToPoint(o.b);
@@ -735,6 +762,50 @@ React.useEffect(() => {
         if (!a || !b) {
           ctx.restore();
           return;
+        }
+
+        if (o.type === "LONG" || o.type === "SHORT") {
+          const entry = o.a.p;
+          const target = o.b.p;
+          const stop = o.sl;
+          const sy = candleSeriesRef.current?.priceToCoordinate(stop);
+          if (sy != null) {
+            const left = Math.min(a.x, b.x);
+            const width = Math.max(24, Math.abs(b.x - a.x));
+            const entryY = a.y;
+            const targetY = b.y;
+            const stopY = Number(sy);
+            const isLong = o.type === "LONG";
+            const valid = isLong ? target > entry && stop < entry : target < entry && stop > entry;
+            const risk = Math.abs(entry - stop);
+            const rr = risk > 0 ? Math.abs(target - entry) / risk : 0;
+            ctx.fillStyle = "rgba(16,185,129,0.23)";
+            ctx.fillRect(left, Math.min(entryY,targetY), width, Math.abs(targetY-entryY));
+            ctx.fillStyle = "rgba(244,63,94,0.23)";
+            ctx.fillRect(left, Math.min(entryY,stopY), width, Math.abs(stopY-entryY));
+            const line = (y: number, color: string) => {
+              ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 1.5;
+              ctx.moveTo(left,y); ctx.lineTo(left+width,y); ctx.stroke();
+            };
+            line(targetY,"#10b981"); line(entryY,"#cbd5e1"); line(stopY,"#f43f5e");
+            ctx.font = "bold 11px Arial";
+            const label = (txt: string,y:number,bg:string) => {
+              const w = ctx.measureText(txt).width + 14;
+              const x = Math.max(0,Math.min(canvas.clientWidth-w,left+width-w));
+              ctx.fillStyle=bg; ctx.fillRect(x,y-11,w,21);
+              ctx.fillStyle="#fff"; ctx.fillText(txt,x+7,y+4);
+            };
+            const precision = Math.abs(entry)>=100 ? 2 : 5;
+            label(`TP ${target.toFixed(precision)}`,targetY,"#047857");
+            label(`ENTRY ${entry.toFixed(precision)}  RR ${rr.toFixed(2)}${valid ? "" : " !"}`,entryY,"#334155");
+            label(`SL ${stop.toFixed(precision)}`,stopY,"#be123c");
+            if (selected) {
+              for (const yy of [targetY,entryY,stopY]) {
+                ctx.beginPath(); ctx.arc(left,yy,5,0,Math.PI*2);
+                ctx.fillStyle="#60a5fa";ctx.fill();
+              }
+            }
+          }
         }
 
         if (o.type === "TREND") {
@@ -961,6 +1032,7 @@ if (o.type === "FIBO") {
         color: "#facc15",
         visible: true,
         createdAt: Date.now(),
+        sl: draft.p - (activeDrawTool === "LONG" ? 1 : -1) * Math.max(Math.abs(previewRef.current.p-draft.p)/2,Math.abs(draft.p)*0.00001),
       } as AnyObj);
     }
 
@@ -1027,8 +1099,11 @@ if (o.type === "FIBO") {
 
     let raf = 0;
     const redraw = () => {
-      if (raf) cancelAnimationFrame(raf);
+      // Coalesce range notifications into one draw per frame. Cancel/requeue
+      // could postpone drawing while continuous pointer events are arriving.
+      if (raf) return;
       raf = requestAnimationFrame(() => {
+        raf = 0;
         draw();
       });
     };
@@ -1039,9 +1114,8 @@ if (o.type === "FIBO") {
       timeScale.subscribeVisibleLogicalRangeChange(redraw);
     } catch {}
 
-    try {
-      timeScale.subscribeVisibleTimeRangeChange(redraw);
-    } catch {}
+    // Logical-range changes already cover horizontal pan and zoom.
+    // Avoid a second subscription firing for the same movement.
 
     redraw();
 
@@ -1049,9 +1123,6 @@ if (o.type === "FIBO") {
       if (raf) cancelAnimationFrame(raf);
       try {
         timeScale.unsubscribeVisibleLogicalRangeChange(redraw);
-      } catch {}
-      try {
-        timeScale.unsubscribeVisibleTimeRangeChange(redraw);
       } catch {}
 
     };
@@ -1068,7 +1139,13 @@ if (o.type === "FIBO") {
 
     const frame = () => {
       if (!syncing) return;
-      draw();
+      // Horizontal chart pan is already redrawn by the range subscription.
+      // Keep the per-frame sync only for vertical price-scale movement and
+      // for drawing interactions that need it.
+      if (!chartPanRef.current.active || panVerticalDirtyRef.current) {
+        panVerticalDirtyRef.current = false;
+        draw();
+      }
       syncRaf = requestAnimationFrame(frame);
     };
 
@@ -1085,6 +1162,7 @@ if (o.type === "FIBO") {
 
       if (!inside || syncing) return;
       syncing = true;
+      panVerticalDirtyRef.current = false;
       draw();
       syncRaf = requestAnimationFrame(frame);
     };
@@ -1288,10 +1366,18 @@ if (o.type === "FIBO") {
         }
       } catch {}
 
+      const panRect = e.currentTarget.getBoundingClientRect();
+      panCanvasRectRef.current = { left: panRect.left, top: panRect.top, width: panRect.width, height: panRect.height };
+      // V6.2: keep the initial scroll position and candle spacing for the
+      // entire gesture. Avoid repeatedly rebuilding a logical visible range.
+      const panTimeScale = chartRef.current?.timeScale();
       chartPanRef.current = {
         active: true,
         lastClientX: e.clientX,
         lastClientY: e.clientY,
+        startClientX: e.clientX,
+        startScrollPosition: panTimeScale?.scrollPosition(),
+        startBarSpacing: panTimeScale?.options().barSpacing,
         priceMin,
         priceMax,
       };
@@ -1338,6 +1424,16 @@ if (o.type === "FIBO") {
         return;
       }
 
+      if (activeDrawTool === "LONG" || activeDrawTool === "SHORT") {
+        const distance = Math.abs(p.p - draft.p);
+        const direction = activeDrawTool === "LONG" ? 1 : -1;
+        const risk = Math.max(distance / 2, Math.abs(draft.p) * 0.00001);
+        const target = { ...p, p: draft.p + direction * Math.max(distance, risk * 2) };
+        addObj({ ...makeBase(activeDrawTool), type: activeDrawTool, a: draft, b: target, sl: draft.p - direction * risk });
+        setDraft(null); previewRef.current=null; setPreview(null);
+        onDrawToolChange?.("SELECT");
+        return;
+      }
       addObj({
         ...makeBase(activeDrawTool),
         type: activeDrawTool as TwoPointObj["type"],
@@ -1362,7 +1458,9 @@ if (o.type === "FIBO") {
   // This keeps BOX/drag/pan visually glued to the pointer without flooding React.
   const processMouseMove = (clientX: number, clientY: number, canvas: HTMLCanvasElement) => {
     lastMouseMoveAtRef.current = performance.now();
-    const rect = canvas.getBoundingClientRect();
+    const rect = chartPanRef.current.active && panCanvasRectRef.current
+      ? panCanvasRectRef.current
+      : canvas.getBoundingClientRect();
     const localX = clientX - rect.left;
     const localY = clientY - rect.top;
 
@@ -1391,19 +1489,18 @@ if (o.type === "FIBO") {
 
         try {
           const timeScale = chart.timeScale();
-          const range = timeScale.getVisibleLogicalRange();
-
-          if (range) {
-            const canvasWidth = canvas.clientWidth || 1;
-            const logicalPerPixel = (range.to - range.from) / canvasWidth;
-            const shift = -dx * logicalPerPixel;
-
-            timeScale.setVisibleLogicalRange({
-              from: range.from + shift,
-              to: range.to + shift,
-            });
-            // visibleLogicalRange subscription redraws the overlay once; do not
-            // schedule a second canvas frame here.
+          if (dx !== 0) {
+            // V6.2: scroll in native Lightweight Charts bar coordinates.
+            // A pointer displacement of 1px moves candles by 1px, independent
+            // of chart width and the number of visible candles.
+            const startPosition = chartPanRef.current.startScrollPosition;
+            const startX = chartPanRef.current.startClientX;
+            const spacing = chartPanRef.current.startBarSpacing;
+            if (startPosition != null && startX != null && spacing != null && spacing > 0) {
+              const movedPx = clientX - startX;
+              timeScale.scrollToPosition(startPosition + movedPx / spacing, false);
+            }
+            // The visible-range subscription redraws the drawings overlay.
           }
 
           // PAN Y: przesuwanie wykresu góra/dół myszką w pustym miejscu.
@@ -1411,8 +1508,8 @@ if (o.type === "FIBO") {
           const min = chartPanRef.current.priceMin;
           const max = chartPanRef.current.priceMax;
 
-          if (series && min != null && max != null && max > min) {
-            const canvasHeight = canvas.clientHeight || 1;
+          if (dy !== 0 && series && min != null && max != null && max > min) {
+            const canvasHeight = panCanvasRectRef.current?.height || canvas.clientHeight || 1;
             const span = max - min;
             const priceShift = (dy / canvasHeight) * span;
             const nextMin = min + priceShift;
@@ -1420,6 +1517,7 @@ if (o.type === "FIBO") {
 
             chartPanRef.current.priceMin = nextMin;
             chartPanRef.current.priceMax = nextMax;
+            panVerticalDirtyRef.current = true;
 
             series.applyOptions({
               autoscaleInfoProvider: (() => ({
@@ -1470,6 +1568,9 @@ if (o.type === "FIBO") {
         const nextObjs = objsRef.current.map((o) => {
             if (o.id !== id) return o;
 
+            if (mode === "sl" && (o.type === "LONG" || o.type === "SHORT")) {
+              return { ...o, sl: p.p };
+            }
             if (mode === "a" && "a" in o && "b" in o) {
               return { ...o, a: p } as AnyObj;
             }
@@ -1560,7 +1661,9 @@ if (o.type === "FIBO") {
               startObj.type === "RAY" ||
               startObj.type === "HORIZONTAL_RAY" ||
               startObj.type === "RECT" ||
-              startObj.type === "FIBO"
+              startObj.type === "FIBO" ||
+        startObj.type === "LONG" ||
+        startObj.type === "SHORT"
             ) {
               return {
                 ...o,
@@ -1640,6 +1743,14 @@ if (o.type === "FIBO") {
   }, [activeDrawTool, draft, hoverId]);
 
   const handleMouseUp = () => {
+    // Apply the last coalesced pointer sample before ending the gesture.
+    if (pointerMoveRafRef.current != null) {
+      cancelAnimationFrame(pointerMoveRafRef.current);
+      pointerMoveRafRef.current = null;
+      const pending = pendingPointerRef.current;
+      pendingPointerRef.current = null;
+      if (pending) processMouseMove(pending.clientX, pending.clientY, pending.canvas);
+    }
     isMouseDownRef.current = false;
     lastBrushScreenRef.current = null;
 
@@ -1681,6 +1792,7 @@ if (o.type === "FIBO") {
     fastDragStaticCanvasRef.current = null;
     fastDragMovingCanvasRef.current = null;
 
+    panCanvasRectRef.current = null;
     chartPanRef.current = {
       active: false,
       lastClientX: 0,
@@ -1757,7 +1869,9 @@ if (o.type === "FIBO") {
   }, [wrapRef]);
 
   const selectedFibo = objs.find(
-    (o) => o.id === selectedId && o.type === "FIBO"
+    (o) => o.id === selectedId && o.type === "FIBO" ||
+        o.type === "LONG" ||
+        o.type === "SHORT"
   );
 
   return (
