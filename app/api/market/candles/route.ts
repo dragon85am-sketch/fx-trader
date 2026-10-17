@@ -32,20 +32,19 @@ async function readCandles(symbol: string, interval: string, limit: number) {
 }
 
 async function readCandlesBatch(symbols: string[], interval: string, limit: number) {
-  // V4: ONE PostgreSQL round-trip for the complete Market Watch.
-  // row_number() keeps the requested per-symbol limit without 31 Promise.all queries.
+  // One query, bounded index-friendly lookup per requested symbol.
+  // Requires an efficient index on (symbol, interval, bucket DESC).
   const rows = await prisma.$queryRaw<Row[]>(Prisma.sql`
-    SELECT "symbol","bucket","open","high","low","close","ticks"
-    FROM (
-      SELECT
-        "symbol","bucket","open","high","low","close","ticks",
-        ROW_NUMBER() OVER (PARTITION BY "symbol" ORDER BY "bucket" DESC) AS rn
-      FROM "MarketCandle"
-      WHERE "symbol" IN (${Prisma.join(symbols)})
-        AND "interval"=${interval}
-    ) ranked
-    WHERE rn <= ${limit}
-    ORDER BY "symbol" ASC, "bucket" DESC
+    SELECT c."symbol", c."bucket", c."open", c."high", c."low", c."close", c."ticks"
+    FROM unnest(ARRAY[${Prisma.join(symbols)}]::text[]) AS requested("symbol")
+    CROSS JOIN LATERAL (
+      SELECT mc."symbol", mc."bucket", mc."open", mc."high", mc."low", mc."close", mc."ticks"
+      FROM "MarketCandle" AS mc
+      WHERE mc."symbol" = requested."symbol" AND mc."interval" = ${interval}
+      ORDER BY mc."bucket" DESC
+      LIMIT ${limit}
+    ) AS c
+    ORDER BY c."symbol" ASC, c."bucket" DESC
   `);
 
   const grouped = new Map<string, Row[]>();

@@ -68,6 +68,9 @@ export async function requireAuth() {
         role: true,
         tokenVersion: true,
         isBanned: true,
+        isPremium: true,
+        premiumUntil: true,
+        cancelAtPeriodEnd: true,
       },
     });
 
@@ -135,6 +138,9 @@ export async function requireAuth() {
 
         role:
           user.role as "admin" | "user",
+        isPremium: user.isPremium,
+        premiumUntil: user.premiumUntil,
+        cancelAtPeriodEnd: user.cancelAtPeriodEnd,
       },
     };
   } catch (error) {
@@ -198,35 +204,15 @@ export async function requirePremiumUser() {
     return auth;
   }
 
-  const user = await prisma.user.findUnique({
-    where: {
-      id: auth.user.userId,
-    },
-
-    select: {
-      id: true,
-      role: true,
-
-      isPremium: true,
-      premiumUntil: true,
-      cancelAtPeriodEnd: true,
-    },
-  });
-
-  if (!user) {
-    return {
-      ok: false as const,
-
-      response: NextResponse.json(
-        {
-          error: "Unauthorized",
-        },
-        {
-          status: 401,
-        }
-      ),
-    };
-  }
+  // Dane Premium zostały już pobrane i zweryfikowane w requireAuth().
+  // Unikamy drugiego zapytania do Supabase podczas każdego wejścia na Dashboard.
+  const user = {
+    id: auth.user.userId,
+    role: auth.user.role,
+    isPremium: auth.user.isPremium,
+    premiumUntil: auth.user.premiumUntil,
+    cancelAtPeriodEnd: auth.user.cancelAtPeriodEnd,
+  };
 
   // =================================================
   // ADMIN ALWAYS HAS ACCESS
@@ -347,4 +333,38 @@ export async function requirePremiumUser() {
         user.cancelAtPeriodEnd,
     },
   };
+}
+
+// Profil użytkownika: jedna weryfikacja JWT i jeden odczyt Prisma.
+// Nie pomijamy kontroli blokady ani unieważnienia tokenu.
+export async function requireAuthProfile() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("token")?.value;
+  if (!token) return { ok: false as const, response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+  const secret = process.env.JWT_SECRET;
+  if (!secret) return { ok: false as const, response: NextResponse.json({ error: "Server configuration error" }, { status: 500 }) };
+  let decoded: TokenPayload;
+  try {
+    decoded = jwt.verify(token, secret) as TokenPayload;
+    if (!decoded || typeof decoded.userId !== "string" || typeof decoded.tokenVersion !== "number") throw new Error("Invalid token payload");
+  } catch {
+    return { ok: false as const, response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+  }
+  // Błędy bazy propagujemy do obsługi 500, nie udajemy wygaśnięcia sesji.
+  const user = await prisma.user.findUnique({
+    where: { id: decoded.userId },
+    select: {
+      id: true, email: true, name: true, role: true, tokenVersion: true, isBanned: true,
+      theme: true, language: true, priceFormat: true, avatarUrl: true,
+      isPremium: true, premiumSince: true, premiumUntil: true, cancelAtPeriodEnd: true,
+      stripeCustomerId: true, stripeSubscriptionId: true, pinHash: true, twoFactorEnabled: true,
+    },
+  });
+  if (!user || user.tokenVersion !== decoded.tokenVersion) {
+    return { ok: false as const, response: NextResponse.json({ error: "Session expired" }, { status: 401 }) };
+  }
+  if (user.isBanned) {
+    return { ok: false as const, response: NextResponse.json({ error: "Account banned" }, { status: 403 }) };
+  }
+  return { ok: true as const, user };
 }

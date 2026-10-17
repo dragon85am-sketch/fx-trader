@@ -8,6 +8,12 @@ type TokenPayload = {
   isBanned?: boolean;
 };
 
+// Reuse the encoded secret within a warm middleware instance.
+// This avoids allocating a TextEncoder and encoding the same key on every request.
+const jwtSecretBytes = process.env.JWT_SECRET
+  ? new TextEncoder().encode(process.env.JWT_SECRET)
+  : null;
+
 async function getTokenPayload(
   req: NextRequest
 ): Promise<TokenPayload | null> {
@@ -15,15 +21,11 @@ async function getTokenPayload(
     const token = req.cookies.get("token")?.value;
 
     if (!token) return null;
-    if (!process.env.JWT_SECRET) return null;
-
-    const secret = new TextEncoder().encode(
-      process.env.JWT_SECRET
-    );
+    if (!jwtSecretBytes) return null;
 
     const { payload } = await jwtVerify(
       token,
-      secret
+      jwtSecretBytes
     );
 
     return payload as unknown as TokenPayload;

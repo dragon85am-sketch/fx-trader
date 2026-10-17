@@ -307,8 +307,7 @@ export async function POST(req: NextRequest) {
         : undefined;
 
     const defaultLogoUrl =
-      process.env.FXTRADE_LOGO_URL?.trim() ||
-      "https://fx-trade.eu/images/scanner.png";
+      `${(process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || "https://fx-trade.eu").replace(/\/$/, "")}/images/fxtrade-scanner-telegram.png`;
 
     // Osobny, stały obraz dla raportu tygodniowego.
     // Najpierw może być nadpisany przez FXTRADE_WEEKLY_IMAGE_URL.
