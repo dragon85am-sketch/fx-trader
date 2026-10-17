@@ -1491,6 +1491,7 @@ if (o.type === "FIBO") {
           const timeScale = chart.timeScale();
           if (dx !== 0) {
             // V6.2: scroll in native Lightweight Charts bar coordinates.
+            // Reverse horizontal pan direction as requested: dragging right shifts the view right.
             // A pointer displacement of 1px moves candles by 1px, independent
             // of chart width and the number of visible candles.
             const startPosition = chartPanRef.current.startScrollPosition;
@@ -1498,7 +1499,7 @@ if (o.type === "FIBO") {
             const spacing = chartPanRef.current.startBarSpacing;
             if (startPosition != null && startX != null && spacing != null && spacing > 0) {
               const movedPx = clientX - startX;
-              timeScale.scrollToPosition(startPosition + movedPx / spacing, false);
+              timeScale.scrollToPosition(startPosition - movedPx / spacing, false);
             }
             // The visible-range subscription redraws the drawings overlay.
           }
