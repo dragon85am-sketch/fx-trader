@@ -1192,20 +1192,35 @@ fullscreenMode = false,
   const zoneSvgRef = React.useRef<SVGSVGElement | null>(null);
   const zoneLabelsRef = React.useRef<HTMLDivElement | null>(null);
 
+  // V5.8: reduce idle zone-overlay work while keeping smooth pan/zoom.
   React.useEffect(() => {
     let raf = 0;
-    const sync = () => {
+    let lastTransform = "";
+    let lastCheck = 0;
+    const sync = (now: number) => {
       const chart = chartRef.current;
       const t = zoneAnchorTimeRef.current;
       const baseX = zoneBaseXRef.current;
-      if (chart && t != null && baseX != null) {
-        const x = chart.timeScale().timeToCoordinate(t);
-        if (x != null && Number.isFinite(Number(x))) {
-          const dx = Number(x) + zoneGapPxRef.current - baseX;
-          const tr = `translate3d(${dx}px,0,0)`;
-          if (zoneSvgRef.current) zoneSvgRef.current.style.transform = tr;
-          if (zoneLabelsRef.current) zoneLabelsRef.current.style.transform = tr;
+      const svg = zoneSvgRef.current;
+      const labels = zoneLabelsRef.current;
+      // No active trade-zone overlay: avoid reading chart coordinates.
+      if (chart && t != null && baseX != null && (svg || labels)) {
+        // Cap the DOM synchronization to ~30 Hz; canvas chart remains full speed.
+        if (now - lastCheck >= 32) {
+          lastCheck = now;
+          const x = chart.timeScale().timeToCoordinate(t);
+          if (x != null && Number.isFinite(Number(x))) {
+            const dx = Number(x) + zoneGapPxRef.current - baseX;
+            const tr = `translate3d(${dx}px,0,0)`;
+            if (tr !== lastTransform) {
+              if (svg) svg.style.transform = tr;
+              if (labels) labels.style.transform = tr;
+              lastTransform = tr;
+            }
+          }
         }
+      } else {
+        lastTransform = "";
       }
       raf = requestAnimationFrame(sync);
     };

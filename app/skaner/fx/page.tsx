@@ -23,6 +23,7 @@ import {
   ArrowUpRight,
   RectangleHorizontal,
   Brush,
+  ArrowDownRight,
   Waves,
   ChartNoAxesCombined,
   FileSpreadsheet,
@@ -2681,6 +2682,8 @@ export default function MarketScannerPage() {
   { tool: "FIBO", icon: ChartNoAxesCombined, title: "Fibonacci" },
   { tool: "PATH", icon: Waves, title: "Path" },
   { tool: "BRUSH", icon: Brush, title: "Brush" },
+  { tool: "LONG", icon: ArrowUpRight, title: "Long / BUY – pozycja długa" },
+  { tool: "SHORT", icon: ArrowDownRight, title: "Short / SELL – pozycja krótka" },
 ];
   const [search, setSearch] = React.useState("");
   const [directionFilter, setDirectionFilter] = React.useState<DirectionFilter>(null);
@@ -2834,6 +2837,8 @@ const DRAW_TOOL_BUTTONS = [
   { tool: "FIBO", icon: ChartNoAxesCombined, title: "Fibonacci" },
   { tool: "PATH", icon: Waves, title: "Path" },
   { tool: "BRUSH", icon: Brush, title: "Brush" },
+  { tool: "LONG", icon: ArrowUpRight, title: "Long / BUY – pozycja długa" },
+  { tool: "SHORT", icon: ArrowDownRight, title: "Short / SELL – pozycja krótka" },
 ] as const;
     return instruments.map((s) => {
       const savedRow = saved.get(s);
