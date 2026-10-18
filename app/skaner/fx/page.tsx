@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import type { DrawTool } from "@/components/DrawingsLayer";
 import React from "react";
@@ -2747,6 +2747,7 @@ export default function MarketScannerPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [closedTrades, setClosedTrades] = React.useState<ClosedTrade[]>([]);
   const [activeTrades, setActiveTrades] = React.useState<ActiveTrade[]>([]);
+  const [tradesTab, setTradesTab] = React.useState<"active" | "closed">("active");
   const [previewTrade, setPreviewTrade] = React.useState<ActiveTrade | null>(null);
   const chartPreviewRef = React.useRef<HTMLDivElement | null>(null);
   const openTradePreview = React.useCallback((trade: ActiveTrade) => {
@@ -5347,13 +5348,21 @@ if (closedNow.length) {
                 />
               </div>
 
-              <div className={cn("mt-1 grid w-full min-w-0 gap-2 xl:grid-cols-2", landscapeFullscreen && "hidden")}>
-                <div className="min-w-0 overflow-hidden rounded-2xl border border-cyan-300/25 bg-[#061c37]/80">
+              <div className={cn("mt-2 w-full min-w-0", landscapeFullscreen && "hidden")}>
+                <div className="mb-2 flex flex-wrap items-center gap-2 rounded-xl border border-cyan-300/15 bg-[#082647]/70 p-2">
+                  <button type="button" onClick={() => setTradesTab("active")}
+                    aria-pressed={tradesTab === "active"}
+                    className={cn("rounded-lg border px-4 py-2 text-xs font-bold transition sm:text-sm", tradesTab === "active" ? "border-cyan-400/70 bg-sky-600 text-white shadow-[0_0_16px_rgba(14,165,233,.25)]" : "border-sky-400/20 bg-[#092b4d] text-sky-200 hover:bg-[#12416b]")}>ACTIVE TRADES <span className="ml-1 rounded-full bg-white/10 px-2 py-0.5">{activeTrades.length}</span></button>
+                  <button type="button" onClick={() => setTradesTab("closed")}
+                    aria-pressed={tradesTab === "closed"}
+                    className={cn("rounded-lg border px-4 py-2 text-xs font-bold transition sm:text-sm", tradesTab === "closed" ? "border-cyan-400/70 bg-sky-600 text-white shadow-[0_0_16px_rgba(14,165,233,.25)]" : "border-sky-400/20 bg-[#092b4d] text-sky-200 hover:bg-[#12416b]")}>CLOSED TRADES <span className="ml-1 rounded-full bg-white/10 px-2 py-0.5">{closedTrades.length}</span></button>
+                </div>
+                {tradesTab === "active" && <div className="w-full min-w-0 overflow-hidden rounded-2xl border border-cyan-300/25 bg-[#061c37]/80">
                   <div className="border-b border-cyan-300/15 bg-[#0b315c]/75 px-3 py-2 text-sm font-semibold text-white">
                     Active Trades <span className="ml-2 rounded-full bg-cyan-500/20 px-2 py-0.5 text-xs text-cyan-200">{activeTrades.length}</span>
                   </div>
-                  <div className="h-[150px] overflow-auto sm:h-[170px] xl:h-[250px]">
-                    <table className="w-full min-w-[750px] text-xs">
+                  <div className="h-[170px] overflow-auto sm:h-[200px] xl:h-[250px]">
+                    <table className="w-full min-w-[900px] text-xs sm:text-sm">
                       <thead className="sticky top-0 bg-[#082749] text-sky-100/80"><tr className="border-b border-sky-300/15">
                         {['Data','Instrument','Kierunek','Wejście','SL','TP1','TP2','TP3','Status','Action'].map(h => <th key={h} className="px-2 py-2 text-left">{h}</th>)}
                       </tr></thead>
@@ -5373,8 +5382,8 @@ if (closedNow.length) {
                       </tbody>
                     </table>
                   </div>
-                </div>
-              <div className={cn(
+                </div>}
+              {tradesTab === "closed" && <div className={cn(
                 "mt-1 w-full overflow-hidden rounded-2xl border border-sky-300/16 bg-[#061c37]/78 shadow-[inset_0_1px_0_rgba(255,255,255,.03)]",
                 landscapeFullscreen && "hidden"
               )}>
@@ -5469,7 +5478,7 @@ closedTrades.map((t) => (
                     </tbody>
                   </table>
                 </div>
-              </div>
+              </div>}
 
               </div>
 
