@@ -4244,6 +4244,11 @@ kineticScroll: {
               symbol={symbol}
               timeframe={tf ?? "default"}
               tradeZoneSpec={tradeZoneCanvasSpec}
+              onManualPanStart={() => {
+                manualPanRef.current = true;
+                setFollowOnTick(false);
+                setDetached(true);
+              }}
             />
           </div>
           {false && <svg ref={zoneSvgRef} className="pointer-events-none absolute inset-0 z-[5] h-full w-full" style={{ willChange: "transform" }}>

@@ -133,6 +133,7 @@ export default function DrawingsLayer({
   symbol,
   timeframe,
   tradeZoneSpec,
+  onManualPanStart,
 }: {
   wrapRef: React.RefObject<HTMLDivElement | null>;
   chartRef: React.RefObject<IChartApi | null>;
@@ -143,6 +144,7 @@ export default function DrawingsLayer({
   symbol: string;
   timeframe: string;
   tradeZoneSpec?: TradeZoneCanvasSpec;
+  onManualPanStart?: () => void;
 }) {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   // V5.7 DIRECT DRAG: dedicated compositor canvas for the actively moved object.
@@ -1333,6 +1335,8 @@ if (o.type === "FIBO") {
       }
 
       // Empty chart area => pan chart instead of selecting a drawing.
+      // Detach live-follow before moving the viewport, otherwise incoming ticks snap it back.
+      onManualPanStart?.();
       setSelectedId(null);
 
       dragRef.current = {
@@ -1491,7 +1495,7 @@ if (o.type === "FIBO") {
           const timeScale = chart.timeScale();
           if (dx !== 0) {
             // V6.2: scroll in native Lightweight Charts bar coordinates.
-            // Reverse horizontal pan direction as requested: dragging right shifts the view right.
+            // Match Alpha Scanner: dragging right moves candles right (scroll position increases).
             // A pointer displacement of 1px moves candles by 1px, independent
             // of chart width and the number of visible candles.
             const startPosition = chartPanRef.current.startScrollPosition;
@@ -1499,7 +1503,7 @@ if (o.type === "FIBO") {
             const spacing = chartPanRef.current.startBarSpacing;
             if (startPosition != null && startX != null && spacing != null && spacing > 0) {
               const movedPx = clientX - startX;
-              timeScale.scrollToPosition(startPosition - movedPx / spacing, false);
+              timeScale.scrollToPosition(startPosition + movedPx / spacing, false);
             }
             // The visible-range subscription redraws the drawings overlay.
           }
