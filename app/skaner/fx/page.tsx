@@ -5220,6 +5220,64 @@ if (closedNow.length) {
                     .fx-indicator-toolbar > :nth-child(14) { order: 9; } /* FORMACJE */
                     .fx-indicator-toolbar > :nth-child(15) { order: 10; } /* TARGETS */
                     .fx-indicator-toolbar > :nth-child(18) { order: 11; } /* POC MINI */
+                    /* FX TRADE PRO: redesigned indicator controls, no logic changes */
+                    .fx-indicator-toolbar { gap: 7px; padding: 5px 2px 12px; align-items: center; }
+                    .fx-indicator-toolbar > button,
+                    .fx-indicator-toolbar > div[ref] > button,
+                    .fx-indicator-toolbar > div.relative > button {
+                      position: relative;
+                      min-height: 35px;
+                      border-radius: 10px;
+                      border: 1px solid rgba(85,174,246,.28);
+                      background: linear-gradient(160deg,#164674 0%,#0b294d 58%,#071b36 100%);
+                      color: #c7e6ff;
+                      font-size: 11px;
+                      font-weight: 800;
+                      letter-spacing: .025em;
+                      box-shadow: inset 0 1px 0 rgba(200,235,255,.10),0 3px 10px rgba(0,7,28,.23);
+                      transition: border-color .16s ease,box-shadow .16s ease,transform .16s ease,background .16s ease;
+                    }
+                    .fx-indicator-toolbar > button:hover,
+                    .fx-indicator-toolbar > div.relative > button:hover {
+                      border-color: rgba(91,209,255,.85);
+                      background: linear-gradient(155deg,#2068a8,#103b71 55%,#0a284e);
+                      color: #fff;
+                      box-shadow: 0 0 16px rgba(15,166,255,.25),inset 0 1px 0 rgba(255,255,255,.16);
+                      transform: translateY(-1px);
+                    }
+                    .fx-indicator-toolbar > button[class*="bg-sky-500"],
+                    .fx-indicator-toolbar > button[class*="bg-emerald-500"],
+                    .fx-indicator-toolbar > button[class*="bg-amber-500"],
+                    .fx-indicator-toolbar > button[class*="bg-yellow-400"],
+                    .fx-indicator-toolbar > button[class*="bg-violet-500"],
+                    .fx-indicator-toolbar > button[class*="bg-[linear-gradient"] {
+                      border-color: rgba(76,211,255,.90);
+                      background: linear-gradient(135deg,#167ec9,#174eac 70%,#0c397c);
+                      color: white;
+                      box-shadow: 0 0 18px rgba(0,158,255,.32),inset 0 1px 0 rgba(255,255,255,.20);
+                    }
+                    .fx-indicator-toolbar > button:nth-child(9),
+                    .fx-indicator-toolbar > button:nth-child(13),
+                    .fx-indicator-toolbar > button:nth-child(17),
+                    .fx-indicator-toolbar > div.relative > button:nth-child(2) {
+                      min-width: 34px;
+                      width: 34px;
+                      padding: 0;
+                      display: inline-grid;
+                      place-items: center;
+                      border-radius: 10px;
+                      color: #7bd5ff;
+                      background: linear-gradient(145deg,#164a77,#092442);
+                    }
+                    .fx-indicator-toolbar > button:nth-child(8),
+                    .fx-indicator-toolbar > button:nth-child(12),
+                    .fx-indicator-toolbar > button:nth-child(16) { padding-inline: 13px; }
+                    .fx-indicator-toolbar > div.relative { gap: 6px; }
+                    @media (max-width: 640px) {
+                      .fx-indicator-toolbar { gap: 5px; }
+                      .fx-indicator-toolbar > button { min-height: 32px; font-size: 10px; }
+                    }
+
                   `}</style>
                   {targetsPanelOpen && typeof document !== "undefined"
                     ? createPortal(
