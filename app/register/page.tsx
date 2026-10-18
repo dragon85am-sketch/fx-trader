@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
@@ -15,6 +15,9 @@ import {
   LockKeyhole,
   Mail,
   Radio,
+  Activity,
+  Globe2,
+  TrendingUp,
   ShieldCheck,
   Target,
   UserRound,
@@ -100,20 +103,14 @@ export default function RegisterPage() {
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_50%_-10%,#1679b8_0%,#0b548d_25%,#06345f_52%,#031a34_100%)] text-white">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed inset-0 z-0 bg-cover bg-center bg-no-repeat"
-        style={{
-          backgroundImage:
-            "linear-gradient(rgba(2,8,23,.34), rgba(2,8,23,.58)), url('/register-bg.png')",
-        }}
-      />
+      <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0 bg-[#020a19]" style={{ backgroundImage: "radial-gradient(ellipse at 32% 40%, rgba(0,120,255,.20), transparent 45%), radial-gradient(ellipse at 90% 12%, rgba(0,220,255,.12), transparent 40%), linear-gradient(120deg,#020817,#041a39 55%,#020916)" }} />
+      <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0 opacity-25" style={{ backgroundImage: "linear-gradient(rgba(56,189,248,.13) 1px,transparent 1px),linear-gradient(90deg,rgba(56,189,248,.13) 1px,transparent 1px)", backgroundSize: "54px 54px", maskImage: "linear-gradient(to bottom,transparent,#000 20%,#000 80%,transparent)" }} />
       <div
         aria-hidden="true"
         className="pointer-events-none fixed inset-0 z-[1] bg-[radial-gradient(circle_at_50%_18%,rgba(34,211,238,.10),transparent_42%)]"
       />
 
-      <div className="relative z-10 mx-auto w-full max-w-[1780px] px-4 py-6 md:px-6 xl:px-8">
+      <div className="relative z-10 mx-auto w-full max-w-[1540px] px-4 py-6 md:px-6 xl:px-8">
         {/* BRAND + LANGUAGE */}
         <div className="mb-4 flex justify-end">
           <LanguageSwitcher />
@@ -140,7 +137,7 @@ export default function RegisterPage() {
         </div>
 
         {/* MAIN */}
-        <section className="grid min-h-[760px] overflow-hidden rounded-[30px] border border-sky-300/30 bg-[linear-gradient(145deg,rgba(10,70,128,.88),rgba(4,37,75,.92))] shadow-[0_30px_100px_rgba(0,0,0,.28),0_0_55px_rgba(14,165,233,.12),inset_0_1px_0_rgba(255,255,255,.06)] xl:grid-cols-[1.05fr_.95fr]">
+        <section className="grid min-h-[760px] overflow-hidden rounded-[30px] border border-sky-300/30 bg-[linear-gradient(145deg,rgba(4,27,59,.88),rgba(2,13,34,.94))] shadow-[0_30px_100px_rgba(0,0,0,.28),0_0_55px_rgba(14,165,233,.12),inset_0_1px_0_rgba(255,255,255,.06)] xl:grid-cols-[1.05fr_.95fr]">
           {/* LEFT */}
           <div className="relative overflow-hidden border-b border-sky-500/15 p-7 md:p-10 xl:border-b-0 xl:border-r xl:p-12">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_48%,rgba(56,189,248,.18),transparent_38%),linear-gradient(145deg,rgba(14,165,233,.055),transparent_55%)]" />
@@ -188,17 +185,8 @@ export default function RegisterPage() {
                   </div>
                 </div>
 
-                {/* BULL BESIDE COPY */}
-                <div className="relative min-h-[560px] overflow-hidden rounded-[26px]">
-                  <img
-                    src="/images/register/fx-bull.png"
-                    alt="FX Trade - niebieski byk tradingowy"
-                    className="absolute inset-0 h-full w-full object-cover object-[58%_56%]"
-                  />
-
-                  <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(2,8,18,.18),rgba(2,8,18,.02)_28%,rgba(2,8,18,.04))]" />
-                  <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(2,8,18,.02),rgba(2,8,18,.14))]" />
-                </div>
+                {/* MARKET VISUAL — pure CSS/SVG, no image assets */}
+                <MarketVisual />
               </div>
 
               <div className="mt-7 flex items-center gap-3 rounded-2xl border border-sky-300/35 bg-[linear-gradient(145deg,rgba(8,65,119,.92),rgba(4,36,73,.95))] p-4 shadow-[0_12px_35px_rgba(0,0,0,.20),0_0_24px_rgba(56,189,248,.09),inset_0_1px_0_rgba(255,255,255,.05)] backdrop-blur-md">
@@ -219,7 +207,7 @@ export default function RegisterPage() {
 
           {/* RIGHT */}
           <div className="flex items-center justify-center p-6 md:p-10 xl:p-12">
-            <div className="w-full max-w-[700px] rounded-[28px] border border-cyan-300/40 bg-[radial-gradient(circle_at_top,rgba(14,165,233,.12),transparent_34%),linear-gradient(145deg,#0a477f,#052c57_58%,#041f40)] p-6 shadow-[0_24px_70px_rgba(0,0,0,.24),0_0_55px_rgba(14,165,233,.18),inset_0_1px_0_rgba(255,255,255,.07)] md:p-10">
+            <div className="w-full max-w-[700px] rounded-[28px] border border-cyan-300/40 bg-[radial-gradient(circle_at_top,rgba(14,165,233,.12),transparent_38%),linear-gradient(145deg,#082b56,#041b39_58%,#03142e)] p-6 shadow-[0_24px_70px_rgba(0,0,0,.24),0_0_55px_rgba(14,165,233,.18),inset_0_1px_0_rgba(255,255,255,.07)] md:p-10">
               <div className="text-center">
                 <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-blue-500/35 bg-blue-500/10 shadow-[0_0_30px_rgba(37,99,235,.20)]">
                   <UserRound className="h-9 w-9 text-blue-400" />
@@ -234,7 +222,7 @@ export default function RegisterPage() {
                 </p>
               </div>
 
-              <form onSubmit={handleSubmit} className="mt-9 space-y-6">
+              <form onSubmit={handleSubmit} className="mt-9 space-y-5">
                 <div>
                   <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-300">
                     <UserRound className="h-4 w-4 text-sky-400" />
@@ -312,7 +300,7 @@ export default function RegisterPage() {
                 {msg ? (
                   <div
                     className={`rounded-2xl border px-4 py-3 text-sm ${
-                      msg.toLowerCase().includes("sukces")
+                      msg.toLowerCase().includes("utworzone")
                         ? "border-emerald-400/20 bg-emerald-500/10 text-emerald-200"
                         : "border-rose-400/20 bg-rose-500/10 text-rose-200"
                     }`}
@@ -345,7 +333,7 @@ export default function RegisterPage() {
         </section>
 
         {/* DISCLAIMER */}
-        <section className="mt-4 rounded-2xl border border-sky-300/30 bg-[linear-gradient(145deg,#094779,#052d56)] p-5 shadow-[0_14px_38px_rgba(0,0,0,.18),0_0_28px_rgba(14,165,233,.08),inset_0_1px_0_rgba(255,255,255,.05)] md:p-6">
+        <section className="mt-4 rounded-2xl border border-sky-300/30 bg-[linear-gradient(145deg,#062b55,#03172f)] p-5 shadow-[0_14px_38px_rgba(0,0,0,.18),0_0_28px_rgba(14,165,233,.08),inset_0_1px_0_rgba(255,255,255,.05)] md:p-6">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-center">
             <div className="flex flex-1 items-start gap-4">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-blue-500/25 bg-blue-500/10">
@@ -434,3 +422,47 @@ function MiniBenefit({
   );
 }
 
+
+function MarketVisual() {
+  const closes = [36, 42, 38, 49, 53, 47, 60, 57, 66, 71, 64, 77, 72, 82, 79, 90, 85, 95, 89, 100, 106, 101, 115, 110];
+  return (
+    <div className="relative min-h-[390px] overflow-hidden rounded-[26px] border border-cyan-400/25 bg-[#020d23] shadow-[0_0_45px_rgba(0,145,255,.14)] md:min-h-[520px]">
+      <div className="absolute inset-0 opacity-40" style={{ backgroundImage: "linear-gradient(rgba(56,189,248,.13) 1px,transparent 1px),linear-gradient(90deg,rgba(56,189,248,.13) 1px,transparent 1px)", backgroundSize: "38px 38px" }} />
+      <div className="absolute -left-24 top-12 h-80 w-80 rounded-full bg-blue-600/20 blur-[75px]" />
+      <div className="absolute -right-20 bottom-0 h-72 w-72 rounded-full bg-cyan-400/15 blur-[75px]" />
+      <div className="absolute left-5 right-5 top-5 z-10 flex flex-wrap items-center justify-between gap-2">
+        <span className="flex items-center gap-2 rounded-full border border-cyan-400/30 bg-[#061d3a]/90 px-3 py-2 text-[11px] font-bold tracking-[.15em] text-cyan-300"><Globe2 className="h-4 w-4" /> GLOBAL MARKETS</span>
+        <span className="flex items-center gap-1.5 rounded-full border border-sky-400/20 bg-[#061d3a]/90 px-3 py-2 text-[10px] text-sky-200"><span className="h-2 w-2 rounded-full bg-cyan-400 shadow-[0_0_12px_#22d3ee]" /> MARKET ANALYTICS</span>
+      </div>
+      <svg className="absolute inset-0 h-full w-full" viewBox="0 0 500 560" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Dekoracyjny wykres świecowy rynków finansowych">
+        <defs>
+          <linearGradient id="marketGlow" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stopColor="#0065f5" stopOpacity="0"/><stop offset="100%" stopColor="#00d9ff" stopOpacity=".27"/></linearGradient>
+          <filter id="marketBlur"><feGaussianBlur stdDeviation="5"/></filter>
+        </defs>
+        <circle cx="280" cy="285" r="165" fill="none" stroke="#0ea5e9" strokeOpacity=".19" strokeWidth="1.5" />
+        <circle cx="280" cy="285" r="127" fill="none" stroke="#0ea5e9" strokeOpacity=".15" />
+        <ellipse cx="280" cy="285" rx="165" ry="62" fill="none" stroke="#0ea5e9" strokeOpacity=".16" />
+        <ellipse cx="280" cy="285" rx="80" ry="165" fill="none" stroke="#0ea5e9" strokeOpacity=".15" />
+        <path d="M 25 460 C 110 415, 140 430, 200 355 S 315 335, 360 245 S 430 225, 485 120" fill="none" stroke="#00cfff" strokeWidth="9" opacity=".5" filter="url(#marketBlur)" />
+        <path d="M 25 460 C 110 415, 140 430, 200 355 S 315 335, 360 245 S 430 225, 485 120" fill="none" stroke="#1acbff" strokeWidth="2.5" />
+        {closes.map((close, i) => {
+          const x = 28 + i * 19;
+          const y = 470 - close * 2.8;
+          const up = i === 0 || close >= closes[i - 1];
+          const color = up ? "#16d9ff" : "#f59e62";
+          const bodyTop = up ? y : y - 7;
+          return <g key={i}><line x1={x} y1={y - 20} x2={x} y2={y + 30} stroke={color} strokeWidth="1.5" opacity=".85"/><rect x={x - 5} y={bodyTop} width="10" height={20 + (i % 3) * 5} rx="1" fill={color} opacity=".95" /></g>;
+        })}
+      </svg>
+      <div className="absolute bottom-5 left-4 right-4 z-10 grid grid-cols-3 gap-2">
+        {[{symbol:"EUR/USD",name:"FOREX"},{symbol:"XAU/USD",name:"GOLD"},{symbol:"US30",name:"INDICES"}].map((item) => (
+          <div key={item.symbol} className="rounded-xl border border-cyan-400/20 bg-[#041b39]/90 px-2 py-3 text-center backdrop-blur-xl">
+            <div className="text-[10px] font-semibold tracking-wider text-slate-400">{item.name}</div>
+            <div className="mt-1 text-xs font-black text-cyan-200 sm:text-sm">{item.symbol}</div>
+          </div>
+        ))}
+      </div>
+      <div className="absolute bottom-24 left-5 flex items-center gap-2 text-xs font-bold tracking-[.15em] text-sky-200/80"><Activity className="h-4 w-4 text-cyan-400"/> FOREX · METALS · INDICES <TrendingUp className="h-4 w-4 text-cyan-400" /></div>
+    </div>
+  );
+}

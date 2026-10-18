@@ -282,8 +282,8 @@ const YOUTUBE_VIDEOS: Record<string, string> = {
   // Każda lekcja ma osobny wpis; nie zmieniaj kluczy po lewej stronie.
   // Moduł 1
   "m1-l1-tradingview-podstawy": "bq678euQjT8",
-  "m1-l2-mt4-mt5": "bq678euQjT8",
-  "m1-l3-jak-otworzyc-trade": "bq678euQjT8",
+  "m1-l2-mt4-mt5": "dUWgQVN76s8",
+  "m1-l3-jak-otworzyc-trade": "ihXRTKUuhMo",
   "m1-l4-stop-loss-take-profit": "bq678euQjT8",
   "m1-l5-typy-zlecen": "bq678euQjT8",
   "m1-l6-zarzadzanie-pozycja": "bq678euQjT8",
