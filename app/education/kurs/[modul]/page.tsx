@@ -267,6 +267,173 @@ const COURSE_DATA: Record<string, ModuleData> = {
   },
 };
 
+// Wklej identyfikatory filmów YouTube dla kolejnych lekcji.
+// Możesz wkleić także pełny adres youtube.com/watch?v=... lub youtu.be/...
+const YOUTUBE_VIDEOS: Record<string, string> = {
+  "m0-l1-czym-jest-trading": "hpTgxMk6NVU",
+  "m0-l2-jak-dziala-rynek-forex": "8m0hSrA2y6U",
+  "m0-l3-pips-lot-spread": "aicgDtSoI_o",
+  "m0-l4-rodzaje-rynkow": "o8nwGLizf04",
+  "m0-l5-jak-dziala-broker": "UZaITtSKVVc",
+  "m0-l6-jak-powstaje-cena": "jCnl9983kUA",
+
+  // Moduły 1–18: wklej swój pełny link YouTube po dwukropku, zamiast pustego "".
+  // Przykład: "m1-l1-tradingview-podstawy": "https://youtu.be/XXXXXXXXXXX",
+  // Każda lekcja ma osobny wpis; nie zmieniaj kluczy po lewej stronie.
+  // Moduł 1
+  "m1-l1-tradingview-podstawy": "bq678euQjT8",
+  "m1-l2-mt4-mt5": "bq678euQjT8",
+  "m1-l3-jak-otworzyc-trade": "bq678euQjT8",
+  "m1-l4-stop-loss-take-profit": "bq678euQjT8",
+  "m1-l5-typy-zlecen": "bq678euQjT8",
+  "m1-l6-zarzadzanie-pozycja": "bq678euQjT8",
+
+  // Moduł 2
+  "m2-l1-typy-wykresow": "",
+  "m2-l2-timeframe": "",
+  "m2-l3-swiece-japonskie": "",
+  "m2-l4-jak-czytac-swiece": "",
+  "m2-l5-struktura-swiecy": "",
+  "m2-l6-momentum-swiec": "",
+
+  // Moduł 3
+  "m3-l1-hh-hl-lh-ll": "",
+  "m3-l2-jak-rozpoznac-trend": "",
+  "m3-l3-zmiana-struktury": "",
+  "m3-l4-bos": "",
+  "m3-l5-choch": "",
+  "m3-l6-struktura-w-praktyce": "",
+
+  // Moduł 4
+  "m4-l1-co-to-jest-trend": "",
+  "m4-l2-trend-vs-konsolidacja": "",
+  "m4-l3-jak-okreslic-bias": "",
+  "m4-l4-kiedy-nie-handlowac": "",
+  "m4-l5-trend-na-roznych-timeframe": "",
+  "m4-l6-multi-timeframe-analysis": "",
+
+  // Moduł 5
+  "m5-l1-podstawy-price-action": "",
+  "m5-l2-momentum-ceny": "",
+  "m5-l3-pin-bar": "",
+  "m5-l4-engulfing": "",
+  "m5-l5-fake-breakout": "",
+  "m5-l6-price-action-w-praktyce": "",
+
+  // Moduł 6
+  "m6-l1-co-to-jest-setup": "",
+  "m6-l2-setup-1-2-3": "",
+  "m6-l3-breakout": "",
+  "m6-l4-retest": "",
+  "m6-l5-falszywe-wybicie": "",
+  "m6-l6-checklist-setupu": "",
+
+  // Moduł 7
+  "m7-l1-timing-wejscia": "",
+  "m7-l2-wejscia-na-m1": "",
+  "m7-l3-wejscia-na-m5": "",
+  "m7-l4-potwierdzenie-wejscia": "",
+  "m7-l5-moment-impulsu": "",
+  "m7-l6-idealny-moment-wejscia": "",
+
+  // Moduł 8
+  "m8-l1-czym-jest-liquidity": "",
+  "m8-l2-gdzie-jest-liquidity": "",
+  "m8-l3-liquidity-sweep": "",
+  "m8-l4-stop-hunt": "",
+  "m8-l5-equal-highs-lows": "",
+  "m8-l6-liquidity-w-praktyce": "",
+
+  // Moduł 9
+  "m9-l1-co-to-jest-risk-management": "",
+  "m9-l2-zarzadzanie-pozycja": "",
+  "m9-l3-wielkosc-pozycji": "",
+  "m9-l4-ile-ryzykowac": "",
+  "m9-l5-zarzadzanie-seria-strat": "",
+  "m9-l6-jak-chronic-konto": "",
+
+  // Moduł 10
+  "m10-l1-zarzadzanie-trade": "",
+  "m10-l2-partial-tp": "",
+  "m10-l3-trailing-stop": "",
+  "m10-l4-scaling-pozycji": "",
+  "m10-l5-kiedy-zamknac-trade": "",
+  "m10-l6-zarzadzanie-wygrana": "",
+
+  // Moduł 11
+  "m11-l1-emocje-w-tradingu": "",
+  "m11-l2-fomo": "",
+  "m11-l3-revenge-trading": "",
+  "m11-l4-overtrading": "",
+  "m11-l5-strach-przed-strata": "",
+  "m11-l6-proces-vs-wynik": "",
+
+  // Moduł 12
+  "m12-l1-plan-dnia-tradera": "",
+  "m12-l2-analiza-przed-sesja": "",
+  "m12-l3-przygotowanie-do-tradingu": "",
+  "m12-l4-rutyna-tradingowa": "",
+  "m12-l5-analiza-po-sesji": "",
+  "m12-l6-dyscyplina": "",
+
+  // Moduł 13
+  "m13-l1-dlaczego-journal-jest-wazny": "",
+  "m13-l2-jak-prowadzic-journal": "",
+  "m13-l3-co-zapisywac": "",
+  "m13-l4-analiza-trade": "",
+  "m13-l5-poprawa-wynikow": "",
+  "m13-l6-budowanie-statystyk": "",
+
+  // Moduł 14
+  "m14-l1-analiza-realnego-trade": "",
+  "m14-l2-analiza-sesji-tradingowej": "",
+  "m14-l3-trade-krok-po-kroku": "",
+  "m14-l4-bledy-w-trade": "",
+  "m14-l5-poprawna-analiza": "",
+  "m14-l6-wnioski-z-trade": "",
+
+  // Moduł 15
+  "m15-l1-czym-jest-system": "",
+  "m15-l2-budowanie-strategii": "",
+  "m15-l3-checklist-trade": "",
+  "m15-l4-plan-tradingowy": "",
+  "m15-l5-edge-tradera": "",
+  "m15-l6-testowanie-strategii": "",
+
+  // Moduł 16
+  "m16-l1-win-rate": "",
+  "m16-l2-expectancy": "",
+  "m16-l3-edge-w-tradingu": "",
+  "m16-l4-analiza-wynikow": "",
+  "m16-l5-backtesting": "",
+  "m16-l6-optymalizacja-strategii": "",
+
+  // Moduł 17
+  "m17-l1-jak-skalowac-konto": "",
+  "m17-l2-zarzadzanie-wiekszym-kapitalem": "",
+  "m17-l3-trading-w-prop-firmach": "",
+  "m17-l4-funded-account": "",
+  "m17-l5-zarzadzanie-kapitalem": "",
+  "m17-l6-profesjonalny-trading": "",
+
+  // Moduł 18
+  "m18-l1-bledy-poczatkujacych": "",
+  "m18-l2-bledy-w-risk-management": "",
+  "m18-l3-bledy-psychologiczne": "",
+  "m18-l4-overtrading": "",
+  "m18-l5-brak-planu": "",
+  "m18-l6-jak-unikac-bledow": "",
+
+};
+
+function youtubeVideoId(value: string): string | null {
+  const input = value.trim();
+  if (!input) return null;
+  const match = input.match(/(?:youtu\.be\/|(?:www\.|m\.|music\.)?youtube\.com\/(?:watch\?(?:[^#]*&)?v=|embed\/|shorts\/|live\/))([a-zA-Z0-9_-]{11})/);
+  const id = match?.[1] ?? input;
+  return /^[a-zA-Z0-9_-]{11}$/.test(id) ? id : null;
+}
+
 function renderLessonBlock(block: any, index: number) {
   switch (block.type) {
     case "h2":
@@ -438,6 +605,8 @@ export default function ModulPage({
   const lessonContent =
     !isQuizLesson && active.contentKey ? LESSON_CONTENT[active.contentKey] : null;
 
+  const lessonVideoId = active.contentKey ? youtubeVideoId(YOUTUBE_VIDEOS[active.contentKey] ?? "") : null;
+
   const activeLessonStorageKey =
     active.contentKey || active.quizKey || `${modul}-${activeLesson}`;
 
@@ -574,28 +743,27 @@ export default function ModulPage({
           </div>
 
 {!isQuizLesson && (
-  <div className="aspect-video max-w-3xl mx-auto bg-black/30 rounded-xl overflow-hidden mb-8 border border-white/10">
-    <iframe
-      className="w-full h-full"
-      src={
-  active.contentKey === "m0-l1-czym-jest-trading"
-    ? "https://www.youtube.com/embed/hpTgxMk6NVU"
-    : active.contentKey === "m0-l2-jak-dziala-rynek-forex"
-    ? "https://www.youtube.com/embed/8m0hSrA2y6U"
-    : active.contentKey === "m0-l3-pips-lot-spread"
-    ? "https://www.youtube.com/embed/aicgDtSoI_o"
-    : active.contentKey === "m0-l4-rodzaje-rynkow"
-    ? "https://www.youtube.com/embed/o8nwGLizf04"
-    : active.contentKey === "m0-l5-jak-dziala-broker"
-    ? "https://www.youtube.com/embed/UZaITtSKVVc"
-    : active.contentKey === "m0-l6-jak-powstaje-cena"
-    ? "https://www.youtube.com/embed/jCnl9983kUA"
-    : ""
-}
-      title="Wideo lekcji"
-      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-      allowFullScreen
-    />
+  <div className="max-w-3xl mx-auto mb-8">
+    {lessonVideoId ? (
+      <div className="aspect-video bg-black/30 rounded-xl overflow-hidden border border-white/10">
+        <iframe
+          key={lessonVideoId}
+          className="w-full h-full"
+          src={`https://www.youtube.com/embed/${lessonVideoId}`}
+          title={`Wideo: ${active.title}`}
+          loading="lazy"
+          referrerPolicy="strict-origin-when-cross-origin"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowFullScreen
+        />
+      </div>
+    ) : (
+      <div className="aspect-video flex flex-col items-center justify-center gap-3 rounded-xl border border-blue-500/20 bg-gradient-to-br from-slate-900 to-blue-950/40 text-center p-6">
+        <span className="text-4xl" aria-hidden="true">▶</span>
+        <h3 className="text-xl font-semibold text-white">Lekcja wideo w przygotowaniu</h3>
+        <p className="text-sm text-slate-300">Materiał tekstowy lekcji jest dostępny poniżej.</p>
+      </div>
+    )}
   </div>
 )}
           <div className="bg-white/5 border border-white/10 rounded-xl p-6">
