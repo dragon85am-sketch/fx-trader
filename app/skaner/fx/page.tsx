@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import type { DrawTool } from "@/components/DrawingsLayer";
 import React from "react";
@@ -28,6 +28,7 @@ import {
   Waves,
   ChartNoAxesCombined,
   FileSpreadsheet,
+  Eye,
 } from "lucide-react";
 const EMA_FAST = 14;
 const WMA_SLOW = 40;
@@ -2746,6 +2747,17 @@ export default function MarketScannerPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [closedTrades, setClosedTrades] = React.useState<ClosedTrade[]>([]);
   const [activeTrades, setActiveTrades] = React.useState<ActiveTrade[]>([]);
+  const [previewTrade, setPreviewTrade] = React.useState<ActiveTrade | null>(null);
+  const chartPreviewRef = React.useRef<HTMLDivElement | null>(null);
+  const openTradePreview = React.useCallback((trade: ActiveTrade) => {
+    setPreviewTrade(trade);
+    setSelectedSymbol(trade.instrument.toUpperCase());
+    if (trade.tf && TIMEFRAMES.includes(trade.tf.toUpperCase() as Timeframe)) {
+      setTf(trade.tf.toUpperCase() as Timeframe);
+    }
+    window.requestAnimationFrame(() => chartPreviewRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }));
+  }, []);
+
   
   const closedTradesLoadedRef = React.useRef(false);
 
@@ -3933,6 +3945,16 @@ if (closedNow.length) {
     return next;
   }, [renkoSource, tf, selectedCandles, renkoCandles, liveCandle]);
 
+  const previewMatchesChart = !!previewTrade && previewTrade.instrument.toUpperCase() === selected?.symbol?.toUpperCase() && (!previewTrade.tf || previewTrade.tf.toUpperCase() === tf);
+  const previewRisk = previewTrade ? Math.abs(previewTrade.entry - previewTrade.sl) : 0;
+  const previewLevels: Levels | undefined = previewMatchesChart && previewTrade ? {
+    side: previewTrade.direction,
+    entry: previewTrade.entry,
+    sl: previewTrade.sl,
+    tps: [previewTrade.tp1, previewTrade.tp2, previewTrade.tp3],
+    rr: previewRisk > 0 ? Math.abs(previewTrade.tp3 - previewTrade.entry) / previewRisk : 0,
+    zones: [],
+  } : undefined;
   const highlightTime: UTCTimestamp | null = selected.tradeActive ? selected.hammerTime ?? null : null;
   const hasTrade =
     !!selected.levels &&
@@ -5283,6 +5305,7 @@ if (closedNow.length) {
     </button>
   ))}
 </div>
+                <div ref={chartPreviewRef} />
                 <MarketChart
                   key={`${selected.symbol}-${tf}`}
                   symbol={selected.symbol}
@@ -5296,8 +5319,8 @@ if (closedNow.length) {
                   renko={renko}
                   renkoCandles={effectiveRenkoCandles as any}
                   renkoBoxSize={renkoBoxSize > 0 ? renkoBoxSize : undefined}
-                  showTradeLines={hasTrade}
-                  levels={hasTrade ? selected.levels : undefined}
+                  showTradeLines={!!previewLevels || hasTrade}
+                  levels={previewLevels ?? (hasTrade ? selected.levels : undefined)}
                   highlightTime={highlightTime}
                   activeDrawTool={activeDrawTool}
                   onDrawToolChange={setActiveDrawTool}
@@ -5332,7 +5355,7 @@ if (closedNow.length) {
                   <div className="h-[150px] overflow-auto sm:h-[170px] xl:h-[250px]">
                     <table className="w-full min-w-[750px] text-xs">
                       <thead className="sticky top-0 bg-[#082749] text-sky-100/80"><tr className="border-b border-sky-300/15">
-                        {['Data','Instrument','Kierunek','Wejście','SL','TP1','TP2','TP3','Status'].map(h => <th key={h} className="px-2 py-2 text-left">{h}</th>)}
+                        {['Data','Instrument','Kierunek','Wejście','SL','TP1','TP2','TP3','Status','Action'].map(h => <th key={h} className="px-2 py-2 text-left">{h}</th>)}
                       </tr></thead>
                       <tbody>
                         {activeTrades.length ? activeTrades.map(t => <tr key={t.id} className="border-b border-sky-300/10 text-sky-50 hover:bg-sky-400/[0.06]">
@@ -5345,7 +5368,8 @@ if (closedNow.length) {
                           <td className="px-2 py-2">{formatTradePrice(t.instrument,t.tp2)}</td>
                           <td className="px-2 py-2">{formatTradePrice(t.instrument,t.tp3)}</td>
                           <td className="px-2 py-2"><span className="rounded-full bg-cyan-500/15 px-2 py-1 font-bold text-cyan-200">{t.tp2Hit ? 'TP2 HIT' : t.tp1Hit ? 'TP1 HIT' : 'OPEN'}</span></td>
-                        </tr>) : <tr><td colSpan={9} className="px-3 py-6 text-center text-sky-100/45">Brak aktywnych transakcji</td></tr>}
+                          <td className="px-2 py-2"><button type="button" onClick={() => openTradePreview(t)} title={`Pokaż ${t.instrument} na wykresie`} aria-label={`Podgląd transakcji ${t.instrument}`} className="inline-flex h-7 w-8 items-center justify-center rounded-lg border border-cyan-400/35 bg-cyan-500/10 text-cyan-200 transition hover:bg-cyan-500/25 hover:text-white"><Eye size={15} /></button></td>
+                        </tr>) : <tr><td colSpan={10} className="px-3 py-6 text-center text-sky-100/45">Brak aktywnych transakcji</td></tr>}
                       </tbody>
                     </table>
                   </div>
