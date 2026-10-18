@@ -286,7 +286,7 @@ function iconGlowClasses(href: string, active: boolean) {
 }
 
 function iconForHref(href: string): IconName {
-  if (href === "/dashboard") return "dashboard";
+  if (href === "/dashboard") return "home";
   if (href.startsWith("/trading-room") || href === "/journal") return "trading";
   if (href.startsWith("/skaner")) return "scanner";
   if (href.startsWith("/strategie")) return "strategy";
@@ -605,13 +605,24 @@ export default function AppSidebar() {
     <aside className="h-full w-full shrink-0">
       <div className="h-full p-3 lg:h-screen lg:pr-0 xl:p-4 xl:pr-0">
         <div className={cn(
-            "sticky top-3 flex max-h-[calc(100vh-1.5rem)] flex-col overflow-hidden rounded-[30px] border border-sky-300/25 text-sky-50 shadow-[0_22px_70px_rgba(0,20,55,.42),0_0_30px_rgba(56,189,248,.12),inset_0_1px_0_rgba(255,255,255,.08)] backdrop-blur-2xl transition-colors duration-300 xl:top-4 xl:max-h-[calc(100vh-2rem)]",
+            "sticky top-3 flex max-h-[calc(100vh-1.5rem)] flex-col overflow-hidden rounded-[27px] border border-cyan-400/45 text-sky-50 shadow-[0_24px_75px_rgba(0,7,28,.75),0_0_22px_rgba(0,157,255,.28),inset_3px_0_0_rgba(0,175,255,.8)] backdrop-blur-2xl transition-colors duration-300 xl:top-4 xl:max-h-[calc(100vh-2rem)]",
             themeMode === "light"
-              ? "bg-[linear-gradient(180deg,#2B91D0_0%,#207BB9_38%,#17679E_100%)]"
+              ? "bg-[linear-gradient(180deg,#123E72_0%,#092A50_45%,#04172F_100%)]"
               : themeMode === "dark"
-                ? "bg-[linear-gradient(180deg,#082642_0%,#061D34_38%,#041526_100%)]"
-                : "bg-[linear-gradient(180deg,#194F8C_0%,#123D70_38%,#0A2B50_100%)]"
+                ? "bg-[linear-gradient(180deg,#04162F_0%,#03152C_50%,#020D20_100%)]"
+                : "bg-[linear-gradient(180deg,#082D5B_0%,#062447_45%,#03152D_100%)]"
           )}>
+          {/* Brand header: rendered in CSS/SVG, no external image required. */}
+          <Link href="/dashboard" aria-label="FX TRADE — Dashboard" className="group relative mx-3 mt-3 block overflow-hidden rounded-[18px] border border-cyan-400/60 bg-[radial-gradient(ellipse_at_80%_0%,rgba(0,166,255,.26),transparent_55%),linear-gradient(115deg,#03132D,#07336B_65%,#042149)] px-3 py-3 shadow-[0_0_17px_rgba(0,174,255,.38),inset_0_1px_0_rgba(255,255,255,.13)]">
+            <div className="pointer-events-none absolute right-3 top-2 flex h-7 items-end gap-[3px] opacity-65" aria-hidden="true">
+              {[9,16,12,23,17,28,21,32,26,38].map((h,i) => <span key={i} className="w-[3px] rounded-sm bg-gradient-to-t from-blue-700 to-cyan-300 shadow-[0_0_6px_#00bfff]" style={{height:h}} />)}
+            </div>
+            <div className="relative flex items-center gap-2 whitespace-nowrap italic leading-none tracking-[-.07em]">
+              <span className="bg-gradient-to-b from-white via-cyan-300 to-blue-600 bg-clip-text text-[36px] font-black text-transparent drop-shadow-[0_0_9px_rgba(0,170,255,.65)]">FX</span>
+              <span className="bg-gradient-to-b from-white via-slate-200 to-sky-400 bg-clip-text text-[24px] font-black text-transparent">TRADE</span>
+            </div>
+            <div className="relative mt-1 text-center text-[8px] font-bold tracking-[.30em] text-cyan-200/85">PRO TRADING PLATFORM</div>
+          </Link>
           <div className="relative overflow-hidden border-b border-sky-200/10 px-5 pb-4 pt-5">
             <div className="pointer-events-none absolute -right-12 -top-14 h-36 w-36 rounded-full bg-cyan-300/20 blur-3xl" />
             <div className="pointer-events-none absolute left-10 top-0 h-24 w-24 rounded-full bg-blue-500/20 blur-3xl" />
@@ -676,12 +687,12 @@ export default function AppSidebar() {
                           : undefined
                       }
                       className={cn(
-                        "group relative flex min-h-[58px] items-center justify-between overflow-hidden rounded-2xl border px-3.5 py-2.5 text-sm font-medium transition-all duration-200",
+                        "group relative flex min-h-[56px] items-center justify-between overflow-hidden rounded-[15px] border px-2.5 py-2 text-sm font-medium shadow-[inset_0_1px_0_rgba(255,255,255,.035)] transition-all duration-200",
                         locked
                           ? "border-amber-300/15 bg-amber-300/[0.035] text-sky-100/45 hover:border-amber-300/25 hover:bg-amber-300/[0.07] hover:text-sky-50/75"
                           : active
-                            ? "border-cyan-200/35 bg-[linear-gradient(90deg,#147BFF_0%,#1FA8FF_52%,#38C6F7_100%)] text-white shadow-[0_0_24px_rgba(14,165,233,.34),inset_0_1px_0_rgba(255,255,255,.16)]"
-                            : "border-transparent text-sky-50/88 hover:border-cyan-300/15 hover:bg-cyan-300/[0.08] hover:text-white"
+                            ? "border-cyan-300/80 bg-[linear-gradient(100deg,#00327C_0%,#0755C8_55%,#08AEFA_100%)] text-white shadow-[0_0_18px_rgba(0,168,255,.65),inset_0_1px_0_rgba(255,255,255,.30)]"
+                            : "border-sky-500/20 bg-[linear-gradient(95deg,rgba(1,20,47,.82),rgba(4,40,79,.7))] text-sky-50/90 hover:border-cyan-400/65 hover:bg-sky-600/20 hover:text-white hover:shadow-[0_0_15px_rgba(0,165,255,.22)]"
                       )}
                     >
                       {!locked && active && (
@@ -691,7 +702,7 @@ export default function AppSidebar() {
                       <span className="flex min-w-0 items-center gap-3">
                         <span
                           className={cn(
-                            "flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[13px] border transition-all duration-200",
+                            "flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-[12px] border transition-all duration-200",
                             locked
                               ? "border-white/[0.03] bg-white/[0.025] text-sky-100/30"
                               : NAV_IMAGE_BY_HREF[it.href]
@@ -710,7 +721,7 @@ export default function AppSidebar() {
                           ) : (
                             <NavIcon
                               name={iconForHref(it.href)}
-                              className="h-[23px] w-[23px] drop-shadow-[0_0_7px_currentColor]"
+                              className="h-[24px] w-[24px] drop-shadow-[0_0_7px_currentColor]"
                             />
                           )}
                         </span>
@@ -796,7 +807,7 @@ export default function AppSidebar() {
             </nav>
 
             {/* FX TRADE PREMIUM COMMUNITY — pełny byk z /public */}
-            <div className="mt-5 overflow-hidden rounded-[20px] border border-[#0d579e] bg-[#041f40] shadow-[0_0_26px_rgba(14,165,233,.12),inset_0_1px_0_rgba(255,255,255,.04)]">
+            <div className="mt-5 overflow-hidden rounded-[20px] border border-cyan-400/70 bg-[#04132d] shadow-[0_0_22px_rgba(0,157,255,.36),inset_0_1px_0_rgba(255,255,255,.10)]">
               <div
                 className="relative aspect-[208/280] w-full overflow-hidden bg-cover bg-center bg-no-repeat"
                 style={{
@@ -813,7 +824,7 @@ export default function AppSidebar() {
               </div>
             </div>
 
-            <div className="mt-4 grid grid-cols-3 gap-2 rounded-[16px] border border-cyan-300/15 bg-[#052348] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,.04)]">
+            <div className="mt-4 grid grid-cols-3 gap-2 rounded-[16px] border border-cyan-400/35 bg-[#031a37] p-2 shadow-[0_0_12px_rgba(0,149,255,.12),inset_0_1px_0_rgba(255,255,255,.06)]">
               <button
                 type="button"
                 onClick={() => changeTheme("light")}
