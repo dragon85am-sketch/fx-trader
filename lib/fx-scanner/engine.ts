@@ -46,3 +46,39 @@ export function advanceTrade(c:Candle[],side:Side,l:Levels,signalTime:number,tp1
   }
   return {status:null,tp1Hit,tp2Hit};
 }
+
+
+// Faza 3.3: niezalezna ocena jakosci Liquidity Sweep (nie zmienia warunku 4/4).
+export type LiquiditySweepScore = {
+  side: Side; score: number; sweep: number; rejection: number;
+  confirmation: number; sweepTime: number | null; confirmed: boolean;
+};
+export function scoreLiquiditySweep(c: Candle[], side: Side, lookback = 5): LiquiditySweepScore {
+  const empty = (): LiquiditySweepScore => ({side,score:0,sweep:0,rejection:0,confirmation:0,sweepTime:null,confirmed:false});
+  // Ostatnia swieca moze byc w trakcie tworzenia: analizujemy tylko zamkniete.
+  if (c.length < 4) return empty();
+  const end = c.length - 2;
+  let best = empty();
+  for (let i = Math.max(2, end - Math.max(1, lookback) + 1); i <= end; i++) {
+    const x = c[i], previous = c[i - 1];
+    const range = x.high - x.low;
+    if (!(range > 0)) continue;
+    const buy = side === "BUY";
+    const swept = buy ? x.low < previous.low : x.high > previous.high;
+    if (!swept) continue;
+    const reclaimed = buy ? x.close > previous.low : x.close < previous.high;
+    const penetration = buy ? previous.low - x.low : x.high - previous.high;
+    const sweep = Math.round(40 * (reclaimed ? 0.6 + 0.4 * Math.min(1, penetration / range) : 0.3 * Math.min(1, penetration / range)));
+    const wick = buy ? Math.min(x.open,x.close)-x.low : x.high-Math.max(x.open,x.close);
+    const wickRatio = Math.max(0,wick/range);
+    const closePosition = buy ? (x.close-x.low)/range : (x.high-x.close)/range;
+    const rejection = Math.round(35 * Math.min(1, 0.65 * wickRatio / 0.5 + 0.35 * Math.max(0,closePosition)));
+    // Potwierdzenie musi nastapic na kolejnej ZAMKNIETEJ swiecy.
+    const next = i < end ? c[i+1] : null;
+    const confirmed = !!next && (buy ? next.close > x.high : next.close < x.low);
+    const confirmation = confirmed ? 25 : next && (buy ? next.close > x.close : next.close < x.close) ? 12 : 0;
+    const score = Math.min(100,sweep+rejection+confirmation);
+    if (score > best.score) best = {side,score,sweep,rejection,confirmation,sweepTime:x.time,confirmed};
+  }
+  return best;
+}

@@ -1,8 +1,9 @@
-﻿"use client";
+"use client";
 
 import type { DrawTool } from "@/components/DrawingsLayer";
 import React from "react";
 import { FX_SCANNER_SYMBOLS } from "@/lib/fx-scanner/symbols";
+import { scoreLiquiditySweep } from "@/lib/fx-scanner/engine";
 import * as XLSX from "xlsx-js-style";
 import { createPortal } from "react-dom";
 import { Card, CardContent, Pill, cn, Button } from "@/components/ui";
@@ -116,6 +117,8 @@ type CandlePattern =
 type Row = {
   symbol: string;
   liquidity: number;
+  sweepScore?: number;
+  sweepConfirmed?: boolean;
   tf: Timeframe;
   status: Status;
   signal: Signal;
@@ -3413,6 +3416,11 @@ const signal: Signal = supertrendEnabled
     let openedTradeThisRefresh = false;
     const cs = candlesCache.current.get(candleCacheKey(r.symbol, tf)) ?? [];
     const tick = getTickSize(r.symbol);
+    // Faza 3.3: score informacyjny, bez zmiany 4/4 / READY / SL / TP.
+    const scoreSide: Side | null = r.confirmationSide ?? r.side ?? null;
+    const sweepResult = scoreSide ? scoreLiquiditySweep(cs.map(c => ({
+      time: Number(c.time), open: c.open, high: c.high, low: c.low, close: c.close
+    })), scoreSide) : null;
 
     const emaWmaDirection = getEmaWmaSignal(cs);
     const supertrendDirection = getSupertrendSignal(
@@ -3515,6 +3523,8 @@ const signal: Signal = supertrendEnabled
       ...p,
       tf,
       liquidity: nextLiquidity,
+      sweepScore: sweepResult?.score ?? 0,
+      sweepConfirmed: sweepResult?.confirmed ?? false,
       status: rowStatus,
       tradeActive,
       side: sideOut,
@@ -4545,6 +4555,9 @@ if (closedNow.length) {
                       scannerOn ? "text-emerald-300" : waitLiquidity ? "text-amber-200" : "text-sky-100/55"
                     )}>
                       {isOffline ? 0 : Math.round(r.liquidity)}%
+                      <span className="block text-[9px] font-semibold text-cyan-200/80" title="Liquidity Sweep Score 0–100; wynik informacyjny, nie prawdopodobieństwo wygranej">
+                        S {isOffline ? 0 : (r.sweepScore ?? 0)}%
+                      </span>
                     </span>
                   </div>
                 );
