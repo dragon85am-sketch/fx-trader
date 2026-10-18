@@ -155,6 +155,22 @@ type ClosedTrade = {
   tp3Hit?: boolean;
 };
 
+type ActiveTrade = {
+  id: string;
+  date: string;
+  instrument: string;
+  direction: Side;
+  tf?: string;
+  entry: number;
+  sl: number;
+  tp1: number;
+  tp2: number;
+  tp3: number;
+  status: string;
+  tp1Hit: boolean;
+  tp2Hit: boolean;
+};
+
 type Candle = {
   time: UTCTimestamp;
   open: number;
@@ -2729,6 +2745,7 @@ export default function MarketScannerPage() {
   const [lastSync, setLastSync] = React.useState<number | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [closedTrades, setClosedTrades] = React.useState<ClosedTrade[]>([]);
+  const [activeTrades, setActiveTrades] = React.useState<ActiveTrade[]>([]);
   
   const closedTradesLoadedRef = React.useRef(false);
 
@@ -2898,6 +2915,13 @@ React.useEffect(() => {
         const activeJson = await activeRes.json();
         if (!alive) return;
 
+        setActiveTrades((activeJson.trades ?? []).map((t: any) => ({
+          id: String(t.id), date: String(t.openedAt ?? t.signalTime),
+          instrument: String(t.instrument), direction: t.side as Side, tf: t.tf,
+          entry: Number(t.entry), sl: Number(t.sl), tp1: Number(t.tp1),
+          tp2: Number(t.tp2), tp3: Number(t.tp3), status: String(t.status),
+          tp1Hit: !!t.tp1Hit, tp2Hit: !!t.tp2Hit,
+        })));
         const activeBySymbol = new Map<string, any>();
         for (const t of activeJson.trades ?? []) {
           // Current chart TF gets the central zone for that instrument.
@@ -4464,8 +4488,8 @@ if (closedNow.length) {
               </button>
             </div>
 
-            <div className="grid grid-cols-[1fr_42px_64px_54px] gap-2 border-b border-sky-300/10 px-2 pb-1 text-[9px] font-bold uppercase tracking-wider text-sky-100/35 xl:text-[10px]">
-              <span>Instrument</span><span>TF</span><span>Signal</span><span className="text-right">Setup</span>
+            <div className="grid grid-cols-[minmax(0,1fr)_28px_51px_40px_42px] gap-2 border-b border-sky-300/10 px-2 pb-1 text-[9px] font-bold uppercase tracking-wider text-sky-100/35 xl:text-[10px]">
+              <span>Instrument</span><span>TF</span><span>Signal</span><span className="text-right">Setup</span><span className="text-right text-cyan-300">Sweep</span>
             </div>
 
             {error && (
@@ -4501,7 +4525,7 @@ if (closedNow.length) {
                     }}
                     onClick={() => setSelectedSymbol(r.symbol)}
                     className={cn(
-                      "group grid cursor-pointer grid-cols-[minmax(0,1fr)_34px_62px_42px] items-center gap-2 border-b border-sky-300/[0.07] px-2 py-1.5 text-[11px] transition last:border-b-0 xl:min-h-[36px] xl:px-2.5 xl:py-1.5 xl:text-xs",
+                      "group grid cursor-pointer grid-cols-[minmax(0,1fr)_28px_51px_40px_42px] items-center gap-2 border-b border-sky-300/[0.07] px-2 py-1.5 text-[11px] transition last:border-b-0 xl:min-h-[36px] xl:px-2.5 xl:py-1.5 xl:text-xs",
                       active
                         ? "bg-cyan-400/15 shadow-[inset_3px_0_0_rgba(34,211,238,.9)]"
                         : "hover:bg-sky-400/[0.08]",
@@ -4555,9 +4579,9 @@ if (closedNow.length) {
                       scannerOn ? "text-emerald-300" : waitLiquidity ? "text-amber-200" : "text-sky-100/55"
                     )}>
                       {isOffline ? 0 : Math.round(r.liquidity)}%
-                      <span className="block text-[9px] font-semibold text-cyan-200/80" title="Liquidity Sweep Score 0–100; wynik informacyjny, nie prawdopodobieństwo wygranej">
-                        S {isOffline ? 0 : (r.sweepScore ?? 0)}%
-                      </span>
+                    </span>
+                    <span className="text-right text-[10px] font-black tabular-nums text-cyan-300" title="Liquidity Sweep Score 0–100; wynik informacyjny, nie prawdopodobieństwo wygranej">
+                      {isOffline ? 0 : (r.sweepScore ?? 0)}%
                     </span>
                   </div>
                 );
@@ -5300,6 +5324,32 @@ if (closedNow.length) {
                 />
               </div>
 
+              <div className={cn("mt-1 grid w-full min-w-0 gap-2 xl:grid-cols-2", landscapeFullscreen && "hidden")}>
+                <div className="min-w-0 overflow-hidden rounded-2xl border border-cyan-300/25 bg-[#061c37]/80">
+                  <div className="border-b border-cyan-300/15 bg-[#0b315c]/75 px-3 py-2 text-sm font-semibold text-white">
+                    Active Trades <span className="ml-2 rounded-full bg-cyan-500/20 px-2 py-0.5 text-xs text-cyan-200">{activeTrades.length}</span>
+                  </div>
+                  <div className="h-[150px] overflow-auto sm:h-[170px] xl:h-[250px]">
+                    <table className="w-full min-w-[750px] text-xs">
+                      <thead className="sticky top-0 bg-[#082749] text-sky-100/80"><tr className="border-b border-sky-300/15">
+                        {['Data','Instrument','Kierunek','Wejście','SL','TP1','TP2','TP3','Status'].map(h => <th key={h} className="px-2 py-2 text-left">{h}</th>)}
+                      </tr></thead>
+                      <tbody>
+                        {activeTrades.length ? activeTrades.map(t => <tr key={t.id} className="border-b border-sky-300/10 text-sky-50 hover:bg-sky-400/[0.06]">
+                          <td className="whitespace-nowrap px-2 py-2">{Number.isFinite(new Date(t.date).getTime()) ? new Intl.DateTimeFormat('pl-PL', {timeZone:'Europe/Amsterdam',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}).format(new Date(t.date)) : '—'}</td>
+                          <td className="px-2 py-2 font-semibold">{t.instrument} <span className="text-sky-200/50">{t.tf}</span></td>
+                          <td className={cn('px-2 py-2 font-bold',t.direction === 'BUY' ? 'text-emerald-300' : 'text-rose-300')}>{t.direction}</td>
+                          <td className="px-2 py-2">{formatTradePrice(t.instrument,t.entry)}</td>
+                          <td className="px-2 py-2">{formatTradePrice(t.instrument,t.sl)}</td>
+                          <td className="px-2 py-2">{formatTradePrice(t.instrument,t.tp1)}</td>
+                          <td className="px-2 py-2">{formatTradePrice(t.instrument,t.tp2)}</td>
+                          <td className="px-2 py-2">{formatTradePrice(t.instrument,t.tp3)}</td>
+                          <td className="px-2 py-2"><span className="rounded-full bg-cyan-500/15 px-2 py-1 font-bold text-cyan-200">{t.tp2Hit ? 'TP2 HIT' : t.tp1Hit ? 'TP1 HIT' : 'OPEN'}</span></td>
+                        </tr>) : <tr><td colSpan={9} className="px-3 py-6 text-center text-sky-100/45">Brak aktywnych transakcji</td></tr>}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               <div className={cn(
                 "mt-1 w-full overflow-hidden rounded-2xl border border-sky-300/16 bg-[#061c37]/78 shadow-[inset_0_1px_0_rgba(255,255,255,.03)]",
                 landscapeFullscreen && "hidden"
@@ -5395,6 +5445,8 @@ closedTrades.map((t) => (
                     </tbody>
                   </table>
                 </div>
+              </div>
+
               </div>
 
               <div className={cn(
