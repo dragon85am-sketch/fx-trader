@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import type { DrawTool } from "@/components/DrawingsLayer";
 import React from "react";
@@ -4638,7 +4638,7 @@ if (closedNow.length) {
                     <h2 className="text-base font-extrabold tracking-tight text-white sm:text-lg xl:text-xl">{selected.symbol}</h2>
                   </div>
 
-                  <div className="flex w-full min-w-0 items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:overflow-visible sm:gap-1.5 lg:gap-2 xl:flex-nowrap xl:overflow-x-auto">
+                  <div className="fx-indicator-toolbar flex w-full min-w-0 items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:overflow-visible sm:gap-1.5 lg:gap-2 xl:flex-nowrap xl:overflow-x-auto">
                     {TIMEFRAMES.map((t) => (
                       <button
                         key={t}
@@ -5207,6 +5207,20 @@ if (closedNow.length) {
 
                   </div>
 
+
+                  <style jsx>{`
+                    .fx-indicator-toolbar > :nth-child(8) { order: 1; } /* EMA */
+                    .fx-indicator-toolbar > :nth-child(9) { order: 2; } /* EMA settings */
+                    .fx-indicator-toolbar > :nth-child(10) { order: 3; } /* BB + settings */
+                    .fx-indicator-toolbar > :nth-child(12) { order: 4; } /* RENKO */
+                    .fx-indicator-toolbar > :nth-child(13) { order: 5; } /* RENKO settings */
+                    .fx-indicator-toolbar > :nth-child(16) { order: 6; } /* SUPERTREND */
+                    .fx-indicator-toolbar > :nth-child(17) { order: 7; } /* SUPERTREND settings */
+                    .fx-indicator-toolbar > :nth-child(11) { order: 8; } /* HA */
+                    .fx-indicator-toolbar > :nth-child(14) { order: 9; } /* FORMACJE */
+                    .fx-indicator-toolbar > :nth-child(15) { order: 10; } /* TARGETS */
+                    .fx-indicator-toolbar > :nth-child(18) { order: 11; } /* POC MINI */
+                  `}</style>
                   {targetsPanelOpen && typeof document !== "undefined"
                     ? createPortal(
                         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/60 p-4" onMouseDown={() => setTargetsPanelOpen(false)}>
