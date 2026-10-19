@@ -2367,7 +2367,7 @@ const DEFAULT_EMA: EmaState = [
   { id: 1, period: 20, enabled: false, color: "#ef4444", width: 2 },
   { id: 2, period: 50, enabled: false, color: "#f97316", width: 2 },
   { id: 3, period: 100, enabled: false, color: "#22d3ee", width: 2 },
-  { id: 4, period: 200, enabled: true, color: "#3b82f6", width: 2 },
+  { id: 4, period: 200, enabled: false, color: "#3b82f6", width: 2 },
 ];
 
 function clampEmaPeriod(value: number) {
@@ -4682,15 +4682,13 @@ if (closedNow.length) {
   e.stopPropagation();
   setEmaPanelOpen((v) => !v);
 }}
-  className="rounded-full border border-sky-300/15 bg-[#0b315c]/75 px-2 py-2 text-sky-100/70"
+  className={cn("rounded-full border px-2 py-2 transition", emaPanelOpen ? "border-cyan-300/70 bg-cyan-500/20 text-cyan-100 shadow-[0_0_14px_rgba(34,211,238,.3)]" : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/70 hover:border-sky-300/30")}
 >
   <GearIcon />
-  {emaPanelOpen ? (
-  <div
- className="absolute top-07 z-50 w-[360px] rounded-3xl border border-sky-300/20 bg-[linear-gradient(180deg,#0f3f72,#082749)] p-4 shadow-[0_24px_60px_rgba(0,0,0,.45),0_0_24px_rgba(14,165,233,.10)]"
-  onClick={(e) => e.stopPropagation()}
-  onMouseDown={(e) => e.stopPropagation()}
->
+</button>
+{emaPanelOpen && typeof document !== "undefined" ? createPortal(
+  <div className="fixed inset-0 z-[11000] flex items-center justify-center bg-[#020b1b]/75 p-3 backdrop-blur-sm" onMouseDown={() => setEmaPanelOpen(false)}>
+    <div role="dialog" aria-modal="true" aria-label="EMA SETTINGS" className="max-h-[92vh] w-full max-w-[440px] overflow-y-auto rounded-3xl border border-cyan-400/40 bg-[linear-gradient(180deg,#103e70,#071b36)] p-5 shadow-[0_24px_80px_rgba(0,0,0,.7),0_0_24px_rgba(14,165,233,.2)]" onMouseDown={(e) => e.stopPropagation()}>
     <div className="flex items-center justify-between">
       <div>
         <div className="text-sm font-semibold text-slate-100">EMA SETTINGS</div>
@@ -4841,9 +4839,9 @@ if (closedNow.length) {
         </div>
       ))}
     </div>
-  </div>
+    </div>
+  </div>, document.body
 ) : null}
-</button>
 <div className="relative flex items-center gap-1" ref={bbPanelWrapRef}>
   <button
     type="button"
@@ -5145,23 +5143,6 @@ if (closedNow.length) {
 
                     <button
                       type="button"
-                      onClick={() => {
-                        setTargetDraft({ ...targetSettings });
-                        setTargetsPanelOpen(true);
-                      }}
-                      title="Ustawienia ATR / SL / TP"
-                      className={cn(
-                        "shrink-0 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[10px] font-semibold transition sm:ml-1 sm:gap-2 sm:px-3 sm:py-1 sm:text-sm",
-                        targetsPanelOpen
-                          ? "border-violet-300/50 bg-violet-500/15 text-violet-100"
-                          : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/75 hover:border-violet-300/35 hover:bg-violet-500/10 hover:text-violet-100"
-                      )}
-                    >
-                      TARGETS
-                    </button>
-
-                    <button
-                      type="button"
                       onClick={() => setSupertrendEnabled((v) => !v)}
                       title={
                         supertrendEnabled
@@ -5209,18 +5190,28 @@ if (closedNow.length) {
 
 
                   <style jsx>{`
-                    .fx-indicator-toolbar > :nth-child(8) { order: 1; } /* EMA */
-                    .fx-indicator-toolbar > :nth-child(9) { order: 2; } /* EMA settings */
-                    .fx-indicator-toolbar > :nth-child(10) { order: 3; } /* BB + settings */
-                    .fx-indicator-toolbar > :nth-child(12) { order: 4; } /* RENKO */
-                    .fx-indicator-toolbar > :nth-child(13) { order: 5; } /* RENKO settings */
-                    .fx-indicator-toolbar > :nth-child(16) { order: 6; } /* SUPERTREND */
-                    .fx-indicator-toolbar > :nth-child(17) { order: 7; } /* SUPERTREND settings */
-                    .fx-indicator-toolbar > :nth-child(11) { order: 8; } /* HA */
-                    .fx-indicator-toolbar > :nth-child(14) { order: 9; } /* FORMACJE */
-                    .fx-indicator-toolbar > :nth-child(15) { order: 10; } /* TARGETS */
-                    .fx-indicator-toolbar > :nth-child(18) { order: 11; } /* POC MINI */
+
+
+
+
+
+
+
+
+
+
+
                     /* FX TRADE PRO: redesigned indicator controls, no logic changes */
+                    .fx-indicator-toolbar > :nth-child(8) { order: 1; }
+                    .fx-indicator-toolbar > :nth-child(9) { order: 2; }
+                    .fx-indicator-toolbar > :nth-child(10) { order: 3; }
+                    .fx-indicator-toolbar > :nth-child(12) { order: 4; }
+                    .fx-indicator-toolbar > :nth-child(13) { order: 5; }
+                    .fx-indicator-toolbar > :nth-child(15) { order: 6; }
+                    .fx-indicator-toolbar > :nth-child(16) { order: 7; }
+                    .fx-indicator-toolbar > :nth-child(11) { order: 8; }
+                    .fx-indicator-toolbar > :nth-child(14) { order: 9; }
+                    .fx-indicator-toolbar > :nth-child(17) { order: 10; }
                     .fx-indicator-toolbar { gap: 7px; padding: 5px 2px 12px; align-items: center; }
                     .fx-indicator-toolbar > button,
                     .fx-indicator-toolbar > div[ref] > button,
