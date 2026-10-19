@@ -29,7 +29,7 @@ import {
   ChartNoAxesCombined,
   FileSpreadsheet,
   Eye,
-  Settings2,
+  Settings,
   Activity,
   BarChart3,
   CandlestickChart,
@@ -2304,12 +2304,12 @@ function ConfirmationBadge({ count, side }: { count: 0 | 1 | 2 | 3 | 4; side: Si
 }
 
 function GearIcon({ className }: { className?: string }) {
-  return <Settings2 className={className ?? "h-[18px] w-[18px]"} strokeWidth={2.35} aria-hidden="true" />;
+  return <Settings className={className ?? "h-[18px] w-[18px]"} strokeWidth={2.35} aria-hidden="true" />;
 }
 
 const FX_GLOW_ON = "!border-cyan-300/85 !bg-[linear-gradient(135deg,#075d9d,#1045a3)] !text-white shadow-[0_0_9px_rgba(0,200,255,.65),0_0_22px_rgba(0,145,255,.45),inset_0_1px_0_rgba(255,255,255,.3)]";
 const FX_GLOW_OFF = "!border-sky-300/20 !bg-[#071e3c]/85 !text-sky-100/75 hover:!border-cyan-400/55 hover:!text-white";
-const FX_GEAR_BASE = "grid h-8 w-8 shrink-0 place-items-center rounded-xl border transition-all duration-200";
+const FX_GEAR_BASE = "inline-flex h-8 w-8 min-h-8 min-w-8 shrink-0 self-center items-center justify-center align-middle rounded-xl border p-0 leading-none transition-all duration-200 [&>svg]:block [&>svg]:shrink-0";
 const FX_GEAR_ON = "!border-cyan-300/90 !bg-[#075b98] !text-cyan-100 shadow-[0_0_10px_rgba(0,210,255,.75),0_0_24px_rgba(0,150,255,.45)]";
 const FX_GEAR_OFF = "!border-sky-300/25 !bg-[#082447] !text-sky-200/80 hover:!border-cyan-400/60 hover:!text-cyan-100 hover:shadow-[0_0_12px_rgba(0,170,255,.25)]";
 
@@ -5101,7 +5101,7 @@ if (closedNow.length) {
                       title="Ustawienia Renko"
                       className={cn(FX_GEAR_BASE, renkoPanelOpen ? FX_GEAR_ON : FX_GEAR_OFF)}
                     >
-                      <GearIcon className="h-4 w-4" />
+                      <GearIcon className="h-[18px] w-[18px]" />
                     </button>
 
                     <button aria-pressed={patternsEnabled}
@@ -5110,9 +5110,7 @@ if (closedNow.length) {
                       title={patternsEnabled ? FX_GLOW_ON : FX_GLOW_OFF}
                       className={cn(
                         "shrink-0 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[10px] font-semibold transition sm:ml-1 sm:gap-2 sm:px-3 sm:py-1 sm:text-sm",
-                        patternsEnabled
-                          ? "border-yellow-300/55 bg-yellow-400/15 text-yellow-100 shadow-[0_0_16px_rgba(250,204,21,.20)]"
-                          : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/75 hover:border-yellow-300/35 hover:bg-yellow-400/10 hover:text-yellow-100"
+                        patternsEnabled ? FX_GLOW_ON : FX_GLOW_OFF
                       )}
                     >
                       <Shapes className="h-3.5 w-3.5" strokeWidth={2.2} /> FORMACJE
@@ -5126,9 +5124,7 @@ if (closedNow.length) {
                       }
                       className={cn(
                         "shrink-0 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[10px] font-semibold transition sm:ml-1 sm:gap-2 sm:px-3 sm:py-1 sm:text-sm",
-                        supertrendEnabled
-                          ? "border-emerald-300/45 bg-emerald-500/15 text-emerald-100 shadow-[0_0_16px_rgba(34,197,94,.18)]"
-                          : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/75 hover:border-sky-300/30 hover:bg-[#12477f] hover:text-white"
+                        supertrendEnabled ? FX_GLOW_ON : FX_GLOW_OFF
                       )}
                     >
                       <Activity className="h-3.5 w-3.5" strokeWidth={2.2} /> SUPERTREND
@@ -5143,7 +5139,7 @@ if (closedNow.length) {
                       title="Ustawienia SuperTrend"
                       className={cn(FX_GEAR_BASE, supertrendPanelOpen ? FX_GEAR_ON : FX_GEAR_OFF)}
                     >
-                      <GearIcon className="h-4 w-4" />
+                      <GearIcon className="h-[18px] w-[18px]" />
                     </button>
 
                     <div className="ml-2 hidden min-w-[560px] flex-1 lg:block xl:ml-4">
