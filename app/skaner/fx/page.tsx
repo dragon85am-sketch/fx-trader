@@ -29,6 +29,11 @@ import {
   ChartNoAxesCombined,
   FileSpreadsheet,
   Eye,
+  Settings2,
+  Activity,
+  BarChart3,
+  CandlestickChart,
+  Shapes,
 } from "lucide-react";
 const EMA_FAST = 14;
 const WMA_SLOW = 40;
@@ -2299,24 +2304,14 @@ function ConfirmationBadge({ count, side }: { count: 0 | 1 | 2 | 3 | 4; side: Si
 }
 
 function GearIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      width="18"
-      height="18"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z" />
-      <path d="M19.4 15a7.8 7.8 0 0 0 .1-2l2-1.5-2-3.5-2.4 1a7.7 7.7 0 0 0-1.7-1l-.3-2.6H10l-.3 2.6a7.7 7.7 0 0 0-1.7 1l-2.4-1-2 3.5 2 1.5a7.8 7.8 0 0 0 .1 2l-2 1.5 2 3.5 2.4-1a7.7 7.7 0 0 0 1.7 1l.3 2.6h4l.3-2.6a7.7 7.7 0 0 0 1.7-1l2.4 1 2-3.5-2-1.5z" />
-    </svg>
-  );
+  return <Settings2 className={className ?? "h-[18px] w-[18px]"} strokeWidth={2.35} aria-hidden="true" />;
 }
+
+const FX_GLOW_ON = "!border-cyan-300/85 !bg-[linear-gradient(135deg,#075d9d,#1045a3)] !text-white shadow-[0_0_9px_rgba(0,200,255,.65),0_0_22px_rgba(0,145,255,.45),inset_0_1px_0_rgba(255,255,255,.3)]";
+const FX_GLOW_OFF = "!border-sky-300/20 !bg-[#071e3c]/85 !text-sky-100/75 hover:!border-cyan-400/55 hover:!text-white";
+const FX_GEAR_BASE = "grid h-8 w-8 shrink-0 place-items-center rounded-xl border transition-all duration-200";
+const FX_GEAR_ON = "!border-cyan-300/90 !bg-[#075b98] !text-cyan-100 shadow-[0_0_10px_rgba(0,210,255,.75),0_0_24px_rgba(0,150,255,.45)]";
+const FX_GEAR_OFF = "!border-sky-300/25 !bg-[#082447] !text-sky-200/80 hover:!border-cyan-400/60 hover:!text-cyan-100 hover:shadow-[0_0_12px_rgba(0,170,255,.25)]";
 
 type DirectionFilter = "BUY" | "SELL" | null;
 type MarketCategory = "ALL" | "FOREX" | "INDICES" | "CRYPTO" | "METALS" | "FAV";
@@ -4655,7 +4650,7 @@ if (closedNow.length) {
                       </button>
                     ))}
 
-                    <button
+                    <button aria-pressed={emaState.some((cfg) => cfg.enabled)}
                       type="button"
               onClick={() => {
   setEmaState((prev) => {
@@ -4669,12 +4664,10 @@ if (closedNow.length) {
 }}
                       className={cn(
                         "shrink-0 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[10px] font-semibold transition sm:ml-1 sm:gap-2 sm:px-3 sm:py-1 sm:text-sm",
-                        emaState.some((cfg) => cfg.enabled)
-                          ? "border-sky-400/30 bg-sky-500/15 text-sky-100"
-                          : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/75 hover:border-sky-300/30 hover:bg-[#12477f] hover:text-white"
+                        emaState.some((cfg) => cfg.enabled) ? FX_GLOW_ON : FX_GLOW_OFF
                       )}
                     >
-                      EMA
+                      <Activity className="h-3.5 w-3.5" strokeWidth={2.2} /> EMA
                     </button>
                     <button
   type="button"
@@ -4682,7 +4675,7 @@ if (closedNow.length) {
   e.stopPropagation();
   setEmaPanelOpen((v) => !v);
 }}
-  className={cn("rounded-full border px-2 py-2 transition", emaPanelOpen ? "border-cyan-300/70 bg-cyan-500/20 text-cyan-100 shadow-[0_0_14px_rgba(34,211,238,.3)]" : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/70 hover:border-sky-300/30")}
+  className={cn(FX_GEAR_BASE, emaPanelOpen ? FX_GEAR_ON : FX_GEAR_OFF)}
 >
   <GearIcon />
 </button>
@@ -4843,17 +4836,15 @@ if (closedNow.length) {
   </div>, document.body
 ) : null}
 <div className="relative flex items-center gap-1" ref={bbPanelWrapRef}>
-  <button
+  <button aria-pressed={bbState.enabled}
     type="button"
     onClick={() => setBbState((p) => ({ ...p, enabled: !p.enabled }))}
     className={cn(
       "shrink-0 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[10px] font-semibold transition sm:ml-1 sm:gap-2 sm:px-3 sm:py-1 sm:text-sm",
-      bbState.enabled
-        ? "border-fuchsia-400/30 bg-fuchsia-500/15 text-fuchsia-100"
-        : "border-white/10 bg-white/5 text-zinc-200/70 hover:bg-white/10 hover:text-white"
+      bbState.enabled ? FX_GLOW_ON : FX_GLOW_OFF
     )}
   >
-    BB
+    <Activity className="h-3.5 w-3.5" strokeWidth={2.2} /> BB
   </button>
 
   <button
@@ -4865,12 +4856,7 @@ if (closedNow.length) {
       e.stopPropagation();
       setBbPanelOpen((v) => !v);
     }}
-    className={cn(
-      "rounded-full border px-2 py-2 transition",
-      bbPanelOpen
-        ? "border-fuchsia-300/50 bg-fuchsia-500/20 text-fuchsia-100 shadow-[0_0_16px_rgba(217,70,239,.20)]"
-        : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/70 hover:border-sky-300/30 hover:bg-[#12477f]"
-    )}
+    className={cn(FX_GEAR_BASE, bbPanelOpen ? FX_GEAR_ON : FX_GEAR_OFF)}
   >
     <GearIcon />
   </button>
@@ -5070,7 +5056,7 @@ if (closedNow.length) {
   document.body
 ) : null}
 </div>
-                    <button
+                    <button aria-pressed={heikinAshi}
                       type="button"
                       onClick={() => {
                         setHeikinAshi((v) => {
@@ -5081,15 +5067,13 @@ if (closedNow.length) {
                       }}
                       className={cn(
                         "shrink-0 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[10px] font-semibold transition sm:ml-1 sm:gap-2 sm:px-3 sm:py-1 sm:text-sm",
-                        heikinAshi
-                          ? "border-amber-400/30 bg-amber-500/15 text-amber-100"
-                          : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/75 hover:border-sky-300/30 hover:bg-[#12477f] hover:text-white"
+                        heikinAshi ? FX_GLOW_ON : FX_GLOW_OFF
                       )}
                     >
-                      HA
+                      <CandlestickChart className="h-3.5 w-3.5" strokeWidth={2.2} /> HA
                     </button>
 
-                    <button
+                    <button aria-pressed={renko}
                       type="button"
                       onClick={() => {
                         setRenko((v) => {
@@ -5100,12 +5084,10 @@ if (closedNow.length) {
                       }}
                       className={cn(
                         "shrink-0 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[10px] font-semibold transition sm:ml-1 sm:gap-2 sm:px-3 sm:py-1 sm:text-sm",
-                        renko
-                          ? "border-emerald-400/30 bg-emerald-500/15 text-emerald-100"
-                          : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/75 hover:border-sky-300/30 hover:bg-[#12477f] hover:text-white"
+                        renko ? FX_GLOW_ON : FX_GLOW_OFF
                       )}
                     >
-                      RENKO
+                      <BarChart3 className="h-3.5 w-3.5" strokeWidth={2.2} /> RENKO
                     </button>
 
                     <button
@@ -5117,20 +5099,15 @@ if (closedNow.length) {
                         setRenkoPanelOpen(true);
                       }}
                       title="Ustawienia Renko"
-                      className={cn(
-                        "grid h-8 w-8 place-items-center rounded-full border transition",
-                        renkoPanelOpen
-                          ? "border-emerald-300/50 bg-emerald-500/15 text-emerald-100 shadow-[0_0_14px_rgba(34,197,94,.16)]"
-                          : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/70 hover:border-emerald-300/35 hover:bg-emerald-500/10 hover:text-emerald-100"
-                      )}
+                      className={cn(FX_GEAR_BASE, renkoPanelOpen ? FX_GEAR_ON : FX_GEAR_OFF)}
                     >
                       <GearIcon className="h-4 w-4" />
                     </button>
 
-                    <button
+                    <button aria-pressed={patternsEnabled}
                       type="button"
                       onClick={() => setPatternsEnabled((v) => !v)}
-                      title={patternsEnabled ? "Formacje świecowe aktywne — kliknij, aby wyłączyć" : "Pokaż formacje świecowe"}
+                      title={patternsEnabled ? FX_GLOW_ON : FX_GLOW_OFF}
                       className={cn(
                         "shrink-0 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[10px] font-semibold transition sm:ml-1 sm:gap-2 sm:px-3 sm:py-1 sm:text-sm",
                         patternsEnabled
@@ -5138,16 +5115,14 @@ if (closedNow.length) {
                           : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/75 hover:border-yellow-300/35 hover:bg-yellow-400/10 hover:text-yellow-100"
                       )}
                     >
-                      FORMACJE
+                      <Shapes className="h-3.5 w-3.5" strokeWidth={2.2} /> FORMACJE
                     </button>
 
-                    <button
+                    <button aria-pressed={supertrendEnabled}
                       type="button"
                       onClick={() => setSupertrendEnabled((v) => !v)}
                       title={
-                        supertrendEnabled
-                          ? "SuperTrend aktywny — kliknij, aby wyłączyć"
-                          : "Włącz SuperTrend"
+                        supertrendEnabled ? FX_GLOW_ON : FX_GLOW_OFF
                       }
                       className={cn(
                         "shrink-0 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[10px] font-semibold transition sm:ml-1 sm:gap-2 sm:px-3 sm:py-1 sm:text-sm",
@@ -5156,7 +5131,7 @@ if (closedNow.length) {
                           : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/75 hover:border-sky-300/30 hover:bg-[#12477f] hover:text-white"
                       )}
                     >
-                      SUPERTREND
+                      <Activity className="h-3.5 w-3.5" strokeWidth={2.2} /> SUPERTREND
                     </button>
 
                     <button
@@ -5166,12 +5141,7 @@ if (closedNow.length) {
                         setSupertrendPanelOpen(true);
                       }}
                       title="Ustawienia SuperTrend"
-                      className={cn(
-                        "grid h-8 w-8 place-items-center rounded-full border transition",
-                        supertrendPanelOpen
-                          ? "border-emerald-300/50 bg-emerald-500/15 text-emerald-100 shadow-[0_0_14px_rgba(34,197,94,.16)]"
-                          : "border-sky-300/15 bg-[#0b315c]/75 text-sky-100/70 hover:border-emerald-300/35 hover:bg-emerald-500/10 hover:text-emerald-100"
-                      )}
+                      className={cn(FX_GEAR_BASE, supertrendPanelOpen ? FX_GEAR_ON : FX_GEAR_OFF)}
                     >
                       <GearIcon className="h-4 w-4" />
                     </button>
