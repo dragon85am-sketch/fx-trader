@@ -26,8 +26,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Podaj email i hasło" }, { status: 400 });
     }
 
-    // Keep email matching behavior consistent with the existing login route.
-    const user = await prisma.user.findUnique({ where: { email } });
+    // Retry a read-only lookup once after a transient pool timeout.
+    // Do not retry invalid credentials or arbitrary database failures.
+    let user: Awaited<ReturnType<typeof prisma.user.findUnique>>;
+    try {
+      user = await prisma.user.findUnique({ where: { email } });
+    } catch (error) {
+      const code = error && typeof error === "object" && "code" in error ? String(error.code) : "";
+      const message = error instanceof Error ? error.message : "";
+      const transient = code === "P2024" || /Timed out fetching a new connection|connection pool timeout/i.test(message);
+      if (!transient) throw error;
+      await new Promise<void>((resolve) => setTimeout(resolve, 250 + Math.floor(Math.random() * 250)));
+      user = await prisma.user.findUnique({ where: { email } });
+    }
     if (!user?.password || !(await bcrypt.compare(password, user.password))) {
       return NextResponse.json({ error: "Nieprawidłowy email lub hasło" }, { status: 401 });
     }
