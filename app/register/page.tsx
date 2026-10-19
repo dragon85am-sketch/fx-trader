@@ -100,7 +100,7 @@ export default function RegisterPage() {
 
   return (
     <main className="relative isolate min-h-screen overflow-hidden bg-[#020b1c] text-white">
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-20 bg-cover bg-[center_top] bg-no-repeat" style={{ backgroundImage: "url('/fx-trade-market-background.webp')" }} />
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-20 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/fx-trade-market-background.png')" }} />
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(1,8,25,.70)_0%,rgba(1,9,26,.18)_45%,rgba(1,8,25,.60)_100%)]" />
       <div className="mx-auto max-w-[1540px] px-5 pb-8 pt-6 md:px-10">
         <header className="mb-7 flex items-start justify-between gap-4">
