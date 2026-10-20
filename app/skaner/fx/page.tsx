@@ -1622,6 +1622,47 @@ function aggregateToD1(candles: Candle[]): Candle[] {
   return aggregateCandles(candles, 86400);
 }
 
+// FX TRADE V6: deduplicate simultaneous identical candle requests and reuse
+// recent responses briefly. A failed request is never cached.
+const candleRequestCache = new Map<string, { expires: number; payload: any }>();
+const candleRequestsInFlight = new Map<string, Promise<any>>();
+const CANDLE_CACHE_MAX_ENTRIES = 180;
+
+async function fetchSharedMarketCandles(params: URLSearchParams): Promise<any> {
+  const key = params.toString();
+  const now = Date.now();
+  const cached = candleRequestCache.get(key);
+  if (cached && cached.expires > now) return cached.payload;
+  const pending = candleRequestsInFlight.get(key);
+  if (pending) return pending;
+
+  const request = (async () => {
+    const res = await fetch(`/api/market/candles?${key}`, {
+      cache: "no-store",
+      headers: { Accept: "application/json" },
+    });
+    if (!res.ok) throw new Error(`FX Trade Candle Engine: ${await res.text()}`);
+    const payload = await res.json();
+    if (payload?.status !== "ok") throw new Error(payload?.message || "Market Candle Engine error");
+    // Short TTL preserves the forming candle while avoiding repeated DB reads.
+    const ttl = params.has("symbols") ? 15_000 : 8_000;
+    if (candleRequestCache.size >= CANDLE_CACHE_MAX_ENTRIES) {
+      for (const [k, v] of candleRequestCache) {
+        if (v.expires <= Date.now()) candleRequestCache.delete(k);
+      }
+      if (candleRequestCache.size >= CANDLE_CACHE_MAX_ENTRIES) {
+        const oldest = candleRequestCache.keys().next().value;
+        if (oldest !== undefined) candleRequestCache.delete(oldest);
+      }
+    }
+    candleRequestCache.set(key, { expires: Date.now() + ttl, payload });
+    return payload;
+  })();
+  candleRequestsInFlight.set(key, request);
+  try { return await request; }
+  finally { candleRequestsInFlight.delete(key); }
+}
+
 async function fetchFxTradeCandles(
   symbol: string,
   tf: Timeframe,
@@ -1633,14 +1674,7 @@ async function fetchFxTradeCandles(
   const engineInterval = MARKET_INTERVAL[tf];
   const params = new URLSearchParams({ symbol, interval: engineInterval, limit: String(limit) });
 
-  const res = await fetch(`/api/market/candles?${params.toString()}`, {
-    cache: "no-store",
-    headers: { Accept: "application/json" },
-  });
-
-  if (!res.ok) throw new Error(`${symbol} FX Trade Candle Engine: ${await res.text()}`);
-
-  const data = await res.json();
+  const data = await fetchSharedMarketCandles(params);
   if (data?.status === "error" || !Array.isArray(data?.values)) {
     throw new Error(data?.message || data?.error || `${symbol}: brak danych Candle Engine`);
   }
@@ -1724,13 +1758,7 @@ async function fetchBatchAutoCandles(
     interval: MARKET_INTERVAL[tf],
     limit: "300",
   });
-  const res = await fetch(`/api/market/candles?${params.toString()}`, {
-    cache: "no-store",
-    headers: { Accept: "application/json" },
-  });
-  if (!res.ok) throw new Error(`FX Trade Candle batch: ${await res.text()}`);
-
-  const data = await res.json();
+  const data = await fetchSharedMarketCandles(params);
   if (data?.status !== "ok" || !data?.symbols) {
     throw new Error(data?.message || "Brak danych Candle Engine batch");
   }
@@ -1887,18 +1915,7 @@ async function fetchPocCandles(
     limit: "300",
   });
 
-  const res = await fetch(`/api/market/candles?${params.toString()}`, {
-    cache: "no-store",
-    headers: { Accept: "application/json" },
-  });
-
-  if (!res.ok) {
-    throw new Error(
-      `POC Live Rates / Master Collector error: ${symbol} ${tf} | ${await res.text()}`
-    );
-  }
-
-  const data = await res.json();
+  const data = await fetchSharedMarketCandles(params);
 
   if (data?.status === "error" || !Array.isArray(data?.values)) {
     throw new Error(
