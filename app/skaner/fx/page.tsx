@@ -3803,6 +3803,11 @@ if (closedNow.length) {
         const cacheKey = candleCacheKey(symbol, tf);
         const history = candlesCache.current.get(cacheKey) ?? [];
 
+        // Ignore delayed/out-of-order SSE ticks; never rewind the live bucket.
+        if (prev && Number(bucketTime) < Number(prev.time)) return prev;
+        const newestHistory = history[history.length - 1];
+        if (newestHistory && Number(bucketTime) < Number(newestHistory.time)) return prev;
+
         if (prev && Number(prev.time) === Number(bucketTime)) {
           return { ...prev, high: Math.max(prev.high, price), low: Math.min(prev.low, price), close: price };
         }

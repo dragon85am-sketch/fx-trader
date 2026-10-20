@@ -1180,6 +1180,8 @@ fullscreenMode = false,
   const seriesKeyRef = React.useRef<string>("");
 
   const rawCacheRef = React.useRef<CandlestickData[]>([]);
+  const latestLiveRef = React.useRef<CandlestickData | null>(null);
+  const latestLiveKeyRef = React.useRef<string>("");
   const displayCacheRef = React.useRef<CandlestickData[]>([]);
 
   const frozenAnchorTimeRef = React.useRef<UTCTimestamp | null>(null);
@@ -2547,7 +2549,13 @@ kineticScroll: {
     const candleSeries = candleSeriesRef.current;
     if (!chart || !candleSeries) return;
 
-    const safeRaw = normalizeCandles(candles ?? []);
+    const history = normalizeCandles(candles ?? []);
+    const incomingKey = `${symbol}|${tf ?? ""}`;
+    const live = latestLiveKeyRef.current === incomingKey ? latestLiveRef.current : null;
+    // Never let a delayed historical response rewind the currently forming bar.
+    const safeRaw = live && (!history.length || Number(live.time) >= Number(history[history.length - 1].time))
+      ? normalizeCandles([...history.filter((c) => Number(c.time) !== Number(live.time)), live])
+      : history;
     rawCacheRef.current = safeRaw;
 
     // V5.6 VIEWPORT HARD LOCK
@@ -2977,9 +2985,17 @@ kineticScroll: {
     if (seriesKeyRef.current && seriesKeyRef.current !== keyNow) return;
 
     const lc = normalizeCandle(liveCandle);
+    if (latestLiveKeyRef.current !== keyNow) {
+      latestLiveRef.current = null;
+      latestLiveKeyRef.current = keyNow;
+    }
+    const previousLive = latestLiveRef.current;
+    if (previousLive && Number(lc.time) < Number(previousLive.time)) return;
+    latestLiveRef.current = lc;
 
     const raw = rawCacheRef.current ?? [];
     const last = raw[raw.length - 1];
+    if (last && Number(lc.time) < Number(last.time)) return;
 
     if (!last) {
       rawCacheRef.current = [lc];
