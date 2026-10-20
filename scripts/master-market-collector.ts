@@ -31,6 +31,8 @@ const latestTicks: Record<string, Tick> = {};
 // Reject out-of-order events that would overwrite the latest candle close.
 const lastAcceptedTimestamp = new Map<string, number>();
 let staleTicksRejected = 0;
+const staleTicksBySymbol = new Map<string, number>();
+const acceptedTicksBySymbol = new Map<string, number>();
 let invalidTimestampsRejected = 0;
 let futureTimestampsRejected = 0;
 let invalidPricesRejected = 0;
@@ -70,6 +72,7 @@ function observeProviderPrice(timestamp: number) {
 
 function recordAcceptedTick(t: Tick) {
   acceptedTicks++;
+  acceptedTicksBySymbol.set(t.symbol, (acceptedTicksBySymbol.get(t.symbol) || 0) + 1);
   lastAcceptedTickAt = Date.now();
   lastProviderTickTimestamp = t.timestamp;
   lastProviderTickLagMs = Date.now() - t.timestamp;
@@ -115,6 +118,9 @@ const QUEUE_FILE = path.join(QUEUE_DIR, "state.json");
 const MAX_QUEUE_BYTES = 64 * 1024 * 1024;
 let queueCheckpointAt: number | null = null;
 let queueCheckpointBytes = 0;
+let lastQueueCheckpointMs: number | null = null;
+let maxQueueCheckpointMs = 0;
+let slowQueueCheckpoints = 0;
 let queueRecoveredRows = 0;
 let queueFatalError: string | null = null;
 
@@ -128,6 +134,7 @@ function validateBatch(value: any): value is TickBatch {
 }
 
 function saveQueue(): void {
+  const checkpointStarted = Date.now();
   const payload = JSON.stringify({ version: 1, pending: [...pending.entries()], retryChunks });
   const bytes = Buffer.byteLength(payload);
   if (bytes > MAX_QUEUE_BYTES) throw new Error(`OHLC queue exceeds 64 MiB (${bytes} bytes)`);
@@ -141,6 +148,13 @@ function saveQueue(): void {
     try { fs.fsyncSync(dirfd); } finally { fs.closeSync(dirfd); }
     queueCheckpointAt = Date.now();
     queueCheckpointBytes = bytes;
+    lastQueueCheckpointMs = Date.now() - checkpointStarted;
+    maxQueueCheckpointMs = Math.max(maxQueueCheckpointMs, lastQueueCheckpointMs);
+    if (lastQueueCheckpointMs > 250) {
+      slowQueueCheckpoints++;
+      if (slowQueueCheckpoints <= 5 || slowQueueCheckpoints % 100 === 0)
+        console.warn(`[MASTER] slow durable queue checkpoint: ${lastQueueCheckpointMs}ms, bytes=${bytes}, pending=${pending.size}, retries=${retryChunks.length}`);
+    }
   } catch (err) {
     try { fs.unlinkSync(tmp); } catch {}
     throw err;
@@ -411,7 +425,7 @@ socket.on("rates",(raw:any)=>{ try {
     observeProviderPrice(timestamp);
     if(timestamp > Date.now() + MAX_FUTURE_TICK_MS){ futureTimestampsRejected++; continue; }
     const last=lastAcceptedTimestamp.get(symbol);
-    if(last !== undefined && timestamp < last){ staleTicksRejected++; continue; }
+    if(last !== undefined && timestamp < last){ staleTicksRejected++; staleTicksBySymbol.set(symbol, (staleTicksBySymbol.get(symbol) || 0) + 1); continue; }
     lastAcceptedTimestamp.set(symbol,timestamp);
     const tick={symbol,price,timestamp};
     latestTicks[symbol]=tick;recordAcceptedTick(tick);broadcastTick(tick);queueDbTick(tick);
@@ -426,7 +440,7 @@ const server=http.createServer((req,res)=>{
   const origin=req.headers.origin||"*"; res.setHeader("Access-Control-Allow-Origin",origin);res.setHeader("Vary","Origin");res.setHeader("Access-Control-Allow-Methods","GET, OPTIONS");res.setHeader("Access-Control-Allow-Headers","Content-Type");
   if(req.method==="OPTIONS"){res.writeHead(204);res.end();return;}
   const url=new URL(req.url||"/",`http://${req.headers.host||"localhost"}`);
-  if(url.pathname==="/health"){res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});res.end(JSON.stringify({ok:true,mode:"MASTER_150",connected:liveRatesConnected,configured:PROVIDER_INSTRUMENTS.length,providerSubscriptions:providerSubscriptions(),forexSlashSubscriptions,diagnostics:{rawEventCounts:Object.fromEntries(rawEventCounts),rawSymbolCounts:Object.fromEntries(rawSymbolCounts),rawMessageShapes:Object.fromEntries(rawMessageShapes),lastRateAt,lastConnectAt,lastDisconnectAt},clients:totalClients(),receivedSymbols:Object.keys(latestTicks).length,latestTicks,dbWriting,dbPending:[...new Set([...pending.values()].map(b=>b.symbol))],dbPendingRows:pending.size,dbRetryRows:retryChunks.reduce((n,c)=>n+c.length,0),durableQueue:{directory:QUEUE_DIR,checkpointAt:queueCheckpointAt,checkpointBytes:queueCheckpointBytes,recoveredRows:queueRecoveredRows,fatalError:queueFatalError},dbMetrics:{flushMs:DB_FLUSH_MS,chunkRows:DB_CHUNK_ROWS,successfulDbWrites,failedDbWrites,consecutiveDbFailures,lastDbWriteMs,lastDbSqlMs,lastDbCheckpointMs,maxDbSqlMs,lastDbBatchRows,lastDbBatchAt,lastDbSuccessAt,lastDbFailureAt,shutdownFlushFailed},ingestionDiagnostics:ingestionDiagnostics(),ohlcMetrics:{staleTicksRejected,invalidTimestampsRejected,futureTimestampsRejected,invalidPricesRejected,activeCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)>Date.now()).length,closedPendingCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)<=Date.now()).length},providerInfo:providerInfo||null,providerError:providerError||null,failedDbWrites,receivedCount:Object.fromEntries(receivedCount),unrecognizedSymbols:Object.fromEntries(unrecognizedSymbols),missingConfiguredSymbols:PROVIDER_INSTRUMENTS.filter(s=>!latestTicks[s])}));return;}
+  if(url.pathname==="/health"){res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});res.end(JSON.stringify({ok:true,mode:"MASTER_150",connected:liveRatesConnected,configured:PROVIDER_INSTRUMENTS.length,providerSubscriptions:providerSubscriptions(),forexSlashSubscriptions,diagnostics:{rawEventCounts:Object.fromEntries(rawEventCounts),rawSymbolCounts:Object.fromEntries(rawSymbolCounts),rawMessageShapes:Object.fromEntries(rawMessageShapes),lastRateAt,lastConnectAt,lastDisconnectAt},clients:totalClients(),receivedSymbols:Object.keys(latestTicks).length,latestTicks,dbWriting,dbPending:[...new Set([...pending.values()].map(b=>b.symbol))],dbPendingRows:pending.size,dbRetryRows:retryChunks.reduce((n,c)=>n+c.length,0),durableQueue:{directory:QUEUE_DIR,checkpointAt:queueCheckpointAt,checkpointBytes:queueCheckpointBytes,lastCheckpointMs:lastQueueCheckpointMs,maxCheckpointMs:maxQueueCheckpointMs,slowCheckpoints:slowQueueCheckpoints,recoveredRows:queueRecoveredRows,fatalError:queueFatalError},dbMetrics:{flushMs:DB_FLUSH_MS,chunkRows:DB_CHUNK_ROWS,successfulDbWrites,failedDbWrites,consecutiveDbFailures,lastDbWriteMs,lastDbSqlMs,lastDbCheckpointMs,maxDbSqlMs,lastDbBatchRows,lastDbBatchAt,lastDbSuccessAt,lastDbFailureAt,shutdownFlushFailed},ingestionDiagnostics:ingestionDiagnostics(),ohlcMetrics:{staleTicksRejected,staleTicksBySymbol:Object.fromEntries(staleTicksBySymbol),acceptedTicksBySymbol:Object.fromEntries(acceptedTicksBySymbol),invalidTimestampsRejected,futureTimestampsRejected,invalidPricesRejected,activeCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)>Date.now()).length,closedPendingCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)<=Date.now()).length},providerInfo:providerInfo||null,providerError:providerError||null,failedDbWrites,receivedCount:Object.fromEntries(receivedCount),unrecognizedSymbols:Object.fromEntries(unrecognizedSymbols),missingConfiguredSymbols:PROVIDER_INSTRUMENTS.filter(s=>!latestTicks[s])}));return;}
   const m=url.pathname.match(/^\/api\/(?:market\/)?([a-z0-9]+)\/stream$/i);
   if(m){ const symbol=normalizeMarketSymbol(m[1]); if(!PROVIDER_SET.has(symbol)){res.writeHead(404,{"Content-Type":"application/json"});res.end(JSON.stringify({ok:false,error:"Unknown symbol"}));return;} res.writeHead(200,{"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache, no-transform",Connection:"keep-alive","X-Accel-Buffering":"no","Access-Control-Allow-Origin":origin,Vary:"Origin"});res.write("retry: 3000\n\n");res.write(`event: status\ndata: ${JSON.stringify({provider:"live-rates",connected:liveRatesConnected,symbol,mode:"MASTER_150"})}\n\n`);if(latestTicks[symbol])res.write(`event: tick\ndata: ${JSON.stringify(latestTicks[symbol])}\n\n`);const set=clientSet(symbol);set.add(res);const keep=setInterval(()=>{try{res.write(`: keepalive ${Date.now()}\n\n`);}catch{}},15000);req.on("close",()=>{clearInterval(keep);set.delete(res);});return; }
   res.writeHead(200,{"Content-Type":"application/json"});res.end(JSON.stringify({ok:true,service:"FX Trade Master Market Collector",mode:"MASTER_150",configured:PROVIDER_INSTRUMENTS.length,health:"/health",streamPattern:"/api/market/{symbol}/stream"}));
