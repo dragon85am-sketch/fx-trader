@@ -208,6 +208,17 @@ const DB_FLUSH_MS = 15000;
 // Fewer database round-trips. Existing durable retry chunks retain their original IDs.
 // Keep bounded to avoid excessively large SQL statements.
 const DB_CHUNK_ROWS = Math.max(1, Math.min(64, Number(process.env.OHLC_DB_CHUNK_ROWS || 42) || 42));
+// V2: adaptive sizing applies ONLY to newly created chunks. Persisted retry
+// chunks retain their exact contents and IDs to preserve ledger idempotency.
+const DB_MIN_CHUNK_ROWS = Math.min(DB_CHUNK_ROWS, 12);
+let adaptiveChunkRows = DB_CHUNK_ROWS;
+let consecutiveFastBatches = 0;
+let slowDbBatches = 0;
+let adaptiveReductions = 0;
+let adaptiveIncreases = 0;
+const DB_SLOW_MS = 5000;
+const DB_FAST_MS = 1500;
+const DB_MAX_FLUSH_WORK_MS = 12000;
 let lastDbSqlMs: number | null = null;
 let lastDbCheckpointMs: number | null = null;
 let maxDbSqlMs = 0;
@@ -345,13 +356,15 @@ async function writeBatches(rows: DurableBatch[]) {
 async function flushDb() {
   if (dbWriting) return;
   dbWriting = true;
+  const flushStarted = Date.now();
   try {
     // Retry immutable failed chunks first. Never merge them with fresh ticks.
     const snapshot = [...pending.entries()];
     pending.clear();
     const newChunks: DurableBatch[][] = [];
-    for (let i = 0; i < snapshot.length; i += DB_CHUNK_ROWS) {
-      newChunks.push(snapshot.slice(i, i + DB_CHUNK_ROWS).map(([, batch]) => ({ id: crypto.randomUUID(), batch })));
+    const chunkRowsForThisFlush = adaptiveChunkRows;
+    for (let i = 0; i < snapshot.length; i += chunkRowsForThisFlush) {
+      newChunks.push(snapshot.slice(i, i + chunkRowsForThisFlush).map(([, batch]) => ({ id: crypto.randomUUID(), batch })));
     }
     retryChunks.push(...newChunks);
     // Stable batch IDs must reach disk before any SQL request.
@@ -375,8 +388,29 @@ async function flushDb() {
         lastDbSuccessAt = Date.now();
         successfulDbWrites++;
         consecutiveDbFailures = 0;
+        if (lastDbSqlMs > DB_SLOW_MS) {
+          slowDbBatches++;
+          consecutiveFastBatches = 0;
+          const smaller = Math.max(DB_MIN_CHUNK_ROWS, Math.floor(adaptiveChunkRows / 2));
+          if (smaller < adaptiveChunkRows) {
+            adaptiveChunkRows = smaller;
+            adaptiveReductions++;
+            console.warn(`[MASTER] adaptive DB chunk reduced to ${adaptiveChunkRows} after ${lastDbSqlMs}ms SQL`);
+          }
+        } else if (lastDbSqlMs < DB_FAST_MS) {
+          consecutiveFastBatches++;
+          if (consecutiveFastBatches >= 12 && adaptiveChunkRows < DB_CHUNK_ROWS) {
+            adaptiveChunkRows = Math.min(DB_CHUNK_ROWS, adaptiveChunkRows + 4);
+            adaptiveIncreases++;
+            consecutiveFastBatches = 0;
+          }
+        } else {
+          consecutiveFastBatches = 0;
+        }
         if (lastDbSqlMs > 5000 || lastDbCheckpointMs > 1000)
           console.warn(`[MASTER] slow DB upsert: sql=${lastDbSqlMs}ms, checkpoint=${lastDbCheckpointMs}ms, total=${lastDbWriteMs}ms, rows=${part.length}, retryChunks=${retryChunks.length}, pending=${pending.size}`);
+        // Yield between chunks during overload. Keep all remaining chunks durable.
+        if (!shuttingDown && Date.now() - flushStarted >= DB_MAX_FLUSH_WORK_MS) break;
       } catch (e: any) {
         failedDbWrites++;
         consecutiveDbFailures++;
@@ -440,7 +474,7 @@ const server=http.createServer((req,res)=>{
   const origin=req.headers.origin||"*"; res.setHeader("Access-Control-Allow-Origin",origin);res.setHeader("Vary","Origin");res.setHeader("Access-Control-Allow-Methods","GET, OPTIONS");res.setHeader("Access-Control-Allow-Headers","Content-Type");
   if(req.method==="OPTIONS"){res.writeHead(204);res.end();return;}
   const url=new URL(req.url||"/",`http://${req.headers.host||"localhost"}`);
-  if(url.pathname==="/health"){res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});res.end(JSON.stringify({ok:true,mode:"MASTER_150",connected:liveRatesConnected,configured:PROVIDER_INSTRUMENTS.length,providerSubscriptions:providerSubscriptions(),forexSlashSubscriptions,diagnostics:{rawEventCounts:Object.fromEntries(rawEventCounts),rawSymbolCounts:Object.fromEntries(rawSymbolCounts),rawMessageShapes:Object.fromEntries(rawMessageShapes),lastRateAt,lastConnectAt,lastDisconnectAt},clients:totalClients(),receivedSymbols:Object.keys(latestTicks).length,latestTicks,dbWriting,dbPending:[...new Set([...pending.values()].map(b=>b.symbol))],dbPendingRows:pending.size,dbRetryRows:retryChunks.reduce((n,c)=>n+c.length,0),durableQueue:{directory:QUEUE_DIR,checkpointAt:queueCheckpointAt,checkpointBytes:queueCheckpointBytes,lastCheckpointMs:lastQueueCheckpointMs,maxCheckpointMs:maxQueueCheckpointMs,slowCheckpoints:slowQueueCheckpoints,recoveredRows:queueRecoveredRows,fatalError:queueFatalError},dbMetrics:{flushMs:DB_FLUSH_MS,chunkRows:DB_CHUNK_ROWS,successfulDbWrites,failedDbWrites,consecutiveDbFailures,lastDbWriteMs,lastDbSqlMs,lastDbCheckpointMs,maxDbSqlMs,lastDbBatchRows,lastDbBatchAt,lastDbSuccessAt,lastDbFailureAt,shutdownFlushFailed},ingestionDiagnostics:ingestionDiagnostics(),ohlcMetrics:{staleTicksRejected,staleTicksBySymbol:Object.fromEntries(staleTicksBySymbol),acceptedTicksBySymbol:Object.fromEntries(acceptedTicksBySymbol),invalidTimestampsRejected,futureTimestampsRejected,invalidPricesRejected,activeCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)>Date.now()).length,closedPendingCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)<=Date.now()).length},providerInfo:providerInfo||null,providerError:providerError||null,failedDbWrites,receivedCount:Object.fromEntries(receivedCount),unrecognizedSymbols:Object.fromEntries(unrecognizedSymbols),missingConfiguredSymbols:PROVIDER_INSTRUMENTS.filter(s=>!latestTicks[s])}));return;}
+  if(url.pathname==="/health"){res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});res.end(JSON.stringify({ok:true,mode:"MASTER_150",connected:liveRatesConnected,configured:PROVIDER_INSTRUMENTS.length,providerSubscriptions:providerSubscriptions(),forexSlashSubscriptions,diagnostics:{rawEventCounts:Object.fromEntries(rawEventCounts),rawSymbolCounts:Object.fromEntries(rawSymbolCounts),rawMessageShapes:Object.fromEntries(rawMessageShapes),lastRateAt,lastConnectAt,lastDisconnectAt},clients:totalClients(),receivedSymbols:Object.keys(latestTicks).length,latestTicks,dbWriting,dbPending:[...new Set([...pending.values()].map(b=>b.symbol))],dbPendingRows:pending.size,dbRetryRows:retryChunks.reduce((n,c)=>n+c.length,0),durableQueue:{directory:QUEUE_DIR,checkpointAt:queueCheckpointAt,checkpointBytes:queueCheckpointBytes,lastCheckpointMs:lastQueueCheckpointMs,maxCheckpointMs:maxQueueCheckpointMs,slowCheckpoints:slowQueueCheckpoints,recoveredRows:queueRecoveredRows,fatalError:queueFatalError},dbMetrics:{flushMs:DB_FLUSH_MS,chunkRows:DB_CHUNK_ROWS,adaptiveChunkRows,slowDbBatches,adaptiveReductions,adaptiveIncreases,successfulDbWrites,failedDbWrites,consecutiveDbFailures,lastDbWriteMs,lastDbSqlMs,lastDbCheckpointMs,maxDbSqlMs,lastDbBatchRows,lastDbBatchAt,lastDbSuccessAt,lastDbFailureAt,shutdownFlushFailed},ingestionDiagnostics:ingestionDiagnostics(),ohlcMetrics:{staleTicksRejected,staleTicksBySymbol:Object.fromEntries(staleTicksBySymbol),acceptedTicksBySymbol:Object.fromEntries(acceptedTicksBySymbol),invalidTimestampsRejected,futureTimestampsRejected,invalidPricesRejected,activeCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)>Date.now()).length,closedPendingCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)<=Date.now()).length},providerInfo:providerInfo||null,providerError:providerError||null,failedDbWrites,receivedCount:Object.fromEntries(receivedCount),unrecognizedSymbols:Object.fromEntries(unrecognizedSymbols),missingConfiguredSymbols:PROVIDER_INSTRUMENTS.filter(s=>!latestTicks[s])}));return;}
   const m=url.pathname.match(/^\/api\/(?:market\/)?([a-z0-9]+)\/stream$/i);
   if(m){ const symbol=normalizeMarketSymbol(m[1]); if(!PROVIDER_SET.has(symbol)){res.writeHead(404,{"Content-Type":"application/json"});res.end(JSON.stringify({ok:false,error:"Unknown symbol"}));return;} res.writeHead(200,{"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache, no-transform",Connection:"keep-alive","X-Accel-Buffering":"no","Access-Control-Allow-Origin":origin,Vary:"Origin"});res.write("retry: 3000\n\n");res.write(`event: status\ndata: ${JSON.stringify({provider:"live-rates",connected:liveRatesConnected,symbol,mode:"MASTER_150"})}\n\n`);if(latestTicks[symbol])res.write(`event: tick\ndata: ${JSON.stringify(latestTicks[symbol])}\n\n`);const set=clientSet(symbol);set.add(res);const keep=setInterval(()=>{try{res.write(`: keepalive ${Date.now()}\n\n`);}catch{}},15000);req.on("close",()=>{clearInterval(keep);set.delete(res);});return; }
   res.writeHead(200,{"Content-Type":"application/json"});res.end(JSON.stringify({ok:true,service:"FX Trade Master Market Collector",mode:"MASTER_150",configured:PROVIDER_INSTRUMENTS.length,health:"/health",streamPattern:"/api/market/{symbol}/stream"}));
