@@ -204,7 +204,12 @@ let lastDbWriteMs: number | null = null;
 let lastDbSuccessAt: number | null = null;
 let lastDbFailureAt: number | null = null;
 let consecutiveDbFailures = 0;
-const DB_FLUSH_MS = 15000;
+// V2: aggregate incoming ticks for longer before creating immutable SQL chunks.
+// The durable queue is still checkpointed on every accepted tick, so this
+// does not discard tick data. Configure OHLC_DB_FLUSH_MS on Railway if needed.
+// 60s default reduces repeated UPSERTs of the same active candle compared
+// with the previous 15s interval. Existing retry chunks are never rewritten.
+const DB_FLUSH_MS = Math.max(15_000, Math.min(120_000, Number(process.env.OHLC_DB_FLUSH_MS || 60_000) || 60_000));
 // Fewer database round-trips. Existing durable retry chunks retain their original IDs.
 // Keep bounded to avoid excessively large SQL statements.
 const DB_CHUNK_ROWS = Math.max(1, Math.min(64, Number(process.env.OHLC_DB_CHUNK_ROWS || 42) || 42));
@@ -482,7 +487,7 @@ const server=http.createServer((req,res)=>{
 // Fail startup if the persistent volume is absent, read-only, or contains invalid data.
 try { recoverQueue(); } catch (e) { fatalQueueError(e); }
 server.listen(PORT,"0.0.0.0",()=>{
-  console.log(`[MASTER] HTTP/SSE :${PORT}`);
+  console.log(`[MASTER] HTTP/SSE :${PORT}; OHLC flush=${DB_FLUSH_MS}ms; chunk max=${DB_CHUNK_ROWS}`);
   if (pending.size || retryChunks.length) scheduleFlush(1000);
   socket.connect();
 });
