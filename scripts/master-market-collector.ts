@@ -115,6 +115,13 @@ const retryChunks: Array<Array<{ id: string; batch: TickBatch }>> = [];
 // Checkpoint BEFORE acknowledging a tick or submitting SQL, preserving stable ledger IDs.
 const QUEUE_DIR = process.env.OHLC_QUEUE_DIR || "/data/ohlc-queue";
 const QUEUE_FILE = path.join(QUEUE_DIR, "state.json");
+// V2.1: small fsynced append-only WAL per tick; large snapshots only at flush boundaries.
+const WAL_FILE = path.join(QUEUE_DIR, "ticks.wal");
+let walSequence = 0;
+let walBytes = 0;
+let walRecoveredTicks = 0;
+let lastWalSyncMs: number | null = null;
+const MAX_WAL_BYTES = 16 * 1024 * 1024;
 const MAX_QUEUE_BYTES = 64 * 1024 * 1024;
 let queueCheckpointAt: number | null = null;
 let queueCheckpointBytes = 0;
@@ -135,7 +142,7 @@ function validateBatch(value: any): value is TickBatch {
 
 function saveQueue(): void {
   const checkpointStarted = Date.now();
-  const payload = JSON.stringify({ version: 1, pending: [...pending.entries()], retryChunks });
+  const payload = JSON.stringify({ version: 2, walSequence, pending: [...pending.entries()], retryChunks });
   const bytes = Buffer.byteLength(payload);
   if (bytes > MAX_QUEUE_BYTES) throw new Error(`OHLC queue exceeds 64 MiB (${bytes} bytes)`);
   const tmp = `${QUEUE_FILE}.${process.pid}.tmp`;
@@ -146,6 +153,11 @@ function saveQueue(): void {
     // Ensure the directory entry survives a host crash where supported.
     const dirfd = fs.openSync(QUEUE_DIR, "r");
     try { fs.fsyncSync(dirfd); } finally { fs.closeSync(dirfd); }
+    // Snapshot is now durable. WAL records <= walSequence are covered by it.
+    // A crash before WAL truncation is safe: recovery skips those sequences.
+    const walFd = fs.openSync(WAL_FILE, fs.existsSync(WAL_FILE) ? "r+" : "w+", 0o600);
+    try { fs.ftruncateSync(walFd, 0); fs.fsyncSync(walFd); } finally { fs.closeSync(walFd); }
+    walBytes = 0;
     queueCheckpointAt = Date.now();
     queueCheckpointBytes = bytes;
     lastQueueCheckpointMs = Date.now() - checkpointStarted;
@@ -163,19 +175,62 @@ function saveQueue(): void {
 
 function recoverQueue(): void {
   fs.mkdirSync(QUEUE_DIR, { recursive: true });
-  if (!fs.existsSync(QUEUE_FILE)) { saveQueue(); return; }
+  if (!fs.existsSync(QUEUE_FILE)) {
+    if (fs.existsSync(WAL_FILE) && fs.statSync(WAL_FILE).size > 0)
+      throw new Error("WAL exists but state.json is missing; refusing unsafe recovery");
+    saveQueue(); return;
+  }
   const state = JSON.parse(fs.readFileSync(QUEUE_FILE, "utf8"));
-  if (state?.version !== 1 || !Array.isArray(state.pending) || !Array.isArray(state.retryChunks))
+  if (![1, 2].includes(state?.version) || !Array.isArray(state.pending) || !Array.isArray(state.retryChunks))
     throw new Error("Invalid OHLC durable queue version or structure");
   for (const entry of state.pending) {
     if (!Array.isArray(entry) || entry.length !== 2 || typeof entry[0] !== "string" || !validateBatch(entry[1]) || entry[0] !== batchKey(entry[1]))
       throw new Error("Corrupt OHLC pending entry");
+    if (pending.has(entry[0])) throw new Error("Duplicate OHLC pending key");
     pending.set(entry[0], entry[1]);
   }
+  const recoveredIds = new Set<string>();
   for (const chunk of state.retryChunks) {
     if (!Array.isArray(chunk) || !chunk.every((row: any) => row && typeof row.id === "string" && validateBatch(row.batch)))
       throw new Error("Corrupt OHLC retry chunk");
+    for (const row of chunk) {
+      if (recoveredIds.has(row.id)) throw new Error("Duplicate durable batch ID");
+      recoveredIds.add(row.id);
+    }
     retryChunks.push(chunk);
+  }
+  walSequence = state.version === 2 ? state.walSequence : 0;
+  if (!Number.isSafeInteger(walSequence) || walSequence < 0) throw new Error("Invalid WAL sequence");
+  if (fs.existsSync(WAL_FILE)) {
+    let raw = fs.readFileSync(WAL_FILE, "utf8");
+    // Never silently discard an incomplete record: it may contain an acknowledged tick.
+    // Preserve the WAL intact for inspection or recovery from the external backup.
+    if (raw.length && !raw.endsWith("\n"))
+      throw new Error("Incomplete WAL tail; refusing automatic truncation to protect queued ticks");
+    walBytes = Buffer.byteLength(raw);
+    const lines = raw.split("\n");
+    // A final partial record can be caused by a crash during append; ignore only that tail.
+    for (let i = 0; i < lines.length; i++) {
+      if (!lines[i]) continue;
+      let entry: { seq: number; tick: Tick; sha256?: string };
+      try { entry = JSON.parse(lines[i]); }
+      catch (e) { throw new Error(`Invalid WAL JSON at line ${i + 1}`); }
+      if (!Number.isSafeInteger(entry.seq) || entry.seq <= 0 ||
+          !entry.tick || typeof entry.tick.symbol !== "string" ||
+          !Number.isFinite(entry.tick.price) || entry.tick.price <= 0 ||
+          !Number.isFinite(entry.tick.timestamp) || entry.tick.timestamp <= 0)
+        throw new Error("Invalid durable WAL record");
+      if (entry.sha256 !== undefined) {
+        const expected = crypto.createHash("sha256")
+          .update(JSON.stringify({ seq: entry.seq, tick: entry.tick })).digest("hex");
+        if (entry.sha256 !== expected) throw new Error(`WAL checksum mismatch at line ${i + 1}`);
+      }
+      if (entry.seq <= walSequence) continue;
+      if (entry.seq !== walSequence + 1) throw new Error("WAL sequence gap");
+      aggregateTick(entry.tick);
+      walSequence = entry.seq;
+      walRecoveredTicks++;
+    }
   }
   queueRecoveredRows = pending.size + retryChunks.reduce((n, c) => n + c.length, 0);
   queueCheckpointBytes = fs.statSync(QUEUE_FILE).size;
@@ -297,7 +352,7 @@ function scheduleFlush(delayMs = DB_FLUSH_MS) {
   }
 }
 
-function queueDbTick(t: Tick) {
+function aggregateTick(t: Tick) {
   // Aggregate by the *actual* candle bucket, not just by symbol.
   // A batch crossing 1m/5m/etc boundaries must never be assigned to one candle.
   for (const [interval, size] of frames) {
@@ -311,7 +366,26 @@ function queueDbTick(t: Tick) {
     const existing = pending.get(k);
     pending.set(k, existing ? mergeBatch(existing, incoming) : incoming);
   }
-  try { saveQueue(); } catch (e) { fatalQueueError(e); }
+}
+
+function queueDbTick(t: Tick) {
+  try {
+    // Checkpoint first, then derive the next sequence from the durable state.
+    // Include a checksum for new records; legacy WAL lines remain readable.
+    const nextBytesEstimate = Buffer.byteLength(JSON.stringify({ seq: walSequence + 1, tick: t, sha256: "0".repeat(64) }) + "\n");
+    if (walBytes + nextBytesEstimate > MAX_WAL_BYTES) saveQueue();
+    const seq = walSequence + 1;
+    const sha256 = crypto.createHash("sha256").update(JSON.stringify({ seq, tick: t })).digest("hex");
+    const record = JSON.stringify({ seq, tick: t, sha256 }) + "\n";
+    const bytes = Buffer.byteLength(record);
+    const started = Date.now();
+    const fd = fs.openSync(WAL_FILE, "a", 0o600);
+    try { fs.writeFileSync(fd, record); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+    lastWalSyncMs = Date.now() - started;
+    walBytes += bytes;
+    walSequence = seq;
+    aggregateTick(t);
+  } catch (e) { fatalQueueError(e); }
   scheduleFlush();
 }
 
@@ -479,7 +553,15 @@ const server=http.createServer((req,res)=>{
   const origin=req.headers.origin||"*"; res.setHeader("Access-Control-Allow-Origin",origin);res.setHeader("Vary","Origin");res.setHeader("Access-Control-Allow-Methods","GET, OPTIONS");res.setHeader("Access-Control-Allow-Headers","Content-Type");
   if(req.method==="OPTIONS"){res.writeHead(204);res.end();return;}
   const url=new URL(req.url||"/",`http://${req.headers.host||"localhost"}`);
-  if(url.pathname==="/health"){res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});res.end(JSON.stringify({ok:true,mode:"MASTER_150",connected:liveRatesConnected,configured:PROVIDER_INSTRUMENTS.length,providerSubscriptions:providerSubscriptions(),forexSlashSubscriptions,diagnostics:{rawEventCounts:Object.fromEntries(rawEventCounts),rawSymbolCounts:Object.fromEntries(rawSymbolCounts),rawMessageShapes:Object.fromEntries(rawMessageShapes),lastRateAt,lastConnectAt,lastDisconnectAt},clients:totalClients(),receivedSymbols:Object.keys(latestTicks).length,latestTicks,dbWriting,dbPending:[...new Set([...pending.values()].map(b=>b.symbol))],dbPendingRows:pending.size,dbRetryRows:retryChunks.reduce((n,c)=>n+c.length,0),durableQueue:{directory:QUEUE_DIR,checkpointAt:queueCheckpointAt,checkpointBytes:queueCheckpointBytes,lastCheckpointMs:lastQueueCheckpointMs,maxCheckpointMs:maxQueueCheckpointMs,slowCheckpoints:slowQueueCheckpoints,recoveredRows:queueRecoveredRows,fatalError:queueFatalError},dbMetrics:{flushMs:DB_FLUSH_MS,chunkRows:DB_CHUNK_ROWS,adaptiveChunkRows,slowDbBatches,adaptiveReductions,adaptiveIncreases,successfulDbWrites,failedDbWrites,consecutiveDbFailures,lastDbWriteMs,lastDbSqlMs,lastDbCheckpointMs,maxDbSqlMs,lastDbBatchRows,lastDbBatchAt,lastDbSuccessAt,lastDbFailureAt,shutdownFlushFailed},ingestionDiagnostics:ingestionDiagnostics(),ohlcMetrics:{staleTicksRejected,staleTicksBySymbol:Object.fromEntries(staleTicksBySymbol),acceptedTicksBySymbol:Object.fromEntries(acceptedTicksBySymbol),invalidTimestampsRejected,futureTimestampsRejected,invalidPricesRejected,activeCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)>Date.now()).length,closedPendingCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)<=Date.now()).length},providerInfo:providerInfo||null,providerError:providerError||null,failedDbWrites,receivedCount:Object.fromEntries(receivedCount),unrecognizedSymbols:Object.fromEntries(unrecognizedSymbols),missingConfiguredSymbols:PROVIDER_INSTRUMENTS.filter(s=>!latestTicks[s])}));return;}
+  if(url.pathname==="/health/quick") {
+    res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});
+    res.end(JSON.stringify({ok:true,connected:liveRatesConnected,dbWriting,
+      pendingRows:pending.size,retryChunks:retryChunks.length,
+      successfulDbWrites,failedDbWrites,lastDbSqlMs,lastDbSuccessAt,
+      walBytes,walSequence,walRecoveredTicks,lastWalSyncMs,
+      checkpointAt:queueCheckpointAt,checkpointBytes:queueCheckpointBytes}));return;
+  }
+  if(url.pathname==="/health"){res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});res.end(JSON.stringify({ok:true,mode:"MASTER_150",connected:liveRatesConnected,configured:PROVIDER_INSTRUMENTS.length,providerSubscriptions:providerSubscriptions(),forexSlashSubscriptions,diagnostics:{rawEventCounts:Object.fromEntries(rawEventCounts),rawSymbolCounts:Object.fromEntries(rawSymbolCounts),rawMessageShapes:Object.fromEntries(rawMessageShapes),lastRateAt,lastConnectAt,lastDisconnectAt},clients:totalClients(),receivedSymbols:Object.keys(latestTicks).length,latestTicks,dbWriting,dbPending:[...new Set([...pending.values()].map(b=>b.symbol))],dbPendingRows:pending.size,dbRetryRows:retryChunks.reduce((n,c)=>n+c.length,0),durableQueue:{directory:QUEUE_DIR,checkpointAt:queueCheckpointAt,checkpointBytes:queueCheckpointBytes,lastCheckpointMs:lastQueueCheckpointMs,maxCheckpointMs:maxQueueCheckpointMs,slowCheckpoints:slowQueueCheckpoints,recoveredRows:queueRecoveredRows,walBytes,walSequence,walRecoveredTicks,lastWalSyncMs,fatalError:queueFatalError},dbMetrics:{flushMs:DB_FLUSH_MS,chunkRows:DB_CHUNK_ROWS,adaptiveChunkRows,slowDbBatches,adaptiveReductions,adaptiveIncreases,successfulDbWrites,failedDbWrites,consecutiveDbFailures,lastDbWriteMs,lastDbSqlMs,lastDbCheckpointMs,maxDbSqlMs,lastDbBatchRows,lastDbBatchAt,lastDbSuccessAt,lastDbFailureAt,shutdownFlushFailed},ingestionDiagnostics:ingestionDiagnostics(),ohlcMetrics:{staleTicksRejected,staleTicksBySymbol:Object.fromEntries(staleTicksBySymbol),acceptedTicksBySymbol:Object.fromEntries(acceptedTicksBySymbol),invalidTimestampsRejected,futureTimestampsRejected,invalidPricesRejected,activeCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)>Date.now()).length,closedPendingCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)<=Date.now()).length},providerInfo:providerInfo||null,providerError:providerError||null,failedDbWrites,receivedCount:Object.fromEntries(receivedCount),unrecognizedSymbols:Object.fromEntries(unrecognizedSymbols),missingConfiguredSymbols:PROVIDER_INSTRUMENTS.filter(s=>!latestTicks[s])}));return;}
   const m=url.pathname.match(/^\/api\/(?:market\/)?([a-z0-9]+)\/stream$/i);
   if(m){ const symbol=normalizeMarketSymbol(m[1]); if(!PROVIDER_SET.has(symbol)){res.writeHead(404,{"Content-Type":"application/json"});res.end(JSON.stringify({ok:false,error:"Unknown symbol"}));return;} res.writeHead(200,{"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache, no-transform",Connection:"keep-alive","X-Accel-Buffering":"no","Access-Control-Allow-Origin":origin,Vary:"Origin"});res.write("retry: 3000\n\n");res.write(`event: status\ndata: ${JSON.stringify({provider:"live-rates",connected:liveRatesConnected,symbol,mode:"MASTER_150"})}\n\n`);if(latestTicks[symbol])res.write(`event: tick\ndata: ${JSON.stringify(latestTicks[symbol])}\n\n`);const set=clientSet(symbol);set.add(res);const keep=setInterval(()=>{try{res.write(`: keepalive ${Date.now()}\n\n`);}catch{}},15000);req.on("close",()=>{clearInterval(keep);set.delete(res);});return; }
   res.writeHead(200,{"Content-Type":"application/json"});res.end(JSON.stringify({ok:true,service:"FX Trade Master Market Collector",mode:"MASTER_150",configured:PROVIDER_INSTRUMENTS.length,health:"/health",streamPattern:"/api/market/{symbol}/stream"}));
