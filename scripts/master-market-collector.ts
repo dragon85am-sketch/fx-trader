@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+﻿import { PrismaClient } from "@prisma/client";
 import { io } from "socket.io-client";
 import dotenv from "dotenv";
 import http from "node:http";
@@ -546,8 +546,39 @@ socket.on("rates",(raw:any)=>{ try {
 } catch(e){console.error("[MASTER] parse",e);} });
 // Count event names only, not raw payloads (which might contain credentials).
 socket.onAny((event:string)=>{ rawEventCounts.set(event,(rawEventCounts.get(event)||0)+1); });
-socket.on("disconnect",reason=>{lastDisconnectAt=Date.now();liveRatesConnected=false;broadcastStatus({provider:"live-rates",connected:false,reason,mode:"MASTER_150"});});
-socket.on("connect_error",e=>{liveRatesConnected=false;providerError=e.message;console.error("[MASTER] connect",e.message);});
+// Socket.IO automatically retries transport failures, but an explicit server-side
+// disconnect ("io server disconnect") disables automatic reconnection. Reconnect
+// that case ourselves, without creating another socket or another API-key session.
+let providerReconnectTimer: NodeJS.Timeout | null = null;
+function scheduleProviderReconnect(delayMs = 5000) {
+  if (shuttingDown || providerReconnectTimer || socket.connected) return;
+  providerReconnectTimer = setTimeout(() => {
+    providerReconnectTimer = null;
+    if (!shuttingDown && !socket.connected) {
+      console.warn("[MASTER] retrying Live-Rates streaming connection");
+      socket.connect();
+    }
+  }, delayMs);
+  providerReconnectTimer.unref();
+}
+socket.on("disconnect", reason => {
+  lastDisconnectAt = Date.now();
+  liveRatesConnected = false;
+  broadcastStatus({provider:"live-rates",connected:false,reason,mode:"MASTER_150"});
+  if (reason === "io server disconnect") scheduleProviderReconnect();
+});
+socket.on("connect_error", e => {
+  liveRatesConnected = false;
+  providerError = e.message;
+  console.error("[MASTER] connect", e.message);
+});
+// Backstop for a connection that remains down despite Socket.IO's own retries.
+// Only one socket is ever used, so the provider's one-connection-per-key rule holds.
+const providerReconnectWatchdog = setInterval(() => {
+  if (!shuttingDown && !socket.connected && !socket.active)
+    scheduleProviderReconnect(1000);
+}, 30_000);
+providerReconnectWatchdog.unref();
 
 const server=http.createServer((req,res)=>{
   const origin=req.headers.origin||"*"; res.setHeader("Access-Control-Allow-Origin",origin);res.setHeader("Vary","Origin");res.setHeader("Access-Control-Allow-Methods","GET, OPTIONS");res.setHeader("Access-Control-Allow-Headers","Content-Type");
@@ -575,7 +606,10 @@ server.listen(PORT,"0.0.0.0",()=>{
 });
 async function shutdown(signal:string){
   console.log(`[MASTER] ${signal}: stopping new ticks and flushing pending candles`);
+  if (shuttingDown) return;
   shuttingDown=true;
+  if (providerReconnectTimer) { clearTimeout(providerReconnectTimer); providerReconnectTimer=null; }
+  clearInterval(providerReconnectWatchdog);
   socket.removeAllListeners("rates");
   socket.disconnect();
   if(flushTimer){clearTimeout(flushTimer);flushTimer=null;}
