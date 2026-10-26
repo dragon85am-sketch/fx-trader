@@ -1,22 +1,148 @@
 "use client";
-import { useEffect, useState } from "react";
+
+import { useCallback, useEffect, useState } from "react";
 import { REWARD_LEVELS } from "@/lib/rewards-levels";
-type Data = {accountStatus:string;brokerAccountMasked:string|null;totalLots:number;earnedUsd:number;last30DaysLots:number;last30DaysUsd:number;level:{index:number;number:number;name:string;percentage:number;next:readonly [string,number,number]|null};trades:{id:string;instrument:string;lots:number;rewardUsd:number;level:number;closedAt:string}[];payouts:{id:string;amountUsd:number;status:string;createdAt:string}[]};
-const money=(v:number)=>new Intl.NumberFormat("en-US",{style:"currency",currency:"USD"}).format(v);
-export default function RewardsPage(){
- const [data,setData]=useState<Data|null>(null);const [error,setError]=useState("");
- useEffect(()=>{fetch("/api/rewards/overview",{cache:"no-store"}).then(async r=>{if(!r.ok)throw Error("Nie udało się pobrać danych nagród");return r.json()}).then(setData).catch(e=>setError(e.message))},[]);
- return <main className="min-h-screen bg-[#060f24] px-4 py-7 text-slate-100 md:px-8">
- <div className="mx-auto max-w-7xl space-y-6">
- <header><p className="text-xs font-semibold tracking-[.28em] text-cyan-400">FX TRADE / REWARDS PRO</p><h1 className="mt-2 text-3xl font-bold">Trading Rewards</h1><p className="mt-2 text-sm text-slate-400">15 stałych rang · awans za zweryfikowane loty · rozliczenia co 30 dni</p></header>
- {error&&<div className="rounded-xl border border-red-500/30 bg-red-950/30 p-4 text-red-200">{error}. Sprawdź migrację bazy danych.</div>}
- {!data&&!error&&<p className="text-slate-400">Ładowanie nagród…</p>}
- {data&&<>
- <div className="rounded-2xl border border-cyan-500/25 bg-[#0a1b39] p-5 shadow-[0_0_28px_rgba(6,182,212,.08)]"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-xs uppercase tracking-widest text-slate-400">Konto TradeQuo</p><p className="mt-1 text-lg font-semibold">{data.accountStatus==="VERIFIED"?"Połączone i zweryfikowane":"Niepołączone / niezweryfikowane"}</p><p className="text-sm text-slate-400">{data.brokerAccountMasked??"Integracja brokera oczekuje na weryfikację API / raportów IB"}</p></div><span className="rounded-full border border-cyan-500/30 px-4 py-2 text-sm text-cyan-300">{data.accountStatus}</span></div></div>
- <div className="grid gap-4 md:grid-cols-4">{[["Aktualna ranga",`L${data.level.number} · ${data.level.name}`],["Łącznie lotów",data.totalLots.toFixed(2)],["Loty / 30 dni",data.last30DaysLots.toFixed(2)],["Nagrody / 30 dni",money(data.last30DaysUsd)]].map(([label,value])=><div key={label} className="rounded-2xl border border-sky-500/20 bg-[#0a1b39] p-5"><p className="text-xs text-slate-400">{label}</p><p className="mt-2 text-xl font-bold text-cyan-200">{value}</p></div>)}</div>
- <section className="rounded-2xl border border-sky-500/20 bg-[#0a1b39] p-5"><div className="flex justify-between gap-3"><h2 className="font-semibold">Postęp kariery</h2><span className="text-sm text-cyan-300">{data.level.percentage}% nagrody</span></div><div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-700"><div className="h-full rounded-full bg-cyan-400" style={{width:`${data.level.next?Math.max(0,Math.min(100,(data.totalLots-REWARD_LEVELS[data.level.index][1])/(data.level.next[1]-REWARD_LEVELS[data.level.index][1])*100)):100}%`}}/></div><p className="mt-2 text-sm text-slate-400">{data.level.next?`Do ${data.level.next[0]}: ${Math.max(0,data.level.next[1]-data.totalLots).toFixed(2)} lotów`:'Najwyższa ranga osiągnięta'}</p></section>
- <section><h2 className="mb-3 text-lg font-semibold">15 rang FX TRADE</h2><div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">{REWARD_LEVELS.map((r,i)=><div key={r[0]} className={`rounded-xl border p-4 ${i===data.level.index?'border-cyan-300 bg-cyan-950/50 shadow-[0_0_20px_rgba(34,211,238,.15)]':'border-sky-500/20 bg-[#0a1b39]'}`}><p className="text-xs text-slate-400">LEVEL {i+1}</p><p className="mt-1 font-bold">{r[0]}</p><p className="mt-2 text-xl font-bold text-cyan-300">{r[2]}%</p><p className="mt-1 text-xs text-slate-400">od {r[1]} lotów</p></div>)}</div></section>
- <section className="grid gap-4 lg:grid-cols-2"><div className="rounded-2xl border border-sky-500/20 bg-[#0a1b39] p-5"><h2 className="mb-4 font-semibold">Ostatnie zweryfikowane transakcje</h2>{data.trades.length===0?<p className="text-sm text-slate-400">Brak zweryfikowanych lotów. Nie naliczamy fikcyjnych nagród.</p>:<div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead className="text-slate-400"><tr><th className="pb-2">Instrument</th><th>Loty</th><th>Nagroda</th></tr></thead><tbody>{data.trades.map(t=><tr key={t.id} className="border-t border-white/10"><td className="py-2">{t.instrument}</td><td>{t.lots}</td><td className="text-cyan-300">{money(t.rewardUsd)}</td></tr>)}</tbody></table></div>}</div><div className="rounded-2xl border border-sky-500/20 bg-[#0a1b39] p-5"><h2 className="font-semibold">Rozliczenia i wypłaty</h2><p className="mt-3 text-sm text-slate-400">Wypłaty będą dostępne po weryfikacji konta, zakończeniu okresu rozliczeniowego i potwierdzeniu danych przez brokera. Nie są jeszcze aktywne.</p><div className="mt-5 text-2xl font-bold text-cyan-200">{money(data.earnedUsd)}</div><p className="text-xs text-slate-400">Łącznie naliczone nagrody (nie saldo dostępne do wypłaty)</p><button disabled className="mt-5 rounded-xl bg-slate-700 px-5 py-3 text-sm text-slate-400">Wypłata — oczekuje na integrację</button></div></section>
- </>}
- </div></main>;
+import {
+  Award, CalendarDays, CheckCircle2, ChevronRight, CircleAlert,
+  Coins, Crown, Gem, Gift, Link2, Loader2, LockKeyhole,
+  RefreshCw, ShieldCheck, Sparkles, TrendingUp, Trophy, Wallet,
+} from "lucide-react";
+
+type Trade = {
+  id: string; instrument: string; lots: number; rewardUsd: number;
+  level: number; closedAt: string;
+};
+type Payout = {
+  id: string; amountUsd: number; status: string; createdAt: string;
+};
+type Data = {
+  accountStatus: string; brokerAccountMasked: string | null;
+  totalLots: number; earnedUsd: number;
+  last30DaysLots: number; last30DaysUsd: number;
+  level: {
+    index: number; number: number; name: string; percentage: number;
+    next: readonly [string, number, number] | null;
+  };
+  trades: Trade[]; payouts: Payout[];
+};
+const usd = (n: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
+const qty = (n: number) => new Intl.NumberFormat("pl-PL", { maximumFractionDigits: 2 }).format(n);
+const date = (v: string) => new Date(v).toLocaleDateString("pl-PL", { day: "2-digit", month: "2-digit", year: "numeric" });
+const card = "rounded-2xl border border-sky-400/20 bg-[linear-gradient(135deg,rgba(9,39,76,.96),rgba(3,19,42,.97))] shadow-[inset_0_1px_0_rgba(125,211,252,.08),0_8px_28px_rgba(0,0,0,.15)]";
+const rankColors = [
+  "text-amber-400", "text-slate-200", "text-yellow-400", "text-slate-300",
+  "text-cyan-300", "text-teal-300", "text-emerald-300", "text-rose-400",
+  "text-violet-300", "text-amber-300", "text-fuchsia-300", "text-sky-300",
+  "text-orange-300", "text-yellow-300", "text-blue-300",
+];
+export default function RewardsPage() {
+  const [data, setData] = useState<Data | null>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const load = useCallback(async () => {
+    setLoading(true); setError("");
+    try {
+      const response = await fetch("/api/rewards/overview", { cache: "no-store" });
+      if (!response.ok) throw new Error(response.status === 401 ? "Zaloguj się ponownie." : "Nie udało się pobrać danych nagród.");
+      setData(await response.json());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Wystąpił błąd.");
+    } finally { setLoading(false); }
+  }, []);
+  useEffect(() => { void load(); }, [load]);
+
+  const total = data?.totalLots ?? 0;
+  const currentIndex = data?.level.index ?? 0;
+  const current = REWARD_LEVELS[currentIndex];
+  const next = REWARD_LEVELS[currentIndex + 1];
+  const progress = next
+    ? Math.min(100, Math.max(0, ((total - current[1]) / (next[1] - current[1])) * 100))
+    : 100;
+  const verified = data?.accountStatus === "VERIFIED";
+
+  return (
+    <main className="min-h-screen bg-[#04152b] px-3 py-5 text-slate-100 sm:px-5 lg:px-7">
+      <div className="mx-auto max-w-[1700px] space-y-5">
+        <header className={`${card} relative overflow-hidden p-5 sm:p-7`}>
+          <div className="pointer-events-none absolute -right-12 -top-28 h-72 w-96 rounded-full bg-blue-500/15 blur-3xl" />
+          <div className="relative flex flex-wrap items-center justify-between gap-5">
+            <div className="flex items-center gap-4">
+              <div className="rounded-2xl border border-cyan-400/30 bg-blue-500/15 p-3 shadow-[0_0_25px_rgba(0,153,255,.18)]"><Trophy className="h-9 w-9 text-cyan-300" /></div>
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[.24em] text-cyan-400">FX TRADE / REWARDS PRO</p>
+                <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">Trading Rewards <span className="text-cyan-400">PRO</span></h1>
+                <p className="mt-1 text-xs text-slate-400 sm:text-sm">Zbieraj kwalifikujące się loty, awansuj w 15 rangach i odbieraj nagrody.</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="hidden rounded-xl border border-cyan-400/20 bg-cyan-500/5 px-4 py-3 text-sm text-cyan-200 md:block">Trade. Grow. Earn Rewards.</span>
+              <button type="button" disabled title="Wypłaty będą dostępne po uruchomieniu weryfikacji i obsługi wypłat" className="flex cursor-not-allowed items-center gap-2 rounded-xl border border-sky-400/20 bg-slate-700/60 px-4 py-3 text-sm font-semibold text-slate-300 opacity-70">
+                <Wallet className="h-4 w-4" /> Wypłata — wkrótce
+              </button>
+            </div>
+          </div>
+        </header>
+
+        {error && <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-rose-500/40 bg-rose-950/30 p-4 text-sm text-rose-200"><span className="flex items-center gap-2"><CircleAlert className="h-5 w-5" />{error}</span><button onClick={() => void load()} className="flex items-center gap-2 rounded-lg border border-rose-400/30 px-3 py-2"><RefreshCw className="h-4 w-4" /> Spróbuj ponownie</button></div>}
+        {loading && <div className="flex items-center gap-2 text-sm text-cyan-200"><Loader2 className="h-4 w-4 animate-spin" /> Pobieranie danych nagród…</div>}
+
+        <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className={`${card} p-5`}>
+            <div className="flex items-start gap-3"><div className="rounded-xl bg-amber-400/10 p-3"><Crown className="h-7 w-7 text-amber-400" /></div><div><p className="text-xs text-slate-400">Twój aktualny poziom</p><p className="mt-1 text-2xl font-extrabold">Level {data?.level.number ?? "—"}</p><p className="text-sm font-semibold text-amber-400">{data?.level.name ?? "—"}</p></div></div>
+            <div className="mt-4 flex justify-between text-xs text-slate-300"><span>{data ? `${qty(total)} / ${next ? qty(next[1]) : qty(total)} lotów` : "—"}</span><span>{data ? `${Math.round(progress)}%` : "—"}</span></div>
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-800"><div className="h-full rounded-full bg-gradient-to-r from-blue-600 to-cyan-300 transition-all" style={{ width: `${data ? progress : 0}%` }} /></div>
+          </div>
+          <div className={`${card} flex items-center gap-4 p-5`}><div className="rounded-xl bg-sky-500/10 p-3"><Coins className="h-8 w-8 text-cyan-300" /></div><div><p className="text-xs text-slate-400">Łącznie kwalifikujących się lotów</p><p className="mt-1 text-3xl font-bold">{data ? qty(total) : "—"}</p><p className="text-xs text-slate-400">Ostatnie 30 dni: {data ? qty(data.last30DaysLots) : "—"}</p></div></div>
+          <div className={`${card} flex items-center gap-4 p-5`}><div className="rounded-xl bg-sky-500/10 p-3"><Gift className="h-8 w-8 text-cyan-300" /></div><div><p className="text-xs text-slate-400">Łącznie naliczone nagrody</p><p className="mt-1 text-3xl font-bold">{data ? usd(data.earnedUsd) : "—"}</p><p className="text-xs text-slate-400">Nie jest to saldo dostępne do wypłaty</p></div></div>
+          <div className={`${card} flex items-center gap-4 p-5`}><div className="rounded-xl bg-sky-500/10 p-3"><CalendarDays className="h-8 w-8 text-cyan-300" /></div><div><p className="text-xs text-slate-400">Okres rozliczeniowy</p><p className="mt-1 text-lg font-bold">Ostatnie 30 dni</p><p className="mt-1 text-sm text-cyan-300">{data ? usd(data.last30DaysUsd) : "—"} nagród</p></div></div>
+        </section>
+
+        <section className={`${card} p-5`}>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3"><div className="rounded-xl border border-cyan-400/20 bg-sky-500/10 p-3"><Link2 className="h-6 w-6 text-cyan-300" /></div><div><h2 className="font-bold">Konto brokerskie TradeQuo</h2><p className="mt-1 text-xs text-slate-400">{verified ? `Konto zweryfikowane${data?.brokerAccountMasked ? ` · ${data.brokerAccountMasked}` : ""}` : "Połączenie i synchronizacja transakcji wymagają integracji z brokerem."}</p></div></div>
+            <div className="flex items-center gap-3"><span className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${verified ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-300" : "border-amber-400/30 bg-amber-500/10 text-amber-300"}`}>{verified ? "Zweryfikowane" : "Niepołączone"}</span><button type="button" disabled title="Integracja TradeQuo nie jest jeszcze aktywna" className="cursor-not-allowed rounded-xl border border-sky-400/20 bg-slate-700/60 px-4 py-2.5 text-xs font-semibold text-slate-300 opacity-70">Połącz konto — wkrótce</button></div>
+          </div>
+          <div className="mt-4 grid gap-2 border-t border-sky-400/10 pt-4 sm:grid-cols-4">
+            {["Połączenie konta", "Synchronizacja transakcji", "Weryfikacja lotów", "Naliczanie nagród"].map((step, i) => <div key={step} className="flex items-center gap-2 text-xs text-slate-400"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-sky-400/20 bg-sky-500/10 font-bold text-cyan-300">{i + 1}</span>{step}{i < 3 && <ChevronRight className="ml-auto hidden h-4 w-4 text-sky-500/30 sm:block" />}</div>)}
+          </div>
+        </section>
+
+        <section className={`${card} p-4 sm:p-5`}>
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3"><Gem className="h-7 w-7 text-cyan-300" /><div><h2 className="text-lg font-bold">15 poziomów nagród</h2><p className="text-xs text-slate-400">Raz zdobyta ranga pozostaje na stałe. Loty sumują się między okresami rozliczeniowymi.</p></div></div>
+            <span className="rounded-lg border border-sky-400/20 bg-sky-500/5 px-3 py-2 text-xs text-cyan-200"><ShieldCheck className="mr-1 inline h-4 w-4" /> Progi do 650 lotów</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-5">
+            {REWARD_LEVELS.map((rank, i) => {
+              const active = data?.level.index === i;
+              const unlocked = !!data && total >= rank[1];
+              const upper = REWARD_LEVELS[i + 1]?.[1];
+              return <div key={rank[0]} className={`relative flex min-h-[166px] flex-col items-center rounded-xl border px-2 py-3 text-center transition-all ${active ? "border-cyan-300 bg-sky-900/45 shadow-[0_0_22px_rgba(14,165,233,.35)]" : unlocked ? "border-sky-400/35 bg-sky-950/35" : "border-sky-400/15 bg-[#04162f]/70"}`}>
+                {active && <span className="absolute -top-2 rounded-full bg-cyan-500 px-2 py-0.5 text-[9px] font-bold text-white">TWÓJ LEVEL</span>}
+                <div className={`relative mt-1 grid h-12 w-12 place-items-center rounded-xl border border-current/20 bg-white/5 ${rankColors[i]}`}><Award className="h-9 w-9 drop-shadow-[0_0_8px_currentColor]" /><span className="absolute text-xs font-black text-white">{i + 1}</span></div>
+                <p className={`mt-3 text-xs font-bold ${rankColors[i]}`}>{rank[0]}</p>
+                <p className="mt-1 text-[10px] text-slate-400">{upper ? `${qty(rank[1])}–${qty(upper - 0.01)}` : `${qty(rank[1])}+`} lotów</p>
+                <div className="mt-auto w-full border-t border-sky-400/10 pt-2"><p className="text-sm font-extrabold text-cyan-200">{rank[2]}%</p><p className="text-[10px] text-slate-500">stawka nagrody</p></div>
+                {unlocked && !active && <CheckCircle2 className="absolute right-1 top-1 h-3 w-3 text-emerald-400" />}
+              </div>;
+            })}
+          </div>
+          <div className="mt-4 flex items-center gap-2 rounded-lg border border-sky-400/15 bg-sky-500/5 px-3 py-2 text-xs text-slate-400"><Sparkles className="h-4 w-4 shrink-0 text-cyan-300" />Procenty oznaczają poziom nagrody w programie. Nie przedstawiają zysku z handlu ani gwarantowanej wypłaty.</div>
+        </section>
+
+        <section className="grid gap-4 xl:grid-cols-2">
+          <div className={`${card} min-w-0 p-5`}>
+            <div className="mb-4 flex items-center gap-2"><TrendingUp className="h-5 w-5 text-cyan-300" /><h2 className="font-bold">Ostatnie kwalifikujące się transakcje</h2></div>
+            {data?.trades.length ? <div className="overflow-x-auto"><table className="w-full min-w-[500px] text-left text-xs"><thead><tr className="bg-sky-500/10 text-slate-300"><th className="rounded-l-lg p-3">Data zamknięcia</th><th className="p-3">Instrument</th><th className="p-3">Loty</th><th className="p-3">Nagroda</th><th className="rounded-r-lg p-3">Status</th></tr></thead><tbody>{data.trades.map(t => <tr key={t.id} className="border-b border-sky-400/10"><td className="p-3 text-slate-400">{date(t.closedAt)}</td><td className="p-3 font-semibold">{t.instrument}</td><td className="p-3">{qty(t.lots)}</td><td className="p-3 text-cyan-300">{usd(t.rewardUsd)}</td><td className="p-3 text-emerald-300">Zweryfikowana</td></tr>)}</tbody></table></div>
+              : <div className="flex min-h-40 flex-col items-center justify-center gap-2 text-center"><LockKeyhole className="h-7 w-7 text-sky-300/70" /><p className="font-semibold">Brak zweryfikowanych transakcji</p><p className="max-w-sm text-xs text-slate-400">Transakcje pojawią się po podłączeniu konta i potwierdzeniu lotów przez brokera.</p></div>}
+          </div>
+          <div className={`${card} min-w-0 p-5`}>
+            <div className="mb-4 flex items-center gap-2"><Wallet className="h-5 w-5 text-cyan-300" /><h2 className="font-bold">Historia wypłat nagród</h2></div>
+            {data?.payouts.length ? <div className="overflow-x-auto"><table className="w-full min-w-[420px] text-left text-xs"><thead><tr className="bg-sky-500/10 text-slate-300"><th className="rounded-l-lg p-3">Data wniosku</th><th className="p-3">Kwota</th><th className="rounded-r-lg p-3">Status</th></tr></thead><tbody>{data.payouts.map(p => <tr key={p.id} className="border-b border-sky-400/10"><td className="p-3 text-slate-400">{date(p.createdAt)}</td><td className="p-3 text-cyan-300">{usd(p.amountUsd)}</td><td className="p-3">{p.status}</td></tr>)}</tbody></table></div>
+              : <div className="flex min-h-40 flex-col items-center justify-center gap-2 text-center"><Gift className="h-7 w-7 text-sky-300/70" /><p className="font-semibold">Brak wypłat</p><p className="text-xs text-slate-400">Tutaj pojawią się zatwierdzone wnioski i historia wypłat.</p></div>}
+          </div>
+        </section>
+      </div>
+    </main>
+  );
 }
