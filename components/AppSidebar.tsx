@@ -481,6 +481,7 @@ export default function AppSidebar() {
                   href: "/dashboard/admin/payouts",
                   children: [
                     { label: "Admin Panel", href: "/dashboard/admin" },
+                    { label: "Platform Monitor", href: "/dashboard/admin/platform-monitor" },
                     { label: "Admin Payouts", href: "/dashboard/admin/payouts" },
                   ],
                 },
@@ -555,6 +556,7 @@ export default function AppSidebar() {
                   href: "/dashboard/admin/payouts",
                   children: [
                     { label: "Admin Panel", href: "/dashboard/admin" },
+                    { label: "Platform Monitor", href: "/dashboard/admin/platform-monitor" },
                     { label: "Wypłaty admin", href: "/dashboard/admin/payouts" },
                   ],
                 },
