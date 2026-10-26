@@ -30,6 +30,7 @@ function isPremiumNavHref(href: string) {
 
   // Affiliate i Admin zostają poza blokadą Premium w sidebarze.
   if (path.startsWith("/dashboard/affiliate")) return false;
+  if (path.startsWith("/dashboard/rewards")) return false;
   if (path.startsWith("/dashboard/admin")) return false;
 
   return PREMIUM_NAV_PATHS.some(
@@ -101,6 +102,7 @@ type IconName =
   | "scanner"
   | "strategy"
   | "affiliate"
+  | "rewards"
   | "education"
   | "live"
   | "settings"
@@ -165,6 +167,8 @@ function NavIcon({ name, className }: { name: IconName; className?: string }) {
           <path d="m6.5 13.5 2 2M9 16l1.5 1.5M15 16l-1.5 1.5" />
         </svg>
       );
+    case "rewards":
+      return <svg {...common}><path d="m12 2 3 7 7 .5-5.5 4.7 1.8 7.3L12 17.6l-6.3 3.9 1.8-7.3L2 9.5 9 9z" /></svg>;
     case "education":
       return (
         <svg {...common}>
@@ -290,6 +294,7 @@ function iconForHref(href: string): IconName {
   if (href.startsWith("/trading-room") || href === "/journal") return "trading";
   if (href.startsWith("/skaner")) return "scanner";
   if (href.startsWith("/strategie")) return "strategy";
+  if (href.startsWith("/dashboard/rewards")) return "rewards";
   if (href.startsWith("/dashboard/affiliate")) return "affiliate";
   if (href.startsWith("/education")) return "education";
   if (href.startsWith("/sesje")) return "live";
@@ -463,6 +468,7 @@ export default function AppSidebar() {
               { label: "Materials", href: "/dashboard/affiliate/materials" },
             ],
           },
+          { label: "Trading Rewards", href: "/dashboard/rewards" },
           {
             label: "Education",
             href: "/education",
@@ -538,6 +544,7 @@ export default function AppSidebar() {
               { label: "Materiały", href: "/dashboard/affiliate/materials" },
             ],
           },
+          { label: "Trading Rewards", href: "/dashboard/rewards" },
           {
             label: "Education",
             href: "/education",

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import {useEffect,useState} from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -79,7 +80,11 @@ function toneClass(tone: string) {
   return "border-sky-500/35 bg-sky-500/10 text-sky-300";
 }
 
+type PublishedWebinar = {id:string;title:string;description:string;startsAt:string;durationMinutes:number;hostName:string;status:string};
 export default function WebinaryPage() {
+  const [published,setPublished]=useState<PublishedWebinar[]>([]);
+  useEffect(()=>{fetch("/api/webinars",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(d=>{if(d?.webinars)setPublished(d.webinars)}).catch(()=>{})},[]);
+
   return (
     <main className="min-h-screen bg-[#020914] text-white">
       <div className="mx-auto w-full max-w-[1900px] px-4 py-5 md:px-6 xl:px-8">
@@ -129,6 +134,8 @@ export default function WebinaryPage() {
           </div>
         </header>
 
+        <div className="mt-3 flex justify-end"><Link href="/sesje/zarzadzaj" className="rounded-lg border border-sky-500/40 bg-sky-900/30 px-4 py-2 text-xs font-bold text-sky-200">+ Zarządzaj webinarami (Admin / Educator)</Link></div>
+        {published.length>0&&<section className="mt-4 rounded-2xl border border-sky-700 bg-[#061726] p-5"><h2 className="mb-4 text-lg font-bold">Aktualne sesje LIVE i webinary</h2><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{published.map(w=><article key={w.id} className="rounded-xl border border-slate-700 bg-[#091b30] p-4"><div className="text-xs text-sky-300">{w.status.toUpperCase()}</div><h3 className="mt-2 text-base font-bold">{w.title}</h3><p className="mt-2 text-xs text-slate-400">{w.description}</p><p className="mt-3 text-xs">{new Date(w.startsAt).toLocaleString("pl-PL")} · {w.durationMinutes} min</p><p className="text-xs text-slate-400">Prowadzący: {w.hostName}</p></article>)}</div></section>}
         {/* KPI */}
         <section className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {[

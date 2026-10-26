@@ -73,6 +73,29 @@ export default function AdminUserActions({
     }
   }
 
+  async function toggleEducator() {
+    if (role === "admin") {
+      alert("Najpierw odbierz rolę Admin, aby nadać Educator.");
+      return;
+    }
+    try {
+      setLoading(true);
+      const nextRole = role === "educator" ? "user" : "educator";
+      const res = await fetch(`/api/admin/users/${userId}/role`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role: nextRole }),
+      });
+      if (!res.ok) throw new Error("Nie udało się zmienić roli Educator");
+      window.location.reload();
+    } catch (error) {
+      console.error(error);
+      alert("Błąd zmiany roli Educator");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function toggleBan() {
     try {
       setLoading(true);
@@ -101,13 +124,13 @@ export default function AdminUserActions({
   }
 
   return (
-    <div className="grid min-w-[640px] grid-cols-3 gap-x-6 gap-y-3">
+    <div className="grid min-w-[760px] grid-cols-4 gap-x-3 gap-y-3">
       <button
         onClick={togglePremium}
         disabled={loading}
         className={`
           flex
-          w-[180px]
+          w-[170px]
           items-center
           justify-center
           rounded-2xl
@@ -131,7 +154,7 @@ export default function AdminUserActions({
         disabled={loading}
         className={`
           flex
-          w-[180px]
+          w-[170px]
           items-center
           justify-center
           rounded-2xl
@@ -151,11 +174,24 @@ export default function AdminUserActions({
       </button>
 
       <button
+        onClick={toggleEducator}
+        disabled={loading || role === "admin"}
+        title={role === "admin" ? "Najpierw odbierz rolę Admin" : undefined}
+        className={`flex w-[170px] items-center justify-center rounded-2xl px-5 py-3 text-sm font-semibold transition disabled:opacity-40 ${
+          role === "educator"
+            ? "bg-amber-500/20 text-amber-300 hover:bg-amber-500/30"
+            : "bg-violet-500/20 text-violet-300 hover:bg-violet-500/30"
+        }`}
+      >
+        {loading ? "Loading..." : role === "educator" ? "Remove Educator" : "Make Educator"}
+      </button>
+
+      <button
         onClick={toggleBan}
         disabled={loading}
         className={`
           flex
-          w-[180px]
+          w-[170px]
           items-center
           justify-center
           rounded-2xl

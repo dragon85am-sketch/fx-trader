@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 
 export type TokenPayload = {
   userId: string;
-  role: "admin" | "user";
+  role: "admin" | "educator" | "user";
   tokenVersion: number;
 };
 
@@ -137,7 +137,7 @@ export async function requireAuth() {
         userId: user.id,
 
         role:
-          user.role as "admin" | "user",
+          user.role as "admin" | "educator" | "user",
         isPremium: user.isPremium,
         premiumUntil: user.premiumUntil,
         cancelAtPeriodEnd: user.cancelAtPeriodEnd,
@@ -226,7 +226,7 @@ export async function requirePremiumUser() {
         userId: user.id,
 
         role:
-          user.role as "admin" | "user",
+          user.role as "admin" | "educator" | "user",
 
         isPremium: true,
 
@@ -322,7 +322,7 @@ export async function requirePremiumUser() {
       userId: user.id,
 
       role:
-        user.role as "admin" | "user",
+        user.role as "admin" | "educator" | "user",
 
       isPremium: true,
 

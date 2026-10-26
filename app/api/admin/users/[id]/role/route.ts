@@ -16,7 +16,7 @@ export async function PATCH(req: Request, { params }: Context) {
 
     const role = body?.role;
 
-    if (role !== "admin" && role !== "user") {
+    if (role !== "admin" && role !== "educator" && role !== "user") {
       return NextResponse.json({ error: "Nieprawidłowa rola" }, { status: 400 });
     }
 
