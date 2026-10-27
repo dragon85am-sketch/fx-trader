@@ -5,7 +5,7 @@ import { REWARD_LEVELS } from "@/lib/rewards-levels";
 import {
   Award, CalendarDays, CheckCircle2, ChevronRight, CircleAlert, HelpCircle,
   Coins, Crown, Gem, Gift, Link2, Loader2, LockKeyhole,
-  RefreshCw, ShieldCheck, Sparkles, TrendingUp, Trophy, Wallet, BarChart3, Download, FileImage,
+  RefreshCw, ShieldCheck, Sparkles, TrendingUp, Trophy, Wallet, BarChart3,
 } from "lucide-react";
 
 type Trade = {
@@ -37,18 +37,19 @@ const medalColors = [
   ["#ffb265", "#c5540b"], ["#ffe67d", "#c98b0b"], ["#7fcaff", "#0453ca"],
 ] as const;
 
-function RankMedal({ level, color, dark }: { level: number; color: string; dark: string }) {
-  return <div className="relative mx-auto grid h-[66px] w-[66px] place-items-center" style={{ filter: `drop-shadow(0 0 9px ${dark})` }}>
-    <svg viewBox="0 0 80 80" className="absolute inset-0 h-full w-full" aria-hidden="true">
-      <defs><linearGradient id={`medal-${level}`} x1="0" x2="1" y1="0" y2="1"><stop offset="0" stopColor={color}/><stop offset=".55" stopColor={dark}/><stop offset="1" stopColor={color}/></linearGradient></defs>
-      <path d="M22 5 40 14 58 5 61 19 74 24 67 40 74 55 59 61 55 75 40 67 25 75 21 61 6 55 13 40 6 24 19 19Z" fill={`url(#medal-${level})`} stroke={color} strokeWidth="1.5"/>
-      <circle cx="40" cy="40" r="26" fill="#031b3c" stroke={color} strokeWidth="4"/>
-      <circle cx="40" cy="40" r="20" fill={dark} fillOpacity=".65" stroke={color} strokeOpacity=".6"/>
-      <path d="m31 14 9-8 9 8" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round"/>
-      <path d="M30 24 40 20 50 24" fill="none" stroke="#ffffff" strokeOpacity=".55" strokeWidth="1.5"/>
-    </svg>
-    <span className="relative z-10 text-[27px] font-black italic tracking-tight text-white" style={{ textShadow: `0 1px 3px #00142d,0 0 8px ${color}` }}>{level}</span>
-  </div>;
+function RankTrophy({ level }: { level: number }) {
+  return (
+    <div className="relative mx-auto h-[110px] w-full max-w-[112px] overflow-hidden rounded-lg bg-[#031327]">
+      <img
+        src={`/rewards/trophies/level-${String(level).padStart(2, "0")}.webp`}
+        alt={`Puchar Trading Rewards, poziom ${level}`}
+        className="h-full w-full object-contain"
+        loading="lazy"
+        width={112}
+        height={110}
+      />
+    </div>
+  );
 }
 
 export default function RewardsPage() {
@@ -144,15 +145,15 @@ export default function RewardsPage() {
             <span className="rounded-lg border border-sky-400/20 bg-sky-500/5 px-3 py-2 text-xs text-cyan-200"><ShieldCheck className="mr-1 inline h-4 w-4" /> Progi do 650 lotów</span>
           </div>
           <div className="overflow-x-auto pb-3" aria-label="Poziomy Trading Rewards — przewijaj poziomo">
-            <div className="grid min-w-[1530px] grid-cols-15 gap-2" style={{gridTemplateColumns:"repeat(15,minmax(94px,1fr))"}}>
+            <div className="grid min-w-[1770px] grid-cols-15 gap-2" style={{gridTemplateColumns:"repeat(15,minmax(112px,1fr))"}}>
               {REWARD_LEVELS.map((rank, i) => {
                 const active = data?.level.index === i;
                 const unlocked = !!data && total >= rank[1];
                 const upper = REWARD_LEVELS[i + 1]?.[1];
                 const [color, dark] = medalColors[i];
-                return <div key={rank[0]} className={`relative flex min-h-[205px] min-w-0 flex-col items-center rounded-xl border px-1.5 py-3 text-center ${active ? "border-cyan-200 bg-[#0a3764] shadow-[0_0_22px_rgba(0,184,255,.55),inset_0_0_15px_rgba(0,149,255,.2)]" : unlocked ? "border-cyan-500/50 bg-[#062950]" : "border-blue-500/35 bg-[#041b38]"}`}>
+                return <div key={rank[0]} className={`relative flex min-h-[245px] min-w-0 flex-col items-center rounded-xl border px-1.5 py-3 text-center ${active ? "border-cyan-200 bg-[#082f58] shadow-[0_0_22px_rgba(0,184,255,.55),inset_0_0_15px_rgba(0,149,255,.2)]" : unlocked ? "border-cyan-500/50 bg-[#062950]" : "border-blue-500/35 bg-[#041b38]"}`}>
                   {active && <span className="absolute -top-2 rounded-full bg-cyan-500 px-2 py-0.5 text-[9px] font-bold text-white shadow-[0_0_12px_#00baff]">TWÓJ LEVEL</span>}
-                  <RankMedal level={i + 1} color={color} dark={dark} />
+                  <RankTrophy level={i + 1} />
                   <p className="mt-2 min-h-[32px] text-[11px] font-extrabold leading-4" style={{color}}>{rank[0]}</p>
                   <p className="text-xs font-bold text-slate-200">{upper ? `${qty(rank[1])}–${qty(upper - 1)}` : `${qty(rank[1])}+`}</p>
                   <p className="text-[10px] text-sky-300">lotów</p>
@@ -166,27 +167,6 @@ export default function RewardsPage() {
             </div>
           </div>
           <div className="mt-4 flex items-center gap-2 rounded-lg border border-sky-400/30 bg-sky-500/10 px-3 py-2 text-xs text-slate-400"><Sparkles className="h-4 w-4 shrink-0 text-cyan-300" />Procenty oznaczają poziom nagrody w programie. Nie przedstawiają zysku z handlu ani gwarantowanej wypłaty.</div>
-        </section>
-
-        <section className={`${card} flex flex-wrap items-center justify-between gap-4 p-4 sm:p-5`}>
-          <div className="flex items-center gap-3">
-            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-cyan-400/40 bg-cyan-500/10 shadow-[0_0_16px_rgba(0,185,255,.16)]">
-              <FileImage className="h-6 w-6 text-cyan-300" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-white">Tabela poziomów i symulacja nagród</h2>
-              <p className="mt-1 text-xs text-slate-300">Pobierz grafikę z tabelą 15 poziomów, progami lotów i przykładowym czasem awansu.</p>
-              <p className="mt-1 text-[11px] text-amber-200">Uwaga: grafika pokazuje próg Level 15 = 600 lotów; aktualny panel ma 650 lotów. Symulacja ma charakter orientacyjny.</p>
-            </div>
-          </div>
-          <a
-            href="/rewards/fx-trade-poziomy-1-15.png"
-            download="FX-TRADE-Trading-Rewards-Poziomy-1-15.png"
-            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-cyan-300/60 bg-gradient-to-r from-blue-600 to-cyan-600 px-5 py-3 text-sm font-bold text-white shadow-[0_0_18px_rgba(0,160,255,.35)] transition hover:from-blue-500 hover:to-cyan-500"
-          >
-            <Download className="h-4 w-4" />
-            Pobierz tabelę PNG
-          </a>
         </section>
 
         <section className="grid gap-3 xl:grid-cols-2">
