@@ -118,12 +118,12 @@ export default function RewardsPage() {
             <div className="flex items-center gap-3"><Gem className="h-7 w-7 text-cyan-300" /><div><h2 className="text-lg font-bold">15 poziomów nagród</h2><p className="text-xs text-slate-400">Raz zdobyta ranga pozostaje na stałe. Loty sumują się między okresami rozliczeniowymi.</p></div></div>
             <span className="rounded-lg border border-sky-400/20 bg-sky-500/5 px-3 py-2 text-xs text-cyan-200"><ShieldCheck className="mr-1 inline h-4 w-4" /> Progi do 650 lotów</span>
           </div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5 xl:grid-cols-5 2xl:grid-cols-5">
+          <div className="flex gap-2 overflow-x-auto pb-3 [scrollbar-width:thin] [scrollbar-color:#147dc0_#031329]">
             {REWARD_LEVELS.map((rank, i) => {
               const active = data?.level.index === i;
               const unlocked = !!data && total >= rank[1];
               const upper = REWARD_LEVELS[i + 1]?.[1];
-              return <div key={rank[0]} className={`relative flex min-h-[184px] flex-col items-center rounded-lg border px-1.5 py-3 text-center transition-all ${active ? "border-cyan-300 bg-[#0b3560] shadow-[0_0_20px_rgba(14,165,233,.45)]" : unlocked ? "border-sky-400/35 bg-sky-950/35" : "border-sky-400/25 bg-[#04162f]/90"}`}>
+              return <div key={rank[0]} className={`relative flex min-h-[184px] min-w-[112px] flex-[1_0_112px] flex-col items-center rounded-lg border px-1.5 py-3 text-center transition-all ${active ? "border-cyan-300 bg-[#0b3560] shadow-[0_0_20px_rgba(14,165,233,.45)]" : unlocked ? "border-sky-400/35 bg-sky-950/35" : "border-sky-400/25 bg-[#04162f]/90"}`}>
                 {active && <span className="absolute -top-2 rounded-full bg-cyan-500 px-2 py-0.5 text-[9px] font-bold text-white">TWÓJ LEVEL</span>}
                 <div className={`relative mt-1 grid h-12 w-12 place-items-center rounded-xl border border-current/20 bg-white/5 ${rankColors[i]}`}><Award className="h-9 w-9 drop-shadow-[0_0_8px_currentColor]" /><span className="absolute text-xs font-black text-white">{i + 1}</span></div>
                 <p className={`mt-3 text-[11px] font-bold ${rankColors[i]}`}>{rank[0]}</p>
