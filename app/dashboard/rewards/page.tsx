@@ -5,7 +5,7 @@ import { REWARD_LEVELS } from "@/lib/rewards-levels";
 import {
   Award, CalendarDays, CheckCircle2, ChevronRight, CircleAlert, HelpCircle,
   Coins, Crown, Gem, Gift, Link2, Loader2, LockKeyhole,
-  RefreshCw, ShieldCheck, Sparkles, TrendingUp, Trophy, Wallet, BarChart3,
+  RefreshCw, ShieldCheck, Sparkles, TrendingUp, Trophy, Wallet, BarChart3, Download, FileImage,
 } from "lucide-react";
 
 type Trade = {
@@ -166,6 +166,27 @@ export default function RewardsPage() {
             </div>
           </div>
           <div className="mt-4 flex items-center gap-2 rounded-lg border border-sky-400/30 bg-sky-500/10 px-3 py-2 text-xs text-slate-400"><Sparkles className="h-4 w-4 shrink-0 text-cyan-300" />Procenty oznaczają poziom nagrody w programie. Nie przedstawiają zysku z handlu ani gwarantowanej wypłaty.</div>
+        </section>
+
+        <section className={`${card} flex flex-wrap items-center justify-between gap-4 p-4 sm:p-5`}>
+          <div className="flex items-center gap-3">
+            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-cyan-400/40 bg-cyan-500/10 shadow-[0_0_16px_rgba(0,185,255,.16)]">
+              <FileImage className="h-6 w-6 text-cyan-300" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-white">Tabela poziomów i symulacja nagród</h2>
+              <p className="mt-1 text-xs text-slate-300">Pobierz grafikę z tabelą 15 poziomów, progami lotów i przykładowym czasem awansu.</p>
+              <p className="mt-1 text-[11px] text-amber-200">Uwaga: grafika pokazuje próg Level 15 = 600 lotów; aktualny panel ma 650 lotów. Symulacja ma charakter orientacyjny.</p>
+            </div>
+          </div>
+          <a
+            href="/rewards/fx-trade-poziomy-1-15.png"
+            download="FX-TRADE-Trading-Rewards-Poziomy-1-15.png"
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-cyan-300/60 bg-gradient-to-r from-blue-600 to-cyan-600 px-5 py-3 text-sm font-bold text-white shadow-[0_0_18px_rgba(0,160,255,.35)] transition hover:from-blue-500 hover:to-cyan-500"
+          >
+            <Download className="h-4 w-4" />
+            Pobierz tabelę PNG
+          </a>
         </section>
 
         <section className="grid gap-3 xl:grid-cols-2">
