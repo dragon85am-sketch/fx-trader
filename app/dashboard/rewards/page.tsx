@@ -5,7 +5,7 @@ import { REWARD_LEVELS } from "@/lib/rewards-levels";
 import {
   Award, CalendarDays, CheckCircle2, ChevronRight, CircleAlert, HelpCircle,
   Coins, Crown, Gem, Gift, Link2, Loader2, LockKeyhole,
-  RefreshCw, ShieldCheck, Sparkles, TrendingUp, Trophy, Wallet, BarChart3,
+  RefreshCw, ShieldCheck, Sparkles, TrendingUp, Trophy, Wallet, BarChart3, Download, FileImage, Send,
 } from "lucide-react";
 
 type Trade = {
@@ -24,6 +24,7 @@ type Data = {
     next: readonly [string, number, number] | null;
   };
   trades: Trade[]; payouts: Payout[];
+  availableForRequestUsd?: number;
 };
 const usd = (n: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(n);
 const qty = (n: number) => new Intl.NumberFormat("pl-PL", { maximumFractionDigits: 2 }).format(n);
@@ -39,14 +40,14 @@ const medalColors = [
 
 function RankTrophy({ level }: { level: number }) {
   return (
-    <div className="relative mx-auto h-[110px] w-full max-w-[112px] overflow-hidden rounded-lg bg-[#031327]">
+    <div className="relative mx-auto flex h-[92px] w-[92px] shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[#031327]">
       <img
         src={`/rewards/trophies/level-${String(level).padStart(2, "0")}.webp`}
         alt={`Puchar Trading Rewards, poziom ${level}`}
-        className="h-full w-full object-contain"
+        className="block h-[86px] w-[86px] max-w-full object-contain object-center"
         loading="lazy"
-        width={112}
-        height={110}
+        width={86}
+        height={86}
       />
     </div>
   );
@@ -57,6 +58,9 @@ export default function RewardsPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [showHelp, setShowHelp] = useState(false);
+  const [payoutSending, setPayoutSending] = useState(false);
+  const [payoutMessage, setPayoutMessage] = useState("");
+  const [payoutError, setPayoutError] = useState("");
   const load = useCallback(async () => {
     setLoading(true); setError("");
     try {
@@ -77,6 +81,20 @@ export default function RewardsPage() {
     ? Math.min(100, Math.max(0, ((total - current[1]) / (next[1] - current[1])) * 100))
     : 100;
   const verified = data?.accountStatus === "VERIFIED";
+  const availableUsd = data?.availableForRequestUsd ?? 0;
+  const canRequestPayout = verified && availableUsd >= 0.01 && !payoutSending && !loading;
+  const requestPayout = async () => {
+    if (!canRequestPayout || !window.confirm(`Złożyć wniosek o wypłatę ${usd(availableUsd)}? Wniosek wymaga zatwierdzenia przez FX TRADE.`)) return;
+    setPayoutSending(true); setPayoutError(""); setPayoutMessage("");
+    try {
+      const response = await fetch("/api/rewards/payout/request", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: "{}" });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(typeof result.error === "string" ? result.error : "Nie udało się złożyć wniosku.");
+      setPayoutMessage(`Wniosek o ${usd(Number(result.amountUsd))} został zapisany. Status: oczekuje na weryfikację.`);
+      await load();
+    } catch (e) { setPayoutError(e instanceof Error ? e.message : "Nie udało się złożyć wniosku."); }
+    finally { setPayoutSending(false); }
+  };
 
   return (
     <main className="min-h-screen bg-[#02162f] px-2 py-3 sm:px-3 lg:px-4 text-slate-100 sm:px-5 lg:px-7">
@@ -145,16 +163,16 @@ export default function RewardsPage() {
             <span className="rounded-lg border border-sky-400/20 bg-sky-500/5 px-3 py-2 text-xs text-cyan-200"><ShieldCheck className="mr-1 inline h-4 w-4" /> Progi do 650 lotów</span>
           </div>
           <div className="overflow-x-auto pb-3" aria-label="Poziomy Trading Rewards — przewijaj poziomo">
-            <div className="grid min-w-[1770px] grid-cols-15 gap-2" style={{gridTemplateColumns:"repeat(15,minmax(112px,1fr))"}}>
+            <div className="grid min-w-[1590px] grid-cols-15 items-stretch gap-2" style={{gridTemplateColumns:"repeat(15,minmax(98px,1fr))"}}>
               {REWARD_LEVELS.map((rank, i) => {
                 const active = data?.level.index === i;
                 const unlocked = !!data && total >= rank[1];
                 const upper = REWARD_LEVELS[i + 1]?.[1];
                 const [color, dark] = medalColors[i];
-                return <div key={rank[0]} className={`relative flex min-h-[245px] min-w-0 flex-col items-center rounded-xl border px-1.5 py-3 text-center ${active ? "border-cyan-200 bg-[#082f58] shadow-[0_0_22px_rgba(0,184,255,.55),inset_0_0_15px_rgba(0,149,255,.2)]" : unlocked ? "border-cyan-500/50 bg-[#062950]" : "border-blue-500/35 bg-[#041b38]"}`}>
+                return <div key={rank[0]} className={`relative flex min-h-[220px] min-w-0 flex-col items-center overflow-hidden rounded-xl border px-1.5 pb-3 pt-3 text-center ${active ? "border-cyan-200 bg-[#082f58] shadow-[0_0_22px_rgba(0,184,255,.55),inset_0_0_15px_rgba(0,149,255,.2)]" : unlocked ? "border-cyan-500/50 bg-[#062950]" : "border-blue-500/35 bg-[#041b38]"}`}>
                   {active && <span className="absolute -top-2 rounded-full bg-cyan-500 px-2 py-0.5 text-[9px] font-bold text-white shadow-[0_0_12px_#00baff]">TWÓJ LEVEL</span>}
                   <RankTrophy level={i + 1} />
-                  <p className="mt-2 min-h-[32px] text-[11px] font-extrabold leading-4" style={{color}}>{rank[0]}</p>
+                  <p className="mt-2 flex h-[34px] w-full items-center justify-center text-[11px] font-extrabold leading-4" style={{color}}>{rank[0]}</p>
                   <p className="text-xs font-bold text-slate-200">{upper ? `${qty(rank[1])}–${qty(upper - 1)}` : `${qty(rank[1])}+`}</p>
                   <p className="text-[10px] text-sky-300">lotów</p>
                   <div className="mt-auto w-full border-t border-blue-400/20 pt-2">
@@ -169,6 +187,18 @@ export default function RewardsPage() {
           <div className="mt-4 flex items-center gap-2 rounded-lg border border-sky-400/30 bg-sky-500/10 px-3 py-2 text-xs text-slate-400"><Sparkles className="h-4 w-4 shrink-0 text-cyan-300" />Procenty oznaczają poziom nagrody w programie. Nie przedstawiają zysku z handlu ani gwarantowanej wypłaty.</div>
         </section>
 
+        <section className={`${card} flex flex-wrap items-center justify-between gap-4 p-4 sm:p-5`}>
+          <div className="flex items-center gap-3">
+            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-cyan-400/40 bg-cyan-500/10"><FileImage className="h-6 w-6 text-cyan-300" /></div>
+            <div>
+              <h2 className="font-bold">Tabela poziomów i symulacja awansu</h2>
+              <p className="mt-1 text-xs text-slate-300">Pobierz grafikę z progami lotów, nagrodami i symulacją 5 transakcji dziennie.</p>
+              <p className="mt-1 text-xs text-amber-200">Uwaga: grafika ma wcześniejsze progi (Level 15: 600 lotów). Aktualny panel wskazuje 650 lotów.</p>
+            </div>
+          </div>
+          <a href="/rewards/fx-trade-poziomy-1-15.png" download="FX-TRADE-Poziomy-1-15.png" className="inline-flex items-center gap-2 rounded-xl border border-cyan-300/50 bg-gradient-to-r from-blue-600 to-cyan-600 px-5 py-3 text-sm font-bold text-white hover:from-blue-500 hover:to-cyan-500"><Download className="h-4 w-4" /> Pobierz tabelę PNG</a>
+        </section>
+
         <section className="grid gap-3 xl:grid-cols-2">
           <div className={`${card} min-w-0 p-5`}>
             <div className="mb-4 flex items-center gap-2"><TrendingUp className="h-5 w-5 text-cyan-300" /><h2 className="font-bold">Ostatnie kwalifikujące się transakcje</h2></div>
@@ -176,8 +206,14 @@ export default function RewardsPage() {
               : <div className="flex min-h-40 flex-col items-center justify-center gap-2 text-center"><LockKeyhole className="h-7 w-7 text-sky-300/70" /><p className="font-semibold">Brak zweryfikowanych transakcji</p><p className="max-w-sm text-xs text-slate-400">Transakcje pojawią się po podłączeniu konta i potwierdzeniu lotów przez brokera.</p></div>}
           </div>
           <div className={`${card} min-w-0 p-5`}>
-            <div className="mb-4 flex items-center gap-2"><Wallet className="h-5 w-5 text-cyan-300" /><h2 className="font-bold">Historia wypłat nagród</h2></div>
-            {data?.payouts.length ? <div className="overflow-x-auto"><table className="w-full min-w-[420px] text-left text-xs"><thead><tr className="bg-sky-500/10 text-slate-300"><th className="rounded-l-lg p-3">Data wniosku</th><th className="p-3">Kwota</th><th className="p-3">Ranga</th><th className="rounded-r-lg p-3">Status</th></tr></thead><tbody>{data.payouts.map(p => <tr key={p.id} className="border-b border-sky-400/10"><td className="p-3 text-slate-400">{date(p.createdAt)}</td><td className="p-3 text-cyan-300">{usd(p.amountUsd)}</td><td className="p-3">{p.status}</td></tr>)}</tbody></table></div>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2"><Wallet className="h-5 w-5 text-cyan-300" /><h2 className="font-bold">Historia wypłat nagród</h2></div>
+              <button type="button" onClick={() => void requestPayout()} disabled={!canRequestPayout} title={!verified ? "Wymagane zweryfikowane konto TradeQuo" : availableUsd < 0.01 ? "Brak dostępnych, rozliczonych nagród (minimum 30 dni)" : "Złóż wniosek o wypłatę"} className="inline-flex items-center gap-2 rounded-xl border border-cyan-300/50 bg-gradient-to-r from-blue-600 to-cyan-600 px-4 py-2.5 text-xs font-bold text-white enabled:hover:from-blue-500 enabled:hover:to-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"><Send className="h-4 w-4" /> {payoutSending ? "Wysyłanie…" : "Złóż wniosek o wypłatę"}</button>
+            </div>
+            <p className="mb-3 text-xs text-slate-300">Dostępne do wnioskowania: <span className="font-bold text-cyan-300">{data ? usd(availableUsd) : "—"}</span>. Wnioski wymagają zatwierdzenia; nie oznaczają automatycznej wypłaty.</p>
+            {payoutError && <p role="alert" className="mb-3 rounded-lg border border-red-400/30 bg-red-950/30 p-3 text-xs text-red-200">{payoutError}</p>}
+            {payoutMessage && <p role="status" className="mb-3 rounded-lg border border-emerald-400/30 bg-emerald-950/30 p-3 text-xs text-emerald-200">{payoutMessage}</p>}
+            {data?.payouts.length ? <div className="overflow-x-auto"><table className="w-full min-w-[420px] text-left text-xs"><thead><tr className="bg-sky-500/10 text-slate-300"><th className="rounded-l-lg p-3">Data wniosku</th><th className="p-3">Kwota</th><th className="rounded-r-lg p-3">Status</th></tr></thead><tbody>{data.payouts.map(p => <tr key={p.id} className="border-b border-sky-400/10"><td className="p-3 text-slate-400">{date(p.createdAt)}</td><td className="p-3 text-cyan-300">{usd(p.amountUsd)}</td><td className="p-3">{p.status}</td></tr>)}</tbody></table></div>
               : <div className="flex min-h-40 flex-col items-center justify-center gap-2 text-center"><Gift className="h-7 w-7 text-sky-300/70" /><p className="font-semibold">Brak wypłat</p><p className="text-xs text-slate-400">Tutaj pojawią się zatwierdzone wnioski i historia wypłat.</p></div>}
           </div>
         </section>
