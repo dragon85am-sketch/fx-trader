@@ -1,4 +1,4 @@
-﻿import { PrismaClient } from "@prisma/client";
+import { Worker } from "node:worker_threads";
 import { io } from "socket.io-client";
 import dotenv from "dotenv";
 import http from "node:http";
@@ -6,11 +6,44 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { getCollectorSymbols, normalizeMarketSymbol, toLiveRatesSymbol } from "../lib/market/master-symbols";
+import { LiveCandleEngine } from "../lib/market/live-candle-engine";
+import { historyDrainPolicy } from "../lib/market/history-drain-policy";
 
 dotenv.config({ path: ".env.local" });
 dotenv.config({ path: ".env" });
 
-const prisma = new PrismaClient();
+// Worker owns the only PrismaClient for history writes.
+let sqlWorker: Worker | null = null;
+let workerRequestId = 0;
+let inFlight: { id: number; resolve: () => void; reject: (error: Error) => void } | null = null;
+function rejectInFlight(error: Error) {
+  const current = inFlight;
+  inFlight = null;
+  if (current) current.reject(error);
+}
+function ensureSqlWorker(): Worker {
+  if (sqlWorker) return sqlWorker;
+  const workerFile = path.join(process.cwd(), "scripts", "history-sql-worker.cjs");
+  if (!fs.existsSync(workerFile)) throw new Error(`Missing HISTORY SQL worker: ${workerFile}`);
+  const worker = new Worker(workerFile);
+  sqlWorker = worker;
+  worker.on("message", (message: { type?: string; id?: number; ok?: boolean; error?: string }) => {
+    if (message?.type !== "result" || !inFlight || message.id !== inFlight.id) return;
+    const current = inFlight;
+    inFlight = null;
+    if (message.ok) current.resolve();
+    else current.reject(new Error(message.error || "HISTORY SQL write failed"));
+  });
+  worker.on("error", (error) => {
+    if (sqlWorker === worker) sqlWorker = null;
+    rejectInFlight(error);
+  });
+  worker.on("exit", (code) => {
+    if (sqlWorker === worker) sqlWorker = null;
+    rejectInFlight(new Error(`HISTORY worker exited with code ${code}`));
+  });
+  return worker;
+}
 const key = process.env.LIVE_RATES_API_KEY;
 if (!key) throw new Error("Missing LIVE_RATES_API_KEY");
 
@@ -28,6 +61,7 @@ type Tick = { symbol: string; price: number; timestamp: number };
 type TickBatch = { symbol: string; interval: string; bucket: number; open: number; high: number; low: number; close: number; firstAt: number; lastAt: number; ticks: number };
 
 const latestTicks: Record<string, Tick> = {};
+const liveCandleEngine = new LiveCandleEngine();
 // Reject out-of-order events that would overwrite the latest candle close.
 const lastAcceptedTimestamp = new Map<string, number>();
 let staleTicksRejected = 0;
@@ -248,6 +282,10 @@ function fatalQueueError(error: unknown): never {
 
 let flushTimer: NodeJS.Timeout | null = null;
 let dbWriting = false;
+// V2.2: in-flight diagnostics; no changes to WAL, batch identity or SQL semantics.
+let dbSqlStartedAt: number | null = null;
+let dbSqlRowsInFlight = 0;
+let dbFlushStartedAt: number | null = null;
 let liveRatesConnected = false;
 let providerInfo = "";
 let providerError = "";
@@ -385,57 +423,31 @@ function queueDbTick(t: Tick) {
     walBytes += bytes;
     walSequence = seq;
     aggregateTick(t);
+    // Publish LIVE only after the tick has been fsynced to the WAL.
+    liveCandleEngine.accept(t);
   } catch (e) { fatalQueueError(e); }
   scheduleFlush();
 }
 
 type DurableBatch = { id: string; batch: TickBatch };
 
-async function writeBatches(rows: DurableBatch[]) {
+async function writeBatches(rows: DurableBatch[]): Promise<void> {
   if (!rows.length) return;
-  const params: unknown[] = [];
-  const values = rows.map(({ id, batch: b }) => {
-    const base = params.length;
-    params.push(id, crypto.randomUUID(), b.symbol, b.interval, new Date(b.bucket),
-      b.open, b.high, b.low, b.close, b.ticks, new Date(b.firstAt), new Date(b.lastAt));
-    const p = Array.from({ length: 12 }, (_, i) => `$${base + i + 1}`);
-    return `(${p.join(",")})`;
-  }).join(",");
-  // One atomic SQL statement: only previously unseen batch IDs may update candles.
-  // A timed-out but committed batch cannot be applied twice.
-  await prisma.$executeRawUnsafe(`
-    WITH incoming(batch_id, id, symbol, interval, bucket, open, high, low, close, ticks, first_at, last_at) AS
-      (VALUES ${values}),
-    accepted AS (
-      INSERT INTO public."MarketCandleBatchLedger" ("batchId")
-      SELECT batch_id::text FROM incoming
-      ON CONFLICT ("batchId") DO NOTHING
-      RETURNING "batchId"
-    )
-    INSERT INTO public."MarketCandle"
-      ("id","symbol","interval","bucket","open","high","low","close","ticks","firstAt","lastAt","createdAt","updatedAt")
-    SELECT i.id::text,i.symbol::text,i.interval::text,i.bucket::timestamptz,
-      i.open::float8,i.high::float8,i.low::float8,i.close::float8,i.ticks::integer,
-      i.first_at::timestamptz,i.last_at::timestamptz,NOW(),NOW()
-    FROM incoming i JOIN accepted a ON a."batchId" = i.batch_id::text
-    ON CONFLICT ("symbol","interval","bucket") DO UPDATE SET
-      "high"=GREATEST("MarketCandle"."high",EXCLUDED."high"),
-      "low"=LEAST("MarketCandle"."low",EXCLUDED."low"),
-      "open"=CASE WHEN "MarketCandle"."firstAt" IS NULL OR EXCLUDED."firstAt" < "MarketCandle"."firstAt"
-        THEN EXCLUDED."open" ELSE "MarketCandle"."open" END,
-      "close"=CASE WHEN "MarketCandle"."lastAt" IS NULL OR EXCLUDED."lastAt" >= "MarketCandle"."lastAt"
-        THEN EXCLUDED."close" ELSE "MarketCandle"."close" END,
-      "firstAt"=LEAST(COALESCE("MarketCandle"."firstAt", EXCLUDED."firstAt"), EXCLUDED."firstAt"),
-      "lastAt"=GREATEST(COALESCE("MarketCandle"."lastAt", EXCLUDED."lastAt"), EXCLUDED."lastAt"),
-      "ticks"="MarketCandle"."ticks"+EXCLUDED."ticks",
-      "updatedAt"=NOW()
-  `, ...params);
+  const worker = ensureSqlWorker();
+  if (inFlight) throw new Error("HISTORY worker already has an in-flight SQL batch");
+  await new Promise<void>((resolve, reject) => {
+    const id = ++workerRequestId;
+    inFlight = { id, resolve, reject };
+    try { worker.postMessage({ type: "write", id, rows }); }
+    catch (error) { rejectInFlight(error instanceof Error ? error : new Error(String(error))); }
+  });
 }
 
 async function flushDb() {
   if (dbWriting) return;
   dbWriting = true;
   const flushStarted = Date.now();
+  dbFlushStartedAt = flushStarted;
   try {
     // Retry immutable failed chunks first. Never merge them with fresh ticks.
     const snapshot = [...pending.entries()];
@@ -448,9 +460,20 @@ async function flushDb() {
     retryChunks.push(...newChunks);
     // Stable batch IDs must reach disk before any SQL request.
     try { saveQueue(); } catch (e) { fatalQueueError(e); }
-    while (retryChunks.length) {
+    // V4: bounded HISTORY pass; LIVE ingestion remains independent of SQL progress.
+    const decision = historyDrainPolicy({
+      queuedRows: retryChunks.reduce((total, chunk) => total + chunk.length, 0),
+      sqlFailures: consecutiveDbFailures,
+      lastSqlMs: lastDbSqlMs,
+      liveTickLagMs: lastProviderTickLagMs,
+      shuttingDown,
+    });
+    let chunksProcessed = 0;
+    while (retryChunks.length && chunksProcessed < decision.maxChunksPerPass) {
       const part = retryChunks[0];
       const started = Date.now();
+      dbSqlStartedAt = started;
+      dbSqlRowsInFlight = part.length;
       try {
         await writeBatches(part);
         const sqlFinished = Date.now();
@@ -459,6 +482,7 @@ async function flushDb() {
         lastDbBatchRows = part.length;
         lastDbBatchAt = sqlFinished;
         retryChunks.shift();
+        chunksProcessed++;
         // SQL is committed. If we crash before checkpoint, ledger deduplicates replay.
         const checkpointStarted = Date.now();
         try { saveQueue(); } catch (e) { fatalQueueError(e); }
@@ -501,11 +525,18 @@ async function flushDb() {
     }
   } finally {
     dbWriting = false;
+    dbSqlStartedAt = null;
+    dbSqlRowsInFlight = 0;
+    dbFlushStartedAt = null;
     if (pending.size || retryChunks.length) {
-      const retryMs = consecutiveDbFailures
-        ? Math.min(DB_RETRY_MAX_MS, DB_FLUSH_MS * 2 ** Math.min(consecutiveDbFailures - 1, 3))
-        : DB_FLUSH_MS;
-      scheduleFlush(retryMs);
+      const decision = historyDrainPolicy({
+        queuedRows: pending.size + retryChunks.reduce((total, chunk) => total + chunk.length, 0),
+        sqlFailures: consecutiveDbFailures,
+        lastSqlMs: lastDbSqlMs,
+        liveTickLagMs: lastProviderTickLagMs,
+        shuttingDown,
+      });
+      scheduleFlush(Math.max(decision.delayMs, consecutiveDbFailures ? Math.min(DB_RETRY_MAX_MS, DB_FLUSH_MS) : 0));
     }
   }
 }
@@ -539,9 +570,13 @@ socket.on("rates",(raw:any)=>{ try {
     if(timestamp > Date.now() + MAX_FUTURE_TICK_MS){ futureTimestampsRejected++; continue; }
     const last=lastAcceptedTimestamp.get(symbol);
     if(last !== undefined && timestamp < last){ staleTicksRejected++; staleTicksBySymbol.set(symbol, (staleTicksBySymbol.get(symbol) || 0) + 1); continue; }
-    lastAcceptedTimestamp.set(symbol,timestamp);
     const tick={symbol,price,timestamp};
-    latestTicks[symbol]=tick;recordAcceptedTick(tick);broadcastTick(tick);queueDbTick(tick);
+    // Durability boundary: do not publish or acknowledge before WAL fsync succeeds.
+    queueDbTick(tick);
+    lastAcceptedTimestamp.set(symbol,timestamp);
+    latestTicks[symbol]=tick;
+    recordAcceptedTick(tick);
+    broadcastTick(tick);
   }
 } catch(e){console.error("[MASTER] parse",e);} });
 // Count event names only, not raw payloads (which might contain credentials).
@@ -584,15 +619,35 @@ const server=http.createServer((req,res)=>{
   const origin=req.headers.origin||"*"; res.setHeader("Access-Control-Allow-Origin",origin);res.setHeader("Vary","Origin");res.setHeader("Access-Control-Allow-Methods","GET, OPTIONS");res.setHeader("Access-Control-Allow-Headers","Content-Type");
   if(req.method==="OPTIONS"){res.writeHead(204);res.end();return;}
   const url=new URL(req.url||"/",`http://${req.headers.host||"localhost"}`);
+  // V4: independent, read-only LIVE OHLC view. Never mutates WAL or retry chunks.
+  if(url.pathname==="/api/market/live-candles") {
+    const secret=process.env.OHLC_LIVE_READ_TOKEN;
+    if(secret && req.headers["x-ohlc-live-token"]!==secret){res.writeHead(401);res.end();return;}
+    const symbol=normalizeMarketSymbol(url.searchParams.get("symbol")||"");
+    const interval=url.searchParams.get("interval")||"1min";
+    const frame=frames.find(f=>f[0]===interval);
+    if(!PROVIDER_SET.has(symbol)||!frame){res.writeHead(400,{"Content-Type":"application/json"});res.end(JSON.stringify({status:"error",message:"Invalid symbol or interval"}));return;}
+    const now=Date.now();
+    const currentBucket=Math.floor(now/frame[1])*frame[1];
+    // Independent live state: no retry queue scan and no SQL dependency.
+    const live = liveCandleEngine.current(symbol, interval as import("../lib/market/live-candle-engine").LiveInterval, now);
+    res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});
+    res.end(JSON.stringify({status:"ok",source:"collector-memory",symbol,interval,
+      connected:liveRatesConnected,generatedAt:new Date(now).toISOString(),
+      lastTickAgeMs:live?now-live.lastAt:null,
+      candle:live?{datetime:new Date(live.bucket).toISOString().replace("T"," ").slice(0,19),
+        open:String(live.open),high:String(live.high),low:String(live.low),
+        close:String(live.close),volume:String(live.ticks),firstAt:live.firstAt,lastAt:live.lastAt}:null}));return;
+  }
   if(url.pathname==="/health/quick") {
     res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});
     res.end(JSON.stringify({ok:true,connected:liveRatesConnected,dbWriting,
-      pendingRows:pending.size,retryChunks:retryChunks.length,
+      pendingRows:pending.size,retryChunks:retryChunks.length,liveCandles:liveCandleEngine.size,
       successfulDbWrites,failedDbWrites,lastDbSqlMs,lastDbSuccessAt,
       walBytes,walSequence,walRecoveredTicks,lastWalSyncMs,
       checkpointAt:queueCheckpointAt,checkpointBytes:queueCheckpointBytes}));return;
   }
-  if(url.pathname==="/health"){res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});res.end(JSON.stringify({ok:true,mode:"MASTER_150",connected:liveRatesConnected,configured:PROVIDER_INSTRUMENTS.length,providerSubscriptions:providerSubscriptions(),forexSlashSubscriptions,diagnostics:{rawEventCounts:Object.fromEntries(rawEventCounts),rawSymbolCounts:Object.fromEntries(rawSymbolCounts),rawMessageShapes:Object.fromEntries(rawMessageShapes),lastRateAt,lastConnectAt,lastDisconnectAt},clients:totalClients(),receivedSymbols:Object.keys(latestTicks).length,latestTicks,dbWriting,dbPending:[...new Set([...pending.values()].map(b=>b.symbol))],dbPendingRows:pending.size,dbRetryRows:retryChunks.reduce((n,c)=>n+c.length,0),durableQueue:{directory:QUEUE_DIR,checkpointAt:queueCheckpointAt,checkpointBytes:queueCheckpointBytes,lastCheckpointMs:lastQueueCheckpointMs,maxCheckpointMs:maxQueueCheckpointMs,slowCheckpoints:slowQueueCheckpoints,recoveredRows:queueRecoveredRows,walBytes,walSequence,walRecoveredTicks,lastWalSyncMs,fatalError:queueFatalError},dbMetrics:{flushMs:DB_FLUSH_MS,chunkRows:DB_CHUNK_ROWS,adaptiveChunkRows,slowDbBatches,adaptiveReductions,adaptiveIncreases,successfulDbWrites,failedDbWrites,consecutiveDbFailures,lastDbWriteMs,lastDbSqlMs,lastDbCheckpointMs,maxDbSqlMs,lastDbBatchRows,lastDbBatchAt,lastDbSuccessAt,lastDbFailureAt,shutdownFlushFailed},ingestionDiagnostics:ingestionDiagnostics(),ohlcMetrics:{staleTicksRejected,staleTicksBySymbol:Object.fromEntries(staleTicksBySymbol),acceptedTicksBySymbol:Object.fromEntries(acceptedTicksBySymbol),invalidTimestampsRejected,futureTimestampsRejected,invalidPricesRejected,activeCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)>Date.now()).length,closedPendingCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)<=Date.now()).length},providerInfo:providerInfo||null,providerError:providerError||null,failedDbWrites,receivedCount:Object.fromEntries(receivedCount),unrecognizedSymbols:Object.fromEntries(unrecognizedSymbols),missingConfiguredSymbols:PROVIDER_INSTRUMENTS.filter(s=>!latestTicks[s])}));return;}
+  if(url.pathname==="/health"){res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});res.end(JSON.stringify({ok:true,mode:"MASTER_150",connected:liveRatesConnected,configured:PROVIDER_INSTRUMENTS.length,providerSubscriptions:providerSubscriptions(),forexSlashSubscriptions,diagnostics:{rawEventCounts:Object.fromEntries(rawEventCounts),rawSymbolCounts:Object.fromEntries(rawSymbolCounts),rawMessageShapes:Object.fromEntries(rawMessageShapes),lastRateAt,lastConnectAt,lastDisconnectAt},clients:totalClients(),receivedSymbols:Object.keys(latestTicks).length,latestTicks,dbWriting,dbPending:[...new Set([...pending.values()].map(b=>b.symbol))],dbPendingRows:pending.size,dbRetryRows:retryChunks.reduce((n,c)=>n+c.length,0),durableQueue:{directory:QUEUE_DIR,checkpointAt:queueCheckpointAt,checkpointBytes:queueCheckpointBytes,lastCheckpointMs:lastQueueCheckpointMs,maxCheckpointMs:maxQueueCheckpointMs,slowCheckpoints:slowQueueCheckpoints,recoveredRows:queueRecoveredRows,walBytes,walSequence,walRecoveredTicks,lastWalSyncMs,fatalError:queueFatalError},dbMetrics:{version:"2.2-diagnostics",dbSqlStartedAt,dbSqlAgeMs:dbSqlStartedAt===null?null:Date.now()-dbSqlStartedAt,dbSqlRowsInFlight,dbFlushStartedAt,dbFlushAgeMs:dbFlushStartedAt===null?null:Date.now()-dbFlushStartedAt,flushMs:DB_FLUSH_MS,chunkRows:DB_CHUNK_ROWS,adaptiveChunkRows,slowDbBatches,adaptiveReductions,adaptiveIncreases,successfulDbWrites,failedDbWrites,consecutiveDbFailures,lastDbWriteMs,lastDbSqlMs,lastDbCheckpointMs,maxDbSqlMs,lastDbBatchRows,lastDbBatchAt,lastDbSuccessAt,lastDbFailureAt,shutdownFlushFailed},ingestionDiagnostics:ingestionDiagnostics(),ohlcMetrics:{staleTicksRejected,staleTicksBySymbol:Object.fromEntries(staleTicksBySymbol),acceptedTicksBySymbol:Object.fromEntries(acceptedTicksBySymbol),invalidTimestampsRejected,futureTimestampsRejected,invalidPricesRejected,activeCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)>Date.now()).length,closedPendingCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)<=Date.now()).length},providerInfo:providerInfo||null,providerError:providerError||null,failedDbWrites,receivedCount:Object.fromEntries(receivedCount),unrecognizedSymbols:Object.fromEntries(unrecognizedSymbols),missingConfiguredSymbols:PROVIDER_INSTRUMENTS.filter(s=>!latestTicks[s])}));return;}
   const m=url.pathname.match(/^\/api\/(?:market\/)?([a-z0-9]+)\/stream$/i);
   if(m){ const symbol=normalizeMarketSymbol(m[1]); if(!PROVIDER_SET.has(symbol)){res.writeHead(404,{"Content-Type":"application/json"});res.end(JSON.stringify({ok:false,error:"Unknown symbol"}));return;} res.writeHead(200,{"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache, no-transform",Connection:"keep-alive","X-Accel-Buffering":"no","Access-Control-Allow-Origin":origin,Vary:"Origin"});res.write("retry: 3000\n\n");res.write(`event: status\ndata: ${JSON.stringify({provider:"live-rates",connected:liveRatesConnected,symbol,mode:"MASTER_150"})}\n\n`);if(latestTicks[symbol])res.write(`event: tick\ndata: ${JSON.stringify(latestTicks[symbol])}\n\n`);const set=clientSet(symbol);set.add(res);const keep=setInterval(()=>{try{res.write(`: keepalive ${Date.now()}\n\n`);}catch{}},15000);req.on("close",()=>{clearInterval(keep);set.delete(res);});return; }
   res.writeHead(200,{"Content-Type":"application/json"});res.end(JSON.stringify({ok:true,service:"FX Trade Master Market Collector",mode:"MASTER_150",configured:PROVIDER_INSTRUMENTS.length,health:"/health",streamPattern:"/api/market/{symbol}/stream"}));
@@ -605,26 +660,49 @@ server.listen(PORT,"0.0.0.0",()=>{
   socket.connect();
 });
 async function shutdown(signal:string){
-  console.log(`[MASTER] ${signal}: stopping new ticks and flushing pending candles`);
   if (shuttingDown) return;
-  shuttingDown=true;
-  if (providerReconnectTimer) { clearTimeout(providerReconnectTimer); providerReconnectTimer=null; }
+  console.log(`[MASTER] ${signal}: stopping LIVE; preserving durable OHLC queue`);
+  shuttingDown = true;
+  if (providerReconnectTimer) { clearTimeout(providerReconnectTimer); providerReconnectTimer = null; }
   clearInterval(providerReconnectWatchdog);
   socket.removeAllListeners("rates");
   socket.disconnect();
-  if(flushTimer){clearTimeout(flushTimer);flushTimer=null;}
-  // An in-flight flush must finish before a final snapshot is taken.
-  const waitUntil=Date.now()+20_000;
-  while(dbWriting && Date.now()<waitUntil) await new Promise(r=>setTimeout(r,100));
-  if(dbWriting){shutdownFlushFailed=true;console.error("[MASTER] shutdown: DB write still in progress");}
-  else {
-    // Flush pending batches once; any failures remain durable on the mounted volume.
-    await flushDb();
-    if(pending.size || retryChunks.length){shutdownFlushFailed=true;console.error(`[MASTER] shutdown: ${pending.size} pending candles, ${retryChunks.length} retry chunks`);}
+  if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+
+  // A durable checkpoint includes all pending and retry rows, even if SQL is in flight.
+  // Never remove an in-flight retry chunk unless the worker confirmed SQL commit.
+  try { saveQueue(); }
+  catch (error) {
+    shutdownFlushFailed = true;
+    console.error("[MASTER] shutdown checkpoint failed", error);
   }
-  for(const set of clientsBySymbol.values())for(const c of set)try{c.end();}catch{}
-  await new Promise<void>(r=>server.close(()=>r()));
-  await prisma.$disconnect();
-  process.exit(shutdownFlushFailed?1:0);
+
+  // Give an existing SQL write a bounded chance to finish. Do not initiate a new
+  // database request during shutdown: Railway may terminate the process mid-query.
+  const waitUntil = Date.now() + 20_000;
+  while (dbWriting && Date.now() < waitUntil)
+    await new Promise(resolve => setTimeout(resolve, 100));
+  if (dbWriting) {
+    shutdownFlushFailed = true;
+    console.error("[MASTER] SQL still in flight; durable retry chunk retained for ledger-safe replay");
+  }
+
+  // If a commit completed while waiting, persist the updated retry queue again.
+  try { saveQueue(); }
+  catch (error) {
+    shutdownFlushFailed = true;
+    console.error("[MASTER] final shutdown checkpoint failed", error);
+  }
+  if (pending.size || retryChunks.length) {
+    console.warn(`[MASTER] ${pending.size} pending candles and ${retryChunks.length} retry chunks remain durable for restart`);
+  }
+
+  for (const set of clientsBySymbol.values()) for (const c of set) try { c.end(); } catch {}
+  await new Promise<void>(resolve => server.close(() => resolve()));
+  // Only terminate an idle worker. An unfinished write is left to process shutdown;
+  // its durable retry ID is intentionally preserved for idempotent replay.
+  if (!dbWriting && sqlWorker) await sqlWorker.terminate();
+  process.exit(shutdownFlushFailed ? 1 : 0);
 }
+
 process.on("SIGINT",()=>void shutdown("SIGINT"));process.on("SIGTERM",()=>void shutdown("SIGTERM"));

@@ -319,9 +319,11 @@ export default async function DashboardPage() {
       }),
       prisma.dashboardStat.findUnique({
         where: { userId: authUser.userId },
+        select: { clicks: true, sales: true, conversion: true, monthlyPnl: true },
       }),
       prisma.affiliateStat.findUnique({
         where: { userId: authUser.userId },
+        select: { totalEarned: true },
       }),
     ]);
 

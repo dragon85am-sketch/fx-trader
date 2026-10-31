@@ -71,6 +71,35 @@ function serializeRows(rows: Row[]) {
   }));
 }
 
+// V4 opt-in live overlay. If collector is down, preserve the existing DB response.
+type CandleValue = { datetime: string; open: string; high: string; low: string; close: string; volume: string };
+async function overlayLive(symbol: string, interval: string, values: CandleValue[]): Promise<CandleValue[]> {
+  const base=process.env.OHLC_LIVE_COLLECTOR_URL;
+  if(!base) return values;
+  try {
+    const url=new URL("/api/market/live-candles",base);
+    url.searchParams.set("symbol",symbol);
+    url.searchParams.set("interval",interval);
+    const headers:Record<string,string>={};
+    if(process.env.OHLC_LIVE_READ_TOKEN) headers["x-ohlc-live-token"]=process.env.OHLC_LIVE_READ_TOKEN;
+    const response=await fetch(url,{headers,cache:"no-store",signal:AbortSignal.timeout(1500)});
+    if(!response.ok) return values;
+    const data=await response.json() as {connected?:boolean;candle?:CandleValue|null};
+    if(!data.connected||!data.candle) return values;
+    const candle=data.candle;
+    const t=Date.parse(candle.datetime.replace(" ","T")+"Z");
+    const frame=INTERVAL_MS[interval];
+    if(!Number.isFinite(t)||t!==Math.floor(Date.now()/frame)*frame) return values;
+    const ix=values.findIndex(v=>v.datetime===candle.datetime);
+    if(ix>=0){
+      // DB may already contain part of the same candle. Do not add volumes
+      // or replace its open: those would double-count without an exact merge ledger.
+      return values;
+    }
+    return [...values,candle].sort((a,b)=>a.datetime.localeCompare(b.datetime)).slice(-2000);
+  }catch{return values;}
+}
+
 async function readCandles(symbol: string, interval: string, limit: number) {
   const rows = await prisma.$queryRaw<Row[]>`
     SELECT "bucket","open","high","low","close","ticks"
@@ -150,8 +179,9 @@ export async function GET(req: NextRequest) {
     }
 
     const { rows, values } = await readCandles(symbol, interval, limit);
+    const liveValues = await overlayLive(symbol, interval, values);
     return NextResponse.json(
-      { status: "ok", symbol, interval, count: values.length, warmup: values.length < 60, health: diagnose(rows, interval), values },
+      { status: "ok", symbol, interval, count: liveValues.length, warmup: liveValues.length < 60, health: diagnose(rows, interval), values: liveValues },
       { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
     );
   } catch (error) {

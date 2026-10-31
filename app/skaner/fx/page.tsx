@@ -3619,13 +3619,26 @@ if (closedNow.length) {
       }
     }
 
+    // Prevent overlapping full scanner refreshes if a previous request is slow.
+    // Keep the existing 5-minute cadence and live-data behavior unchanged.
+    let refreshRunning = false;
+    const refreshSafely = async () => {
+      if (refreshRunning || !alive) return;
+      refreshRunning = true;
+      try {
+        await refresh();
+      } finally {
+        refreshRunning = false;
+      }
+    };
+
     if (scannerEnabled) {
-      void refresh();
+      void refreshSafely();
     }
 
     const id = window.setInterval(() => {
       if (scannerEnabled) {
-        void refresh();
+        void refreshSafely();
       }
     }, REFRESH_MS);
 

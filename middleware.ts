@@ -8,27 +8,30 @@ type TokenPayload = {
   isBanned?: boolean;
 };
 
-// Reuse the encoded secret within a warm middleware instance.
-// This avoids allocating a TextEncoder and encoding the same key on every request.
 const jwtSecretBytes = process.env.JWT_SECRET
   ? new TextEncoder().encode(process.env.JWT_SECRET)
   : null;
 
-async function getTokenPayload(
-  req: NextRequest
-): Promise<TokenPayload | null> {
+function isRoute(pathname: string, route: string): boolean {
+  return pathname === route || pathname.startsWith(`${route}/`);
+}
+
+async function getTokenPayload(req: NextRequest): Promise<TokenPayload | null> {
+  const token = req.cookies.get("token")?.value;
+  if (!token || !jwtSecretBytes) return null;
+
   try {
-    const token = req.cookies.get("token")?.value;
-
-    if (!token) return null;
-    if (!jwtSecretBytes) return null;
-
-    const { payload } = await jwtVerify(
-      token,
-      jwtSecretBytes
-    );
-
-    return payload as unknown as TokenPayload;
+    const { payload } = await jwtVerify(token, jwtSecretBytes);
+    if (
+      typeof payload.userId !== "string" ||
+      !payload.userId ||
+      (payload.role !== "admin" && payload.role !== "user") ||
+      typeof payload.tokenVersion !== "number" ||
+      (payload.isBanned !== undefined && typeof payload.isBanned !== "boolean")
+    ) {
+      return null;
+    }
+    return payload as TokenPayload;
   } catch {
     return null;
   }
@@ -36,191 +39,51 @@ async function getTokenPayload(
 
 export async function middleware(req: NextRequest) {
   const { pathname, searchParams } = req.nextUrl;
-
-  /*
-   * ============================================
-   * REFERRAL
-   * ============================================
-   */
-  const ref = searchParams.get("ref");
-
-  if (ref && ref.trim()) {
-    const response = NextResponse.next();
-
-    response.cookies.set(
-      "fx_ref",
-      ref.trim(),
-      {
-        path: "/",
-        maxAge: 60 * 60 * 24 * 7,
-        httpOnly: true,
-        sameSite: "lax",
-        secure:
-          process.env.NODE_ENV === "production",
-      }
-    );
-
-    return response;
-  }
-
-  /*
-   * ============================================
-   * USER FROM JWT
-   * ============================================
-   */
-  const user = await getTokenPayload(req);
-
-  const isLoginRoute =
-    pathname.startsWith("/login");
-
-  const isRegisterRoute =
-    pathname.startsWith("/register");
-
-  const isPaywallRoute =
-    pathname.startsWith("/paywall");
-
-  const isPaymentSuccessRoute =
-    pathname.startsWith("/payment/success");
-
-  const isAdminRoute =
-    pathname.startsWith("/dashboard/admin");
-
+  const isLoginRoute = isRoute(pathname, "/login");
+  const isRegisterRoute = isRoute(pathname, "/register");
+  const isPaywallRoute = isRoute(pathname, "/paywall");
+  const isPaymentSuccessRoute = isRoute(pathname, "/payment/success");
+  const isAdminRoute = isRoute(pathname, "/dashboard/admin");
   const isProtectedRoute =
-    pathname.startsWith("/dashboard") ||
-    pathname.startsWith("/trading-room") ||
-    pathname.startsWith("/education") ||
-    pathname.startsWith("/skaner");
+    isRoute(pathname, "/dashboard") ||
+    isRoute(pathname, "/trading-room") ||
+    isRoute(pathname, "/education") ||
+    isRoute(pathname, "/skaner");
 
-  /*
-   * ============================================
-   * BANNED USER
-   * ============================================
-   *
-   * Jeśli użytkownik jest zbanowany,
-   * czyścimy token i wysyłamy go do logowania.
-   */
-  if (
-    user?.isBanned &&
-    !isLoginRoute
-  ) {
-    const response = NextResponse.redirect(
-      new URL("/login", req.url)
-    );
+  const user = await getTokenPayload(req);
+  let response: NextResponse;
 
-    response.cookies.set("token", "", {
-      path: "/",
-      maxAge: 0,
-    });
-
+  if (user?.isBanned && !isLoginRoute) {
+    response = NextResponse.redirect(new URL("/login", req.url));
+    response.cookies.set("token", "", { path: "/", maxAge: 0 });
     return response;
   }
 
-  /*
-   * ============================================
-   * NIEZALOGOWANY USER
-   * ============================================
-   *
-   * Chronione strony wymagają zalogowania.
-   */
-  if (
-    isProtectedRoute &&
-    !user
-  ) {
-    return NextResponse.redirect(
-      new URL("/login", req.url)
-    );
+  if ((isProtectedRoute || isPaymentSuccessRoute || isPaywallRoute) && !user) {
+    response = NextResponse.redirect(new URL("/login", req.url));
+  } else if (isAdminRoute && user?.role !== "admin") {
+    response = NextResponse.redirect(new URL("/dashboard", req.url));
+  } else if ((isLoginRoute || isRegisterRoute) && user) {
+    response = NextResponse.redirect(new URL("/dashboard", req.url));
+  } else {
+    response = NextResponse.next();
   }
 
-  /*
-   * ============================================
-   * PAYMENT SUCCESS
-   * ============================================
-   *
-   * /payment/success musi być dostępne dla
-   * zalogowanego użytkownika nawet wtedy,
-   * gdy webhook jeszcze nie ustawił Premium.
-   */
-  if (
-    isPaymentSuccessRoute &&
-    !user
-  ) {
-    return NextResponse.redirect(
-      new URL("/login", req.url)
-    );
+  // Referral cookie must never bypass authentication or authorization.
+  // Preserve referral tracking for allowed navigation and redirects.
+  const ref = searchParams.get("ref")?.trim();
+  if (ref && ref.length <= 128) {
+    response.cookies.set("fx_ref", ref, {
+      path: "/",
+      maxAge: 60 * 60 * 24 * 7,
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+    });
   }
 
-  /*
-   * ============================================
-   * ADMIN
-   * ============================================
-   */
-  if (
-    isAdminRoute &&
-    user?.role !== "admin"
-  ) {
-    return NextResponse.redirect(
-      new URL("/dashboard", req.url)
-    );
-  }
-
-  /*
-   * ============================================
-   * LOGIN / REGISTER
-   * ============================================
-   *
-   * Jeśli użytkownik jest już zalogowany,
-   * nie pokazujemy ponownie login/register.
-   *
-   * UWAGA:
-   * nie sprawdzamy tu Premium.
-   */
-  if (
-    (isLoginRoute || isRegisterRoute) &&
-    user
-  ) {
-    return NextResponse.redirect(
-      new URL("/dashboard", req.url)
-    );
-  }
-
-  /*
-   * ============================================
-   * PAYWALL
-   * ============================================
-   *
-   * Paywall musi być dostępny dla zalogowanego
-   * użytkownika bez Premium.
-   *
-   * Nie sprawdzamy tutaj statusu Premium z JWT,
-   * ponieważ JWT może zawierać stare dane.
-   */
-  if (
-    isPaywallRoute &&
-    !user
-  ) {
-    return NextResponse.redirect(
-      new URL("/login", req.url)
-    );
-  }
-
-  /*
-   * ============================================
-   * PREMIUM
-   * ============================================
-   *
-   * CELOWO NIE SPRAWDZAMY tutaj:
-   *
-   * user.isPremium
-   * user.premiumUntil
-   *
-   * Status Premium zmienia się po webhookach Stripe,
-   * a JWT nie aktualizuje się automatycznie.
-   *
-   * Dostęp Premium powinien być sprawdzany
-   * bezpośrednio z bazy przez requirePremiumUser().
-   */
-
-  return NextResponse.next();
+  // Premium entitlements must be verified from the database in protected handlers.
+  return response;
 }
 
 export const config = {
