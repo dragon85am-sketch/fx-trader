@@ -47,6 +47,43 @@ function ensureSqlWorker(): Worker {
 const key = process.env.LIVE_RATES_API_KEY;
 if (!key) throw new Error("Missing LIVE_RATES_API_KEY");
 
+// Stage 2C: opt-in SQLite mode. Legacy WAL is left untouched when enabled.
+const HISTORY_STORAGE = process.env.OHLC_HISTORY_STORAGE || "legacy";
+if (!["legacy", "sqlite"].includes(HISTORY_STORAGE)) throw new Error("Invalid OHLC_HISTORY_STORAGE");
+const SQLITE_MODE = HISTORY_STORAGE === "sqlite";
+const HISTORY_PAUSED = process.env.HISTORY_PAUSED !== "false";
+// The bridge is CommonJS-loaded dynamically by tsx only in SQLite mode.
+// Node 24 handles node:sqlite in the isolated worker.
+let historyBridge: any = null;
+let historyIntake: any = null;
+let sqliteReady = false;
+let sqliteError: string | null = null;
+let sqliteAccepted = 0;
+let sqliteQueued = 0;
+let sqliteLastCommittedAt: number | null = null;
+const SQLITE_MAX_WAITING = 5000;
+let sqliteSerial = Promise.resolve();
+async function initHistory() {
+  if (!SQLITE_MODE) return;
+  // @ts-ignore - the tested worker bridge is an ESM .mjs module.
+  const mod = await import("./history-bridge.mjs");
+  const file = process.env.OHLC_HISTORY_SQLITE_PATH || "/data/ohlc-history/history.sqlite";
+  historyBridge = new mod.HistoryBridge({ filename: file, maxPendingTicks: SQLITE_MAX_WAITING });
+  await historyBridge.ready;
+  // A separate fsynced journal is replayed before accepting any provider ticks.
+  // @ts-ignore - local ESM module
+  const intakeModule = await import("./history-intake.mjs");
+  historyIntake = new intakeModule.HistoryIntake({
+    dir: process.env.OHLC_HISTORY_INTAKE_DIR || "/data/ohlc-history/intake",
+    maxBytes: Number(process.env.OHLC_HISTORY_INTAKE_MAX_BYTES || 268435456),
+  });
+  const replay = await historyIntake.replay(historyBridge);
+  console.log(`[MASTER] SQLite intake replayed ${replay.read} durable ticks`);
+  historyIntake.checkpoint();
+  sqliteReady = true;
+  console.log(`[MASTER] SQLite history ready: ${file}; legacy WAL preserved, SQL disabled`);
+}
+
 const PORT = Number(process.env.PORT || 8080);
 const PROVIDER_INSTRUMENTS = getCollectorSymbols(process.env.LIVE_RATES_INSTRUMENTS);
 const PROVIDER_SET = new Set(PROVIDER_INSTRUMENTS);
@@ -426,7 +463,7 @@ function queueDbTick(t: Tick) {
     // Publish LIVE only after the tick has been fsynced to the WAL.
     liveCandleEngine.accept(t);
   } catch (e) { fatalQueueError(e); }
-  scheduleFlush();
+  if (!SQLITE_MODE && !HISTORY_PAUSED) scheduleFlush();
 }
 
 type DurableBatch = { id: string; batch: TickBatch };
@@ -444,6 +481,7 @@ async function writeBatches(rows: DurableBatch[]): Promise<void> {
 }
 
 async function flushDb() {
+  if (SQLITE_MODE || HISTORY_PAUSED) return;
   if (dbWriting) return;
   dbWriting = true;
   const flushStarted = Date.now();
@@ -571,12 +609,54 @@ socket.on("rates",(raw:any)=>{ try {
     const last=lastAcceptedTimestamp.get(symbol);
     if(last !== undefined && timestamp < last){ staleTicksRejected++; staleTicksBySymbol.set(symbol, (staleTicksBySymbol.get(symbol) || 0) + 1); continue; }
     const tick={symbol,price,timestamp};
-    // Durability boundary: do not publish or acknowledge before WAL fsync succeeds.
-    queueDbTick(tick);
-    lastAcceptedTimestamp.set(symbol,timestamp);
-    latestTicks[symbol]=tick;
-    recordAcceptedTick(tick);
-    broadcastTick(tick);
+    if (SQLITE_MODE) {
+      if (shuttingDown || sqliteError) return;
+      // Acknowledge/publish only after SQLite transaction commits. Serialize provider
+      // events to preserve ordering, and never create new legacy SQL retry chunks.
+      if (sqliteQueued >= SQLITE_MAX_WAITING) {
+        sqliteError = "SQLite input backlog exceeded safe bound";
+        console.error("[MASTER]", sqliteError);
+        socket.disconnect();
+        shuttingDown = true;
+        process.exitCode = 1;
+        return;
+      }
+      sqliteQueued++;
+      sqliteSerial = sqliteSerial.then(async () => {
+        try {
+          if (sqliteError) return;
+          const prev = lastAcceptedTimestamp.get(symbol);
+          if (prev !== undefined && timestamp < prev) return;
+          // fsync before committing/publishing; stable identity makes replay idempotent.
+          const durableTick = historyIntake.append(tick);
+          await historyBridge.ticks([durableTick]);
+          lastAcceptedTimestamp.set(symbol,timestamp);
+          latestTicks[symbol]=tick;
+          liveCandleEngine.accept(tick);
+          recordAcceptedTick(tick);
+          broadcastTick(tick);
+          sqliteAccepted++;
+          sqliteLastCommittedAt = Date.now();
+        } finally {
+          sqliteQueued--;
+          if (!sqliteError && sqliteQueued === 0 && historyIntake.bytes >= historyIntake.rotateBytes) historyIntake.checkpoint();
+        }
+      }).catch((error: unknown) => {
+        sqliteError = error instanceof Error ? error.message : String(error);
+        console.error("[MASTER] SQLite commit failed; stopping stream without publishing uncommitted ticks", sqliteError);
+        socket.disconnect();
+        // A failed history write must not silently resume on reconnection.
+        shuttingDown = true;
+        process.exitCode = 1;
+      });
+    } else {
+      // Legacy mode remains unchanged until migration is explicitly enabled.
+      queueDbTick(tick);
+      lastAcceptedTimestamp.set(symbol,timestamp);
+      latestTicks[symbol]=tick;
+      recordAcceptedTick(tick);
+      broadcastTick(tick);
+    }
   }
 } catch(e){console.error("[MASTER] parse",e);} });
 // Count event names only, not raw payloads (which might contain credentials).
@@ -619,6 +699,25 @@ const server=http.createServer((req,res)=>{
   const origin=req.headers.origin||"*"; res.setHeader("Access-Control-Allow-Origin",origin);res.setHeader("Vary","Origin");res.setHeader("Access-Control-Allow-Methods","GET, OPTIONS");res.setHeader("Access-Control-Allow-Headers","Content-Type");
   if(req.method==="OPTIONS"){res.writeHead(204);res.end();return;}
   const url=new URL(req.url||"/",`http://${req.headers.host||"localhost"}`);
+  if (url.pathname === "/api/market/history") {
+    if (!SQLITE_MODE || !sqliteReady) { res.writeHead(503,{"Content-Type":"application/json"});res.end(JSON.stringify({ok:false,error:"SQLite history not enabled"}));return; }
+    const secret=process.env.OHLC_LIVE_READ_TOKEN;
+    if (secret && req.headers["x-ohlc-live-token"] !== secret) {res.writeHead(401);res.end();return;}
+    const symbol=normalizeMarketSymbol(url.searchParams.get("symbol")||"");
+    const interval=url.searchParams.get("interval")||"1min";
+    const limit=Math.min(2000,Math.max(1,Number(url.searchParams.get("limit")||500)));
+    const before=Number(url.searchParams.get("before")||Date.now());
+    if (!PROVIDER_SET.has(symbol) || !frames.some(f=>f[0]===interval) || !Number.isSafeInteger(before) || !Number.isFinite(limit)) {
+      res.writeHead(400,{"Content-Type":"application/json"});res.end(JSON.stringify({ok:false,error:"Invalid history query"}));return;
+    }
+    void historyBridge.read(symbol,interval,limit,before).then((result:any)=>{
+      res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});
+      res.end(JSON.stringify({ok:true,source:"collector-sqlite",symbol,interval,candles:result.rows}));
+    }).catch((error:unknown)=>{
+      res.writeHead(503,{"Content-Type":"application/json"});res.end(JSON.stringify({ok:false,error:"History temporarily unavailable"}));
+      console.error("[MASTER] SQLite history read",error);
+    });return;
+  }
   // V4: independent, read-only LIVE OHLC view. Never mutates WAL or retry chunks.
   if(url.pathname==="/api/market/live-candles") {
     const secret=process.env.OHLC_LIVE_READ_TOKEN;
@@ -641,7 +740,7 @@ const server=http.createServer((req,res)=>{
   }
   if(url.pathname==="/health/quick") {
     res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});
-    res.end(JSON.stringify({ok:true,connected:liveRatesConnected,dbWriting,
+    res.end(JSON.stringify({ok:!sqliteError,connected:liveRatesConnected,historyStorage:HISTORY_STORAGE,historyPaused:HISTORY_PAUSED,sqliteReady,sqliteQueued,sqliteAccepted,sqliteLastCommittedAt,sqliteError,dbWriting,
       pendingRows:pending.size,retryChunks:retryChunks.length,liveCandles:liveCandleEngine.size,
       successfulDbWrites,failedDbWrites,lastDbSqlMs,lastDbSuccessAt,
       walBytes,walSequence,walRecoveredTicks,lastWalSyncMs,
@@ -653,12 +752,15 @@ const server=http.createServer((req,res)=>{
   res.writeHead(200,{"Content-Type":"application/json"});res.end(JSON.stringify({ok:true,service:"FX Trade Master Market Collector",mode:"MASTER_150",configured:PROVIDER_INSTRUMENTS.length,health:"/health",streamPattern:"/api/market/{symbol}/stream"}));
 });
 // Fail startup if the persistent volume is absent, read-only, or contains invalid data.
-try { recoverQueue(); } catch (e) { fatalQueueError(e); }
-server.listen(PORT,"0.0.0.0",()=>{
+// SQLite mode does not read, modify, truncate, or replay the old /data/ohlc-queue.
+if (!SQLITE_MODE) {
+  try { recoverQueue(); } catch (e) { fatalQueueError(e); }
+}
+void initHistory().then(() => server.listen(PORT,"0.0.0.0",()=>{
   console.log(`[MASTER] HTTP/SSE :${PORT}; OHLC flush=${DB_FLUSH_MS}ms; chunk max=${DB_CHUNK_ROWS}`);
-  if (pending.size || retryChunks.length) scheduleFlush(1000);
+  if (!SQLITE_MODE && !HISTORY_PAUSED && (pending.size || retryChunks.length)) scheduleFlush(1000);
   socket.connect();
-});
+})).catch(error => { console.error("[MASTER] History initialization failed", error); process.exit(1); });
 async function shutdown(signal:string){
   if (shuttingDown) return;
   console.log(`[MASTER] ${signal}: stopping LIVE; preserving durable OHLC queue`);
@@ -671,7 +773,7 @@ async function shutdown(signal:string){
 
   // A durable checkpoint includes all pending and retry rows, even if SQL is in flight.
   // Never remove an in-flight retry chunk unless the worker confirmed SQL commit.
-  try { saveQueue(); }
+  try { if (!SQLITE_MODE) saveQueue(); }
   catch (error) {
     shutdownFlushFailed = true;
     console.error("[MASTER] shutdown checkpoint failed", error);
@@ -688,15 +790,20 @@ async function shutdown(signal:string){
   }
 
   // If a commit completed while waiting, persist the updated retry queue again.
-  try { saveQueue(); }
+  try { if (!SQLITE_MODE) saveQueue(); }
   catch (error) {
     shutdownFlushFailed = true;
     console.error("[MASTER] final shutdown checkpoint failed", error);
   }
-  if (pending.size || retryChunks.length) {
+  if (!SQLITE_MODE && (pending.size || retryChunks.length)) {
     console.warn(`[MASTER] ${pending.size} pending candles and ${retryChunks.length} retry chunks remain durable for restart`);
   }
 
+  if (SQLITE_MODE) {
+    await sqliteSerial;
+    if (historyBridge) try { await historyBridge.close(); } catch (error) { shutdownFlushFailed = true; console.error("[MASTER] SQLite shutdown failed", error); }
+    if (historyIntake) try { historyIntake.close(); } catch (error) { shutdownFlushFailed = true; console.error("[MASTER] SQLite intake close failed", error); }
+  }
   for (const set of clientsBySymbol.values()) for (const c of set) try { c.end(); } catch {}
   await new Promise<void>(resolve => server.close(() => resolve()));
   // Only terminate an idle worker. An unfinished write is left to process shutdown;
