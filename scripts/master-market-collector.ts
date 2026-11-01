@@ -739,7 +739,7 @@ const server=http.createServer((req,res)=>{
         close:String(live.close),volume:String(live.ticks),firstAt:live.firstAt,lastAt:live.lastAt}:null}));return;
   }
   if(url.pathname==="/health/quick") {
-    res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});
+    res.writeHead(SQLITE_MODE && (!sqliteReady || sqliteError) ? 503 : 200,{"Content-Type":"application/json","Cache-Control":"no-store"});
     res.end(JSON.stringify({ok:!sqliteError,connected:liveRatesConnected,historyStorage:HISTORY_STORAGE,historyPaused:HISTORY_PAUSED,sqliteReady,sqliteQueued,sqliteAccepted,sqliteLastCommittedAt,sqliteError,dbWriting,
       pendingRows:pending.size,retryChunks:retryChunks.length,liveCandles:liveCandleEngine.size,
       successfulDbWrites,failedDbWrites,lastDbSqlMs,lastDbSuccessAt,
