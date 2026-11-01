@@ -3892,7 +3892,40 @@ if (closedNow.length) {
   // rows/tf changes already re-render this component, so the chart now receives
   // the freshly fetched OHLC for M1/M5/M15/M30/H1/H4/D1.
   void chartHistoryVersion;
-  const selectedCandles = candlesCache.current.get(candleCacheKey(selected.symbol, tf)) ?? [];
+  const cachedSelectedCandles = candlesCache.current.get(candleCacheKey(selected.symbol, tf)) ?? [];
+  // BTCUSD LIVE-FIRST: when the DB history is stale or from a different price
+  // regime, do not draw it together with today's tick-driven candles.
+  // No synthetic OHLC bars: missing historical candles remain missing.
+  // This is intentionally scoped to BTCUSD only.
+  const selectedCandles = (() => {
+    if (selected.symbol.toUpperCase() !== "BTCUSD" || !liveCandle) return cachedSelectedCandles;
+    const secondsByTf: Record<Timeframe, number> = {
+      M1: 60, M5: 300, M15: 900, M30: 1800,
+      H1: 3600, H4: 14400, D1: 86400,
+    };
+    const step = secondsByTf[tf];
+    const liveTime = Number(liveCandle.time);
+    const sorted = [...cachedSelectedCandles].sort((a, b) => Number(a.time) - Number(b.time));
+    const past = sorted.filter((c) => Number(c.time) <= liveTime);
+    const last = past[past.length - 1];
+    if (!last) return [];
+    // A multi-bucket outage or a large price discontinuity must not appear
+    // as a misleading chart with old candles thousands of dollars above LIVE.
+    const staleGap = liveTime - Number(last.time) > step * 2;
+    const priceMismatch = Math.abs(last.close - liveCandle.close) / Math.max(liveCandle.close, 1) > 0.01;
+    if (!staleGap && !priceMismatch) return past;
+    // Keep only the most recent contiguous candles that genuinely match LIVE.
+    // After a long outage this may be empty; subsequent real ticks build M1/M5.
+    let start = past.length;
+    for (let i = past.length - 1; i >= 0; i--) {
+      const c = past[i];
+      const nextTime = i === past.length - 1 ? liveTime : Number(past[i + 1].time);
+      if (nextTime - Number(c.time) > step * 2) break;
+      if (Math.abs(c.close - liveCandle.close) / Math.max(liveCandle.close, 1) > 0.01) break;
+      start = i;
+    }
+    return past.slice(start);
+  })();
 
   // RENKO ma własne źródło danych niezależne od głównego interwału wykresu.
   // CURRENT/AUTO = aktualny TF, dzięki czemu Renko zachowuje ten sam czas i live tick co wykres.
