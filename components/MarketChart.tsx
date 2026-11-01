@@ -266,6 +266,10 @@ function normalizeCandles(arr: CandlestickData[]): CandlestickData[] {
 
 function guessPrecision(symbol: string, lastPrice: number) {
   const s = symbol.toUpperCase();
+  // Crypto pairs such as BTCUSD/ETHUSD have six letters too; they are not FX pairs.
+  if (/^(BTC|ETH|SOL|BNB|XRP|ADA|DOGE)(USD|USDT)$/.test(s)) {
+    return Math.abs(lastPrice) >= 1000 ? 2 : Math.abs(lastPrice) >= 1 ? 4 : 6;
+  }
   const looksForex = /^[A-Z]{6}$/.test(s) && !s.endsWith("USDT");
   if (looksForex) return 5;
 
