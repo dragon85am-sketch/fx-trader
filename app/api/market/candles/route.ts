@@ -100,6 +100,63 @@ async function overlayLive(symbol: string, interval: string, values: CandleValue
   }catch{return values;}
 }
 
+// Shadow SQLite source is opt-in. Without the flag the existing Prisma path stays untouched.
+// Set both variables in the FX TRADE frontend service (not market-collector).
+const MIRROR_ENABLED = process.env.OHLC_CANDLES_SOURCE === "mirror";
+const MIRROR_BASE = process.env.OHLC_HISTORY_MIRROR_URL;
+
+type MirrorCandle = {
+  bucket: number | string;
+  open: number | string;
+  high: number | string;
+  low: number | string;
+  close: number | string;
+  ticks?: number;
+};
+
+async function readMirrorCandles(symbol: string, interval: string, limit: number) {
+  if (!MIRROR_BASE) throw new Error("OHLC_HISTORY_MIRROR_URL is missing");
+  const url = new URL("/api/market/history", MIRROR_BASE);
+  url.searchParams.set("symbol", symbol);
+  url.searchParams.set("interval", interval);
+  url.searchParams.set("limit", String(limit));
+  const headers: Record<string, string> = {};
+  if (process.env.OHLC_LIVE_READ_TOKEN) headers["x-ohlc-live-token"] = process.env.OHLC_LIVE_READ_TOKEN;
+  const response = await fetch(url, {
+    headers, cache: "no-store", signal: AbortSignal.timeout(8000),
+  });
+  if (!response.ok) throw new Error(`History mirror HTTP ${response.status} for ${symbol}/${interval}`);
+  const data = await response.json() as { ok?: boolean; candles?: MirrorCandle[] };
+  if (data.ok !== true || !Array.isArray(data.candles)) {
+    throw new Error(`Invalid history mirror response for ${symbol}/${interval}`);
+  }
+  const rows: Row[] = data.candles.map(c => {
+    const n = typeof c.bucket === "number" ? c.bucket : Number(c.bucket);
+    const bucket = Number.isFinite(n) ? new Date(n) : new Date(c.bucket);
+    if (!Number.isFinite(bucket.getTime())) throw new Error(`Invalid candle bucket for ${symbol}`);
+    for (const v of [c.open, c.high, c.low, c.close]) {
+      if (!Number.isFinite(Number(v))) throw new Error(`Invalid candle price for ${symbol}`);
+    }
+    return { symbol, bucket, open: c.open, high: c.high, low: c.low, close: c.close, ticks: Number(c.ticks ?? 0) };
+  }).sort((a, b) => +b.bucket - +a.bucket).slice(0, limit);
+  return { rows, values: serializeRows(rows) };
+}
+
+async function readMirrorBatch(symbols: string[], interval: string, limit: number) {
+  // Limit concurrent upstream requests; one mirror endpoint currently serves one symbol.
+  const output: Record<string, { count: number; warmup: boolean; health: CandleHealth; values: CandleValue[] }> = {};
+  let cursor = 0;
+  const worker = async () => {
+    while (cursor < symbols.length) {
+      const symbol = symbols[cursor++];
+      const { rows, values } = await readMirrorCandles(symbol, interval, limit);
+      output[symbol] = { count: values.length, warmup: values.length < 60, health: diagnose(rows, interval), values };
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(4, symbols.length) }, () => worker()));
+  return output;
+}
+
 async function readCandles(symbol: string, interval: string, limit: number) {
   const rows = await prisma.$queryRaw<Row[]>`
     SELECT "bucket","open","high","low","close","ticks"
@@ -166,7 +223,9 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ status: "error", message: "Missing symbols" }, { status: 400 });
       }
 
-      const symbolData = await readCandlesBatch(symbols, interval, limit);
+      const symbolData = MIRROR_ENABLED
+        ? await readMirrorBatch(symbols, interval, limit)
+        : await readCandlesBatch(symbols, interval, limit);
       return NextResponse.json(
         { status: "ok", interval, symbols: symbolData },
         { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
@@ -178,7 +237,9 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ status: "error", message: "Missing symbol" }, { status: 400 });
     }
 
-    const { rows, values } = await readCandles(symbol, interval, limit);
+    const { rows, values } = MIRROR_ENABLED
+      ? await readMirrorCandles(symbol, interval, limit)
+      : await readCandles(symbol, interval, limit);
     const liveValues = await overlayLive(symbol, interval, values);
     return NextResponse.json(
       { status: "ok", symbol, interval, count: liveValues.length, warmup: liveValues.length < 60, health: diagnose(rows, interval), values: liveValues },
