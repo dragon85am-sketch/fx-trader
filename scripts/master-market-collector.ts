@@ -1,4 +1,4 @@
-import { Worker } from "node:worker_threads";
+import { PrismaClient } from "@prisma/client";
 import { io } from "socket.io-client";
 import dotenv from "dotenv";
 import http from "node:http";
@@ -7,82 +7,14 @@ import fs from "node:fs";
 import path from "node:path";
 import { getCollectorSymbols, normalizeMarketSymbol, toLiveRatesSymbol } from "../lib/market/master-symbols";
 import { LiveCandleEngine } from "../lib/market/live-candle-engine";
-import { historyDrainPolicy } from "../lib/market/history-drain-policy";
+import { chooseNextChunk } from "../lib/market/history-priority";
 
 dotenv.config({ path: ".env.local" });
 dotenv.config({ path: ".env" });
 
-// Worker owns the only PrismaClient for history writes.
-let sqlWorker: Worker | null = null;
-let workerRequestId = 0;
-let inFlight: { id: number; resolve: () => void; reject: (error: Error) => void } | null = null;
-function rejectInFlight(error: Error) {
-  const current = inFlight;
-  inFlight = null;
-  if (current) current.reject(error);
-}
-function ensureSqlWorker(): Worker {
-  if (sqlWorker) return sqlWorker;
-  const workerFile = path.join(process.cwd(), "scripts", "history-sql-worker.cjs");
-  if (!fs.existsSync(workerFile)) throw new Error(`Missing HISTORY SQL worker: ${workerFile}`);
-  const worker = new Worker(workerFile);
-  sqlWorker = worker;
-  worker.on("message", (message: { type?: string; id?: number; ok?: boolean; error?: string }) => {
-    if (message?.type !== "result" || !inFlight || message.id !== inFlight.id) return;
-    const current = inFlight;
-    inFlight = null;
-    if (message.ok) current.resolve();
-    else current.reject(new Error(message.error || "HISTORY SQL write failed"));
-  });
-  worker.on("error", (error) => {
-    if (sqlWorker === worker) sqlWorker = null;
-    rejectInFlight(error);
-  });
-  worker.on("exit", (code) => {
-    if (sqlWorker === worker) sqlWorker = null;
-    rejectInFlight(new Error(`HISTORY worker exited with code ${code}`));
-  });
-  return worker;
-}
+const prisma = new PrismaClient();
 const key = process.env.LIVE_RATES_API_KEY;
 if (!key) throw new Error("Missing LIVE_RATES_API_KEY");
-
-// Stage 2C: opt-in SQLite mode. Legacy WAL is left untouched when enabled.
-const HISTORY_STORAGE = process.env.OHLC_HISTORY_STORAGE || "legacy";
-if (!["legacy", "sqlite"].includes(HISTORY_STORAGE)) throw new Error("Invalid OHLC_HISTORY_STORAGE");
-const SQLITE_MODE = HISTORY_STORAGE === "sqlite";
-const HISTORY_PAUSED = process.env.HISTORY_PAUSED !== "false";
-// The bridge is CommonJS-loaded dynamically by tsx only in SQLite mode.
-// Node 24 handles node:sqlite in the isolated worker.
-let historyBridge: any = null;
-let historyIntake: any = null;
-let sqliteReady = false;
-let sqliteError: string | null = null;
-let sqliteAccepted = 0;
-let sqliteQueued = 0;
-let sqliteLastCommittedAt: number | null = null;
-const SQLITE_MAX_WAITING = 5000;
-let sqliteSerial = Promise.resolve();
-async function initHistory() {
-  if (!SQLITE_MODE) return;
-  // @ts-ignore - the tested worker bridge is an ESM .mjs module.
-  const mod = await import("./history-bridge.mjs");
-  const file = process.env.OHLC_HISTORY_SQLITE_PATH || "/data/ohlc-history/history.sqlite";
-  historyBridge = new mod.HistoryBridge({ filename: file, maxPendingTicks: SQLITE_MAX_WAITING });
-  await historyBridge.ready;
-  // A separate fsynced journal is replayed before accepting any provider ticks.
-  // @ts-ignore - local ESM module
-  const intakeModule = await import("./history-intake.mjs");
-  historyIntake = new intakeModule.HistoryIntake({
-    dir: process.env.OHLC_HISTORY_INTAKE_DIR || "/data/ohlc-history/intake",
-    maxBytes: Number(process.env.OHLC_HISTORY_INTAKE_MAX_BYTES || 268435456),
-  });
-  const replay = await historyIntake.replay(historyBridge);
-  console.log(`[MASTER] SQLite intake replayed ${replay.read} durable ticks`);
-  historyIntake.checkpoint();
-  sqliteReady = true;
-  console.log(`[MASTER] SQLite history ready: ${file}; legacy WAL preserved, SQL disabled`);
-}
 
 const PORT = Number(process.env.PORT || 8080);
 const PROVIDER_INSTRUMENTS = getCollectorSymbols(process.env.LIVE_RATES_INSTRUMENTS);
@@ -184,7 +116,17 @@ const pending = new Map<string, TickBatch>();
 const retryChunks: Array<Array<{ id: string; batch: TickBatch }>> = [];
 // Synchronous, crash-safe checkpoint on the mounted Railway Volume.
 // Checkpoint BEFORE acknowledging a tick or submitting SQL, preserving stable ledger IDs.
-const QUEUE_DIR = process.env.OHLC_QUEUE_DIR || "/data/ohlc-queue";
+// Fresh-start mode is opt-in and NEVER removes the legacy durable queue.
+// Deploy with OHLC_FRESH_START=true and a NEW OHLC_QUEUE_DIR on the SAME mounted volume.
+const FRESH_START = (process.env.OHLC_FRESH_START || "").trim().toLowerCase() === "true";
+const LEGACY_QUEUE_DIR = "/data/ohlc-queue";
+const QUEUE_DIR = process.env.OHLC_QUEUE_DIR || LEGACY_QUEUE_DIR;
+if (FRESH_START && (path.resolve(QUEUE_DIR) === path.resolve(LEGACY_QUEUE_DIR) ||
+    !path.resolve(QUEUE_DIR).startsWith("/data/"))) {
+  throw new Error("FRESH START requires a separate OHLC_QUEUE_DIR under /data/ (e.g. /data/ohlc-fresh-20261106); legacy queue is protected");
+}
+// Prevent replayed provider ticks from rebuilding pre-restart history.
+const FRESH_START_AT = Date.now();
 const QUEUE_FILE = path.join(QUEUE_DIR, "state.json");
 // V2.1: small fsynced append-only WAL per tick; large snapshots only at flush boundaries.
 const WAL_FILE = path.join(QUEUE_DIR, "ticks.wal");
@@ -193,7 +135,7 @@ let walBytes = 0;
 let walRecoveredTicks = 0;
 let lastWalSyncMs: number | null = null;
 const MAX_WAL_BYTES = 16 * 1024 * 1024;
-const MAX_QUEUE_BYTES = 64 * 1024 * 1024;
+const MAX_QUEUE_BYTES = 128 * 1024 * 1024; // Temporary recovery headroom; keep WAL 16 MiB guard.
 let queueCheckpointAt: number | null = null;
 let queueCheckpointBytes = 0;
 let lastQueueCheckpointMs: number | null = null;
@@ -215,7 +157,7 @@ function saveQueue(): void {
   const checkpointStarted = Date.now();
   const payload = JSON.stringify({ version: 2, walSequence, pending: [...pending.entries()], retryChunks });
   const bytes = Buffer.byteLength(payload);
-  if (bytes > MAX_QUEUE_BYTES) throw new Error(`OHLC queue exceeds 64 MiB (${bytes} bytes)`);
+  if (bytes > MAX_QUEUE_BYTES) throw new Error(`OHLC queue exceeds 128 MiB (${bytes} bytes)`);
   const tmp = `${QUEUE_FILE}.${process.pid}.tmp`;
   try {
     const fd = fs.openSync(tmp, "w", 0o600);
@@ -339,7 +281,7 @@ let consecutiveDbFailures = 0;
 // does not discard tick data. Configure OHLC_DB_FLUSH_MS on Railway if needed.
 // 60s default reduces repeated UPSERTs of the same active candle compared
 // with the previous 15s interval. Existing retry chunks are never rewritten.
-const DB_FLUSH_MS = Math.max(15_000, Math.min(120_000, Number(process.env.OHLC_DB_FLUSH_MS || 60_000) || 60_000));
+const DB_FLUSH_MS = FRESH_START ? 15_000 : Math.max(15_000, Math.min(120_000, Number(process.env.OHLC_DB_FLUSH_MS || 60_000) || 60_000));
 // Fewer database round-trips. Existing durable retry chunks retain their original IDs.
 // Keep bounded to avoid excessively large SQL statements.
 const DB_CHUNK_ROWS = Math.max(1, Math.min(64, Number(process.env.OHLC_DB_CHUNK_ROWS || 42) || 42));
@@ -359,6 +301,43 @@ let lastDbCheckpointMs: number | null = null;
 let maxDbSqlMs = 0;
 let lastDbBatchRows = 0;
 let lastDbBatchAt: number | null = null;
+// V4 history priority is opt-in until production recovery/latency tests pass.
+// One SQL writer and one durable queue remain the source of truth.
+const V4_HISTORY_PRIORITY = process.env.OHLC_V4_HISTORY_PRIORITY === "true";
+const V4_RECENT_WINDOW_MS = Math.max(60_000, Math.min(3_600_000, Number(process.env.OHLC_V4_RECENT_WINDOW_MS || 300_000) || 300_000));
+const V4_HISTORY_QUOTA = Math.max(1, Math.min(20, Number(process.env.OHLC_V4_HISTORY_QUOTA || 3) || 3));
+let historyWritesSinceLive = 0;
+let priorityLiveWrites = 0;
+let historyWrites = 0;
+// V4 stage 4a: drain persisted backlog faster while keeping SQL work bounded.
+// This changes scheduling only; WAL format, chunk IDs and SQL semantics are unchanged.
+const DB_DRAIN_MS = Math.max(500, Math.min(30_000, Number(process.env.OHLC_DB_DRAIN_MS || 750) || 750));
+const DB_DRAIN_BACKLOG_ROWS = Math.max(1, Math.min(1_000_000, Number(process.env.OHLC_DB_DRAIN_BACKLOG_ROWS || 1000) || 1000));
+let drainSchedules = 0;
+// Stage 4B: opt-in two independent asynchronous SQL lanes; one queue owner.
+// No second process touches state.json/ticks.wal. Disabled by default.
+// Production safety: writes stay paused unless explicitly enabled.
+const HISTORY_PAUSED = (process.env.HISTORY_PAUSED || "true").trim().toLowerCase() !== "false";
+// Controlled database probe: at most ONE already-durable SQL chunk per process lifetime.
+// Never split immutable chunks: their ledger IDs must remain unchanged.
+const DB_PROBE_ONCE = (process.env.OHLC_DB_PROBE_ONCE || "").trim().toLowerCase() === "true";
+const DB_PROBE_MAX_ROWS = 64; // Existing immutable chunks may contain up to 64 rows; never split them.
+let dbProbeAttempted = false;
+let dbProbeSucceeded = false;
+const V4_DUAL_WRITER = (process.env.OHLC_V4_DUAL_WRITER || "").trim().toLowerCase() === "true";
+let v4LiveInFlight = 0;
+let v4HistoryInFlight = 0;
+let v4LiveCommitted = 0;
+let v4HistoryCommitted = 0;
+let v4ConflictDeferrals = 0;
+let v4WriterErrors = 0;
+// Safe backlog recovery: one SQL writer, bounded work per flush, no queue ID rewrites.
+const RECOVERY_MAX_BATCHES = Math.max(1, Math.min(8, Number(process.env.OHLC_RECOVERY_MAX_BATCHES || 8) || 8));
+const RECOVERY_NEW_ROWS = FRESH_START ? 512 : Math.max(1, Math.min(512, Number(process.env.OHLC_RECOVERY_NEW_ROWS || 128) || 128));
+const RECOVERY_RETRY_THRESHOLD = Math.max(0, Math.min(10000, Number(process.env.OHLC_RECOVERY_RETRY_THRESHOLD || 1000) || 1000));
+let recoveryBatchesThisFlush = 0;
+let recoveryCheckpointGroups = 0;
+let recoveryCheckpointSaved = 0;
 const DB_RETRY_MAX_MS = 60000;
 let shuttingDown = false;
 // Bounded, sanitized diagnostics; never expose API keys or complete raw payloads.
@@ -422,7 +401,7 @@ function mergeBatch(a: TickBatch, b: TickBatch): TickBatch {
 }
 
 function scheduleFlush(delayMs = DB_FLUSH_MS) {
-  if (!flushTimer && !shuttingDown) {
+  if (!flushTimer && !shuttingDown && !HISTORY_PAUSED && !(DB_PROBE_ONCE && dbProbeAttempted)) {
     flushTimer = setTimeout(() => { flushTimer = null; void flushDb(); }, delayMs);
   }
 }
@@ -463,52 +442,99 @@ function queueDbTick(t: Tick) {
     // Publish LIVE only after the tick has been fsynced to the WAL.
     liveCandleEngine.accept(t);
   } catch (e) { fatalQueueError(e); }
-  if (!SQLITE_MODE && !HISTORY_PAUSED) scheduleFlush();
+  scheduleFlush();
 }
 
 type DurableBatch = { id: string; batch: TickBatch };
 
-async function writeBatches(rows: DurableBatch[]): Promise<void> {
+async function writeBatches(rows: DurableBatch[]) {
   if (!rows.length) return;
-  const worker = ensureSqlWorker();
-  if (inFlight) throw new Error("HISTORY worker already has an in-flight SQL batch");
-  await new Promise<void>((resolve, reject) => {
-    const id = ++workerRequestId;
-    inFlight = { id, resolve, reject };
-    try { worker.postMessage({ type: "write", id, rows }); }
-    catch (error) { rejectInFlight(error instanceof Error ? error : new Error(String(error))); }
-  });
+  const params: unknown[] = [];
+  const values = rows.map(({ id, batch: b }) => {
+    const base = params.length;
+    params.push(id, crypto.randomUUID(), b.symbol, b.interval, new Date(b.bucket),
+      b.open, b.high, b.low, b.close, b.ticks, new Date(b.firstAt), new Date(b.lastAt));
+    const p = Array.from({ length: 12 }, (_, i) => `$${base + i + 1}`);
+    return `(${p.join(",")})`;
+  }).join(",");
+  // One atomic SQL statement: only previously unseen batch IDs may update candles.
+  // A timed-out but committed batch cannot be applied twice.
+  await prisma.$executeRawUnsafe(`
+    WITH incoming(batch_id, id, symbol, interval, bucket, open, high, low, close, ticks, first_at, last_at) AS
+      (VALUES ${values}),
+    accepted AS (
+      INSERT INTO public."MarketCandleBatchLedger" ("batchId")
+      SELECT batch_id::text FROM incoming
+      ON CONFLICT ("batchId") DO NOTHING
+      RETURNING "batchId"
+    )
+    INSERT INTO public."MarketCandle"
+      ("id","symbol","interval","bucket","open","high","low","close","ticks","firstAt","lastAt","createdAt","updatedAt")
+    SELECT i.id::text,i.symbol::text,i.interval::text,i.bucket::timestamptz,
+      i.open::float8,i.high::float8,i.low::float8,i.close::float8,i.ticks::integer,
+      i.first_at::timestamptz,i.last_at::timestamptz,NOW(),NOW()
+    FROM incoming i JOIN accepted a ON a."batchId" = i.batch_id::text
+    ON CONFLICT ("symbol","interval","bucket") DO UPDATE SET
+      "high"=GREATEST("MarketCandle"."high",EXCLUDED."high"),
+      "low"=LEAST("MarketCandle"."low",EXCLUDED."low"),
+      "open"=CASE WHEN "MarketCandle"."firstAt" IS NULL OR EXCLUDED."firstAt" < "MarketCandle"."firstAt"
+        THEN EXCLUDED."open" ELSE "MarketCandle"."open" END,
+      "close"=CASE WHEN "MarketCandle"."lastAt" IS NULL OR EXCLUDED."lastAt" >= "MarketCandle"."lastAt"
+        THEN EXCLUDED."close" ELSE "MarketCandle"."close" END,
+      "firstAt"=LEAST(COALESCE("MarketCandle"."firstAt", EXCLUDED."firstAt"), EXCLUDED."firstAt"),
+      "lastAt"=GREATEST(COALESCE("MarketCandle"."lastAt", EXCLUDED."lastAt"), EXCLUDED."lastAt"),
+      "ticks"="MarketCandle"."ticks"+EXCLUDED."ticks",
+      "updatedAt"=NOW()
+  `, ...params);
 }
 
 async function flushDb() {
-  if (SQLITE_MODE || HISTORY_PAUSED) return;
+  if (HISTORY_PAUSED || (DB_PROBE_ONCE && dbProbeAttempted)) return;
   if (dbWriting) return;
   dbWriting = true;
   const flushStarted = Date.now();
   dbFlushStartedAt = flushStarted;
+  let committedSinceCheckpoint = 0;
   try {
     // Retry immutable failed chunks first. Never merge them with fresh ticks.
-    const snapshot = [...pending.entries()];
-    pending.clear();
-    const newChunks: DurableBatch[][] = [];
-    const chunkRowsForThisFlush = adaptiveChunkRows;
-    for (let i = 0; i < snapshot.length; i += chunkRowsForThisFlush) {
-      newChunks.push(snapshot.slice(i, i + chunkRowsForThisFlush).map(([, batch]) => ({ id: crypto.randomUUID(), batch })));
+    // Drain durable legacy chunks before moving pending rows into new chunks.
+    // This avoids a large one-shot queue rewrite near the snapshot size guard.
+    // Keep only a bounded number of newly frozen rows per flush.
+    if (DB_PROBE_ONCE || retryChunks.length <= RECOVERY_RETRY_THRESHOLD) {
+      const limit = DB_PROBE_ONCE ? pending.size : Math.min(pending.size, RECOVERY_NEW_ROWS);
+      const snapshot: Array<[string, TickBatch]> = [];
+      for (const entry of pending.entries()) {
+        if (snapshot.length >= limit) break;
+        snapshot.push(entry);
+      }
+      for (const [key] of snapshot) pending.delete(key);
+      const chunkRowsForThisFlush = adaptiveChunkRows;
+      for (let i = 0; i < snapshot.length; i += chunkRowsForThisFlush)
+        retryChunks.push(snapshot.slice(i, i + chunkRowsForThisFlush).map(([, batch]) => ({ id: crypto.randomUUID(), batch })));
+      // Persist IDs before any SQL; on error stop rather than risk unprotected writes.
+      if (snapshot.length) try { saveQueue(); } catch (e) { fatalQueueError(e); }
     }
-    retryChunks.push(...newChunks);
-    // Stable batch IDs must reach disk before any SQL request.
-    try { saveQueue(); } catch (e) { fatalQueueError(e); }
-    // V4: bounded HISTORY pass; LIVE ingestion remains independent of SQL progress.
-    const decision = historyDrainPolicy({
-      queuedRows: retryChunks.reduce((total, chunk) => total + chunk.length, 0),
-      sqlFailures: consecutiveDbFailures,
-      lastSqlMs: lastDbSqlMs,
-      liveTickLagMs: lastProviderTickLagMs,
-      shuttingDown,
-    });
-    let chunksProcessed = 0;
-    while (retryChunks.length && chunksProcessed < decision.maxChunksPerPass) {
-      const part = retryChunks[0];
+    recoveryBatchesThisFlush = 0;
+    while (retryChunks.length) {
+      if (!DB_PROBE_ONCE && recoveryBatchesThisFlush >= RECOVERY_MAX_BATCHES) break;
+      if (DB_PROBE_ONCE && dbProbeAttempted) break;
+      // Never split or mutate immutable chunks. Only choose a recent chunk when
+      // it cannot overtake an older write to the same symbol/interval/bucket.
+      const selectedIndex = V4_HISTORY_PRIORITY
+        ? chooseNextChunk(retryChunks, Date.now(), V4_RECENT_WINDOW_MS, historyWritesSinceLive, V4_HISTORY_QUOTA)
+        : 0;
+      const part = retryChunks[selectedIndex];
+      if (DB_PROBE_ONCE) {
+        // Refuse oversized legacy chunks instead of modifying durable batch IDs.
+        if (part.length > DB_PROBE_MAX_ROWS) {
+          dbProbeAttempted = true;
+          console.error(`[MASTER PROBE] refused: chunk has ${part.length} rows; limit=${DB_PROBE_MAX_ROWS}; no SQL sent`);
+          break;
+        }
+        dbProbeAttempted = true; // before SQL, including on timeout/error
+        console.warn(`[MASTER PROBE] one SQL attempt: ${part.length} durable rows`);
+      }
+      const isPriorityLive = selectedIndex > 0;
       const started = Date.now();
       dbSqlStartedAt = started;
       dbSqlRowsInFlight = part.length;
@@ -519,15 +545,19 @@ async function flushDb() {
         maxDbSqlMs = Math.max(maxDbSqlMs, lastDbSqlMs);
         lastDbBatchRows = part.length;
         lastDbBatchAt = sqlFinished;
-        retryChunks.shift();
-        chunksProcessed++;
-        // SQL is committed. If we crash before checkpoint, ledger deduplicates replay.
-        const checkpointStarted = Date.now();
-        try { saveQueue(); } catch (e) { fatalQueueError(e); }
-        lastDbCheckpointMs = Date.now() - checkpointStarted;
+        retryChunks.splice(selectedIndex, 1);
+        if (isPriorityLive) { priorityLiveWrites++; historyWritesSinceLive = 0; }
+        else { historyWrites++; historyWritesSinceLive++; }
+        // SQL is committed. Defer the expensive full state.json fsync until the
+        // bounded group ends. If the process crashes first, replaying the older
+        // durable checkpoint is safe: the SQL ledger deduplicates batch IDs.
+        // Never change IDs or split existing retry chunks.
+        committedSinceCheckpoint++;
         lastDbWriteMs = Date.now() - started;
         lastDbSuccessAt = Date.now();
         successfulDbWrites++;
+        recoveryBatchesThisFlush++;
+        if (DB_PROBE_ONCE) dbProbeSucceeded = true;
         consecutiveDbFailures = 0;
         if (lastDbSqlMs > DB_SLOW_MS) {
           slowDbBatches++;
@@ -548,7 +578,7 @@ async function flushDb() {
         } else {
           consecutiveFastBatches = 0;
         }
-        if (lastDbSqlMs > 5000 || lastDbCheckpointMs > 1000)
+        if ((lastDbSqlMs ?? 0) > 5000 || (lastDbCheckpointMs ?? 0) > 1000)
           console.warn(`[MASTER] slow DB upsert: sql=${lastDbSqlMs}ms, checkpoint=${lastDbCheckpointMs}ms, total=${lastDbWriteMs}ms, rows=${part.length}, retryChunks=${retryChunks.length}, pending=${pending.size}`);
         // Yield between chunks during overload. Keep all remaining chunks durable.
         if (!shuttingDown && Date.now() - flushStarted >= DB_MAX_FLUSH_WORK_MS) break;
@@ -562,19 +592,147 @@ async function flushDb() {
       }
     }
   } finally {
+    // Exactly one full durable checkpoint per bounded group of committed SQL
+    // chunks, instead of one 60+ MiB rewrite per successful SQL statement.
+    // WAL fsync remains per accepted tick and is unchanged.
+    if (committedSinceCheckpoint > 0) {
+      const checkpointStarted = Date.now();
+      try { saveQueue(); } catch (e) { fatalQueueError(e); }
+      lastDbCheckpointMs = Date.now() - checkpointStarted;
+      recoveryCheckpointGroups++;
+      recoveryCheckpointSaved += committedSinceCheckpoint;
+    }
     dbWriting = false;
     dbSqlStartedAt = null;
     dbSqlRowsInFlight = 0;
     dbFlushStartedAt = null;
     if (pending.size || retryChunks.length) {
-      const decision = historyDrainPolicy({
-        queuedRows: pending.size + retryChunks.reduce((total, chunk) => total + chunk.length, 0),
-        sqlFailures: consecutiveDbFailures,
-        lastSqlMs: lastDbSqlMs,
-        liveTickLagMs: lastProviderTickLagMs,
-        shuttingDown,
-      });
-      scheduleFlush(Math.max(decision.delayMs, consecutiveDbFailures ? Math.min(DB_RETRY_MAX_MS, DB_FLUSH_MS) : 0));
+      const retryMs = consecutiveDbFailures
+        ? Math.min(DB_RETRY_MAX_MS, DB_FLUSH_MS * 2 ** Math.min(consecutiveDbFailures - 1, 3))
+        : (retryChunks.reduce((n, c) => n + c.length, 0) + pending.size >= DB_DRAIN_BACKLOG_ROWS ? DB_DRAIN_MS : DB_FLUSH_MS);
+      if (!consecutiveDbFailures && retryMs === DB_DRAIN_MS) drainSchedules++;
+      scheduleFlush(retryMs);
+    }
+  }
+}
+
+// Stage 4B: parallel SQL *lanes* (not separate processes).
+// The collector remains the only owner of the durable queue and checkpoint.
+// A chunk is never removed until its SQL transaction commits. In-flight chunks
+// stay in the checkpoint and retain the same batch IDs for crash replay.
+async function flushDbV4() {
+  if (HISTORY_PAUSED || DB_PROBE_ONCE) return; // probe always uses the single SQL lane
+  if (dbWriting) return;
+  dbWriting = true;
+  dbFlushStartedAt = Date.now();
+  const startedAt = Date.now();
+  const lockedKeys = new Set<string>();
+  const inFlight = new Set<DurableBatch[]>();
+  let failure = false;
+  try {
+    const snapshot = [...pending.entries()];
+    pending.clear();
+    const chunkSize = adaptiveChunkRows;
+    for (let i = 0; i < snapshot.length; i += chunkSize)
+      retryChunks.push(snapshot.slice(i, i + chunkSize).map(([, batch]) => ({ id: crypto.randomUUID(), batch })));
+    // Persist immutable IDs before starting either lane.
+    try { saveQueue(); } catch (e) { fatalQueueError(e); }
+
+    const rowKey = (row: DurableBatch) => batchKey(row.batch);
+    const recent = (chunk: DurableBatch[]) => chunk.some(row =>
+      row.batch.bucket >= Date.now() - V4_RECENT_WINDOW_MS);
+
+    function claim(lane: "live" | "history"): DurableBatch[] | null {
+      // Check every earlier chunk (including in-flight) to prevent a later
+      // batch for the same candle from overtaking an earlier one.
+      for (let i = 0; i < retryChunks.length; i++) {
+        const chunk = retryChunks[i];
+        if (inFlight.has(chunk)) continue;
+        if (recent(chunk) !== (lane === "live")) continue;
+        const keys = new Set(chunk.map(rowKey));
+        if ([...keys].some(key => lockedKeys.has(key))) { v4ConflictDeferrals++; continue; }
+        let overtakes = false;
+        for (let j = 0; j < i && !overtakes; j++) {
+          for (const row of retryChunks[j]) {
+            if (keys.has(rowKey(row))) { overtakes = true; break; }
+          }
+        }
+        if (overtakes) { v4ConflictDeferrals++; continue; }
+        inFlight.add(chunk);
+        for (const key of keys) lockedKeys.add(key);
+        if (lane === "live") v4LiveInFlight++;
+        else v4HistoryInFlight++;
+        return chunk;
+      }
+      return null;
+    }
+
+    async function laneLoop(lane: "live" | "history") {
+      while (!failure && Date.now() - startedAt < DB_MAX_FLUSH_WORK_MS) {
+        const chunk = claim(lane);
+        if (!chunk) return;
+        const keys = new Set(chunk.map(rowKey));
+        const started = Date.now();
+        try {
+          await writeBatches(chunk);
+          const duration = Date.now() - started;
+          lastDbSqlMs = duration;
+          maxDbSqlMs = Math.max(maxDbSqlMs, duration);
+          lastDbWriteMs = duration;
+          lastDbBatchRows = chunk.length;
+          lastDbBatchAt = Date.now();
+          lastDbSuccessAt = Date.now();
+          successfulDbWrites++;
+          consecutiveDbFailures = 0;
+          if (lane === "live") { v4LiveCommitted++; priorityLiveWrites++; }
+          else { v4HistoryCommitted++; historyWrites++; }
+          const idx = retryChunks.indexOf(chunk);
+          if (idx < 0) throw new Error("V4 durable chunk disappeared during SQL write");
+          retryChunks.splice(idx, 1);
+          // The SQL ledger makes a crash before this checkpoint idempotent.
+          const checkpointStarted = Date.now();
+          try { saveQueue(); } catch (e) { fatalQueueError(e); }
+          lastDbCheckpointMs = Date.now() - checkpointStarted;
+          if (duration > DB_SLOW_MS) {
+            slowDbBatches++;
+            consecutiveFastBatches = 0;
+            const smaller = Math.max(DB_MIN_CHUNK_ROWS, Math.floor(adaptiveChunkRows / 2));
+            if (smaller < adaptiveChunkRows) { adaptiveChunkRows = smaller; adaptiveReductions++; }
+          } else if (duration < DB_FAST_MS) {
+            consecutiveFastBatches++;
+            if (consecutiveFastBatches >= 12 && adaptiveChunkRows < DB_CHUNK_ROWS) {
+              adaptiveChunkRows = Math.min(DB_CHUNK_ROWS, adaptiveChunkRows + 4);
+              adaptiveIncreases++; consecutiveFastBatches = 0;
+            }
+          } else consecutiveFastBatches = 0;
+        } catch (e: any) {
+          failure = true;
+          v4WriterErrors++;
+          failedDbWrites++;
+          consecutiveDbFailures++;
+          lastDbFailureAt = Date.now();
+          console.error(`[MASTER V4] ${lane} SQL failed; durable chunk retained (${chunk.length} rows)`, e?.message || e);
+        } finally {
+          inFlight.delete(chunk);
+          for (const key of keys) lockedKeys.delete(key);
+          if (lane === "live") v4LiveInFlight--;
+          else v4HistoryInFlight--;
+        }
+      }
+    }
+    await Promise.all([laneLoop("live"), laneLoop("history")]);
+  } finally {
+    dbWriting = false;
+    dbFlushStartedAt = null;
+    dbSqlStartedAt = null;
+    dbSqlRowsInFlight = 0;
+    if (pending.size || retryChunks.length) {
+      const remaining = pending.size + retryChunks.reduce((n, c) => n + c.length, 0);
+      const delay = failure || consecutiveDbFailures
+        ? Math.min(DB_RETRY_MAX_MS, DB_FLUSH_MS * 2 ** Math.min(Math.max(consecutiveDbFailures - 1, 0), 3))
+        : remaining >= DB_DRAIN_BACKLOG_ROWS ? DB_DRAIN_MS : DB_FLUSH_MS;
+      if (!failure && delay === DB_DRAIN_MS) drainSchedules++;
+      scheduleFlush(delay);
     }
   }
 }
@@ -606,57 +764,18 @@ socket.on("rates",(raw:any)=>{ try {
     if(timestamp === null){ invalidTimestampsRejected++; continue; }
     observeProviderPrice(timestamp);
     if(timestamp > Date.now() + MAX_FUTURE_TICK_MS){ futureTimestampsRejected++; continue; }
+    // Fresh-start guard: ignore historical/replayed provider ticks from before this process started.
+    if (FRESH_START && timestamp < FRESH_START_AT) { staleTicksRejected++; continue; }
     const last=lastAcceptedTimestamp.get(symbol);
     if(last !== undefined && timestamp < last){ staleTicksRejected++; staleTicksBySymbol.set(symbol, (staleTicksBySymbol.get(symbol) || 0) + 1); continue; }
     const tick={symbol,price,timestamp};
-    if (SQLITE_MODE) {
-      if (shuttingDown || sqliteError) return;
-      // Acknowledge/publish only after SQLite transaction commits. Serialize provider
-      // events to preserve ordering, and never create new legacy SQL retry chunks.
-      if (sqliteQueued >= SQLITE_MAX_WAITING) {
-        sqliteError = "SQLite input backlog exceeded safe bound";
-        console.error("[MASTER]", sqliteError);
-        socket.disconnect();
-        shuttingDown = true;
-        process.exitCode = 1;
-        return;
-      }
-      sqliteQueued++;
-      sqliteSerial = sqliteSerial.then(async () => {
-        try {
-          if (sqliteError) return;
-          const prev = lastAcceptedTimestamp.get(symbol);
-          if (prev !== undefined && timestamp < prev) return;
-          // fsync before committing/publishing; stable identity makes replay idempotent.
-          const durableTick = historyIntake.append(tick);
-          await historyBridge.ticks([durableTick]);
-          lastAcceptedTimestamp.set(symbol,timestamp);
-          latestTicks[symbol]=tick;
-          liveCandleEngine.accept(tick);
-          recordAcceptedTick(tick);
-          broadcastTick(tick);
-          sqliteAccepted++;
-          sqliteLastCommittedAt = Date.now();
-        } finally {
-          sqliteQueued--;
-          if (!sqliteError && sqliteQueued === 0 && historyIntake.bytes >= historyIntake.rotateBytes) historyIntake.checkpoint();
-        }
-      }).catch((error: unknown) => {
-        sqliteError = error instanceof Error ? error.message : String(error);
-        console.error("[MASTER] SQLite commit failed; stopping stream without publishing uncommitted ticks", sqliteError);
-        socket.disconnect();
-        // A failed history write must not silently resume on reconnection.
-        shuttingDown = true;
-        process.exitCode = 1;
-      });
-    } else {
-      // Legacy mode remains unchanged until migration is explicitly enabled.
-      queueDbTick(tick);
-      lastAcceptedTimestamp.set(symbol,timestamp);
-      latestTicks[symbol]=tick;
-      recordAcceptedTick(tick);
-      broadcastTick(tick);
-    }
+    // Durability first: do not expose or acknowledge a tick before WAL fsync.
+    // queueDbTick stops the process if the durable write fails.
+    queueDbTick(tick);
+    lastAcceptedTimestamp.set(symbol,timestamp);
+    latestTicks[symbol]=tick;
+    recordAcceptedTick(tick);
+    broadcastTick(tick);
   }
 } catch(e){console.error("[MASTER] parse",e);} });
 // Count event names only, not raw payloads (which might contain credentials).
@@ -699,26 +818,35 @@ const server=http.createServer((req,res)=>{
   const origin=req.headers.origin||"*"; res.setHeader("Access-Control-Allow-Origin",origin);res.setHeader("Vary","Origin");res.setHeader("Access-Control-Allow-Methods","GET, OPTIONS");res.setHeader("Access-Control-Allow-Headers","Content-Type");
   if(req.method==="OPTIONS"){res.writeHead(204);res.end();return;}
   const url=new URL(req.url||"/",`http://${req.headers.host||"localhost"}`);
-  if (url.pathname === "/api/market/history") {
-    if (!SQLITE_MODE || !sqliteReady) { res.writeHead(503,{"Content-Type":"application/json"});res.end(JSON.stringify({ok:false,error:"SQLite history not enabled"}));return; }
+  // V4: independent, read-only LIVE OHLC view. Never mutates WAL or retry chunks.
+  // Read-only durable tail: bridge SQL backlog to the chart without mutating WAL,
+  // retry IDs, pending batches or the checkpoint. No synthetic candles.
+  if(url.pathname==="/api/market/durable-candles") {
     const secret=process.env.OHLC_LIVE_READ_TOKEN;
-    if (secret && req.headers["x-ohlc-live-token"] !== secret) {res.writeHead(401);res.end();return;}
+    if(secret && req.headers["x-ohlc-live-token"]!==secret){res.writeHead(401);res.end();return;}
     const symbol=normalizeMarketSymbol(url.searchParams.get("symbol")||"");
     const interval=url.searchParams.get("interval")||"1min";
-    const limit=Math.min(2000,Math.max(1,Number(url.searchParams.get("limit")||500)));
-    const before=Number(url.searchParams.get("before")||Date.now());
-    if (!PROVIDER_SET.has(symbol) || !frames.some(f=>f[0]===interval) || !Number.isSafeInteger(before) || !Number.isFinite(limit)) {
-      res.writeHead(400,{"Content-Type":"application/json"});res.end(JSON.stringify({ok:false,error:"Invalid history query"}));return;
-    }
-    void historyBridge.read(symbol,interval,limit,before).then((result:any)=>{
-      res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});
-      res.end(JSON.stringify({ok:true,source:"collector-sqlite",symbol,interval,candles:result.rows}));
-    }).catch((error:unknown)=>{
-      res.writeHead(503,{"Content-Type":"application/json"});res.end(JSON.stringify({ok:false,error:"History temporarily unavailable"}));
-      console.error("[MASTER] SQLite history read",error);
-    });return;
+    const frame=frames.find(f=>f[0]===interval);
+    if(!PROVIDER_SET.has(symbol)||!frame){res.writeHead(400,{"Content-Type":"application/json"});res.end(JSON.stringify({status:"error",message:"Invalid symbol or interval"}));return;}
+    const requested=Number(url.searchParams.get("limit")||"300");
+    const limit=Math.max(1,Math.min(2000,Number.isFinite(requested)?Math.floor(requested):300));
+    // A recent-window filter keeps this endpoint bounded in response size.
+    const cutoff=Date.now()-Math.min(7*86_400_000,Math.max(6*3_600_000,limit*frame[1]*2));
+    const merged=new Map<number,TickBatch>();
+    const accept=(b:TickBatch)=>{
+      if(b.symbol!==symbol||b.interval!==interval||b.bucket<cutoff)return;
+      const old=merged.get(b.bucket);
+      merged.set(b.bucket,old?mergeBatch(old,b):b);
+    };
+    for(const b of pending.values())accept(b);
+    for(const chunk of retryChunks)for(const row of chunk)accept(row.batch);
+    const values=[...merged.values()].sort((a,b)=>a.bucket-b.bucket).slice(-limit).map(b=>({
+      datetime:new Date(b.bucket).toISOString().replace("T"," ").slice(0,19),
+      open:String(b.open),high:String(b.high),low:String(b.low),close:String(b.close),volume:String(b.ticks),
+    }));
+    res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});
+    res.end(JSON.stringify({status:"ok",source:"collector-durable-queue",symbol,interval,count:values.length,values}));return;
   }
-  // V4: independent, read-only LIVE OHLC view. Never mutates WAL or retry chunks.
   if(url.pathname==="/api/market/live-candles") {
     const secret=process.env.OHLC_LIVE_READ_TOKEN;
     if(secret && req.headers["x-ohlc-live-token"]!==secret){res.writeHead(401);res.end();return;}
@@ -739,77 +867,53 @@ const server=http.createServer((req,res)=>{
         close:String(live.close),volume:String(live.ticks),firstAt:live.firstAt,lastAt:live.lastAt}:null}));return;
   }
   if(url.pathname==="/health/quick") {
-    res.writeHead(SQLITE_MODE && (!sqliteReady || sqliteError) ? 503 : 200,{"Content-Type":"application/json","Cache-Control":"no-store"});
-    res.end(JSON.stringify({ok:!sqliteError,connected:liveRatesConnected,historyStorage:HISTORY_STORAGE,historyPaused:HISTORY_PAUSED,sqliteReady,sqliteQueued,sqliteAccepted,sqliteLastCommittedAt,sqliteError,dbWriting,
-      pendingRows:pending.size,retryChunks:retryChunks.length,liveCandles:liveCandleEngine.size,
+    res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});
+    res.end(JSON.stringify({ok:true,buildTag:"fx-fresh-start-v1-20261106",freshStart:FRESH_START,freshStartAt:FRESH_START?FRESH_START_AT:null,connected:liveRatesConnected,historyPaused:HISTORY_PAUSED,dbProbeOnce:DB_PROBE_ONCE,dbProbeAttempted,dbProbeSucceeded,dbWriting,
+      pendingRows:pending.size,retryChunks:retryChunks.length,recoveryMaxBatches:RECOVERY_MAX_BATCHES,recoveryNewRows:RECOVERY_NEW_ROWS,recoveryCheckpointGroups,recoveryCheckpointSaved,dbDrainMs:DB_DRAIN_MS,dbRetryRows:retryChunks.reduce((n,c)=>n+c.length,0),dbBacklogRows:pending.size+retryChunks.reduce((n,c)=>n+c.length,0),liveCandles:liveCandleEngine.size,
       successfulDbWrites,failedDbWrites,lastDbSqlMs,lastDbSuccessAt,
       walBytes,walSequence,walRecoveredTicks,lastWalSyncMs,
       checkpointAt:queueCheckpointAt,checkpointBytes:queueCheckpointBytes}));return;
   }
-  if(url.pathname==="/health"){res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});res.end(JSON.stringify({ok:true,mode:"MASTER_150",connected:liveRatesConnected,configured:PROVIDER_INSTRUMENTS.length,providerSubscriptions:providerSubscriptions(),forexSlashSubscriptions,diagnostics:{rawEventCounts:Object.fromEntries(rawEventCounts),rawSymbolCounts:Object.fromEntries(rawSymbolCounts),rawMessageShapes:Object.fromEntries(rawMessageShapes),lastRateAt,lastConnectAt,lastDisconnectAt},clients:totalClients(),receivedSymbols:Object.keys(latestTicks).length,latestTicks,dbWriting,dbPending:[...new Set([...pending.values()].map(b=>b.symbol))],dbPendingRows:pending.size,dbRetryRows:retryChunks.reduce((n,c)=>n+c.length,0),durableQueue:{directory:QUEUE_DIR,checkpointAt:queueCheckpointAt,checkpointBytes:queueCheckpointBytes,lastCheckpointMs:lastQueueCheckpointMs,maxCheckpointMs:maxQueueCheckpointMs,slowCheckpoints:slowQueueCheckpoints,recoveredRows:queueRecoveredRows,walBytes,walSequence,walRecoveredTicks,lastWalSyncMs,fatalError:queueFatalError},dbMetrics:{version:"2.2-diagnostics",dbSqlStartedAt,dbSqlAgeMs:dbSqlStartedAt===null?null:Date.now()-dbSqlStartedAt,dbSqlRowsInFlight,dbFlushStartedAt,dbFlushAgeMs:dbFlushStartedAt===null?null:Date.now()-dbFlushStartedAt,flushMs:DB_FLUSH_MS,chunkRows:DB_CHUNK_ROWS,adaptiveChunkRows,slowDbBatches,adaptiveReductions,adaptiveIncreases,successfulDbWrites,failedDbWrites,consecutiveDbFailures,lastDbWriteMs,lastDbSqlMs,lastDbCheckpointMs,maxDbSqlMs,lastDbBatchRows,lastDbBatchAt,lastDbSuccessAt,lastDbFailureAt,shutdownFlushFailed},ingestionDiagnostics:ingestionDiagnostics(),ohlcMetrics:{staleTicksRejected,staleTicksBySymbol:Object.fromEntries(staleTicksBySymbol),acceptedTicksBySymbol:Object.fromEntries(acceptedTicksBySymbol),invalidTimestampsRejected,futureTimestampsRejected,invalidPricesRejected,activeCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)>Date.now()).length,closedPendingCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)<=Date.now()).length},providerInfo:providerInfo||null,providerError:providerError||null,failedDbWrites,receivedCount:Object.fromEntries(receivedCount),unrecognizedSymbols:Object.fromEntries(unrecognizedSymbols),missingConfiguredSymbols:PROVIDER_INSTRUMENTS.filter(s=>!latestTicks[s])}));return;}
+  if(url.pathname==="/health"){res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});res.end(JSON.stringify({ok:true,mode:"MASTER_150",freshStart:FRESH_START,freshStartAt:FRESH_START?FRESH_START_AT:null,connected:liveRatesConnected,historyPaused:HISTORY_PAUSED,configured:PROVIDER_INSTRUMENTS.length,providerSubscriptions:providerSubscriptions(),forexSlashSubscriptions,diagnostics:{rawEventCounts:Object.fromEntries(rawEventCounts),rawSymbolCounts:Object.fromEntries(rawSymbolCounts),rawMessageShapes:Object.fromEntries(rawMessageShapes),lastRateAt,lastConnectAt,lastDisconnectAt},clients:totalClients(),receivedSymbols:Object.keys(latestTicks).length,latestTicks,dbWriting,dbPending:[...new Set([...pending.values()].map(b=>b.symbol))],dbPendingRows:pending.size,dbRetryRows:retryChunks.reduce((n,c)=>n+c.length,0),durableQueue:{directory:QUEUE_DIR,checkpointAt:queueCheckpointAt,checkpointBytes:queueCheckpointBytes,lastCheckpointMs:lastQueueCheckpointMs,maxCheckpointMs:maxQueueCheckpointMs,slowCheckpoints:slowQueueCheckpoints,recoveredRows:queueRecoveredRows,walBytes,walSequence,walRecoveredTicks,lastWalSyncMs,fatalError:queueFatalError},dbMetrics:{version:"4.0-priority-preview",v4HistoryPriority:V4_HISTORY_PRIORITY,v4DualWriter:V4_DUAL_WRITER,historyPaused:HISTORY_PAUSED,dbProbeOnce:DB_PROBE_ONCE,dbProbeAttempted,dbProbeSucceeded,v4LiveInFlight,v4HistoryInFlight,v4LiveCommitted,v4HistoryCommitted,v4ConflictDeferrals,v4WriterErrors,dbDrainMs:DB_DRAIN_MS,dbDrainBacklogRows:DB_DRAIN_BACKLOG_ROWS,drainSchedules,recoveryCheckpointGroups,recoveryCheckpointSaved,v4RecentWindowMs:V4_RECENT_WINDOW_MS,v4HistoryQuota:V4_HISTORY_QUOTA,priorityLiveWrites,historyWrites,dbSqlStartedAt,dbSqlAgeMs:dbSqlStartedAt===null?null:Date.now()-dbSqlStartedAt,dbSqlRowsInFlight,dbFlushStartedAt,dbFlushAgeMs:dbFlushStartedAt===null?null:Date.now()-dbFlushStartedAt,flushMs:DB_FLUSH_MS,chunkRows:DB_CHUNK_ROWS,adaptiveChunkRows,slowDbBatches,adaptiveReductions,adaptiveIncreases,successfulDbWrites,failedDbWrites,consecutiveDbFailures,lastDbWriteMs,lastDbSqlMs,lastDbCheckpointMs,maxDbSqlMs,lastDbBatchRows,lastDbBatchAt,lastDbSuccessAt,lastDbFailureAt,shutdownFlushFailed},ingestionDiagnostics:ingestionDiagnostics(),ohlcMetrics:{staleTicksRejected,staleTicksBySymbol:Object.fromEntries(staleTicksBySymbol),acceptedTicksBySymbol:Object.fromEntries(acceptedTicksBySymbol),invalidTimestampsRejected,futureTimestampsRejected,invalidPricesRejected,activeCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)>Date.now()).length,closedPendingCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)<=Date.now()).length},providerInfo:providerInfo||null,providerError:providerError||null,failedDbWrites,receivedCount:Object.fromEntries(receivedCount),unrecognizedSymbols:Object.fromEntries(unrecognizedSymbols),missingConfiguredSymbols:PROVIDER_INSTRUMENTS.filter(s=>!latestTicks[s])}));return;}
   const m=url.pathname.match(/^\/api\/(?:market\/)?([a-z0-9]+)\/stream$/i);
   if(m){ const symbol=normalizeMarketSymbol(m[1]); if(!PROVIDER_SET.has(symbol)){res.writeHead(404,{"Content-Type":"application/json"});res.end(JSON.stringify({ok:false,error:"Unknown symbol"}));return;} res.writeHead(200,{"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache, no-transform",Connection:"keep-alive","X-Accel-Buffering":"no","Access-Control-Allow-Origin":origin,Vary:"Origin"});res.write("retry: 3000\n\n");res.write(`event: status\ndata: ${JSON.stringify({provider:"live-rates",connected:liveRatesConnected,symbol,mode:"MASTER_150"})}\n\n`);if(latestTicks[symbol])res.write(`event: tick\ndata: ${JSON.stringify(latestTicks[symbol])}\n\n`);const set=clientSet(symbol);set.add(res);const keep=setInterval(()=>{try{res.write(`: keepalive ${Date.now()}\n\n`);}catch{}},15000);req.on("close",()=>{clearInterval(keep);set.delete(res);});return; }
   res.writeHead(200,{"Content-Type":"application/json"});res.end(JSON.stringify({ok:true,service:"FX Trade Master Market Collector",mode:"MASTER_150",configured:PROVIDER_INSTRUMENTS.length,health:"/health",streamPattern:"/api/market/{symbol}/stream"}));
 });
 // Fail startup if the persistent volume is absent, read-only, or contains invalid data.
-// SQLite mode does not read, modify, truncate, or replay the old /data/ohlc-queue.
-if (!SQLITE_MODE) {
-  try { recoverQueue(); } catch (e) { fatalQueueError(e); }
-}
-void initHistory().then(() => server.listen(PORT,"0.0.0.0",()=>{
-  console.log(`[MASTER] HTTP/SSE :${PORT}; OHLC flush=${DB_FLUSH_MS}ms; chunk max=${DB_CHUNK_ROWS}`);
-  if (!SQLITE_MODE && !HISTORY_PAUSED && (pending.size || retryChunks.length)) scheduleFlush(1000);
+try { recoverQueue(); } catch (e) { fatalQueueError(e); }
+server.listen(PORT,"0.0.0.0",()=>{
+  console.log(`[MASTER] build=fx-fresh-start-v1-20261106; HTTP/SSE :${PORT}; OHLC flush=${DB_FLUSH_MS}ms; chunk max=${DB_CHUNK_ROWS}`);
+  if (HISTORY_PAUSED) console.warn("[MASTER] HISTORY_PAUSED=true: SQL writes disabled; WAL and LIVE remain active");
+  else if (DB_PROBE_ONCE) console.warn("[MASTER PROBE] one durable chunk (max 64 rows) then SQL stops until restart");
+  if (!HISTORY_PAUSED && !DB_PROBE_ONCE) console.warn(`[MASTER RECOVERY] bounded SQL drain enabled; maxBatches=${RECOVERY_MAX_BATCHES}; newRows=${RECOVERY_NEW_ROWS}; dualWriter=${V4_DUAL_WRITER}`);
+  if (FRESH_START) console.warn(`[MASTER FRESH START] new queue=${QUEUE_DIR}; start=${new Date(FRESH_START_AT).toISOString()}; old queue preserved`);
+  if (pending.size || retryChunks.length) scheduleFlush(1000);
   socket.connect();
-})).catch(error => { console.error("[MASTER] History initialization failed", error); process.exit(1); });
+});
 async function shutdown(signal:string){
+  console.log(`[MASTER] ${signal}: stopping new ticks and flushing pending candles`);
   if (shuttingDown) return;
-  console.log(`[MASTER] ${signal}: stopping LIVE; preserving durable OHLC queue`);
-  shuttingDown = true;
-  if (providerReconnectTimer) { clearTimeout(providerReconnectTimer); providerReconnectTimer = null; }
+  shuttingDown=true;
+  if (providerReconnectTimer) { clearTimeout(providerReconnectTimer); providerReconnectTimer=null; }
   clearInterval(providerReconnectWatchdog);
   socket.removeAllListeners("rates");
   socket.disconnect();
-  if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
-
-  // A durable checkpoint includes all pending and retry rows, even if SQL is in flight.
-  // Never remove an in-flight retry chunk unless the worker confirmed SQL commit.
-  try { if (!SQLITE_MODE) saveQueue(); }
-  catch (error) {
-    shutdownFlushFailed = true;
-    console.error("[MASTER] shutdown checkpoint failed", error);
+  if(flushTimer){clearTimeout(flushTimer);flushTimer=null;}
+  // An in-flight flush must finish before a final snapshot is taken.
+  const waitUntil=Date.now()+20_000;
+  while(dbWriting && Date.now()<waitUntil) await new Promise(r=>setTimeout(r,100));
+  if(dbWriting){shutdownFlushFailed=true;console.error("[MASTER] shutdown: DB write still in progress");}
+  else {
+    // Flush pending batches once; any failures remain durable on the mounted volume.
+    if (!HISTORY_PAUSED && !DB_PROBE_ONCE)
+      await flushDb();
+    else
+      console.log("[MASTER] shutdown: SQL disabled by pause/probe guard; preserving durable queue");
+    if(!HISTORY_PAUSED && !DB_PROBE_ONCE && (pending.size || retryChunks.length)){shutdownFlushFailed=true;console.error(`[MASTER] shutdown: ${pending.size} pending candles, ${retryChunks.length} retry chunks`);}
   }
-
-  // Give an existing SQL write a bounded chance to finish. Do not initiate a new
-  // database request during shutdown: Railway may terminate the process mid-query.
-  const waitUntil = Date.now() + 20_000;
-  while (dbWriting && Date.now() < waitUntil)
-    await new Promise(resolve => setTimeout(resolve, 100));
-  if (dbWriting) {
-    shutdownFlushFailed = true;
-    console.error("[MASTER] SQL still in flight; durable retry chunk retained for ledger-safe replay");
-  }
-
-  // If a commit completed while waiting, persist the updated retry queue again.
-  try { if (!SQLITE_MODE) saveQueue(); }
-  catch (error) {
-    shutdownFlushFailed = true;
-    console.error("[MASTER] final shutdown checkpoint failed", error);
-  }
-  if (!SQLITE_MODE && (pending.size || retryChunks.length)) {
-    console.warn(`[MASTER] ${pending.size} pending candles and ${retryChunks.length} retry chunks remain durable for restart`);
-  }
-
-  if (SQLITE_MODE) {
-    await sqliteSerial;
-    if (historyBridge) try { await historyBridge.close(); } catch (error) { shutdownFlushFailed = true; console.error("[MASTER] SQLite shutdown failed", error); }
-    if (historyIntake) try { historyIntake.close(); } catch (error) { shutdownFlushFailed = true; console.error("[MASTER] SQLite intake close failed", error); }
-  }
-  for (const set of clientsBySymbol.values()) for (const c of set) try { c.end(); } catch {}
-  await new Promise<void>(resolve => server.close(() => resolve()));
-  // Only terminate an idle worker. An unfinished write is left to process shutdown;
-  // its durable retry ID is intentionally preserved for idempotent replay.
-  if (!dbWriting && sqlWorker) await sqlWorker.terminate();
-  process.exit(shutdownFlushFailed ? 1 : 0);
+  for(const set of clientsBySymbol.values())for(const c of set)try{c.end();}catch{}
+  await new Promise<void>(r=>server.close(()=>r()));
+  await prisma.$disconnect();
+  process.exit(shutdownFlushFailed?1:0);
 }
-
 process.on("SIGINT",()=>void shutdown("SIGINT"));process.on("SIGTERM",()=>void shutdown("SIGTERM"));
