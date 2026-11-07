@@ -2650,6 +2650,8 @@ export default function MarketScannerPage() {
   const [oscillatorMenuPosition, setOscillatorMenuPosition] = React.useState({ top: 90, left: 24 });
   const [oscillatorTab, setOscillatorTab] = React.useState<"all" | "active" | "favorites">("all");
   const [activeOscillators, setActiveOscillators] = React.useState<OscillatorName[]>([]);
+  const [oscillatorCrosshairTime, setOscillatorCrosshairTime] = React.useState<number|null>(null);
+  const [oscillatorExternalTime, setOscillatorExternalTime] = React.useState<number|null>(null);
   const [oscillatorLogicalRange, setOscillatorLogicalRange] = React.useState<{ from: number; to: number } | null>(null);
   const [favoriteOscillators, setFavoriteOscillators] = React.useState<OscillatorName[]>(["RSI", "MACD", "Stochastic"]);
   React.useEffect(() => {
@@ -5504,6 +5506,8 @@ if (closedNow.length) {
                   supertrendDownColor={supertrendSettings.downColor}
                   patternsEnabled={patternsEnabled}
                   onVisibleLogicalRangeChange={setOscillatorLogicalRange}
+                  onCrosshairTimeChange={setOscillatorCrosshairTime}
+                  externalCrosshairTime={oscillatorExternalTime}
                 />
                 <OscillatorPanels candles={(() => {
                   // Same live candle that MarketChart receives: replace the current bucket,
@@ -5515,7 +5519,7 @@ if (closedNow.length) {
                     else if (!last || Number(liveCandle.time) > Number(last.time)) bars.push(liveCandle);
                   }
                   return bars;
-                })() as any} active={activeOscillators} visibleLogicalRange={oscillatorLogicalRange} onRemove={n => setActiveOscillators(p => p.filter(x => x !== n))} />
+                })() as any} active={activeOscillators} visibleLogicalRange={oscillatorLogicalRange} crosshairTime={oscillatorExternalTime??oscillatorCrosshairTime} onCrosshairTimeChange={t=>{setOscillatorExternalTime(t);setOscillatorCrosshairTime(t);}} onRemove={n => setActiveOscillators(p => p.filter(x => x !== n))} />
               </div>
 
               <div className={cn("mt-1 w-full min-w-0 lg:hidden", landscapeFullscreen && "hidden")}>

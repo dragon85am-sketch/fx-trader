@@ -118,6 +118,7 @@ type Props = {
   analysisLines?: AnalysisLine[];
   onVisibleTimeRangeChange?: (range: { from: number; to: number } | null) => void;
   onCrosshairTimeChange?: (time: number | null) => void;
+  externalCrosshairTime?: number | null;
   onVisibleLogicalRangeChange?: (range: { from: number; to: number } | null) => void;
 };
 
@@ -1085,7 +1086,11 @@ supertrendDownColor = "#ef4444",
 patternsEnabled = false,
 fullscreenMode = false,
 onVisibleLogicalRangeChange,
+onCrosshairTimeChange,
+externalCrosshairTime,
 }: Props) {
+  const onCrosshairTimeChangeRef = React.useRef(onCrosshairTimeChange);
+  onCrosshairTimeChangeRef.current = onCrosshairTimeChange;
   const onVisibleLogicalRangeChangeRef = React.useRef(onVisibleLogicalRangeChange);
   onVisibleLogicalRangeChangeRef.current = onVisibleLogicalRangeChange;
   const containerRef = React.useRef<HTMLDivElement | null>(null);
@@ -1297,9 +1302,15 @@ onVisibleLogicalRangeChange,
     alphaCrosshairRafRef.current = requestAnimationFrame(() => {
       alphaCrosshairRafRef.current = null;
       const value = pendingAlphaCrosshairRef.current;
-      if (value) setAlphaCrosshair(value);
+      if (value) { setAlphaCrosshair(value); onCrosshairTimeChangeRef.current?.(value.time); }
     });
   }, []);
+  React.useEffect(()=>{
+    if(externalCrosshairTime==null)return;
+    const chart=chartRef.current,series=candleSeriesRef.current;
+    if(!chart||!series)return;
+    try{const bars=displayCacheRef.current??[];const closest=bars.reduce((best:any,c:any)=>Math.abs(Number(c.time)-externalCrosshairTime)<Math.abs(Number(best?.time??Infinity)-externalCrosshairTime)?c:best,null as any);if(closest)(chart as any).setCrosshairPosition(closest.close,closest.time,series);}catch{}
+  },[externalCrosshairTime]);
   const lastIndicatorLiveUpdateRef = React.useRef(0);
   const rightOffset = rightPadOn ? 28 : 10;
 
