@@ -113,7 +113,16 @@ export function OscillatorPanels({candles,active,onRemove,visibleLogicalRange,ch
     {candles.length<35?<p className="p-4 text-xs text-slate-400">Oczekiwanie na historię świec (minimum 35)...</p>:<svg onMouseMove={e=>{const rect=e.currentTarget.getBoundingClientRect();const ratio=(e.clientX-rect.left)/(rect.width*plotFraction);const idx=Math.round(range.from+ratio*(range.to-range.from));const t=(candles[idx] as any)?.time;if(t!=null)onCrosshairTimeChange?.(Number(t));}} onMouseLeave={()=>onCrosshairTimeChange?.(null)} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="block h-[100px] w-full" role="img" aria-label={`Wykres ${name}`}>
       <defs><clipPath id={`fx-osc-clip-${OSCILLATORS.indexOf(name)}`}><rect x="0" y="0" width={width} height={height}/></clipPath></defs>
       {[0.25,0.5,0.75].map(v=><line key={v} x1="0" x2={width} y1={height*v} y2={height*v} stroke="#25334a" strokeDasharray="3 5"/>)}
-      {config.showLevels!==false&&levels.map((v,i)=><line key={`${v}-${i}`} x1="0" x2={width} y1={y(v)} y2={y(v)} stroke={config.levelColor||"#64748b"} strokeWidth={Math.max(1,Math.min(5,Number(config.levelWidth)||1))} strokeDasharray={config.levelStyle==="solid"?undefined:config.levelStyle==="dotted"?"1 5":"6 5"} vectorEffect="non-scaling-stroke" opacity=".8"/>)}
+      {config.showLevels!==false&&levels.map((v,i)=>{
+        const levelY=y(v);
+        const label=Number.isInteger(v)?String(v):String(Number(v.toFixed(4)));
+        const labelWidth=Math.max(30,label.length*7+12);
+        return <g key={`${v}-${i}`}>
+          <line x1="0" x2={width} y1={levelY} y2={levelY} stroke={config.levelColor||"#64748b"} strokeWidth={Math.max(1,Math.min(5,Number(config.levelWidth)||1))} strokeDasharray={config.levelStyle==="solid"?undefined:config.levelStyle==="dotted"?"1 5":"6 5"} vectorEffect="non-scaling-stroke" opacity=".8"/>
+          <rect x={width-labelWidth-5} y={Math.max(1,Math.min(height-19,levelY-9))} width={labelWidth} height="18" rx="4" fill="#0b1e34" stroke={config.levelColor||"#64748b"} strokeOpacity=".65" pointerEvents="none"/>
+          <text x={width-11} y={Math.max(1,Math.min(height-19,levelY-9))+12.5} fill="#e2e8f0" fontSize="12" fontWeight="600" textAnchor="end" pointerEvents="none">{label}</text>
+        </g>;
+      })}
       <g clipPath={`url(#fx-osc-clip-${OSCILLATORS.indexOf(name)})`}>
       {calc.lines.map((series,i)=>i===calc.histogram?series.map((v,j)=>Number.isFinite(v)?<line key={j} x1={x(j)} x2={x(j)} y1={y(0)} y2={y(v)} stroke={v>=0?'#34d399':'#fb7185'} strokeWidth={config.histogramWidth||2}/>:null):<path key={i} d={line(series)} fill="none" stroke={i===0&&config.color?config.color:i===1&&config.signalColor?config.signalColor:calc.colors[i]} strokeWidth={i===1?config.signalWidth||2:config.lineWidth||2} vectorEffect="non-scaling-stroke"/>)}
       </g>
