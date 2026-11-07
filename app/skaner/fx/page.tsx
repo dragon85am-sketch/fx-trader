@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import type { DrawTool } from "@/components/DrawingsLayer";
 import React from "react";
@@ -2650,6 +2650,7 @@ export default function MarketScannerPage() {
   const [oscillatorMenuPosition, setOscillatorMenuPosition] = React.useState({ top: 90, left: 24 });
   const [oscillatorTab, setOscillatorTab] = React.useState<"all" | "active" | "favorites">("all");
   const [activeOscillators, setActiveOscillators] = React.useState<OscillatorName[]>([]);
+  const [oscillatorLogicalRange, setOscillatorLogicalRange] = React.useState<{ from: number; to: number } | null>(null);
   const [favoriteOscillators, setFavoriteOscillators] = React.useState<OscillatorName[]>(["RSI", "MACD", "Stochastic"]);
   React.useEffect(() => {
     try {
@@ -5502,8 +5503,19 @@ if (closedNow.length) {
                   supertrendUpColor={supertrendSettings.upColor}
                   supertrendDownColor={supertrendSettings.downColor}
                   patternsEnabled={patternsEnabled}
+                  onVisibleLogicalRangeChange={setOscillatorLogicalRange}
                 />
-                <OscillatorPanels candles={selectedCandles as any} active={activeOscillators} onRemove={n => setActiveOscillators(p => p.filter(x => x !== n))} />
+                <OscillatorPanels candles={(() => {
+                  // Same live candle that MarketChart receives: replace the current bucket,
+                  // never append a synthetic bar or use a timer-driven price.
+                  const bars = [...selectedCandles];
+                  if (liveCandle) {
+                    const last = bars[bars.length - 1];
+                    if (last && Number(last.time) === Number(liveCandle.time)) bars[bars.length - 1] = liveCandle;
+                    else if (!last || Number(liveCandle.time) > Number(last.time)) bars.push(liveCandle);
+                  }
+                  return bars;
+                })() as any} active={activeOscillators} visibleLogicalRange={oscillatorLogicalRange} onRemove={n => setActiveOscillators(p => p.filter(x => x !== n))} />
               </div>
 
               <div className={cn("mt-1 w-full min-w-0 lg:hidden", landscapeFullscreen && "hidden")}>

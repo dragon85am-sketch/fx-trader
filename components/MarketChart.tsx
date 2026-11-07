@@ -118,6 +118,7 @@ type Props = {
   analysisLines?: AnalysisLine[];
   onVisibleTimeRangeChange?: (range: { from: number; to: number } | null) => void;
   onCrosshairTimeChange?: (time: number | null) => void;
+  onVisibleLogicalRangeChange?: (range: { from: number; to: number } | null) => void;
 };
 
 /* =========================
@@ -1083,7 +1084,10 @@ supertrendUpColor = "#22c55e",
 supertrendDownColor = "#ef4444",
 patternsEnabled = false,
 fullscreenMode = false,
+onVisibleLogicalRangeChange,
 }: Props) {
+  const onVisibleLogicalRangeChangeRef = React.useRef(onVisibleLogicalRangeChange);
+  onVisibleLogicalRangeChangeRef.current = onVisibleLogicalRangeChange;
   const containerRef = React.useRef<HTMLDivElement | null>(null);
   const chartRef = React.useRef<IChartApi | null>(null);
   const candleSeriesRef = React.useRef<ISeriesApi<"Candlestick"> | null>(null);
@@ -2446,6 +2450,8 @@ kineticScroll: {
     drawingTimelineSeriesRef.current = drawingTimelineSeries;
 
     const onRangeChange = () => {
+      const logical = chart.timeScale().getVisibleLogicalRange();
+      onVisibleLogicalRangeChangeRef.current?.(logical ? { from: Number(logical.from), to: Number(logical.to) } : null);
       try {
         scheduleOverlayRefresh();
 
@@ -2498,6 +2504,7 @@ kineticScroll: {
       requestAnimationFrame(onRangeChange);
     });
     ro.observe(el);
+    requestAnimationFrame(onRangeChange);
 
     return () => {
       ro.disconnect();
