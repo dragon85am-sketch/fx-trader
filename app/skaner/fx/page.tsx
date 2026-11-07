@@ -2652,6 +2652,7 @@ export default function MarketScannerPage() {
   const [activeOscillators, setActiveOscillators] = React.useState<OscillatorName[]>([]);
   const [oscillatorCrosshairTime, setOscillatorCrosshairTime] = React.useState<number|null>(null);
   const [oscillatorExternalTime, setOscillatorExternalTime] = React.useState<number|null>(null);
+  const [oscillatorPlotWidth, setOscillatorPlotWidth] = React.useState<number | null>(null);
   const [oscillatorLogicalRange, setOscillatorLogicalRange] = React.useState<{ from: number; to: number } | null>(null);
   const [favoriteOscillators, setFavoriteOscillators] = React.useState<OscillatorName[]>(["RSI", "MACD", "Stochastic"]);
   React.useEffect(() => {
@@ -3058,7 +3059,10 @@ React.useEffect(() => {
   // Fullscreen = tryb CHART MODE na każdej orientacji.
   // Nie polegamy na orientation state, bo część mobilnych przeglądarek
   // aktualizuje fullscreen/orientation w różnej kolejności.
-  const fullscreenChartHeight = Math.max(240, viewportH - 225);
+  const fullscreenChartHeight = Math.max(
+    220,
+    viewportH - 225 - (activeOscillators.length > 0 ? Math.min(330, Math.max(155, Math.round(viewportH * 0.28))) : 0)
+  );
 
   React.useEffect(() => {
     const onDown = (e: MouseEvent) => {
@@ -4726,16 +4730,16 @@ if (closedNow.length) {
           ref={rightPanelRef}
           className={cn(
             "w-full min-w-0 flex-1",
-            landscapeFullscreen && "h-[100dvh] overflow-hidden bg-[#071f3e] p-1"
+            landscapeFullscreen && "h-[100dvh] overflow-y-auto overflow-x-hidden bg-[#071f3e] p-1"
           )}
         >
           <Card className={cn(
             "overflow-visible border-sky-300/18 bg-[linear-gradient(180deg,rgba(17,66,117,.94)_0%,rgba(10,48,91,.97)_45%,rgba(7,35,69,.98)_100%)] shadow-[0_18px_50px_rgba(0,10,35,.34),0_0_30px_rgba(14,165,233,.08),inset_0_1px_0_rgba(255,255,255,.05)]",
-            landscapeFullscreen && "h-full rounded-xl"
+            landscapeFullscreen && "min-h-full rounded-xl"
           )}>
             <CardContent className={cn(
               "flex min-w-0 flex-col gap-2 p-2 sm:p-2.5 md:p-3 xl:gap-4 xl:p-5",
-              landscapeFullscreen && "h-full gap-1 p-2 sm:p-2"
+              landscapeFullscreen && "min-h-full gap-1 p-2 sm:p-2"
             )}>
               <div className="flex min-w-0 flex-col gap-2 sm:gap-3 xl:flex-row xl:items-center xl:justify-between">
                 <div className="min-w-0">
@@ -5506,6 +5510,7 @@ if (closedNow.length) {
                   supertrendDownColor={supertrendSettings.downColor}
                   patternsEnabled={patternsEnabled}
                   onVisibleLogicalRangeChange={setOscillatorLogicalRange}
+                  onChartPlotWidthChange={setOscillatorPlotWidth}
                   onCrosshairTimeChange={setOscillatorCrosshairTime}
                   externalCrosshairTime={oscillatorExternalTime}
                 />
@@ -5519,7 +5524,7 @@ if (closedNow.length) {
                     else if (!last || Number(liveCandle.time) > Number(last.time)) bars.push(liveCandle);
                   }
                   return bars;
-                })() as any} active={activeOscillators} visibleLogicalRange={oscillatorLogicalRange} crosshairTime={oscillatorExternalTime??oscillatorCrosshairTime} onCrosshairTimeChange={t=>{setOscillatorExternalTime(t);setOscillatorCrosshairTime(t);}} onRemove={n => setActiveOscillators(p => p.filter(x => x !== n))} />
+                })() as any} active={activeOscillators} chartPlotWidth={oscillatorPlotWidth} visibleLogicalRange={oscillatorLogicalRange} crosshairTime={oscillatorExternalTime??oscillatorCrosshairTime} onCrosshairTimeChange={t=>{setOscillatorExternalTime(t);setOscillatorCrosshairTime(t);}} onRemove={n => setActiveOscillators(p => p.filter(x => x !== n))} />
               </div>
 
               <div className={cn("mt-1 w-full min-w-0 lg:hidden", landscapeFullscreen && "hidden")}>

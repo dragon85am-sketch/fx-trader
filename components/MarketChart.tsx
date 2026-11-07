@@ -120,6 +120,7 @@ type Props = {
   onCrosshairTimeChange?: (time: number | null) => void;
   externalCrosshairTime?: number | null;
   onVisibleLogicalRangeChange?: (range: { from: number; to: number } | null) => void;
+  onChartPlotWidthChange?: (plotWidth: number) => void;
 };
 
 /* =========================
@@ -1086,11 +1087,14 @@ supertrendDownColor = "#ef4444",
 patternsEnabled = false,
 fullscreenMode = false,
 onVisibleLogicalRangeChange,
+onChartPlotWidthChange,
 onCrosshairTimeChange,
 externalCrosshairTime,
 }: Props) {
   const onCrosshairTimeChangeRef = React.useRef(onCrosshairTimeChange);
   onCrosshairTimeChangeRef.current = onCrosshairTimeChange;
+  const onChartPlotWidthChangeRef = React.useRef(onChartPlotWidthChange);
+  onChartPlotWidthChangeRef.current = onChartPlotWidthChange;
   const onVisibleLogicalRangeChangeRef = React.useRef(onVisibleLogicalRangeChange);
   onVisibleLogicalRangeChangeRef.current = onVisibleLogicalRangeChange;
   const containerRef = React.useRef<HTMLDivElement | null>(null);
@@ -2461,6 +2465,7 @@ kineticScroll: {
     drawingTimelineSeriesRef.current = drawingTimelineSeries;
 
     const onRangeChange = () => {
+      onChartPlotWidthChangeRef.current?.(chart.timeScale().width());
       const logical = chart.timeScale().getVisibleLogicalRange();
       onVisibleLogicalRangeChangeRef.current?.(logical ? { from: Number(logical.from), to: Number(logical.to) } : null);
       try {

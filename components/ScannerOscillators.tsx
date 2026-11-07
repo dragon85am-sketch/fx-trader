@@ -43,14 +43,27 @@ function calculate(name:OscillatorName,c:Candle[],settings:OscillatorSettings):O
  const ta=smooth(tr),p=smooth(pd).map((v,i)=>100*divide(v,ta[i])),m=smooth(md).map((v,i)=>100*divide(v,ta[i]));
  const dx=p.map((v,i)=>100*divide(Math.abs(v-m[i]),v+m[i]));return {lines:[smooth(dx),p,m],colors:["#fbbf24","#34d399","#f87171"],levels:[22]};
 }
-export function OscillatorPanels({candles,active,onRemove,visibleLogicalRange,crosshairTime,onCrosshairTimeChange}:{candles:Candle[];active:OscillatorName[];onRemove:(n:OscillatorName)=>void;visibleLogicalRange?:{from:number;to:number}|null; crosshairTime?:number|null; onCrosshairTimeChange?:(time:number|null)=>void}) {
+export function OscillatorPanels({candles,active,onRemove,visibleLogicalRange,chartPlotWidth,crosshairTime,onCrosshairTimeChange}:{candles:Candle[];active:OscillatorName[];onRemove:(n:OscillatorName)=>void;visibleLogicalRange?:{from:number;to:number}|null; chartPlotWidth?:number|null; crosshairTime?:number|null; onCrosshairTimeChange?:(time:number|null)=>void}) {
+ const [panelWidth,setPanelWidth]=React.useState(900);
+ const panelRef=React.useRef<HTMLDivElement|null>(null);
+ React.useEffect(()=>{
+   const el=panelRef.current;
+   if(!el)return;
+   const observer=new ResizeObserver(entries=>{
+     const w=entries[0]?.contentRect.width;
+     if(w&&Number.isFinite(w))setPanelWidth(w);
+   });
+   observer.observe(el);
+   setPanelWidth(el.clientWidth||900);
+   return ()=>observer.disconnect();
+ },[]);
  const [settings,setSettings]=React.useState<Partial<Record<OscillatorName,OscillatorSettings>>>({});
  const [editing,setEditing]=React.useState<OscillatorName|null>(null);
  React.useEffect(()=>{try{const saved=localStorage.getItem("fx-scanner-oscillator-settings-v1");if(saved)setSettings(JSON.parse(saved));}catch{}},[]);
  const change=(name:OscillatorName,patch:Partial<OscillatorSettings>)=>setSettings(prev=>{const next={...prev,[name]:{...defaultOscillatorSettings,...prev[name],...patch}};try{localStorage.setItem("fx-scanner-oscillator-settings-v1",JSON.stringify(next));}catch{}return next;});
  const data=active.map(name=>({name,config:{...defaultOscillatorSettings,...settings[name]},calc:calculate(name,candles,{...defaultOscillatorSettings,...settings[name]})}));
  if(!active.length)return null;
- return <div className="mt-2 space-y-2" aria-label="Panele oscylatorów">
+ return <div ref={panelRef} className="mt-2 w-full min-w-0 space-y-2" aria-label="Panele oscylatorów">
  {data.map(({name,calc,config})=>{
   const width=900,height=112,pad=8;
   const samples=calc.lines.flatMap(l=>l.filter(Number.isFinite));
@@ -62,7 +75,11 @@ export function OscillatorPanels({candles,active,onRemove,visibleLogicalRange,cr
   // instead of stretching the full historical series to the SVG width.
   const range = visibleLogicalRange && visibleLogicalRange.to > visibleLogicalRange.from
     ? visibleLogicalRange : {from:0,to:Math.max(candles.length-1,1)};
-  const x=(i:number)=>((i-range.from)/(range.to-range.from))*width;
+  // Price axis occupies the right edge of the main chart, not the oscillator.
+  // Match the chart's actual plot width, rather than stretching over its price axis.
+  const plotFraction=chartPlotWidth&&panelWidth>0
+    ? Math.min(1,Math.max(0.1,chartPlotWidth/panelWidth)):1;
+  const x=(i:number)=>((i-range.from)/(range.to-range.from))*width*plotFraction;
   const line=(values:number[])=>values.map((v,i)=>Number.isFinite(v)?`${i===0||!Number.isFinite(values[i-1])?'M':'L'}${x(i).toFixed(2)},${y(v).toFixed(2)}`:'').join(' ');
   const valid=calc.lines[0].filter(Number.isFinite),last=valid[valid.length-1];
   const hasSignal=["MACD","OsMA","Awesome Oscillator","Accelerator Oscillator"].includes(name);
@@ -93,14 +110,14 @@ export function OscillatorPanels({candles,active,onRemove,visibleLogicalRange,cr
       <button type="button" className="rounded border border-sky-400/30 px-3 py-1.5 text-xs text-slate-200" onClick={()=>change(name,defaultOscillatorSettings)}>Reset</button>
       <button type="button" className="rounded bg-sky-600 px-3 py-1.5 text-xs text-white" onClick={()=>setEditing(null)}>Gotowe</button>
     </div>}
-    {candles.length<35?<p className="p-4 text-xs text-slate-400">Oczekiwanie na historię świec (minimum 35)...</p>:<svg onMouseMove={e=>{const rect=e.currentTarget.getBoundingClientRect();const ratio=(e.clientX-rect.left)/rect.width;const idx=Math.round(range.from+ratio*(range.to-range.from));const t=(candles[idx] as any)?.time;if(t!=null)onCrosshairTimeChange?.(Number(t));}} onMouseLeave={()=>onCrosshairTimeChange?.(null)} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="block h-[100px] w-full" role="img" aria-label={`Wykres ${name}`}>
+    {candles.length<35?<p className="p-4 text-xs text-slate-400">Oczekiwanie na historię świec (minimum 35)...</p>:<svg onMouseMove={e=>{const rect=e.currentTarget.getBoundingClientRect();const ratio=(e.clientX-rect.left)/(rect.width*plotFraction);const idx=Math.round(range.from+ratio*(range.to-range.from));const t=(candles[idx] as any)?.time;if(t!=null)onCrosshairTimeChange?.(Number(t));}} onMouseLeave={()=>onCrosshairTimeChange?.(null)} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="block h-[100px] w-full" role="img" aria-label={`Wykres ${name}`}>
       <defs><clipPath id={`fx-osc-clip-${OSCILLATORS.indexOf(name)}`}><rect x="0" y="0" width={width} height={height}/></clipPath></defs>
       {[0.25,0.5,0.75].map(v=><line key={v} x1="0" x2={width} y1={height*v} y2={height*v} stroke="#25334a" strokeDasharray="3 5"/>)}
       {config.showLevels!==false&&levels.map((v,i)=><line key={`${v}-${i}`} x1="0" x2={width} y1={y(v)} y2={y(v)} stroke={config.levelColor||"#64748b"} strokeWidth={Math.max(1,Math.min(5,Number(config.levelWidth)||1))} strokeDasharray={config.levelStyle==="solid"?undefined:config.levelStyle==="dotted"?"1 5":"6 5"} vectorEffect="non-scaling-stroke" opacity=".8"/>)}
       <g clipPath={`url(#fx-osc-clip-${OSCILLATORS.indexOf(name)})`}>
       {calc.lines.map((series,i)=>i===calc.histogram?series.map((v,j)=>Number.isFinite(v)?<line key={j} x1={x(j)} x2={x(j)} y1={y(0)} y2={y(v)} stroke={v>=0?'#34d399':'#fb7185'} strokeWidth={config.histogramWidth||2}/>:null):<path key={i} d={line(series)} fill="none" stroke={i===0&&config.color?config.color:i===1&&config.signalColor?config.signalColor:calc.colors[i]} strokeWidth={i===1?config.signalWidth||2:config.lineWidth||2} vectorEffect="non-scaling-stroke"/>)}
       </g>
-      {crosshairTime!=null&&(()=>{const idx=candles.findIndex(c=>Number((c as any).time)>=crosshairTime);if(idx<0)return null;const cx=x(idx);return cx>=0&&cx<=width?<line x1={cx} x2={cx} y1={0} y2={height} stroke="#94a3b8" strokeDasharray="4 3" strokeWidth="1" vectorEffect="non-scaling-stroke" pointerEvents="none"/>:null;})()}
+      {crosshairTime!=null&&(()=>{const idx=candles.findIndex(c=>Number((c as any).time)===crosshairTime);if(idx<0)return null;const cx=x(idx);return cx>=0&&cx<=width?<line x1={cx} x2={cx} y1={0} y2={height} stroke="#94a3b8" strokeDasharray="4 3" strokeWidth="1" vectorEffect="non-scaling-stroke" pointerEvents="none"/>:null;})()}
     </svg>}
   </div>;
  })}
