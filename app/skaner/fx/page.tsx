@@ -14,6 +14,7 @@ import MarketChart, {
   type Zone,
 } from "@/components/MarketChart";
 import type { UTCTimestamp } from "lightweight-charts";
+import { OSCILLATORS, OscillatorPanels, type OscillatorName } from "@/components/ScannerOscillators";
 
 import {
   MousePointer2,
@@ -1663,6 +1664,24 @@ async function fetchSharedMarketCandles(params: URLSearchParams): Promise<any> {
   finally { candleRequestsInFlight.delete(key); }
 }
 
+// API datetime is UTC without a timezone suffix; preserve explicit zones when
+// supplied and never synthesize timestamps for malformed candles.
+function parseMarketCandleValues(values: any[]): Candle[] {
+  return values.map((v: any) => {
+    const raw = String(v.datetime ?? "").trim().replace(" ", "T");
+    const iso = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw) ? raw : `${raw}Z`;
+    return {
+      time: Math.floor(Date.parse(iso) / 1000) as UTCTimestamp,
+      open: Number(v.open), high: Number(v.high),
+      low: Number(v.low), close: Number(v.close),
+      volume: Number(v.volume ?? 0),
+    };
+  }).filter((c: Candle) =>
+    Number.isFinite(Number(c.time)) &&
+    [c.open, c.high, c.low, c.close].every((n) => Number.isFinite(n) && n > 0)
+  ).sort((a: Candle, b: Candle) => Number(a.time) - Number(b.time));
+}
+
 async function fetchFxTradeCandles(
   symbol: string,
   tf: Timeframe,
@@ -1679,30 +1698,7 @@ async function fetchFxTradeCandles(
     throw new Error(data?.message || data?.error || `${symbol}: brak danych Candle Engine`);
   }
 
-  let candles: Candle[] = data.values
-    .map((v: any) => ({
-      time: Math.floor(
-        new Date(String(v.datetime).replace(" ", "T") + "Z").getTime() / 1000
-      ) as UTCTimestamp,
-      open: Number(v.open),
-      high: Number(v.high),
-      low: Number(v.low),
-      close: Number(v.close),
-      volume: Number(v.volume ?? 0),
-    }))
-    .filter(
-      (c: Candle) =>
-        Number.isFinite(c.time) &&
-        Number.isFinite(c.open) &&
-        Number.isFinite(c.high) &&
-        Number.isFinite(c.low) &&
-        Number.isFinite(c.close) &&
-        c.open > 0 &&
-        c.high > 0 &&
-        c.low > 0 &&
-        c.close > 0
-    )
-    .sort((a: Candle, b: Candle) => Number(a.time) - Number(b.time));
+  const candles = parseMarketCandleValues(data.values);
 
   const volume = candles.reduce((sum, c) => sum + (c.volume ?? 0), 0);
   return { candles, volume };
@@ -2650,6 +2646,21 @@ export default function MarketScannerPage() {
   const [renkoLoading, setRenkoLoading] = React.useState(false);
   const [supertrendEnabled, setSupertrendEnabled] = React.useState(false);
   const [patternsEnabled, setPatternsEnabled] = React.useState(false);
+  const [oscillatorMenuOpen, setOscillatorMenuOpen] = React.useState(false);
+  const [oscillatorMenuPosition, setOscillatorMenuPosition] = React.useState({ top: 90, left: 24 });
+  const [oscillatorTab, setOscillatorTab] = React.useState<"all" | "active" | "favorites">("all");
+  const [activeOscillators, setActiveOscillators] = React.useState<OscillatorName[]>([]);
+  const [favoriteOscillators, setFavoriteOscillators] = React.useState<OscillatorName[]>(["RSI", "MACD", "Stochastic"]);
+  React.useEffect(() => {
+    try {
+      const a = JSON.parse(localStorage.getItem("fxtrade:oscillators:active") || "[]");
+      const f = JSON.parse(localStorage.getItem("fxtrade:oscillators:favorites") || "null");
+      if (Array.isArray(a)) setActiveOscillators(OSCILLATORS.filter(n => a.includes(n)));
+      if (Array.isArray(f)) setFavoriteOscillators(OSCILLATORS.filter(n => f.includes(n)));
+    } catch { /* retain defaults */ }
+  }, []);
+  React.useEffect(() => { try { localStorage.setItem("fxtrade:oscillators:active", JSON.stringify(activeOscillators)); } catch {} }, [activeOscillators]);
+  React.useEffect(() => { try { localStorage.setItem("fxtrade:oscillators:favorites", JSON.stringify(favoriteOscillators)); } catch {} }, [favoriteOscillators]);
   const [supertrendPanelOpen, setSupertrendPanelOpen] = React.useState(false);
   const [supertrendSettings, setSupertrendSettings] =
     React.useState<SupertrendSettings>(DEFAULT_SUPERTREND_SETTINGS);
@@ -3389,7 +3400,9 @@ React.useEffect(() => {
             const existing = candlesCache.current.get(cacheKey) ?? [];
             const merged = new Map<number, Candle>();
             for (const candle of existing) merged.set(Number(candle.time), candle);
-            for (const candle of candles) merged.set(Number(candle.time), candle);
+            for (const candle of candles) {
+              if (!merged.has(Number(candle.time))) merged.set(Number(candle.time), candle);
+            }
             candlesCache.current.set(
               cacheKey,
               [...merged.values()]
@@ -3744,37 +3757,62 @@ if (closedNow.length) {
     let alive = true;
     const symbol = selected?.symbol?.toUpperCase();
     if (!symbol) return;
+    const limit = CHART_HISTORY_LIMIT[tf];
+    const cacheKey = candleCacheKey(symbol, tf);
+    const step = TIMEFRAME_SECONDS[tf];
 
-    async function loadChartHistory() {
-      try {
-        const limit = CHART_HISTORY_LIMIT[tf];
-        const result = await fetchAutoCandles(symbol, tf, source, limit);
-        if (!alive) return;
-
-        const cacheKey = candleCacheKey(symbol, tf);
-        const existing = candlesCache.current.get(cacheKey) ?? [];
-        const merged = new Map<number, Candle>();
-        for (const candle of result.candles ?? []) merged.set(Number(candle.time), candle);
-        for (const candle of existing) merged.set(Number(candle.time), candle);
-
-        candlesCache.current.set(
-          cacheKey,
-          [...merged.values()]
-            .sort((a, b) => Number(a.time) - Number(b.time))
-            .slice(-limit)
-        );
-
-        // candlesCache is a ref, so force one cheap render after deep history arrives.
-        setChartHistoryVersion((v) => v + 1);
-      } catch (error) {
-        // Keep the scanner's 300-bar history if a deep-history request is unavailable.
-        console.warn(`[CHART HISTORY] ${symbol} ${tf}:`, error);
+    // The collector can return a stale PostgreSQL-only response for a large
+    // history request while a small recent-window request succeeds. Always
+    // refresh a small window independently, and never rewind a newer cache.
+    const publish = (incoming: Candle[], label: string) => {
+      if (!alive || !incoming.length) return;
+      const existing = candlesCache.current.get(cacheKey) ?? [];
+      const newestIncoming = Number(incoming[incoming.length - 1].time);
+      const newestExisting = Number(existing[existing.length - 1]?.time ?? 0);
+      // An older archive or temporarily degraded response cannot replace LIVE.
+      if (newestExisting > newestIncoming + step * 3) return;
+      const merged = new Map<number, Candle>();
+      for (const candle of existing) merged.set(Number(candle.time), candle);
+      for (const candle of incoming) {
+        const timestamp = Number(candle.time);
+        if (label !== "archive" || !merged.has(timestamp)) merged.set(timestamp, candle);
       }
-    }
+      const ordered = [...merged.values()]
+        .sort((a, b) => Number(a.time) - Number(b.time))
+        .slice(-limit);
+      candlesCache.current.set(cacheKey, ordered);
+      setChartHistoryVersion((v) => v + 1);
+    };
 
-    void loadChartHistory();
+    const requestRecent = async () => {
+      // Unique request key bypasses the 8s shared cache; the API itself still
+      // uses no-store. Only the actively selected instrument is polled.
+      const params = new URLSearchParams({
+        symbol,
+        interval: MARKET_INTERVAL[tf],
+        limit: "100",
+        _refresh: String(Date.now()),
+      });
+      const data = await fetchSharedMarketCandles(params);
+      if (!alive || !Array.isArray(data?.values)) return;
+      const candles = parseMarketCandleValues(data.values);
+      publish(candles, "recent");
+    };
+
+    void requestRecent().catch((error) => console.warn(`[CHART LATEST] ${symbol} ${tf}:`, error));
+    void fetchAutoCandles(symbol, tf, source, 500)
+      .then((result) => publish(result.candles, "recent"))
+      .catch((error) => console.warn(`[CHART RECENT] ${symbol} ${tf}:`, error));
+    void fetchAutoCandles(symbol, tf, source, limit)
+      .then((result) => publish(result.candles, "archive"))
+      .catch((error) => console.warn(`[CHART ARCHIVE] ${symbol} ${tf}:`, error));
+
+    const refreshId = window.setInterval(() => {
+      void requestRecent().catch((error) => console.warn(`[CHART REFRESH] ${symbol} ${tf}:`, error));
+    }, 20_000);
     return () => {
       alive = false;
+      window.clearInterval(refreshId);
     };
   }, [selected?.symbol, tf, source]);
 
@@ -3893,38 +3931,39 @@ if (closedNow.length) {
   // the freshly fetched OHLC for M1/M5/M15/M30/H1/H4/D1.
   void chartHistoryVersion;
   const cachedSelectedCandles = candlesCache.current.get(candleCacheKey(selected.symbol, tf)) ?? [];
-  // BTCUSD LIVE-FIRST: when the DB history is stale or from a different price
-  // regime, do not draw it together with today's tick-driven candles.
-  // No synthetic OHLC bars: missing historical candles remain missing.
-  // This is intentionally scoped to BTCUSD only.
+  // FX TRADE: Never visually join a stale history window to a fresh LIVE
+  // candle. Applies to every instrument (including AUDJPY), not just BTCUSD.
+  // The actual recent 500-bar request above remains the source of OHLC history.
+  // No artificial candles are generated to bridge missing market data.
   const selectedCandles = (() => {
-    if (selected.symbol.toUpperCase() !== "BTCUSD" || !liveCandle) return cachedSelectedCandles;
-    const secondsByTf: Record<Timeframe, number> = {
-      M1: 60, M5: 300, M15: 900, M30: 1800,
-      H1: 3600, H4: 14400, D1: 86400,
-    };
-    const step = secondsByTf[tf];
-    const liveTime = Number(liveCandle.time);
-    const sorted = [...cachedSelectedCandles].sort((a, b) => Number(a.time) - Number(b.time));
-    const past = sorted.filter((c) => Number(c.time) <= liveTime);
-    const last = past[past.length - 1];
-    if (!last) return [];
-    // A multi-bucket outage or a large price discontinuity must not appear
-    // as a misleading chart with old candles thousands of dollars above LIVE.
-    const staleGap = liveTime - Number(last.time) > step * 2;
-    const priceMismatch = Math.abs(last.close - liveCandle.close) / Math.max(liveCandle.close, 1) > 0.01;
-    if (!staleGap && !priceMismatch) return past;
-    // Keep only the most recent contiguous candles that genuinely match LIVE.
-    // After a long outage this may be empty; subsequent real ticks build M1/M5.
-    let start = past.length;
-    for (let i = past.length - 1; i >= 0; i--) {
-      const c = past[i];
-      const nextTime = i === past.length - 1 ? liveTime : Number(past[i + 1].time);
-      if (nextTime - Number(c.time) > step * 2) break;
-      if (Math.abs(c.close - liveCandle.close) / Math.max(liveCandle.close, 1) > 0.01) break;
-      start = i;
+    if (!cachedSelectedCandles.length) return cachedSelectedCandles;
+    const step = TIMEFRAME_SECONDS[tf];
+    const liveTime = liveCandle ? Number(liveCandle.time) : Math.floor(Date.now() / step) * step;
+    if (!Number.isFinite(liveTime) || !step) return cachedSelectedCandles;
+
+    const sorted = [...cachedSelectedCandles]
+      .filter((c) => Number.isFinite(Number(c.time)) && Number(c.time) <= liveTime)
+      .sort((a, b) => Number(a.time) - Number(b.time));
+    if (!sorted.length) return [];
+
+    // A gap of > 3 buckets immediately before LIVE means the visible history
+    // is not current. Showing it next to LIVE would imply nonexistent bars.
+    // While the latest request is pending, show only genuine LIVE data.
+    const newest = sorted[sorted.length - 1];
+    // When SSE is unavailable, a modest delay is acceptable, but never show
+    // multi-day-old candles as the current trading session.
+    const maxGap = liveCandle ? step * 3 : Math.max(step * 12, 3600);
+    if (liveTime - Number(newest.time) > maxGap) return [];
+
+    // A recent window may itself contain an outage. Keep the latest real
+    // contiguous segment so the price action does not jump across that gap.
+    let start = sorted.length - 1;
+    while (start > 0) {
+      const gap = Number(sorted[start].time) - Number(sorted[start - 1].time);
+      if (gap > step * 3) break;
+      start--;
     }
-    return past.slice(start);
+    return sorted.slice(start);
   })();
 
   // RENKO ma własne źródło danych niezależne od głównego interwału wykresu.
@@ -5184,6 +5223,36 @@ if (closedNow.length) {
                       <Shapes className="h-3.5 w-3.5" strokeWidth={2.2} /> FORMACJE
                     </button>
 
+                    <div className="relative shrink-0">
+                      <button type="button" aria-expanded={oscillatorMenuOpen} onClick={(e) => {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const menuWidth = Math.min(420, window.innerWidth - 24);
+                          setOscillatorMenuPosition({
+                            top: Math.min(rect.bottom + 8, Math.max(12, window.innerHeight - 420)),
+                            left: Math.max(12, Math.min(rect.left, window.innerWidth - menuWidth - 12)),
+                          });
+                          setOscillatorMenuOpen(v => !v);
+                        }}
+                        className={cn("inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[10px] font-bold sm:text-sm", oscillatorMenuOpen || activeOscillators.length ? FX_GLOW_ON : FX_GLOW_OFF)}>
+                        <Activity className="h-3.5 w-3.5"/> OSCYLATORY {activeOscillators.length ? `(${activeOscillators.length})` : ""} ▾
+                      </button>
+                      {oscillatorMenuOpen && typeof document !== "undefined" && createPortal(
+                        <>
+                        <div className="fixed inset-0 z-[9998]" onClick={() => setOscillatorMenuOpen(false)} aria-hidden="true" />
+                        <div role="dialog" aria-label="Wybór oscylatorów" className="fixed z-[9999] w-[min(420px,calc(100vw-24px))] max-h-[calc(100dvh-24px)] overflow-y-auto rounded-2xl border border-sky-400/40 bg-[#17243d] p-3 text-white shadow-[0_24px_65px_rgba(0,0,0,.7)]" style={{ top: oscillatorMenuPosition.top, left: oscillatorMenuPosition.left }} onClick={e => e.stopPropagation()}>
+                        <div className="mb-2 flex items-center justify-between"><span className="text-xs font-bold text-sky-100">OSCYLATORY PRO</span><button type="button" aria-label="Zamknij oscylatory" onClick={() => setOscillatorMenuOpen(false)} className="rounded px-2 py-1 text-slate-300 hover:bg-white/10">✕</button></div>
+                        <div className="mb-3 flex gap-1">{(["favorites","active","all"] as const).map(t => <button type="button" key={t} onClick={() => setOscillatorTab(t)} className={cn("flex-1 rounded-lg border px-2 py-2 text-xs font-semibold", oscillatorTab===t ? "border-sky-400 bg-sky-600 text-white" : "border-white/10 bg-[#0d192e] text-slate-300")}>{t==="favorites"?"★ Ulubione":t==="active"?"Aktywne":"Wszystkie"}</button>)}</div>
+                        <div className="grid max-h-[320px] grid-cols-2 gap-1 overflow-y-auto">
+                          {OSCILLATORS.filter(n => oscillatorTab==="all" || (oscillatorTab==="active" ? activeOscillators.includes(n) : favoriteOscillators.includes(n))).map(n => <div key={n} className="flex items-center gap-1 rounded-lg px-1 py-1.5 hover:bg-white/5">
+                            <button type="button" aria-label={`Ulubione ${n}`} onClick={() => setFavoriteOscillators(p => p.includes(n)?p.filter(x=>x!==n):[...p,n])} className={favoriteOscillators.includes(n)?"text-amber-400":"text-slate-500"}>{favoriteOscillators.includes(n)?"★":"☆"}</button>
+                            <label className="flex min-w-0 cursor-pointer items-center gap-1.5 text-xs text-slate-200"><input type="checkbox" className="accent-sky-500" checked={activeOscillators.includes(n)} onChange={e => setActiveOscillators(p => e.target.checked?[...p,n]:p.filter(x=>x!==n))}/><span>{n}</span></label>
+                          </div>)}
+                        </div>
+                        <button type="button" onClick={() => setActiveOscillators([])} className="mt-3 w-full py-1 text-center text-sm text-red-400 hover:text-red-300">Usuń wszystkie ({activeOscillators.length})</button>
+                      </div>
+                        </>, document.body)}
+                    </div>
+
                     <button aria-pressed={supertrendEnabled}
                       type="button"
                       onClick={() => setSupertrendEnabled((v) => !v)}
@@ -5434,6 +5503,7 @@ if (closedNow.length) {
                   supertrendDownColor={supertrendSettings.downColor}
                   patternsEnabled={patternsEnabled}
                 />
+                <OscillatorPanels candles={selectedCandles as any} active={activeOscillators} onRemove={n => setActiveOscillators(p => p.filter(x => x !== n))} />
               </div>
 
               <div className={cn("mt-1 w-full min-w-0 lg:hidden", landscapeFullscreen && "hidden")}>

@@ -1,0 +1,38 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { DurableIntake } from './durable-intake.mjs';
+import { checkpoint2I } from './checkpoint-2i.mjs';
+const dir=fs.mkdtempSync(path.join(os.tmpdir(),'fx-2k-'));
+const make=(seq)=>({id:`provider:${seq}`,symbol:seq%2?'EURUSD':'XAUUSD',price:seq%2?1.08+seq/100000:2600+seq/100,timestamp:1762020000000+seq});
+let intake;
+try {
+  intake=new DurableIntake(dir);
+  for(let seq=1;seq<=500;seq++) intake.append(make(seq));
+  assert.equal(intake.stats().ticks,0);
+  intake.close();intake=null;
+  intake=new DurableIntake(dir);
+  const a=checkpoint2I(intake,{batchSize:47,chunkBytes:257});
+  assert.equal(a.applied,500);assert.equal(intake.stats().ticks,500);
+  console.log('PASS: 500 fsynced ticks recovered and committed in SQLite batches');
+  for(let seq=1;seq<=500;seq++) intake.append(make(seq));
+  const b=checkpoint2I(intake,{batchSize:47,chunkBytes:257});
+  assert.equal(b.applied,0);assert.equal(intake.stats().ticks,500);
+  console.log('PASS: repeated WAL records do not double-count OHLC');
+  for(let seq=501;seq<=700;seq++) intake.append(make(seq));
+  assert.throws(()=>checkpoint2I(intake,{injectAt:'after-rename'}),/INJECTED_AFTER_RENAME/);
+  intake.close();intake=null;
+  intake=new DurableIntake(dir);
+  const c=checkpoint2I(intake,{batchSize:47,chunkBytes:257});
+  assert.equal(c.applied,200);assert.equal(intake.stats().ticks,700);
+  console.log('PASS: interrupted rotation recovered 200 pending ticks after restart');
+  for(let seq=701;seq<=800;seq++) intake.append(make(seq));
+  assert.throws(()=>checkpoint2I(intake,{injectAt:'after-commit',batchSize:47,chunkBytes:257}),/INJECTED_AFTER_COMMIT/);
+  intake.close();intake=null;
+  intake=new DurableIntake(dir);
+  checkpoint2I(intake,{batchSize:47,chunkBytes:257});
+  assert.equal(intake.stats().ticks,800);
+  console.log('PASS: crash after SQLite commit replays without double counting');
+  console.log('NOTE: isolated proof only; NOT integrated with history-worker.mjs or Master Collector; DO NOT DEPLOY.');
+} finally {if(intake)intake.close();fs.rmSync(dir,{recursive:true,force:true,maxRetries:10,retryDelay:100});}

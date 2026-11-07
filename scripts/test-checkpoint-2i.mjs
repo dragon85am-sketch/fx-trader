@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {DurableIntake} from './durable-intake.mjs';
+import {checkpoint2I} from './checkpoint-2i.mjs';
+const root=fs.mkdtempSync(path.join(os.tmpdir(),'fx2i-'));
+let db;
+const tick=i=>({id:`i-${i}`,symbol:'EURUSD',price:1.1+i/1000000,timestamp:1700000000000+i});
+try{
+ db=new DurableIntake(root);
+ for(let i=0;i<250;i++)db.append(tick(i));
+ assert.throws(()=>checkpoint2I(db,{injectAt:'after-rename'}),/INJECTED_AFTER_RENAME/);
+ assert.equal(db.stats().ticks,0);
+ console.log('PASS: crash after journal rotation leaves recoverable segment');
+ let r=checkpoint2I(db,{batchSize:31});
+ assert.equal(r.applied,250);assert.equal(db.stats().ticks,250);
+ console.log('PASS: recover rotated segment, checkpoint and remove only after SQLite commit');
+ for(let i=250;i<500;i++)db.append(tick(i));
+ assert.throws(()=>checkpoint2I(db,{injectAt:'after-commit',batchSize:37}),/INJECTED_AFTER_COMMIT/);
+ assert.equal(db.stats().ticks,500);
+ r=checkpoint2I(db,{batchSize:23});assert.equal(r.applied,0);assert.equal(db.stats().ticks,500);
+ console.log('PASS: crash after commit replays idempotently, no double-counting');
+ db.append(tick(500));fs.appendFileSync(db.log,'{"id":"incomplete"');
+ assert.throws(()=>checkpoint2I(db),/TORN_SEGMENT_NOT_COMPACTED/);
+ assert.equal(db.stats().ticks,501);
+ assert.ok(fs.readdirSync(root).some(n=>n.startsWith('intake.segment.')));
+ console.log('PASS: torn segment is retained rather than deleted');
+ console.log('NOTE: isolated test only. No concurrent appends, writer lock, live integration or Windows power-loss durability guarantee. DO NOT DEPLOY.');
+}finally{try{db?.close();}catch{}try{fs.rmSync(root,{recursive:true,force:true,maxRetries:20,retryDelay:200});}catch(e){console.warn('Cleanup:',e.code,root);}}

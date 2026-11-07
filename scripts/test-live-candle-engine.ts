@@ -1,0 +1,15 @@
+import assert from "node:assert/strict";
+import { LiveCandleEngine } from "../lib/market/live-candle-engine";
+const e = new LiveCandleEngine();
+const base = Date.UTC(2026, 9, 29, 12, 0, 0);
+e.accept({symbol:"GBPUSD",price:1.2,timestamp:base+1000});
+e.accept({symbol:"GBPUSD",price:1.3,timestamp:base+2000});
+e.accept({symbol:"GBPUSD",price:1.1,timestamp:base+3000});
+assert.deepEqual([e.current("GBPUSD","1min",base+4000)?.open,e.current("GBPUSD","1min",base+4000)?.high,e.current("GBPUSD","1min",base+4000)?.low,e.current("GBPUSD","1min",base+4000)?.close,e.current("GBPUSD","1min",base+4000)?.ticks],[1.2,1.3,1.1,1.1,3]);
+e.accept({symbol:"GBPUSD",price:1.4,timestamp:base+61_000});
+assert.equal(e.current("GBPUSD","1min",base+62_000)?.open,1.4);
+assert.equal(e.current("GBPUSD","5min",base+62_000)?.ticks,4);
+assert.throws(()=>e.accept({symbol:"GBPUSD",price:1.0,timestamp:base+1000}),/Out-of-order/);
+assert.equal(e.current("GBPUSD","1min",base+180_000),null);
+assert.equal(e.current("EURUSD","1min",base+62_000),null);
+console.log("PASS V4 live candle engine: OHLC, buckets, multi-timeframe, stale, ordering");

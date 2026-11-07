@@ -1,0 +1,18 @@
+FX TRADE — poprawka luk M1 po odświeżeniu
+
+Podmień dokładnie 2 pliki z paczki, zachowując ścieżki:
+1. scripts/master-market-collector.ts (serwis Railway market-collector)
+2. app/api/market/candles/route.ts (serwis Next.js fx-trader)
+
+W Next.js ustaw OHLC_LIVE_COLLECTOR_URL na adres HTTPS collectora, jeśli nie jest ustawiony.
+Jeżeli OHLC_LIVE_READ_TOKEN jest ustawiony w collectorze, ta sama wartość musi być w fx-trader.
+
+Najpierw uruchom lokalnie: npm run build
+Wdróż najpierw market-collector, a dopiero potem fx-trader.
+
+BEZPIECZEŃSTWO: brak zmian formatu WAL, state.json, batch IDs i SQL writer.
+Endpoint GET /api/market/durable-candles odczytuje tylko pamięć kolejki.
+Uwaga: skanowanie dużego retry backlogu przy każdym żądaniu może kosztować CPU.
+Nie odtwarza świec, dla których collector nie odebrał ticków.
+Przy pokrywających się świecach DB i kolejki preferuje DB; ich OHLC nie jest scalane.
+Nie dotyka odpowiedzi zbiorczej ?symbols= (wymaga osobnego rozwiązania).

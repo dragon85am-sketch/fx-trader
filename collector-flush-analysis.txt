@@ -1,0 +1,132 @@
+async function flushDb() {
+  if (HISTORY_PAUSED || (DB_PROBE_ONCE && dbProbeAttempted)) return;
+  if (dbWriting) return;
+  dbWriting = true;
+  const flushStarted = Date.now();
+  dbFlushStartedAt = flushStarted;
+  let committedSinceCheckpoint = 0;
+  try {
+    // Retry immutable failed chunks first. Never merge them with fresh ticks.
+    // Drain durable legacy chunks before moving pending rows into new chunks.
+    // This avoids a large one-shot queue rewrite near the snapshot size guard.
+    // Keep only a bounded number of newly frozen rows per flush.
+    if (DB_PROBE_ONCE || retryChunks.length <= RECOVERY_RETRY_THRESHOLD) {
+      const limit = DB_PROBE_ONCE ? pending.size : Math.min(pending.size, RECOVERY_NEW_ROWS);
+      const snapshot: Array<[string, TickBatch]> = [];
+      for (const entry of pending.entries()) {
+        if (snapshot.length >= limit) break;
+        snapshot.push(entry);
+      }
+      for (const [key] of snapshot) pending.delete(key);
+      const chunkRowsForThisFlush = adaptiveChunkRows;
+      for (let i = 0; i < snapshot.length; i += chunkRowsForThisFlush)
+        retryChunks.push(snapshot.slice(i, i + chunkRowsForThisFlush).map(([, batch]) => ({ id: crypto.randomUUID(), batch })));
+      // Persist IDs before any SQL; on error stop rather than risk unprotected writes.
+      if (snapshot.length) try { saveQueue(); } catch (e) { fatalQueueError(e); }
+    }
+    recoveryBatchesThisFlush = 0;
+    while (retryChunks.length) {
+      if (!DB_PROBE_ONCE && recoveryBatchesThisFlush >= RECOVERY_MAX_BATCHES) break;
+      if (DB_PROBE_ONCE && dbProbeAttempted) break;
+      // Never split or mutate immutable chunks. Only choose a recent chunk when
+      // it cannot overtake an older write to the same symbol/interval/bucket.
+      const selectedIndex = V4_HISTORY_PRIORITY
+        ? chooseNextChunk(retryChunks, Date.now(), V4_RECENT_WINDOW_MS, historyWritesSinceLive, V4_HISTORY_QUOTA)
+        : 0;
+      const part = retryChunks[selectedIndex];
+      if (DB_PROBE_ONCE) {
+        // Refuse oversized legacy chunks instead of modifying durable batch IDs.
+        if (part.length > DB_PROBE_MAX_ROWS) {
+          dbProbeAttempted = true;
+          console.error(`[MASTER PROBE] refused: chunk has ${part.length} rows; limit=${DB_PROBE_MAX_ROWS}; no SQL sent`);
+          break;
+        }
+        dbProbeAttempted = true; // before SQL, including on timeout/error
+        console.warn(`[MASTER PROBE] one SQL attempt: ${part.length} durable rows`);
+      }
+      const isPriorityLive = selectedIndex > 0;
+      const started = Date.now();
+      dbSqlStartedAt = started;
+      dbSqlRowsInFlight = part.length;
+      try {
+        await writeBatches(part);
+        const sqlFinished = Date.now();
+        lastDbSqlMs = sqlFinished - started;
+        maxDbSqlMs = Math.max(maxDbSqlMs, lastDbSqlMs);
+        lastDbBatchRows = part.length;
+        lastDbBatchAt = sqlFinished;
+        retryChunks.splice(selectedIndex, 1);
+        if (isPriorityLive) { priorityLiveWrites++; historyWritesSinceLive = 0; }
+        else { historyWrites++; historyWritesSinceLive++; }
+        // SQL is committed. Defer the expensive full state.json fsync until the
+        // bounded group ends. If the process crashes first, replaying the older
+        // durable checkpoint is safe: the SQL ledger deduplicates batch IDs.
+        // Never change IDs or split existing retry chunks.
+        committedSinceCheckpoint++;
+        lastDbWriteMs = Date.now() - started;
+        lastDbSuccessAt = Date.now();
+        successfulDbWrites++;
+        recoveryBatchesThisFlush++;
+        if (DB_PROBE_ONCE) dbProbeSucceeded = true;
+        consecutiveDbFailures = 0;
+        if (lastDbSqlMs > DB_SLOW_MS) {
+          slowDbBatches++;
+          consecutiveFastBatches = 0;
+          const smaller = Math.max(DB_MIN_CHUNK_ROWS, Math.floor(adaptiveChunkRows / 2));
+          if (smaller < adaptiveChunkRows) {
+            adaptiveChunkRows = smaller;
+            adaptiveReductions++;
+            console.warn(`[MASTER] adaptive DB chunk reduced to ${adaptiveChunkRows} after ${lastDbSqlMs}ms SQL`);
+          }
+        } else if (lastDbSqlMs < DB_FAST_MS) {
+          consecutiveFastBatches++;
+          if (consecutiveFastBatches >= 12 && adaptiveChunkRows < DB_CHUNK_ROWS) {
+            adaptiveChunkRows = Math.min(DB_CHUNK_ROWS, adaptiveChunkRows + 4);
+            adaptiveIncreases++;
+            consecutiveFastBatches = 0;
+          }
+        } else {
+          consecutiveFastBatches = 0;
+        }
+        if ((lastDbSqlMs ?? 0) > 5000 || (lastDbCheckpointMs ?? 0) > 1000)
+          console.warn(`[MASTER] slow DB upsert: sql=${lastDbSqlMs}ms, checkpoint=${lastDbCheckpointMs}ms, total=${lastDbWriteMs}ms, rows=${part.length}, retryChunks=${retryChunks.length}, pending=${pending.size}`);
+        // Yield between chunks during overload. Keep all remaining chunks durable.
+        if (!shuttingDown && Date.now() - flushStarted >= DB_MAX_FLUSH_WORK_MS) break;
+      } catch (e: any) {
+        failedDbWrites++;
+        consecutiveDbFailures++;
+        lastDbFailureAt = Date.now();
+        lastDbWriteMs = Date.now() - started;
+        console.error(`[MASTER] DB batch failed; queued retry (${part.length} rows), duration=${lastDbWriteMs}ms`, e?.message || e);
+        break;
+      }
+    }
+  } finally {
+    // Exactly one full durable checkpoint per bounded group of committed SQL
+    // chunks, instead of one 60+ MiB rewrite per successful SQL statement.
+    // WAL fsync remains per accepted tick and is unchanged.
+    if (committedSinceCheckpoint > 0) {
+      const checkpointStarted = Date.now();
+      try { saveQueue(); } catch (e) { fatalQueueError(e); }
+      lastDbCheckpointMs = Date.now() - checkpointStarted;
+      recoveryCheckpointGroups++;
+      recoveryCheckpointSaved += committedSinceCheckpoint;
+    }
+    dbWriting = false;
+    dbSqlStartedAt = null;
+    dbSqlRowsInFlight = 0;
+    dbFlushStartedAt = null;
+    if (pending.size || retryChunks.length) {
+      const retryMs = consecutiveDbFailures
+        ? Math.min(DB_RETRY_MAX_MS, DB_FLUSH_MS * 2 ** Math.min(consecutiveDbFailures - 1, 3))
+        : (retryChunks.reduce((n, c) => n + c.length, 0) + pending.size >= DB_DRAIN_BACKLOG_ROWS ? DB_DRAIN_MS : DB_FLUSH_MS);
+      if (!consecutiveDbFailures && retryMs === DB_DRAIN_MS) drainSchedules++;
+      scheduleFlush(retryMs);
+    }
+  }
+}
+
+// Stage 4B: parallel SQL *lanes* (not separate processes).
+// The collector remains the only owner of the durable queue and checkpoint.
+// A chunk is never removed until its SQL transaction commits. In-flight chunks
+// stay in the checkpoint and retain the same batch IDs for crash replay.

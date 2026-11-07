@@ -1,0 +1,10 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+const src=fs.readFileSync(new URL('./master-market-collector.ts',import.meta.url),'utf8');
+const a=src.indexOf('queueDbTick(tick);',src.indexOf('socket.on("rates"'));
+const b=src.indexOf('broadcastTick(tick);',src.indexOf('socket.on("rates"'));
+assert.ok(a>0 && b>a,'WAL must be durable before publishing tick');
+assert.ok(src.includes('DB_DRAIN_BACKLOG_ROWS'));
+assert.ok(src.includes('if (!consecutiveDbFailures && retryMs === DB_DRAIN_MS)'));
+assert.ok(src.includes('MarketCandleBatchLedger'));
+console.log('PASS stage4a static invariants');

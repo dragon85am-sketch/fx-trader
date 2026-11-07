@@ -1,0 +1,14 @@
+import {Worker} from 'node:worker_threads';
+import fs from 'node:fs';import os from 'node:os';import path from 'node:path';
+const dir=fs.mkdtempSync(path.join(os.tmpdir(),'fx-history-worker-'));
+const filename=path.join(dir,'history.sqlite');
+const worker=new Worker(new URL('./history-worker.mjs',import.meta.url),{workerData:{filename}});
+let id=0;
+const call=(type,data={})=>new Promise((resolve,reject)=>{const key=++id;const listener=m=>{if(m.id!==key)return;worker.off('message',listener);if(m.type==='error')reject(new Error(m.error));else resolve(m)};worker.on('message',listener);worker.postMessage({type,id:key,...data});});
+const t=Date.now();const bucket=Math.floor(t/60000)*60000-60000;
+await call('ticks',{ticks:[{symbol:'BTCUSD',price:77000,timestamp:bucket+1000},{symbol:'BTCUSD',price:77050,timestamp:bucket+2000},{symbol:'BTCUSD',price:77020,timestamp:bucket+3000}]});
+const r=await call('read',{symbol:'BTCUSD',interval:'1min',limit:10,before:t});
+if(r.rows.length!==1||r.rows[0].open!==77000||r.rows[0].high!==77050||r.rows[0].close!==77020)throw Error('OHLC failed');
+const s=await call('stats');if(s.stats.received!==3)throw Error('stats failed');
+await call('close');await worker.terminate();fs.rmSync(dir,{recursive:true,force:true});
+console.log('PASS: isolated worker, batched SQLite transaction, OHLC, history read, stats');

@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import { chooseNextChunk } from '../lib/market/history-priority.ts';
+const now=2_000_000;
+const row=(id,bucket,symbol='EURUSD')=>[{id,batch:{symbol,interval:'1min',bucket}}];
+const old=row('old',1_000_000), live=row('live',1_990_000);
+assert.equal(chooseNextChunk([old,live],now,300_000,3,3),1,'independent live chunk gets priority');
+assert.equal(chooseNextChunk([old,live],now,300_000,2,3),0,'history receives guaranteed turns');
+assert.equal(chooseNextChunk([row('old',1_990_000),row('new',1_990_000)],now,300_000,3,3),0,'same candle must not overtake');
+assert.equal(chooseNextChunk([old,row('same',1_000_000),live],now,300_000,3,3),2,'may bypass unrelated old chunks');
+assert.equal(chooseNextChunk([old],now,300_000,3,3),0);
+console.log('PASS V4 history priority: fairness, recent priority, same-candle ordering');

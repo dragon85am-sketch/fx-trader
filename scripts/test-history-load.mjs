@@ -1,0 +1,30 @@
+import { HistoryBridge } from './history-bridge.mjs';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import assert from 'node:assert/strict';
+const dir=fs.mkdtempSync(path.join(os.tmpdir(),'fx-history-load-'));
+const filename=path.join(dir,'history.sqlite');
+const symbols=Array.from({length:125},(_,i)=>`FX${String(i).padStart(3,'0')}`);
+const base=Math.floor((Date.now()-120000)/60000)*60000;
+const ticks=[];
+for(let j=0;j<60;j++)for(let i=0;i<symbols.length;i++)ticks.push({symbol:symbols[i],price:1.1+i/1000+j/100000,timestamp:base+j*1000});
+let bridge;
+try {
+  bridge=new HistoryBridge({filename,maxPendingTicks:20000});
+  await bridge.ready;
+  const start=performance.now();
+  for(let i=0;i<ticks.length;i+=500)await bridge.ticks(ticks.slice(i,i+500));
+  const elapsed=performance.now()-start;
+  const stats=(await bridge.stats()).stats;
+  assert.equal(Number(stats.symbols),125);
+  assert.equal(Number(stats.candles),125);
+  const read=await bridge.read('FX000','1min',10,base+60000);
+  assert.equal(read.rows.length,1);
+  assert.equal(read.rows[0].ticks,60);
+  await bridge.close();bridge=null;
+  bridge=new HistoryBridge({filename});await bridge.ready;
+  const after=(await bridge.stats()).stats;
+  assert.equal(Number(after.candles),125);
+  console.log(`PASS: 125 symbols, ${ticks.length} ticks, 125 M1 candles, restart; ${Math.round(elapsed)}ms; ${(ticks.length/elapsed*1000).toFixed(0)} ticks/s`);
+} finally {if(bridge)await bridge.close().catch(()=>{});fs.rmSync(dir,{recursive:true,force:true});}
