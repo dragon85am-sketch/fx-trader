@@ -156,7 +156,7 @@ type ClosedTrade = {
   tp2?: number;
   tp3?: number;
   sl: number;
-  status: "TP3" | "SL" | "TP1_BE";
+  status: "TP2" | "TP3" | "SL" | "TP1_BE";
   tp1Hit?: boolean;
   tp2Hit?: boolean;
   tp3Hit?: boolean;
@@ -1482,7 +1482,7 @@ function detectClosedTradeStatus(params: {
   tp1Hit?: boolean;
   tp2Hit?: boolean;
 }): {
-  status: "TP3" | "SL" | "TP1_BE" | null;
+  status: "TP2" | "TP3" | "SL" | "TP1_BE" | null;
   tp1Hit: boolean;
   tp2Hit: boolean;
 } {
@@ -1518,8 +1518,8 @@ function detectClosedTradeStatus(params: {
       if (!tp1Hit && c.high >= tp1) tp1Hit = true;
       if (tp1Hit && !tp2Hit && c.high >= tp2) tp2Hit = true;
 
-      if (c.high >= tp3) {
-        return { status: "TP3", tp1Hit: true, tp2Hit: true };
+      if (c.high >= tp2) {
+        return { status: "TP2", tp1Hit: true, tp2Hit: true };
       }
 
       if (hadTp1BeforeThisCandle && c.low <= levels.entry) {
@@ -1535,8 +1535,8 @@ function detectClosedTradeStatus(params: {
       if (!tp1Hit && c.low <= tp1) tp1Hit = true;
       if (tp1Hit && !tp2Hit && c.low <= tp2) tp2Hit = true;
 
-      if (c.low <= tp3) {
-        return { status: "TP3", tp1Hit: true, tp2Hit: true };
+      if (c.low <= tp2) {
+        return { status: "TP2", tp1Hit: true, tp2Hit: true };
       }
 
       if (hadTp1BeforeThisCandle && c.high >= levels.entry) {
@@ -2468,9 +2468,9 @@ function resultDistanceForTrade(t: ClosedTrade) {
     return Number.isFinite(sl) ? -Math.abs(sl - entry) : null;
   }
 
-  if (t.status === "TP3") {
-    const tp3 = Number(t.tp3);
-    return Number.isFinite(tp3) ? Math.abs(tp3 - entry) : null;
+  if (t.status === "TP2" || t.status === "TP3") {
+    const target = Number(t.status === "TP2" ? t.tp2 : t.tp3);
+    return Number.isFinite(target) ? Math.abs(target - entry) : null;
   }
 
   // TP1 + BE / TP2 + BE: liczymy najdalszy faktycznie zaliczony target.
@@ -2498,7 +2498,7 @@ function tradeResultUnits(t: ClosedTrade): { value: number; unit: "pips" | "pts"
 }
 
 function buildWeeklyTelegramStats(trades: ClosedTrade[]) {
-  const wins = trades.filter((t) => t.status === "TP3" || t.status === "TP1_BE").length;
+  const wins = trades.filter((t) => t.status === "TP2" || t.status === "TP3").length;
   const losses = trades.filter((t) => t.status === "SL").length;
   const rowsMap = new Map<string, WeeklyTelegramRow>();
 
@@ -2690,6 +2690,28 @@ export default function MarketScannerPage() {
   const emaPanelWrapRef = React.useRef<HTMLDivElement | null>(null);
 
   const [bbState, setBbState] = React.useState<BbState>(DEFAULT_BB);
+  const [bbSettingsLoaded, setBbSettingsLoaded] = React.useState(false);
+  React.useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem("fx-trade-scanner-bb-settings-v1");
+      if (saved) {
+        const parsed = JSON.parse(saved) as Partial<BbState>;
+        setBbState({
+          ...DEFAULT_BB,
+          ...parsed,
+          colors: { ...DEFAULT_BB.colors, ...parsed.colors },
+          widths: { ...DEFAULT_BB.widths, ...parsed.widths },
+          background: { ...DEFAULT_BB.background, ...parsed.background },
+        });
+      }
+    } catch (error) { console.warn("BB settings restore failed", error); }
+    setBbSettingsLoaded(true);
+  }, []);
+  React.useEffect(() => {
+    if (!bbSettingsLoaded) return;
+    try { window.localStorage.setItem("fx-trade-scanner-bb-settings-v1", JSON.stringify(bbState)); }
+    catch (error) { console.warn("BB settings save failed", error); }
+  }, [bbState, bbSettingsLoaded]);
 
   React.useEffect(() => {
     setBbState((prev) => ({
@@ -2964,8 +2986,10 @@ React.useEffect(() => {
         })));
         const activeBySymbol = new Map<string, any>();
         for (const t of activeJson.trades ?? []) {
-          // Current chart TF gets the central zone for that instrument.
-          if (t.tf === tf) activeBySymbol.set(String(t.instrument).toUpperCase(), t);
+          // Active trades are tied to symbol, not to the currently selected chart TF.
+          // Prefer the current-TF trade when several independent signals exist.
+          const key = String(t.instrument).toUpperCase();
+          if (!activeBySymbol.has(key) || t.tf === tf) activeBySymbol.set(key, t);
         }
         setRows(prev => prev.map(row => {
           const t = activeBySymbol.get(row.symbol.toUpperCase());
@@ -3282,7 +3306,7 @@ React.useEffect(() => {
       tp1?: number;
       tp2?: number;
       tp3?: number;
-      status?: "TP3" | "SL" | "TP1_BE";
+      status?: "TP2" | "TP3" | "SL" | "TP1_BE";
       tp1Hit?: boolean;
       tp2Hit?: boolean;
       tp3Hit?: boolean;
@@ -3938,40 +3962,13 @@ if (closedNow.length) {
   // the freshly fetched OHLC for M1/M5/M15/M30/H1/H4/D1.
   void chartHistoryVersion;
   const cachedSelectedCandles = candlesCache.current.get(candleCacheKey(selected.symbol, tf)) ?? [];
-  // FX TRADE: Never visually join a stale history window to a fresh LIVE
-  // candle. Applies to every instrument (including AUDJPY), not just BTCUSD.
-  // The actual recent 500-bar request above remains the source of OHLC history.
-  // No artificial candles are generated to bridge missing market data.
-  const selectedCandles = (() => {
-    if (!cachedSelectedCandles.length) return cachedSelectedCandles;
-    const step = TIMEFRAME_SECONDS[tf];
-    const liveTime = liveCandle ? Number(liveCandle.time) : Math.floor(Date.now() / step) * step;
-    if (!Number.isFinite(liveTime) || !step) return cachedSelectedCandles;
-
-    const sorted = [...cachedSelectedCandles]
-      .filter((c) => Number.isFinite(Number(c.time)) && Number(c.time) <= liveTime)
-      .sort((a, b) => Number(a.time) - Number(b.time));
-    if (!sorted.length) return [];
-
-    // A gap of > 3 buckets immediately before LIVE means the visible history
-    // is not current. Showing it next to LIVE would imply nonexistent bars.
-    // While the latest request is pending, show only genuine LIVE data.
-    const newest = sorted[sorted.length - 1];
-    // When SSE is unavailable, a modest delay is acceptable, but never show
-    // multi-day-old candles as the current trading session.
-    const maxGap = liveCandle ? step * 3 : Math.max(step * 12, 3600);
-    if (liveTime - Number(newest.time) > maxGap) return [];
-
-    // A recent window may itself contain an outage. Keep the latest real
-    // contiguous segment so the price action does not jump across that gap.
-    let start = sorted.length - 1;
-    while (start > 0) {
-      const gap = Number(sorted[start].time) - Number(sorted[start - 1].time);
-      if (gap > step * 3) break;
-      start--;
-    }
-    return sorted.slice(start);
-  })();
+  // Preserve all genuine historical candles across gaps. The chart library
+  // represents missing timestamps as gaps; never synthesize OHLC bars.
+  // Previously this code discarded everything before the last >3-bucket gap,
+  // making M1 history disappear even while PostgreSQL still returned it.
+  const selectedCandles = [...cachedSelectedCandles]
+    .filter((c) => Number.isFinite(Number(c.time)))
+    .sort((a, b) => Number(a.time) - Number(b.time));
 
   // RENKO ma własne źródło danych niezależne od głównego interwału wykresu.
   // CURRENT/AUTO = aktualny TF, dzięki czemu Renko zachowuje ten sam czas i live tick co wykres.
@@ -4098,12 +4095,12 @@ if (closedNow.length) {
     // Target reach stats (cumulative):
     const tp1Reached = sortedTrades.filter((t) => {
       const s = getStatus(t);
-      return Boolean(t.tp1Hit) || s === "TP1_BE" || s === "TP3";
+      return Boolean(t.tp1Hit) || s === "TP1_BE" || s === "TP2" || s === "TP3";
     }).length;
 
     const tp2Reached = sortedTrades.filter((t) => {
       const s = getStatus(t);
-      return Boolean(t.tp2Hit) || s === "TP3";
+      return Boolean(t.tp2Hit) || s === "TP2" || s === "TP3";
     }).length;
 
     const tp3Reached = sortedTrades.filter((t) => getStatus(t) === "TP3").length;
@@ -4127,7 +4124,7 @@ if (closedNow.length) {
     const tradeRows = sortedTrades.map((t) => {
       const status = getStatus(t);
       const reachedTp1 =
-        Boolean(t.tp1Hit) || status === "TP1_BE" || status === "TP3";
+        Boolean(t.tp1Hit) || status === "TP1_BE" || status === "TP2" || status === "TP3";
 
       const result =
         status === "SL" && !reachedTp1
@@ -5640,7 +5637,7 @@ closedTrades.map((t) => (
             className={cn(
   "rounded-full px-3 py-1 text-xs font-bold",
 
-  safeStatus === "TP3"
+  (safeStatus === "TP2" || safeStatus === "TP3")
     ? "bg-emerald-500/25 text-emerald-200"
 
     : safeStatus === "TP1_BE"
