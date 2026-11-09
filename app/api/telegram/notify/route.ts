@@ -1,9 +1,11 @@
+import { PrismaClient } from "@prisma/client";
+const telegramDeliveryDb = new PrismaClient();
 ﻿import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
 type Side = "BUY" | "SELL";
-type ClosedStatus = "TP3" | "SL" | "TP1_BE";
+type ClosedStatus = "TP2" | "TP3" | "SL" | "TP1_BE"; // TP3: legacy history only
 
 type WeeklyRow = {
   instrument: string;
@@ -15,6 +17,7 @@ type WeeklyRow = {
 
 type TelegramPayload = {
   type?: "SIGNAL" | "CLOSED" | "WEEKLY";
+  deliveryKey?: string;
 
   instrument?: string;
   side?: Side;
@@ -100,11 +103,9 @@ function buildSignalMessage(p: TelegramPayload) {
     "🎯 <b>TAKE PROFIT</b>",
     `⚪ TP1: <code>${price(p.tp1, instrument)}</code>`,
     `⚪ TP2: <code>${price(p.tp2, instrument)}</code>`,
-    `⚪ TP3: <code>${price(p.tp3, instrument)}</code>`,
     "",
     "🛡 TP1 → SL na BE",
-    "🚀 TP2 → trade dalej aktywny",
-    "🏆 TP3 → pełny WIN",
+    "🏆 TP2 → zamknięcie transakcji (WIN)",
     "",
     "🔵 <b>FxTrade Professional Trading</b>",
   ].join("\n");
@@ -118,21 +119,22 @@ function buildClosedMessage(p: TelegramPayload) {
 
   const tp1 = p.tp1Hit ? "✅" : "⚪";
   const tp2 = p.tp2Hit ? "✅" : "⚪";
-  const tp3 = p.tp3Hit ? "✅" : "⚪";
 
   let title = "✅ <b>TRADE CLOSED</b>";
   let result = "📈 <b>RESULT: SUCCESS</b>";
   let detail = "";
 
-  if (status === "TP3") {
+  if (status === "TP2") {
     title = "🏆 <b>TRADE CLOSED — FULL WIN</b>";
-    result = "💰 <b>RESULT: SUCCESS — TP3</b>";
-    detail = "Wszystkie cele Take Profit zaliczone.";
+    result = "💰 <b>RESULT: SUCCESS — TP2</b>";
+    detail = "Cel TP2 osiągnięty. Transakcja zamknięta.";
+  } else if (status === "TP3") {
+    // Zachowujemy czytelność historycznych rekordów sprzed zmiany logiki na TP2.
+    title = "🏆 <b>TRADE CLOSED — HISTORICAL TP3</b>";
+    result = "💰 <b>RESULT: SUCCESS — TP3 (historyczny)</b>";
   } else if (status === "TP1_BE") {
     title = "✅ <b>TRADE CLOSED — SUCCESS</b>";
-    result = p.tp2Hit
-      ? "📈 <b>RESULT: SUCCESS — TP2 + BE</b>"
-      : "📈 <b>RESULT: SUCCESS — TP1 + BE</b>";
+    result = "🛡 <b>RESULT: TP1 + BE</b>";
     detail = "🛡 Po realizacji zysku pozycja wróciła do BE.";
   } else if (status === "SL") {
     title = "❌ <b>TRADE CLOSED</b>";
@@ -149,7 +151,6 @@ function buildClosedMessage(p: TelegramPayload) {
     "🎯 <b>WYNIK TAKE PROFIT</b>",
     `${tp1} TP1: <code>${price(p.tp1, instrument)}</code>${p.tp1Hit ? "  <b>HIT</b>" : ""}`,
     `${tp2} TP2: <code>${price(p.tp2, instrument)}</code>${p.tp2Hit ? "  <b>HIT</b>" : ""}`,
-    `${tp3} TP3: <code>${price(p.tp3, instrument)}</code>${p.tp3Hit ? "  <b>HIT</b>" : ""}`,
     "",
     detail,
     result,
@@ -274,7 +275,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Worker authorization required" }, { status: 403 });
     }
     const payload = (await req.json()) as TelegramPayload;
-
+    // Idempotency key is mandatory for trade notifications after worker upgrade.
+    // Legacy callers are rejected rather than bypassing durable deduplication.
+    const notificationType = payload.type ?? "SIGNAL";
+    const deliveryKey = payload.deliveryKey;
+    if (notificationType !== "WEEKLY" && (!deliveryKey || !new RegExp(`^${notificationType}:[a-f0-9]{40}$`).test(deliveryKey))) {
+      return NextResponse.json({ error: "Valid deliveryKey required" }, { status: 400 });
+    }
     const type = payload.type ?? "SIGNAL";
 
     if (type !== "WEEKLY" && (!payload?.instrument || !payload?.side || !payload?.tf)) {
@@ -290,6 +297,31 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+
+    const deliveryDb = telegramDeliveryDb;
+    let claimed = false;
+    if (notificationType !== "WEEKLY") {
+      try {
+        await deliveryDb.fxScannerTelegramDelivery.create({ data: { id: deliveryKey! } });
+        claimed = true;
+      } catch (err: any) {
+        if (err?.code === "P2002") {
+          return NextResponse.json({ error: "Delivery already claimed; verify Telegram manually before retry", deliveryKey }, { status: 409 });
+        }
+        throw err;
+      }
+    }
+    // CLAIMED is intentionally not automatically released: a crash or timeout may
+    // happen after Telegram accepted the message but before the HTTP response.
+    async function finishDelivery(ok: boolean, reason?: string) {
+      if (claimed && deliveryKey) {
+        await deliveryDb.fxScannerTelegramDelivery.update({
+          where: { id: deliveryKey },
+          data: { status: ok ? "SENT" : "UNCERTAIN", sentAt: ok ? new Date() : null, error: reason?.slice(0, 500) },
+        });
+      }
+    }
+
 
     const botToken =
       process.env.TELEGRAM_BOT_TOKEN ||
@@ -335,6 +367,7 @@ export async function POST(req: NextRequest) {
         "Telegram config missing: TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID"
       );
 
+      await finishDelivery(false, "Telegram configuration missing");
       return NextResponse.json(
         { error: "Telegram configuration missing" },
         { status: 500 }
@@ -368,12 +401,14 @@ export async function POST(req: NextRequest) {
       if (!response.ok) {
         console.error("Telegram sendMessage error:", data);
 
+      await finishDelivery(false, "Telegram API returned failure");
         return NextResponse.json(
           { error: "Telegram send failed", details: data },
           { status: response.status }
         );
       }
 
+      await finishDelivery(true);
       return NextResponse.json({
         ok: true,
         type,
@@ -423,15 +458,18 @@ export async function POST(req: NextRequest) {
         const textData = await textResponse.json().catch(() => null);
         if (!textResponse.ok) {
           console.error("Telegram weekly/details sendMessage error:", textData);
+      await finishDelivery(false, "Telegram API returned failure");
           return NextResponse.json(
             { error: "Photo sent, but report text failed", details: textData },
             { status: textResponse.status }
           );
         }
 
+      await finishDelivery(true);
         return NextResponse.json({ ok: true, type, mode: "photo_plus_text" });
       }
 
+      await finishDelivery(true);
       return NextResponse.json({
         ok: true,
         type,
@@ -461,6 +499,7 @@ export async function POST(req: NextRequest) {
         fallbackData
       );
 
+      await finishDelivery(false, "Telegram API returned failure");
       return NextResponse.json(
         {
           error: "Telegram photo and fallback text failed",
@@ -471,6 +510,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
+      await finishDelivery(true);
     return NextResponse.json({
       ok: true,
       type,

@@ -313,3 +313,13 @@ model RewardPayout {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@index([userId, createdAt])
 }
+
+// FAZA 3.5B: durable deduplication for Telegram notifications.
+model FxScannerTelegramDelivery {
+  id         String   @id // SIGNAL:<tradeId> or CLOSED:<tradeId>
+  status     String   @default("CLAIMED") // CLAIMED, SENT, UNCERTAIN
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  sentAt     DateTime?
+  error      String?
+}
