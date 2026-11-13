@@ -264,6 +264,23 @@ let dbWriting = false;
 // V2.2: in-flight diagnostics; no changes to WAL, batch identity or SQL semantics.
 let dbSqlStartedAt: number | null = null;
 let dbSqlRowsInFlight = 0;
+// Recovery watchdog: an unresolved Prisma promise must not stall durable SQL draining forever.
+// The SQL chunk and its stable ledger IDs were checkpointed before writeBatches().
+// On a process restart, recoverQueue() replays the same IDs, making an uncertain
+// commit idempotent. This is NOT a SQL cancellation or a fix for DB latency.
+const DB_STALL_RESTART_MS = Math.max(120_000, Math.min(900_000,
+  Number(process.env.OHLC_DB_STALL_RESTART_MS || 180_000) || 180_000));
+const dbStallWatchdog = setInterval(() => {
+  if (shuttingDown || dbSqlStartedAt === null) return;
+  const ageMs = Date.now() - dbSqlStartedAt;
+  if (ageMs < DB_STALL_RESTART_MS) return;
+  console.error(`[MASTER] FATAL stalled Prisma SQL for ${ageMs}ms (${dbSqlRowsInFlight} rows). ` +
+    `Preserved durable queue; exiting for Railway restart and idempotent replay.`);
+  // Do not call shutdown(): it waits for the same stuck promise and could stall.
+  // No in-memory queue rows are discarded: the current SQL batch is durable.
+  process.exit(1);
+}, 15_000);
+dbStallWatchdog.unref();
 let dbFlushStartedAt: number | null = null;
 let liveRatesConnected = false;
 let providerInfo = "";
@@ -894,6 +911,7 @@ async function shutdown(signal:string){
   console.log(`[MASTER] ${signal}: stopping new ticks and flushing pending candles`);
   if (shuttingDown) return;
   shuttingDown=true;
+  clearInterval(dbStallWatchdog);
   if (providerReconnectTimer) { clearTimeout(providerReconnectTimer); providerReconnectTimer=null; }
   clearInterval(providerReconnectWatchdog);
   socket.removeAllListeners("rates");
