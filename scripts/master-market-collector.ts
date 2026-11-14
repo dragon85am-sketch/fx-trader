@@ -321,8 +321,11 @@ let lastDbBatchAt: number | null = null;
 // V4 history priority is opt-in until production recovery/latency tests pass.
 // One SQL writer and one durable queue remain the source of truth.
 const V4_HISTORY_PRIORITY = process.env.OHLC_V4_HISTORY_PRIORITY === "true";
-const V4_RECENT_WINDOW_MS = Math.max(60_000, Math.min(3_600_000, Number(process.env.OHLC_V4_RECENT_WINDOW_MS || 300_000) || 300_000));
+const V4_RECENT_WINDOW_MS = Math.max(60_000, Math.min(3_600_000, Number(process.env.OHLC_V4_RECENT_WINDOW_MS || (V4_HISTORY_PRIORITY ? 3_600_000 : 300_000)) || 300_000));
 const V4_HISTORY_QUOTA = Math.max(1, Math.min(20, Number(process.env.OHLC_V4_HISTORY_QUOTA || 3) || 3));
+// Opt-in: admit a bounded number of recent pending rows during legacy recovery.
+// Never rewrite existing retry chunks or their ledger IDs.
+const V4_LIVE_ADMISSION_ROWS = Math.max(1, Math.min(64, Number(process.env.OHLC_V4_LIVE_ADMISSION_ROWS || 32) || 32));
 let historyWritesSinceLive = 0;
 let priorityLiveWrites = 0;
 let historyWrites = 0;
@@ -517,13 +520,16 @@ async function flushDb() {
     // Drain durable legacy chunks before moving pending rows into new chunks.
     // This avoids a large one-shot queue rewrite near the snapshot size guard.
     // Keep only a bounded number of newly frozen rows per flush.
-    if (DB_PROBE_ONCE || retryChunks.length <= RECOVERY_RETRY_THRESHOLD) {
-      const limit = DB_PROBE_ONCE ? pending.size : Math.min(pending.size, RECOVERY_NEW_ROWS);
-      const snapshot: Array<[string, TickBatch]> = [];
-      for (const entry of pending.entries()) {
-        if (snapshot.length >= limit) break;
-        snapshot.push(entry);
-      }
+    if (DB_PROBE_ONCE || V4_HISTORY_PRIORITY || retryChunks.length <= RECOVERY_RETRY_THRESHOLD) {
+      const recovering = retryChunks.length > RECOVERY_RETRY_THRESHOLD;
+      const limit = DB_PROBE_ONCE ? pending.size : Math.min(pending.size,
+        recovering && V4_HISTORY_PRIORITY ? V4_LIVE_ADMISSION_ROWS : RECOVERY_NEW_ROWS);
+      // During recovery, admit the freshest pending buckets first. Existing
+      // immutable chunks stay in place; chooseNextChunk prevents overtaking
+      // older writes touching the same candle key.
+      const snapshot: Array<[string, TickBatch]> = V4_HISTORY_PRIORITY && recovering
+        ? [...pending.entries()].sort((a, b) => b[1].bucket - a[1].bucket).slice(0, limit)
+        : [...pending.entries()].slice(0, limit);
       for (const [key] of snapshot) pending.delete(key);
       const chunkRowsForThisFlush = adaptiveChunkRows;
       for (let i = 0; i < snapshot.length; i += chunkRowsForThisFlush)
