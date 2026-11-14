@@ -321,11 +321,8 @@ let lastDbBatchAt: number | null = null;
 // V4 history priority is opt-in until production recovery/latency tests pass.
 // One SQL writer and one durable queue remain the source of truth.
 const V4_HISTORY_PRIORITY = process.env.OHLC_V4_HISTORY_PRIORITY === "true";
-const V4_RECENT_WINDOW_MS = Math.max(60_000, Math.min(3_600_000, Number(process.env.OHLC_V4_RECENT_WINDOW_MS || (V4_HISTORY_PRIORITY ? 3_600_000 : 300_000)) || 300_000));
+const V4_RECENT_WINDOW_MS = Math.max(60_000, Math.min(3_600_000, Number(process.env.OHLC_V4_RECENT_WINDOW_MS || 300_000) || 300_000));
 const V4_HISTORY_QUOTA = Math.max(1, Math.min(20, Number(process.env.OHLC_V4_HISTORY_QUOTA || 3) || 3));
-// Opt-in: admit a bounded number of recent pending rows during legacy recovery.
-// Never rewrite existing retry chunks or their ledger IDs.
-const V4_LIVE_ADMISSION_ROWS = Math.max(1, Math.min(64, Number(process.env.OHLC_V4_LIVE_ADMISSION_ROWS || 32) || 32));
 let historyWritesSinceLive = 0;
 let priorityLiveWrites = 0;
 let historyWrites = 0;
@@ -520,16 +517,13 @@ async function flushDb() {
     // Drain durable legacy chunks before moving pending rows into new chunks.
     // This avoids a large one-shot queue rewrite near the snapshot size guard.
     // Keep only a bounded number of newly frozen rows per flush.
-    if (DB_PROBE_ONCE || V4_HISTORY_PRIORITY || retryChunks.length <= RECOVERY_RETRY_THRESHOLD) {
-      const recovering = retryChunks.length > RECOVERY_RETRY_THRESHOLD;
-      const limit = DB_PROBE_ONCE ? pending.size : Math.min(pending.size,
-        recovering && V4_HISTORY_PRIORITY ? V4_LIVE_ADMISSION_ROWS : RECOVERY_NEW_ROWS);
-      // During recovery, admit the freshest pending buckets first. Existing
-      // immutable chunks stay in place; chooseNextChunk prevents overtaking
-      // older writes touching the same candle key.
-      const snapshot: Array<[string, TickBatch]> = V4_HISTORY_PRIORITY && recovering
-        ? [...pending.entries()].sort((a, b) => b[1].bucket - a[1].bucket).slice(0, limit)
-        : [...pending.entries()].slice(0, limit);
+    if (DB_PROBE_ONCE || retryChunks.length <= RECOVERY_RETRY_THRESHOLD) {
+      const limit = DB_PROBE_ONCE ? pending.size : Math.min(pending.size, RECOVERY_NEW_ROWS);
+      const snapshot: Array<[string, TickBatch]> = [];
+      for (const entry of pending.entries()) {
+        if (snapshot.length >= limit) break;
+        snapshot.push(entry);
+      }
       for (const [key] of snapshot) pending.delete(key);
       const chunkRowsForThisFlush = adaptiveChunkRows;
       for (let i = 0; i < snapshot.length; i += chunkRowsForThisFlush)
@@ -831,6 +825,38 @@ socket.on("connect_error", e => {
 });
 // Backstop for a connection that remains down despite Socket.IO's own retries.
 // Only one socket is ever used, so the provider's one-connection-per-key rule holds.
+// FX TRADE FEED-GAP GUARD (2026-11-14): detection is always on; recovery is opt-in.
+// Do not fabricate OHLC candles: a reconnect cannot reconstruct missing provider ticks.
+const FEED_SILENCE_ALERT_MS = Math.max(30_000, Number(process.env.FEED_SILENCE_ALERT_MS || 60_000));
+const FEED_SILENCE_RECONNECT = process.env.FEED_SILENCE_RECONNECT === "true";
+const FEED_SILENCE_RECONNECT_COOLDOWN_MS = Math.max(300_000, Number(process.env.FEED_SILENCE_RECONNECT_COOLDOWN_MS || 600_000));
+let feedSilenceAlerts = 0;
+let feedSilenceReconnects = 0;
+let lastFeedSilenceAlertAt: number | null = null;
+let lastFeedSilenceReconnectAt: number | null = null;
+// Weekend and feed-wide idle periods can be normal. Only enable reconnect after
+// confirming the provider is expected to stream continuously (e.g. BTCUSD).
+const feedSilenceWatchdog = setInterval(() => {
+  if (shuttingDown || !socket.connected || lastProviderPriceArrivalAt === null) return;
+  const now = Date.now();
+  const silentFor = now - lastProviderPriceArrivalAt;
+  if (silentFor < FEED_SILENCE_ALERT_MS) return;
+  if (lastFeedSilenceAlertAt === null || now - lastFeedSilenceAlertAt >= FEED_SILENCE_ALERT_MS) {
+    feedSilenceAlerts++;
+    lastFeedSilenceAlertAt = now;
+    console.warn(`[MASTER] FEED_SILENCE_ALERT no valid provider price for ${silentFor}ms; connected=${socket.connected}`);
+  }
+  if (FEED_SILENCE_RECONNECT &&
+      (lastFeedSilenceReconnectAt === null || now - lastFeedSilenceReconnectAt >= FEED_SILENCE_RECONNECT_COOLDOWN_MS)) {
+    lastFeedSilenceReconnectAt = now;
+    feedSilenceReconnects++;
+    console.warn(`[MASTER] FEED_SILENCE_RECONNECT after ${silentFor}ms; no candle synthesis`);
+    socket.disconnect();
+    socket.connect();
+  }
+}, 15_000);
+feedSilenceWatchdog.unref();
+
 const providerReconnectWatchdog = setInterval(() => {
   if (!shuttingDown && !socket.connected && !socket.active)
     scheduleProviderReconnect(1000);
@@ -897,7 +923,7 @@ const server=http.createServer((req,res)=>{
       walBytes,walSequence,walRecoveredTicks,lastWalSyncMs,
       checkpointAt:queueCheckpointAt,checkpointBytes:queueCheckpointBytes}));return;
   }
-  if(url.pathname==="/health"){res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});res.end(JSON.stringify({ok:true,mode:"MASTER_150",freshStart:FRESH_START,freshStartAt:FRESH_START?FRESH_START_AT:null,connected:liveRatesConnected,historyPaused:HISTORY_PAUSED,configured:PROVIDER_INSTRUMENTS.length,providerSubscriptions:providerSubscriptions(),forexSlashSubscriptions,diagnostics:{rawEventCounts:Object.fromEntries(rawEventCounts),rawSymbolCounts:Object.fromEntries(rawSymbolCounts),rawMessageShapes:Object.fromEntries(rawMessageShapes),lastRateAt,lastConnectAt,lastDisconnectAt},clients:totalClients(),receivedSymbols:Object.keys(latestTicks).length,latestTicks,dbWriting,dbPending:[...new Set([...pending.values()].map(b=>b.symbol))],dbPendingRows:pending.size,dbRetryRows:retryChunks.reduce((n,c)=>n+c.length,0),durableQueue:{directory:QUEUE_DIR,checkpointAt:queueCheckpointAt,checkpointBytes:queueCheckpointBytes,lastCheckpointMs:lastQueueCheckpointMs,maxCheckpointMs:maxQueueCheckpointMs,slowCheckpoints:slowQueueCheckpoints,recoveredRows:queueRecoveredRows,walBytes,walSequence,walRecoveredTicks,lastWalSyncMs,fatalError:queueFatalError},dbMetrics:{version:"4.0-priority-preview",v4HistoryPriority:V4_HISTORY_PRIORITY,v4DualWriter:V4_DUAL_WRITER,historyPaused:HISTORY_PAUSED,dbProbeOnce:DB_PROBE_ONCE,dbProbeAttempted,dbProbeSucceeded,v4LiveInFlight,v4HistoryInFlight,v4LiveCommitted,v4HistoryCommitted,v4ConflictDeferrals,v4WriterErrors,dbDrainMs:DB_DRAIN_MS,dbDrainBacklogRows:DB_DRAIN_BACKLOG_ROWS,drainSchedules,recoveryCheckpointGroups,recoveryCheckpointSaved,v4RecentWindowMs:V4_RECENT_WINDOW_MS,v4HistoryQuota:V4_HISTORY_QUOTA,priorityLiveWrites,historyWrites,dbSqlStartedAt,dbSqlAgeMs:dbSqlStartedAt===null?null:Date.now()-dbSqlStartedAt,dbSqlRowsInFlight,dbFlushStartedAt,dbFlushAgeMs:dbFlushStartedAt===null?null:Date.now()-dbFlushStartedAt,flushMs:DB_FLUSH_MS,chunkRows:DB_CHUNK_ROWS,adaptiveChunkRows,slowDbBatches,adaptiveReductions,adaptiveIncreases,successfulDbWrites,failedDbWrites,consecutiveDbFailures,lastDbWriteMs,lastDbSqlMs,lastDbCheckpointMs,maxDbSqlMs,lastDbBatchRows,lastDbBatchAt,lastDbSuccessAt,lastDbFailureAt,shutdownFlushFailed},ingestionDiagnostics:ingestionDiagnostics(),ohlcMetrics:{staleTicksRejected,staleTicksBySymbol:Object.fromEntries(staleTicksBySymbol),acceptedTicksBySymbol:Object.fromEntries(acceptedTicksBySymbol),invalidTimestampsRejected,futureTimestampsRejected,invalidPricesRejected,activeCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)>Date.now()).length,closedPendingCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)<=Date.now()).length},providerInfo:providerInfo||null,providerError:providerError||null,failedDbWrites,receivedCount:Object.fromEntries(receivedCount),unrecognizedSymbols:Object.fromEntries(unrecognizedSymbols),missingConfiguredSymbols:PROVIDER_INSTRUMENTS.filter(s=>!latestTicks[s])}));return;}
+  if(url.pathname==="/health"){res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});res.end(JSON.stringify({ok:true,mode:"MASTER_150",freshStart:FRESH_START,freshStartAt:FRESH_START?FRESH_START_AT:null,connected:liveRatesConnected,historyPaused:HISTORY_PAUSED,configured:PROVIDER_INSTRUMENTS.length,providerSubscriptions:providerSubscriptions(),forexSlashSubscriptions,diagnostics:{rawEventCounts:Object.fromEntries(rawEventCounts),rawSymbolCounts:Object.fromEntries(rawSymbolCounts),rawMessageShapes:Object.fromEntries(rawMessageShapes),lastRateAt,lastConnectAt,lastDisconnectAt},clients:totalClients(),receivedSymbols:Object.keys(latestTicks).length,latestTicks,dbWriting,dbPending:[...new Set([...pending.values()].map(b=>b.symbol))],dbPendingRows:pending.size,dbRetryRows:retryChunks.reduce((n,c)=>n+c.length,0),durableQueue:{directory:QUEUE_DIR,checkpointAt:queueCheckpointAt,checkpointBytes:queueCheckpointBytes,lastCheckpointMs:lastQueueCheckpointMs,maxCheckpointMs:maxQueueCheckpointMs,slowCheckpoints:slowQueueCheckpoints,recoveredRows:queueRecoveredRows,walBytes,walSequence,walRecoveredTicks,lastWalSyncMs,fatalError:queueFatalError},dbMetrics:{version:"4.0-priority-preview",v4HistoryPriority:V4_HISTORY_PRIORITY,v4DualWriter:V4_DUAL_WRITER,historyPaused:HISTORY_PAUSED,dbProbeOnce:DB_PROBE_ONCE,dbProbeAttempted,dbProbeSucceeded,v4LiveInFlight,v4HistoryInFlight,v4LiveCommitted,v4HistoryCommitted,v4ConflictDeferrals,v4WriterErrors,dbDrainMs:DB_DRAIN_MS,dbDrainBacklogRows:DB_DRAIN_BACKLOG_ROWS,drainSchedules,recoveryCheckpointGroups,recoveryCheckpointSaved,v4RecentWindowMs:V4_RECENT_WINDOW_MS,v4HistoryQuota:V4_HISTORY_QUOTA,priorityLiveWrites,historyWrites,dbSqlStartedAt,dbSqlAgeMs:dbSqlStartedAt===null?null:Date.now()-dbSqlStartedAt,dbSqlRowsInFlight,dbFlushStartedAt,dbFlushAgeMs:dbFlushStartedAt===null?null:Date.now()-dbFlushStartedAt,flushMs:DB_FLUSH_MS,chunkRows:DB_CHUNK_ROWS,adaptiveChunkRows,slowDbBatches,adaptiveReductions,adaptiveIncreases,successfulDbWrites,failedDbWrites,consecutiveDbFailures,lastDbWriteMs,lastDbSqlMs,lastDbCheckpointMs,maxDbSqlMs,lastDbBatchRows,lastDbBatchAt,lastDbSuccessAt,lastDbFailureAt,shutdownFlushFailed},ingestionDiagnostics:ingestionDiagnostics(),ohlcMetrics:{staleTicksRejected,staleTicksBySymbol:Object.fromEntries(staleTicksBySymbol),acceptedTicksBySymbol:Object.fromEntries(acceptedTicksBySymbol),invalidTimestampsRejected,futureTimestampsRejected,invalidPricesRejected,activeCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)>Date.now()).length,closedPendingCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)<=Date.now()).length},feedSilence:{thresholdMs:FEED_SILENCE_ALERT_MS,alertCount:feedSilenceAlerts,lastAlertAt:lastFeedSilenceAlertAt,silenceMs:lastProviderPriceArrivalAt===null?null:Date.now()-lastProviderPriceArrivalAt,reconnectEnabled:FEED_SILENCE_RECONNECT,reconnectCount:feedSilenceReconnects,lastReconnectAt:lastFeedSilenceReconnectAt},providerInfo:providerInfo||null,providerError:providerError||null,failedDbWrites,receivedCount:Object.fromEntries(receivedCount),unrecognizedSymbols:Object.fromEntries(unrecognizedSymbols),missingConfiguredSymbols:PROVIDER_INSTRUMENTS.filter(s=>!latestTicks[s])}));return;}
   const m=url.pathname.match(/^\/api\/(?:market\/)?([a-z0-9]+)\/stream$/i);
   if(m){ const symbol=normalizeMarketSymbol(m[1]); if(!PROVIDER_SET.has(symbol)){res.writeHead(404,{"Content-Type":"application/json"});res.end(JSON.stringify({ok:false,error:"Unknown symbol"}));return;} res.writeHead(200,{"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache, no-transform",Connection:"keep-alive","X-Accel-Buffering":"no","Access-Control-Allow-Origin":origin,Vary:"Origin"});res.write("retry: 3000\n\n");res.write(`event: status\ndata: ${JSON.stringify({provider:"live-rates",connected:liveRatesConnected,symbol,mode:"MASTER_150"})}\n\n`);if(latestTicks[symbol])res.write(`event: tick\ndata: ${JSON.stringify(latestTicks[symbol])}\n\n`);const set=clientSet(symbol);set.add(res);const keep=setInterval(()=>{try{res.write(`: keepalive ${Date.now()}\n\n`);}catch{}},15000);req.on("close",()=>{clearInterval(keep);set.delete(res);});return; }
   res.writeHead(200,{"Content-Type":"application/json"});res.end(JSON.stringify({ok:true,service:"FX Trade Master Market Collector",mode:"MASTER_150",configured:PROVIDER_INSTRUMENTS.length,health:"/health",streamPattern:"/api/market/{symbol}/stream"}));
@@ -920,6 +946,7 @@ async function shutdown(signal:string){
   clearInterval(dbStallWatchdog);
   if (providerReconnectTimer) { clearTimeout(providerReconnectTimer); providerReconnectTimer=null; }
   clearInterval(providerReconnectWatchdog);
+  clearInterval(feedSilenceWatchdog);
   socket.removeAllListeners("rates");
   socket.disconnect();
   if(flushTimer){clearTimeout(flushTimer);flushTimer=null;}
