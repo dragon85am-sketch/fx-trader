@@ -1,6 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 const telegramDeliveryDb = new PrismaClient();
-﻿import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
@@ -301,15 +301,22 @@ export async function POST(req: NextRequest) {
     const deliveryDb = telegramDeliveryDb;
     let claimed = false;
     if (notificationType !== "WEEKLY") {
-      try {
-        await deliveryDb.fxScannerTelegramDelivery.create({ data: { id: deliveryKey! } });
-        claimed = true;
-      } catch (err: any) {
-        if (err?.code === "P2002") {
-          return NextResponse.json({ error: "Delivery already claimed; verify Telegram manually before retry", deliveryKey }, { status: 409 });
-        }
-        throw err;
+      // Atomic claim: a duplicate deliveryKey is ignored by PostgreSQL instead
+      // of raising unique-constraint error 23505 (Prisma P2002).
+      // Never re-send an existing CLAIMED/SENT/UNCERTAIN delivery automatically.
+      const result = await deliveryDb.fxScannerTelegramDelivery.createMany({
+        data: [{ id: deliveryKey! }],
+        skipDuplicates: true,
+      });
+      if (result.count === 0) {
+        return NextResponse.json({
+          ok: true,
+          skipped: true,
+          reason: "Delivery already claimed; verify Telegram manually before retry",
+          deliveryKey,
+        });
       }
+      claimed = true;
     }
     // CLAIMED is intentionally not automatically released: a crash or timeout may
     // happen after Telegram accepted the message but before the HTTP response.
