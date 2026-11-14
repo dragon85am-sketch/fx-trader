@@ -4167,6 +4167,9 @@ kineticScroll: {
         <div className="relative"
           onPointerDownCapture={(e) => {
             if (activeDrawTool !== "SELECT" || e.pointerType !== "mouse" || e.button !== 0) return;
+            // FIX 4.8: axis overlays have their own pointer gestures. Never start
+            // native plot vertical pan for a price/time-axis drag.
+            if ((e.target as HTMLElement)?.closest?.('[data-fx-axis-handle]')) return;
             // Detach FOLLOW before lightweight-charts processes native dragging.
             // Do not capture the pointer or preventDefault: chart owns the gesture.
             // V4: no React state changes on pointer-down. Changing follow/detached
@@ -4198,16 +4201,10 @@ kineticScroll: {
                   }
                 }
                 const currentSpan = top - bottom;
-                if (marketSpan > 0 && currentSpan > marketSpan * 12) {
-                  // Reset the distorted scale without destroying drawings or X viewport.
-                  v6ManualPriceRangeRef.current = null;
-                  for (const priceSeries of v6PriceSeries()) {
-                    priceSeries.applyOptions({ autoscaleInfoProvider: undefined } as any);
-                  }
-                  chartRef.current?.priceScale("right").applyOptions({ autoScale: true });
-                  scheduleOverlayRefresh();
-                  return;
-                }
+                // FIX 4.8: never reset price autoscale at pointer-down.
+                // A reset here changes the viewport during the first drag frame
+                // and produces a visible jump. Explicit Center/Reset controls
+                // remain responsible for clearing distorted scales.
                 nativeVerticalPanRef.current = {
                   pointerId: e.pointerId, startY: e.clientY,
                   pendingY: e.clientY, height: Math.max(1, rect.height),
@@ -4264,6 +4261,7 @@ kineticScroll: {
               Jest aktywny tylko w SELECT i ma prawdziwy kursor ns-resize. */}
           {activeDrawTool === "SELECT" ? (
             <div
+              data-fx-axis-handle="price"
               className="absolute right-0 top-0 z-[45]"
               style={{
                 width: 86,
@@ -4285,6 +4283,7 @@ kineticScroll: {
               Ostatnie 72 px zostawiamy osi ceny. */}
           {activeDrawTool === "SELECT" ? (
             <div
+              data-fx-axis-handle="time"
               className="absolute bottom-0 left-0 z-[45]"
               style={{
                 height: 30,
