@@ -20,31 +20,40 @@ function recentMomentum(c:Candle[],side:Side){const last=Math.max(0,c.length-2),
 export function scan4of4(c:Candle[]){const ew=emaWmaSignal(c),ad=adxDiSignal(c);const score=(side:Side)=>{const want=side==="BUY"?"UP":"DOWN";return Number(ew===want)+Number(ad===want)+Number(recentSweep(c,side))+Number(recentMomentum(c,side));};const buy=score("BUY"),sell=score("SELL");if(buy===4&&buy>sell)return{side:"BUY" as Side,count:4 as const};if(sell===4&&sell>buy)return{side:"SELL" as Side,count:4 as const};return{side:null,count:Math.max(buy,sell) as 0|1|2|3|4};}
 export function buildLevels(c:Candle[],side:Side):Levels|null{const s=lastClosed(c),atr=calcATR(c,TARGET.atrPeriod);if(!s||!atr)return null;const entry=s.close,sl=side==="BUY"?entry-atr*TARGET.slMultiplier:entry+atr*TARGET.slMultiplier;const dir=side==="BUY"?1:-1;return{side,entry,sl,tps:[entry+dir*atr*TARGET.tp1Multiplier,entry+dir*atr*TARGET.tp2Multiplier,entry+dir*atr*TARGET.tp3Multiplier],rr:2};}
 export function advanceTrade(c:Candle[],side:Side,l:Levels,signalTime:number,tp1Hit=false,tp2Hit=false){
-  // Last element is treated as the still-forming candle, as in scan4of4().
-  // Conservative OHLC policy: protective level wins when intrabar order is unknown.
+  // OHLC cannot reveal whether the high or low occurred first inside a candle.
+  // On the TP1 activation candle, never assume a subsequent BE touch.
+  // Only closed candles are used (last element is assumed to be forming).
+  type Exit = null | "TP2" | "SL" | "TP1_BE";
   const start=c.findIndex(x=>x.time>signalTime);
-  if(start<0)return {status:null as null|"TP3"|"SL"|"TP1_BE",tp1Hit,tp2Hit};
-  const isBuy=side==="BUY";
+  if(start<0)return {status:null as Exit,tp1Hit,tp2Hit};
+  const buy=side==="BUY";
+  // Replay from the signal to recover the true activation state when possible.
+  // If the signal candle is outside the available history, retain persisted TP1.
+  const hasSignalHistory=c.some(x=>x.time===signalTime);
+  let armed=hasSignalHistory?false:tp1Hit;
   for(let i=start;i<c.length-1;i++){
     const x=c[i];
-    const stopTouched=isBuy?x.low<=l.sl:x.high>=l.sl;
-    const entryTouched=isBuy?x.low<=l.entry:x.high>=l.entry;
-    const hit1=isBuy?x.high>=l.tps[0]:x.low<=l.tps[0];
-    const hit2=isBuy?x.high>=l.tps[1]:x.low<=l.tps[1];
-    const hit3=isBuy?x.high>=l.tps[2]:x.low<=l.tps[2];
-    if(!tp1Hit&&stopTouched)return {status:"SL" as const,tp1Hit:false,tp2Hit:false};
-    // If BE was already armed, it takes precedence over a target on the same candle.
-    if(tp1Hit&&entryTouched)return {status:"TP1_BE" as const,tp1Hit:true,tp2Hit};
-    if(!tp1Hit&&hit1){
-      tp1Hit=true;
-      // TP1 and retracement to entry inside one candle: order is unknown.
-      // Mark as BE conservatively rather than assuming TP3.
-      if(entryTouched)return {status:"TP1_BE" as const,tp1Hit:true,tp2Hit:false};
+    const stop=buy?x.low<=l.sl:x.high>=l.sl;
+    const be=buy?x.low<=l.entry:x.high>=l.entry;
+    const first=buy?x.high>=l.tps[0]:x.low<=l.tps[0];
+    const second=buy?x.high>=l.tps[1]:x.low<=l.tps[1];
+    if(armed){
+      // Conservative resolution of an OHLC bar touching both BE and TP2.
+      if(be)return {status:"TP1_BE" as const,tp1Hit:true,tp2Hit:false};
+      if(second)return {status:"TP2" as const,tp1Hit:true,tp2Hit:true};
+    }else{
+      // Until TP1, the initial SL has priority if the bar spans both levels.
+      if(stop)return {status:"SL" as const,tp1Hit:false,tp2Hit:false};
+      if(first){
+        armed=true;
+        // TP1 and TP2 on the same bar: TP2 is unambiguous only when
+        // the candle never touched Entry (hence never touched BE).
+        if(second&&!be)return {status:"TP2" as const,tp1Hit:true,tp2Hit:true};
+        // Otherwise arm BE for subsequent closed candles only.
+      }
     }
-    if(tp1Hit&&hit2)tp2Hit=true;
-    if(tp1Hit&&hit3)return {status:"TP3" as const,tp1Hit:true,tp2Hit:true};
   }
-  return {status:null,tp1Hit,tp2Hit};
+  return {status:null as Exit,tp1Hit:armed,tp2Hit:false};
 }
 
 

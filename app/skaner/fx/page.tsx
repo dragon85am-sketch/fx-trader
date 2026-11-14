@@ -2780,7 +2780,7 @@ export default function MarketScannerPage() {
   }, []);
 
   const [panelH, setPanelH] = React.useState<number>(780);
-  const [chartHeight, setChartHeight] = React.useState<number>(690);
+  const [chartHeight, setChartHeight] = React.useState<number>(780);
 
   const candlesCache = React.useRef<Map<string, Candle[]>>(new Map());
 

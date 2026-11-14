@@ -13,15 +13,17 @@ const INTERVAL_MS: Record<string, number> = {
   "1day": 86_400_000,
 };
 
-// Required UTC cutoff: never expose candles from the pre-reset history.
-// Configure OHLC_HISTORY_START_AT in the web application's environment.
-function historyStart(): Date {
-  const raw = process.env.OHLC_HISTORY_START_AT;
+// Separate post-reset cutoffs for FX and crypto. Keep legacy cutoff as fallback
+// for existing production environments that have not adopted the new variables.
+const CRYPTO_SYMBOL = /^(BTC|ETH|SOL|XRP|BNB|ADA|DOGE|LTC|BCH|DOT|AVAX|LINK|TRX|MATIC|POL|SHIB|UNI|ATOM)(USD|USDT|USDC|EUR|GBP)?$/i;
+function historyStart(symbol: string): Date {
+  const key = CRYPTO_SYMBOL.test(symbol) ? "OHLC_CRYPTO_HISTORY_START_AT" : "OHLC_FOREX_HISTORY_START_AT";
+  const raw = process.env[key] || process.env.OHLC_HISTORY_START_AT;
   if (!raw || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(raw)) {
-    throw new Error("OHLC_HISTORY_START_AT must be a UTC ISO timestamp, e.g. 2026-11-06T22:00:00Z");
+    throw new Error(`${key} (or legacy OHLC_HISTORY_START_AT) must be a UTC ISO timestamp`);
   }
   const date = new Date(raw);
-  if (!Number.isFinite(date.getTime())) throw new Error("Invalid OHLC_HISTORY_START_AT");
+  if (!Number.isFinite(date.getTime())) throw new Error(`Invalid ${key}`);
   return date;
 }
 
@@ -196,16 +198,17 @@ async function readCandles(symbol: string, interval: string, limit: number, star
   return { rows, values: serializeRows(rows) };
 }
 
-async function readCandlesBatch(symbols: string[], interval: string, limit: number, start: Date) {
+async function readCandlesBatch(symbols: string[], interval: string, limit: number) {
+  const requests = symbols.map((symbol) => Prisma.sql`SELECT ${symbol}::text AS "symbol", ${historyStart(symbol)}::timestamp AS "start"`);
   // One query, bounded index-friendly lookup per requested symbol.
   // Requires an efficient index on (symbol, interval, bucket DESC).
   const rows = await prisma.$queryRaw<Row[]>(Prisma.sql`
     SELECT c."symbol", c."bucket", c."open", c."high", c."low", c."close", c."ticks"
-    FROM unnest(ARRAY[${Prisma.join(symbols)}]::text[]) AS requested("symbol")
+    FROM (${Prisma.join(requests, " UNION ALL ")}) AS requested
     CROSS JOIN LATERAL (
       SELECT mc."symbol", mc."bucket", mc."open", mc."high", mc."low", mc."close", mc."ticks"
       FROM "MarketCandle" AS mc
-      WHERE mc."symbol" = requested."symbol" AND mc."interval" = ${interval} AND mc."bucket" >= ${start}
+      WHERE mc."symbol" = requested."symbol" AND mc."interval" = ${interval} AND mc."bucket" >= requested."start"
       ORDER BY mc."bucket" DESC
       LIMIT ${limit}
     ) AS c
@@ -230,7 +233,6 @@ async function readCandlesBatch(symbols: string[], interval: string, limit: numb
 
 export async function GET(req: NextRequest) {
   try {
-    const start = historyStart();
     const interval = req.nextUrl.searchParams.get("interval") || "1min";
     const requested = Number(req.nextUrl.searchParams.get("limit") || "300");
     const limit = Math.max(1, Math.min(2000, Number.isFinite(requested) ? requested : 300));
@@ -252,9 +254,9 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ status: "error", message: "Missing symbols" }, { status: 400 });
       }
 
-      const symbolData = await readCandlesBatch(symbols, interval, limit, start);
+      const symbolData = await readCandlesBatch(symbols, interval, limit);
       return NextResponse.json(
-        { status: "ok", interval, historyStartAt: start.toISOString(), symbols: symbolData },
+        { status: "ok", interval, historyStartAtBySymbol: Object.fromEntries(symbols.map((s) => [s, historyStart(s).toISOString()])), symbols: symbolData },
         { headers: { "Cache-Control": "no-store, no-cache, must-revalidate" } }
       );
     }
@@ -264,6 +266,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ status: "error", message: "Missing symbol" }, { status: 400 });
     }
 
+    const start = historyStart(symbol);
     const { rows, values } = await readCandles(symbol, interval, limit, start);
     const overlay = await overlayLive(symbol, interval, values, limit, start);
     const health = healthFromValues(overlay.values, interval);

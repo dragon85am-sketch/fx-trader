@@ -491,10 +491,10 @@ React.useEffect(() => {
       const logicalX = Number(p.logical);
       let x: number | null = null;
 
-      // Drawings created by this version keep their exact logical X anchor.
-      // This is the same horizontal coordinate system used by Lightweight Charts,
-      // so pan/zoom/future-space do not re-interpolate X from RENKO timestamps.
-      if (chart && Number.isFinite(logicalX)) {
+      // Logical bar indices change whenever the timeframe changes.
+      // A saved drawing must therefore be projected from absolute market time.
+      // Keep logical anchors only as a fallback for legacy drawings without time.
+      if (!Number.isFinite(Number(p.t)) && chart && Number.isFinite(logicalX)) {
         const direct = chart.timeScale().logicalToCoordinate(logicalX as any);
         if (direct != null && Number.isFinite(Number(direct))) x = Number(direct);
       }
@@ -925,7 +925,7 @@ if (o.type === "FIBO") {
 
       ctx.restore();
     },
-    [chartRef, candleSeriesRef, dataToPoint, marketTimeToX]
+    [chartRef, candleSeriesRef, dataToPoint, marketTimeToX, fiboLevels]
   );
 
   const drawTradeZones = React.useCallback((ctx: CanvasRenderingContext2D) => {
@@ -1195,6 +1195,8 @@ if (o.type === "FIBO") {
 
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      const target = e.target;
+      if (target instanceof HTMLElement && (target.isContentEditable || Boolean(target.closest('input, textarea, select, [contenteditable="true"], [role="textbox"]')))) return;
       if (e.key === "Escape") {
         setDraft(null);
         setPreview(null);

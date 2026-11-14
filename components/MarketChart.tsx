@@ -1135,6 +1135,33 @@ externalCrosshairTime,
     priceMax: number;
   } | null>(null);
   const manualPanRef = React.useRef(false);
+  // V6: all visible series on the RIGHT price scale must share the same
+  // manually translated range. Otherwise EMA/BB/Supertrend can silently
+  // override the candle-only autoscale provider and resist vertical dragging.
+  const nativeVerticalPanRef = React.useRef<{
+    pointerId: number; startY: number; height: number; min: number; max: number;
+    pendingY: number; raf: number | null;
+  } | null>(null);
+  const v6ManualPriceRangeRef = React.useRef<{ min: number; max: number } | null>(null);
+  const v6PriceRangeProvider = React.useCallback(() => {
+    const r = v6ManualPriceRangeRef.current;
+    return r ? { priceRange: { minValue: r.min, maxValue: r.max }, margins: { above: 0, below: 0 } } : null;
+  }, []);
+  const v6PriceSeries = React.useCallback(() => {
+    return [
+      candleSeriesRef.current,
+      ...Array.from(emaSeriesMapRef.current.values()),
+      bbSeriesRef.current.upper, bbSeriesRef.current.basis, bbSeriesRef.current.lower,
+      supertrendSeriesRef.current.up, supertrendSeriesRef.current.down,
+      tradeLineSeriesRef.current.entry, tradeLineSeriesRef.current.sl,
+      ...tradeLineSeriesRef.current.tps,
+    ].filter(Boolean) as Array<ISeriesApi<any>>;
+  }, []);
+
+
+  // Independent LIVE/PAN: ticks may paint candles, but expensive indicator/overlay
+  // work is deferred until the pointer gesture ends.
+  const deferredLiveIndicatorsRef = React.useRef(false);
   // VANTAGE-SMOOTH V5: live ticks must never rebuild the hidden X timeline.
   // Rebuilding it with setData() can recalculate logical indexes and kick a
   // manually positioned viewport backwards. Keep only the last published time.
@@ -1262,6 +1289,12 @@ externalCrosshairTime,
     crossedIdx: null,
   });
 
+  React.useEffect(() => () => {
+    const pan = nativeVerticalPanRef.current;
+    if (pan?.raf != null) cancelAnimationFrame(pan.raf);
+    nativeVerticalPanRef.current = null;
+  }, []);
+
   const [followOnTick, setFollowOnTick] = React.useState<boolean>(() => {
     try {
       const raw = localStorage.getItem("chart_follow_tick");
@@ -1279,6 +1312,10 @@ externalCrosshairTime,
   });
 
   const [detached, setDetached] = React.useState<boolean>(false);
+  // V4: release the drag guard only after FOLLOW has been detached in React.
+  React.useEffect(() => {
+    if (detached && !followOnTick) manualPanRef.current = false;
+  }, [detached, followOnTick]);
   const [overlayTick, setOverlayTick] = React.useState(0);
   // VANTAGE-SMOOTH V3: collapse high-frequency pointer work to one React
   // update per animation frame. Lightweight Charts itself is updated directly;
@@ -1291,6 +1328,27 @@ externalCrosshairTime,
       setOverlayTick((v) => v + 1);
     });
   }, []);
+
+  const applyNativeVerticalPan = React.useCallback(() => {
+    const pan = nativeVerticalPanRef.current;
+    const chart = chartRef.current;
+    if (!pan || !chart) return;
+    pan.raf = null;
+    const dy = pan.pendingY - pan.startY;
+    // The price shift uses the price/coordinate scale captured at pointer-down;
+    // it never accumulates rounding errors from repeated pointer events.
+    const shift = (dy / pan.height) * (pan.max - pan.min);
+    v6ManualPriceRangeRef.current = { min: pan.min + shift, max: pan.max + shift };
+    try {
+      // All right-scale series need the SAME fixed range. A single candle
+      // provider is insufficient when indicators contribute their own range.
+      for (const series of v6PriceSeries()) {
+        series.applyOptions({ autoscaleInfoProvider: v6PriceRangeProvider as any } as any);
+      }
+      chart.priceScale("right").applyOptions({ autoScale: true });
+      scheduleOverlayRefresh();
+    } catch {}
+  }, [v6PriceSeries, v6PriceRangeProvider, scheduleOverlayRefresh]);
 
   const [alphaCrosshair, setAlphaCrosshair] = React.useState<{
     x: number;
@@ -1328,6 +1386,7 @@ externalCrosshairTime,
   // so its right edge stays on the newest bar + configured right padding.
   // This avoids scrollToRealTime(), which can jump to the wrong edge after setData().
   const followLatestBar = React.useCallback((preferredSpan?: number) => {
+    if (manualPanRef.current) return;
     const chart = chartRef.current;
     const data = displayCacheRef.current;
     if (!chart || !data?.length) return;
@@ -1367,20 +1426,21 @@ externalCrosshairTime,
     if (!chart || !candleSeries || !safe?.length) return [];
 
     try {
-      const detectedPatterns = renko
-        ? detectRenkoPatterns(safe)
-        : detectCandlePatterns(safe);
+      // One canonical OHLC signal stream for Candles, HA and Renko.
+      const source = rawCacheRef.current;
+      if (!source.length) return [];
+      const detectedPatterns = detectCandlePatterns(source);
 
       return detectedPatterns.flatMap((p, idx) => {
-        const x = chart.timeScale().timeToCoordinate(p.time);
-        const signalCandle = safe.find(
-          (c) => Number(c.time) === Number(p.time)
-        ) as any;
-
-        // W RENKO etykieta BUY / SELL ma być POD wykrytą cegłą.
-        const labelPrice = renko
-          ? toNum(signalCandle?.low ?? p.price)
-          : p.price;
+        // Renko has a sparse timeline: attach the same OHLC signal to the
+        // closest displayed brick, without recalculating the signal itself.
+        const nearest = renko
+          ? safe.reduce((best, c) =>
+              Math.abs(Number(c.time) - Number(p.time)) < Math.abs(Number(best.time) - Number(p.time)) ? c : best,
+              safe[0])
+          : null;
+        const x = chart.timeScale().timeToCoordinate((nearest?.time ?? p.time) as any);
+        const labelPrice = p.price;
 
         const y0 = candleSeries.priceToCoordinate(labelPrice);
         if (x == null || y0 == null) return [];
@@ -1393,7 +1453,7 @@ externalCrosshairTime,
           key: `${Number(p.time)}-${p.label}-${idx}`,
           x: Number(x),
           y,
-          label: renko ? p.side : p.label,
+          label: p.label,
           side: p.side,
         }];
       });
@@ -1413,9 +1473,9 @@ externalCrosshairTime,
   // SELL: SL nad ostatnim lokalnym LH / szczytem przed wybiciem.
   // ============================================================
   const patternTradeLevels = React.useMemo<Levels | undefined>(() => {
-    if (!patternsEnabled || renko) return undefined;
+    if (!patternsEnabled) return undefined;
 
-    const safe = displayCacheRef.current;
+    const safe = rawCacheRef.current;
     if (!safe?.length) return undefined;
 
     const signals = detectCandlePatterns(safe);
@@ -1521,9 +1581,9 @@ externalCrosshairTime,
   // Dzięki temu strefy zaczynają się dokładnie przy świecy breakout,
   // zamiast od lewej krawędzi całego wykresu.
   const patternTradeSignalTime = React.useMemo<UTCTimestamp | null>(() => {
-    if (!patternsEnabled || renko) return null;
+    if (!patternsEnabled) return null;
 
-    const safe = displayCacheRef.current;
+    const safe = rawCacheRef.current;
     if (!safe?.length) return null;
 
     const signals = detectCandlePatterns(safe);
@@ -2387,7 +2447,7 @@ externalCrosshairTime,
         fixLeftEdge: false,
         fixRightEdge: false,
         lockVisibleTimeRangeOnResize: false,
-        rightBarStaysOnScroll: true,
+        rightBarStaysOnScroll: false, // V4: do not pin last bar during manual pan
         timeVisible: true,
         secondsVisible: false,
         // Lightweight Charts interprets UTCTimestamp correctly, but without a
@@ -2396,10 +2456,9 @@ externalCrosshairTime,
         tickMarkFormatter: (time: any) => formatChartAxisTime(time),
       },
 handleScroll: {
-  // Pan lewo/prawo obsługujemy własnym pointer handlerem poniżej.
-  // Wyłączenie natywnego drag usuwa podwójne/przeciwne przesuwanie.
-  pressedMouseMove: false,
-  horzTouchDrag: false,
+  // V3 TEST: native mouse pan, no custom plot pointer overlay.
+  pressedMouseMove: true,
+  horzTouchDrag: true,
   vertTouchDrag: false,
   mouseWheel: true,
 },
@@ -2415,8 +2474,8 @@ handleScale: {
 },
 
 kineticScroll: {
-  mouse: true,
-  touch: true,
+  mouse: false,
+  touch: false,
 },
       crosshair: {
         mode: CrosshairMode.Normal,
@@ -3134,7 +3193,8 @@ kineticScroll: {
       const lastClose = toNum((renkoData[renkoData.length - 1] as any)?.close);
       const prec = pricePrecision ?? guessPrecision(symbol, lastClose);
       const minMove = minMoveFromPrecision(prec);
-      applyIndicators(renkoData, prec, minMove);
+      if (manualPanRef.current) deferredLiveIndicatorsRef.current = true;
+      else applyIndicators(renkoData, prec, minMove);
 
       if (followOnTick && !detached && !manualPanRef.current) {
         try {
@@ -3168,7 +3228,8 @@ kineticScroll: {
       const lastClose = toNum((ha[ha.length - 1] as any)?.close);
       const prec = pricePrecision ?? guessPrecision(symbol, lastClose);
       const minMove = minMoveFromPrecision(prec);
-      applyIndicators(ha, prec, minMove);
+      if (manualPanRef.current) deferredLiveIndicatorsRef.current = true;
+      else applyIndicators(ha, prec, minMove);
 
       if (followOnTick && !detached && !manualPanRef.current) {
         try {
@@ -3188,7 +3249,9 @@ kineticScroll: {
 
     const ds = displayCacheRef.current;
     const nowMs = Date.now();
-    if (ds?.length && nowMs - lastIndicatorLiveUpdateRef.current >= 250) {
+    if (manualPanRef.current) {
+      deferredLiveIndicatorsRef.current = true;
+    } else if (ds?.length && nowMs - lastIndicatorLiveUpdateRef.current >= 250) {
       lastIndicatorLiveUpdateRef.current = nowMs;
       const lastClose = toNum((ds[ds.length - 1] as any)?.close);
       const prec = pricePrecision ?? guessPrecision(symbol, lastClose);
@@ -3431,10 +3494,13 @@ kineticScroll: {
     if (!chart || !candleSeries) return;
 
     try {
-      // Przywracamy normalny autoscale Lightweight Charts.
-      candleSeries.applyOptions({
-        autoscaleInfoProvider: undefined,
-      } as any);
+      // Restore autoscale for ALL right-scale series, not only candles.
+      // V6 sets a shared provider on indicators too; leaving one behind
+      // can keep the chart flattened after a price-axis reset.
+      v6ManualPriceRangeRef.current = null;
+      for (const priceSeries of v6PriceSeries()) {
+        priceSeries.applyOptions({ autoscaleInfoProvider: undefined } as any);
+      }
 
       chart.priceScale("right").applyOptions({
         autoScale: true,
@@ -3543,7 +3609,10 @@ kineticScroll: {
 
       // Remove any manual Y transform left by price-axis dragging/panning and
       // let Lightweight Charts fit the newly visible market range.
-      series.applyOptions({ autoscaleInfoProvider: undefined } as any);
+      v6ManualPriceRangeRef.current = null;
+      for (const priceSeries of v6PriceSeries()) {
+        priceSeries.applyOptions({ autoscaleInfoProvider: undefined } as any);
+      }
       chart.priceScale("right").applyOptions({ autoScale: true });
 
       // Center is a one-shot action: preserve current Follow Live state.
@@ -3575,11 +3644,17 @@ kineticScroll: {
       const lows = visible.map((c) => Number(c.low)).filter(Number.isFinite);
       const highs = visible.map((c) => Number(c.high)).filter(Number.isFinite);
 
-      let priceMin = lows.length ? Math.min(...lows) : 0;
-      let priceMax = highs.length ? Math.max(...highs) : 1;
+      // Use the CURRENT visible price scale rather than recalculating it from
+      // candles. Recalculating on every pointer-down recenters a manually
+      // shifted chart and makes consecutive vertical drags jump.
+      const plotHeight = Math.max(1, e.currentTarget.clientHeight);
+      const topPrice = Number(candleSeries.coordinateToPrice(0));
+      const bottomPrice = Number(candleSeries.coordinateToPrice(plotHeight));
+      let priceMin = Number.isFinite(bottomPrice) ? bottomPrice : (lows.length ? Math.min(...lows) : 0);
+      let priceMax = Number.isFinite(topPrice) ? topPrice : (highs.length ? Math.max(...highs) : 1);
       if (!Number.isFinite(priceMin) || !Number.isFinite(priceMax) || priceMax <= priceMin) {
-        priceMin = 0;
-        priceMax = 1;
+        priceMin = lows.length ? Math.min(...lows) : 0;
+        priceMax = highs.length ? Math.max(...highs) : 1;
       }
 
       // Dla TOUCH nie odpinamy FOLLOW przy samym dotknięciu.
@@ -3665,7 +3740,7 @@ kineticScroll: {
     const candleSeries = candleSeriesRef.current;
 
     // Crosshair w stylu Alpha działa także bez wciśniętego przycisku myszy.
-    if (chart && candleSeries && e.pointerType !== "touch") {
+    if (!state && chart && candleSeries && e.pointerType !== "touch") {
       try {
         const rect = e.currentTarget.getBoundingClientRect();
         const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
@@ -3731,23 +3806,29 @@ kineticScroll: {
         }
       }
 
-      // PAN X — przeciąganie lewo/prawo.
-      const span = Math.max(1, state.to - state.from);
-      const barsDelta = (dx / state.width) * span;
+      // SMOOTH PAN V2: absolute pointer anchor, independent from LIVE redraws.
+      // Never use the chart's current range as the next drag origin: a LIVE
+      // time-scale update could otherwise rebase the gesture and kick it back.
+      const ts: any = chart.timeScale();
+      const stepDx = e.clientX - state.startX;
+      const stepDy = e.clientY - state.startY;
 
-      (chart.timeScale() as any).setVisibleLogicalRange?.({
-        from: state.from - barsDelta,
-        to: state.to - barsDelta,
-      });
+      if (stepDx !== 0) {
+        const span = Math.max(1, state.to - state.from);
+        const barsDelta = (stepDx / state.width) * span;
+        ts.setVisibleLogicalRange?.({
+          from: state.from - barsDelta,
+          to: state.to - barsDelta,
+        });
+      }
 
-      // PAN Y wykresu tylko myszką / penem.
-      // Na dotyku pionowy ruch jest zarezerwowany dla scrolla strony.
-      if (state.pointerType !== "touch" || fullscreenMode) {
+      // Y is anchored to the original price range as well; no accumulation of
+      // rounding errors and no dependence on an autoscale result from a tick.
+      if (stepDy !== 0 && (state.pointerType !== "touch" || fullscreenMode)) {
         const priceSpan = Math.max(1e-12, state.priceMax - state.priceMin);
-        const priceShift = (dy / state.height) * priceSpan;
+        const priceShift = (stepDy / state.height) * priceSpan;
         const minValue = state.priceMin + priceShift;
         const maxValue = state.priceMax + priceShift;
-
         candleSeries.applyOptions({
           autoscaleInfoProvider: (() => ({
             priceRange: { minValue, maxValue },
@@ -3757,11 +3838,13 @@ kineticScroll: {
         chart.priceScale("right").applyOptions({ autoScale: true });
       }
 
+      // The chart canvas moves synchronously; overlays are synchronized on the
+      // next animation frame, not on each pointer event.
       scheduleOverlayRefresh();
       e.preventDefault();
       e.stopPropagation();
     } catch {}
-  }, [fullscreenMode]);
+  }, [fullscreenMode, scheduleOverlayRefresh]);
 
   const beginTwoFingerTouch = React.useCallback((e: React.TouchEvent<HTMLDivElement>) => {
     if (activeDrawTool !== "SELECT" || e.touches.length !== 2) return;
@@ -3909,12 +3992,26 @@ kineticScroll: {
     const state = plotPanRef.current;
     if (state?.pointerId !== e.pointerId) return;
     plotPanRef.current = null;
+    // Release the interaction lock only after pointer capture is finished.
+    // Do not re-enable FOLLOW LIVE: the user's manual viewport remains detached.
+    manualPanRef.current = false;
+    if (deferredLiveIndicatorsRef.current) {
+      deferredLiveIndicatorsRef.current = false;
+      const data = displayCacheRef.current;
+      if (data.length) {
+        const lastClose = toNum((data[data.length - 1] as any)?.close);
+        const prec = pricePrecision ?? guessPrecision(symbol, lastClose);
+        applyIndicators(data, prec, minMoveFromPrecision(prec));
+        lastIndicatorLiveUpdateRef.current = Date.now();
+      }
+    }
+    scheduleOverlayRefresh();
     try { e.currentTarget.releasePointerCapture?.(e.pointerId); } catch {}
     if (state.pointerType !== "touch" || state.gesture === "chart") {
       e.preventDefault();
       e.stopPropagation();
     }
-  }, []);
+  }, [applyIndicators, pricePrecision, symbol, scheduleOverlayRefresh]);
 
 
   return (
@@ -4068,7 +4165,84 @@ kineticScroll: {
         `}</style>
 
         <div className="relative"
-          onPointerMoveCapture={(e) => { if (e.pointerType !== "touch") updateAlphaCrosshairFromClient(e.clientX, e.clientY); }}
+          onPointerDownCapture={(e) => {
+            if (activeDrawTool !== "SELECT" || e.pointerType !== "mouse" || e.button !== 0) return;
+            // Detach FOLLOW before lightweight-charts processes native dragging.
+            // Do not capture the pointer or preventDefault: chart owns the gesture.
+            // V4: no React state changes on pointer-down. Changing follow/detached
+            // immediately re-ran both data effects (setData on history) mid-gesture.
+            // The ref already prevents every followLatestBar() while dragging.
+            manualPanRef.current = true;
+            const series = candleSeriesRef.current;
+            const plot = containerRef.current;
+            if (series && plot) {
+              const rect = plot.getBoundingClientRect();
+              const top = Number(series.coordinateToPrice(0));
+              const bottom = Number(series.coordinateToPrice(rect.height));
+              if (Number.isFinite(top) && Number.isFinite(bottom) && top > bottom) {
+                // Guard against a stale/expanded autoscale range (flat candles).
+                // Do not use a corrupted range as the baseline for the next drag.
+                const visibleRange = chartRef.current?.timeScale().getVisibleLogicalRange();
+                const bars = displayCacheRef.current;
+                let marketSpan = 0;
+                if (visibleRange && bars.length) {
+                  const from = Math.max(0, Math.floor(Number(visibleRange.from)));
+                  const to = Math.min(bars.length - 1, Math.ceil(Number(visibleRange.to)));
+                  if (from <= to) {
+                    let low = Infinity, high = -Infinity;
+                    for (let i = from; i <= to; i++) {
+                      low = Math.min(low, Number(bars[i].low));
+                      high = Math.max(high, Number(bars[i].high));
+                    }
+                    if (Number.isFinite(low) && Number.isFinite(high)) marketSpan = high - low;
+                  }
+                }
+                const currentSpan = top - bottom;
+                if (marketSpan > 0 && currentSpan > marketSpan * 12) {
+                  // Reset the distorted scale without destroying drawings or X viewport.
+                  v6ManualPriceRangeRef.current = null;
+                  for (const priceSeries of v6PriceSeries()) {
+                    priceSeries.applyOptions({ autoscaleInfoProvider: undefined } as any);
+                  }
+                  chartRef.current?.priceScale("right").applyOptions({ autoScale: true });
+                  scheduleOverlayRefresh();
+                  return;
+                }
+                nativeVerticalPanRef.current = {
+                  pointerId: e.pointerId, startY: e.clientY,
+                  pendingY: e.clientY, height: Math.max(1, rect.height),
+                  min: bottom, max: top, raf: null,
+                };
+                applyNativeVerticalPan();
+              }
+            }
+          }}
+          onPointerUpCapture={() => {
+            const pan = nativeVerticalPanRef.current;
+            if (pan?.raf != null) cancelAnimationFrame(pan.raf);
+            if (pan) { pan.raf = null; applyNativeVerticalPan(); }
+            nativeVerticalPanRef.current = null;
+            if (!manualPanRef.current) return;
+            setFollowOnTick(false);
+            setDetached(true);
+          }}
+          onPointerCancelCapture={() => {
+            const pan = nativeVerticalPanRef.current;
+            if (pan?.raf != null) cancelAnimationFrame(pan.raf);
+            nativeVerticalPanRef.current = null;
+            if (!manualPanRef.current) return;
+            setFollowOnTick(false);
+            setDetached(true);
+          }}
+          onPointerMoveCapture={(e) => {
+            const pan = nativeVerticalPanRef.current;
+            if (pan && pan.pointerId === e.pointerId && (e.buttons & 1)) {
+              pan.pendingY = e.clientY;
+              if (pan.raf == null) pan.raf = requestAnimationFrame(applyNativeVerticalPan);
+            }
+            if (!manualPanRef.current && e.pointerType !== "touch")
+              updateAlphaCrosshairFromClient(e.clientX, e.clientY);
+          }}
           onPointerLeave={() => setAlphaCrosshair(null)}
         >
           <div
@@ -4083,30 +4257,8 @@ kineticScroll: {
             }}
           />
 
-          {/* Pełny obszar PAN dla SELECT — obsługuje mouse/touch/pen.
-              Osi ceny i czasu nie przykrywamy, bo mają własne uchwyty. */}
-          {activeDrawTool === "SELECT" ? (
-            <div
-              className="absolute left-0 top-0 z-[10]"
-              style={{
-                right: 86,
-                bottom: 30,
-                cursor: "crosshair",
-                touchAction: fullscreenMode ? "none" : "pan-y",
-                background: "transparent",
-              }}
-              onPointerDown={beginPlotPan}
-              onPointerMove={movePlotPan}
-              onPointerLeave={() => setAlphaCrosshair(null)}
-              onPointerUp={endPlotPan}
-              onPointerCancel={endPlotPan}
-              onTouchStart={beginTwoFingerTouch}
-              onTouchMove={moveTwoFingerTouch}
-              onTouchEnd={endTwoFingerTouch}
-              onTouchCancel={endTwoFingerTouch}
-              onWheel={handlePlotWheel}
-            />
-          ) : null}
+          {/* V3 DIAGNOSTIC: no transparent pointer overlay above the chart.
+              Native lightweight-charts receives mouse drag directly. */}
 
           {/* Własny uchwyt PRAWEJ OSI CENY.
               Jest aktywny tylko w SELECT i ma prawdziwy kursor ns-resize. */}
@@ -4278,9 +4430,9 @@ kineticScroll: {
               chartRef={chartRef}
               candleSeriesRef={candleSeriesRef}
               getCandles={() =>
-                renko
-                  ? displayCacheRef.current
-                  : (rawCacheRef.current.length ? rawCacheRef.current : displayCacheRef.current)
+                // Drawings always anchor to real OHLC time/price, including Renko.
+                // The invisible market timeline provides the corresponding X positions.
+                rawCacheRef.current.length ? rawCacheRef.current : displayCacheRef.current
               }
               activeDrawTool={activeDrawTool}
               onDrawToolChange={onDrawToolChange}

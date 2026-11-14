@@ -61,20 +61,38 @@ export function OscillatorPanels({candles,active,onRemove,visibleLogicalRange,ch
  const [editing,setEditing]=React.useState<OscillatorName|null>(null);
  React.useEffect(()=>{try{const saved=localStorage.getItem("fx-scanner-oscillator-settings-v1");if(saved)setSettings(JSON.parse(saved));}catch{}},[]);
  const change=(name:OscillatorName,patch:Partial<OscillatorSettings>)=>setSettings(prev=>{const next={...prev,[name]:{...defaultOscillatorSettings,...prev[name],...patch}};try{localStorage.setItem("fx-scanner-oscillator-settings-v1",JSON.stringify(next));}catch{}return next;});
- const data=active.map(name=>({name,config:{...defaultOscillatorSettings,...settings[name]},calc:calculate(name,candles,{...defaultOscillatorSettings,...settings[name]})}));
+ const data=active.map(name=>({name,config:{...defaultOscillatorSettings,...(name==="Awesome Oscillator"?{fast:5,slow:34}:{}),...settings[name]},calc:calculate(name,candles,{...defaultOscillatorSettings,...(name==="Awesome Oscillator"?{fast:5,slow:34}:{}),...settings[name]})}));
  if(!active.length)return null;
  return <div ref={panelRef} className="mt-2 w-full min-w-0 space-y-2" aria-label="Panele oscylatorów">
  {data.map(({name,calc,config})=>{
-  const width=900,height=112,pad=8;
-  const samples=calc.lines.flatMap(l=>l.filter(Number.isFinite));
+  const width=900,height=160,pad=8;
   const levels=calc.levels??[];
-  const min=calc.bounds?.[0]??Math.min(...samples,...levels,0),max=calc.bounds?.[1]??Math.max(...samples,...levels,1);
-  const span=max-min||1;
-  const y=(v:number)=>pad+(max-v)/span*(height-2*pad);
-  // Lightweight Charts uses logical candle indices. Reuse its visible viewport
-  // instead of stretching the full historical series to the SVG width.
+  // Lightweight Charts uses logical candle indices. Reuse its visible viewport.
   const range = visibleLogicalRange && visibleLogicalRange.to > visibleLogicalRange.from
     ? visibleLogicalRange : {from:0,to:Math.max(candles.length-1,1)};
+  // Scale ONLY from values visible on screen. The old 0..1 floor flattened
+  // low-amplitude indicators (BB Width ~0.05 and AO on FX instruments).
+  const firstVisible=Math.max(0,Math.floor(range.from)-1);
+  const lastVisible=Math.min(candles.length-1,Math.ceil(range.to)+1);
+  const visibleSamples=calc.lines.flatMap(l=>l.slice(firstVisible,lastVisible+1).filter(Number.isFinite));
+  const fallbackSamples=calc.lines.flatMap(l=>l.filter(Number.isFinite));
+  const samples=visibleSamples.length?visibleSamples:fallbackSamples;
+  const finiteLevels=levels.filter(Number.isFinite);
+  const isHistogram=calc.histogram!==undefined;
+  let min=calc.bounds?.[0]??Math.min(...samples,...finiteLevels);
+  let max=calc.bounds?.[1]??Math.max(...samples,...finiteLevels);
+  if(!Number.isFinite(min)||!Number.isFinite(max)){min=-1;max=1;}
+  if(isHistogram && !calc.bounds){
+    const amplitude=Math.max(Math.abs(min),Math.abs(max),1e-10);
+    min=-amplitude;max=amplitude;
+  } else if(!calc.bounds){
+    const spread=Math.max(max-min,Math.max(Math.abs(min),Math.abs(max))*0.02,1e-10);
+    const margin=spread*0.12;
+    min-=margin;max+=margin;
+  }
+  if(max<=min){const margin=Math.max(Math.abs(max)*0.05,1e-8);min-=margin;max+=margin;}
+  const span=max-min;
+  const y=(v:number)=>pad+(max-v)/span*(height-2*pad);
   // Price axis occupies the right edge of the main chart, not the oscillator.
   // Match the chart's actual plot width, rather than stretching over its price axis.
   const plotFraction=chartPlotWidth&&panelWidth>0
@@ -110,17 +128,17 @@ export function OscillatorPanels({candles,active,onRemove,visibleLogicalRange,ch
       <button type="button" className="rounded border border-sky-400/30 px-3 py-1.5 text-xs text-slate-200" onClick={()=>change(name,defaultOscillatorSettings)}>Reset</button>
       <button type="button" className="rounded bg-sky-600 px-3 py-1.5 text-xs text-white" onClick={()=>setEditing(null)}>Gotowe</button>
     </div>}
-    {candles.length<35?<p className="p-4 text-xs text-slate-400">Oczekiwanie na historię świec (minimum 35)...</p>:<svg onMouseMove={e=>{const rect=e.currentTarget.getBoundingClientRect();const ratio=(e.clientX-rect.left)/(rect.width*plotFraction);const idx=Math.round(range.from+ratio*(range.to-range.from));const t=(candles[idx] as any)?.time;if(t!=null)onCrosshairTimeChange?.(Number(t));}} onMouseLeave={()=>onCrosshairTimeChange?.(null)} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="block h-[100px] w-full" role="img" aria-label={`Wykres ${name}`}>
+    {candles.length<35?<p className="p-4 text-xs text-slate-400">Oczekiwanie na historię świec (minimum 35)...</p>:<svg onMouseMove={e=>{const rect=e.currentTarget.getBoundingClientRect();const ratio=(e.clientX-rect.left)/(rect.width*plotFraction);const idx=Math.round(range.from+ratio*(range.to-range.from));const t=(candles[idx] as any)?.time;if(t!=null)onCrosshairTimeChange?.(Number(t));}} onMouseLeave={()=>onCrosshairTimeChange?.(null)} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="block h-[148px] w-full" role="img" aria-label={`Wykres ${name}`}>
       <defs><clipPath id={`fx-osc-clip-${OSCILLATORS.indexOf(name)}`}><rect x="0" y="0" width={width} height={height}/></clipPath></defs>
       {[0.25,0.5,0.75].map(v=><line key={v} x1="0" x2={width} y1={height*v} y2={height*v} stroke="#25334a" strokeDasharray="3 5"/>)}
       {config.showLevels!==false&&levels.map((v,i)=>{
         const levelY=y(v);
         const label=Number.isInteger(v)?String(v):String(Number(v.toFixed(4)));
-        const labelWidth=Math.max(30,label.length*7+12);
+        const labelWidth=Math.max(22,label.length*5+8);
         return <g key={`${v}-${i}`}>
           <line x1="0" x2={width} y1={levelY} y2={levelY} stroke={config.levelColor||"#64748b"} strokeWidth={Math.max(1,Math.min(5,Number(config.levelWidth)||1))} strokeDasharray={config.levelStyle==="solid"?undefined:config.levelStyle==="dotted"?"1 5":"6 5"} vectorEffect="non-scaling-stroke" opacity=".8"/>
-          <rect x={width-labelWidth-5} y={Math.max(1,Math.min(height-19,levelY-9))} width={labelWidth} height="18" rx="4" fill="#0b1e34" stroke={config.levelColor||"#64748b"} strokeOpacity=".65" pointerEvents="none"/>
-          <text x={width-11} y={Math.max(1,Math.min(height-19,levelY-9))+12.5} fill="#e2e8f0" fontSize="12" fontWeight="600" textAnchor="end" pointerEvents="none">{label}</text>
+          <rect x={width-labelWidth-5} y={Math.max(1,Math.min(height-15,levelY-6))} width={labelWidth} height="12" rx="2" fill="#0b1e34" stroke={config.levelColor||"#64748b"} strokeOpacity=".65" pointerEvents="none"/>
+          <text x={width-11} y={Math.max(1,Math.min(height-15,levelY-6))+9.5} fill="#cbd5e1" fontSize="8" fontWeight="500" textAnchor="end" pointerEvents="none">{label}</text>
         </g>;
       })}
       <g clipPath={`url(#fx-osc-clip-${OSCILLATORS.indexOf(name)})`}>
