@@ -49,6 +49,34 @@ let lastProviderTickLagMs: number | null = null;
 const acceptedByMinute = new Map<number, Set<string>>();
 // FAZA 3.0.3: provider-arrival monitoring (independent of accepted tick timestamps).
 let lastProviderPriceArrivalAt: number | null = null;
+// BTCUSD-specific feed supervision. Global feed activity can hide a stalled BTC stream.
+let lastBtcPriceArrivalAt: number | null = null;
+let btcGapEvents = 0;
+let btcMissingM1Slots = 0;
+let btcMissingM5Slots = 0;
+let lastBtcGap: { from: number; to: number; missingM1: number; missingM5: number } | null = null;
+let lastBtcBucketM1: number | null = null;
+let lastBtcBucketM5: number | null = null;
+function observeBtcTick(t: Tick) {
+  if (t.symbol !== "BTCUSD") return;
+  const now = Date.now();
+  lastBtcPriceArrivalAt = now;
+  const m1 = Math.floor(t.timestamp / 60_000) * 60_000;
+  const m5 = Math.floor(t.timestamp / 300_000) * 300_000;
+  if (lastBtcBucketM1 !== null && m1 > lastBtcBucketM1 + 60_000) {
+    const missingM1 = Math.floor((m1 - lastBtcBucketM1) / 60_000) - 1;
+    const missingM5 = lastBtcBucketM5 === null ? 0 :
+      Math.max(0, Math.floor((m5 - lastBtcBucketM5) / 300_000) - 1);
+    btcGapEvents++;
+    btcMissingM1Slots += missingM1;
+    btcMissingM5Slots += missingM5;
+    lastBtcGap = { from: lastBtcBucketM1, to: m1, missingM1, missingM5 };
+    console.warn(`[MASTER] BTC_FEED_GAP missing M1=${missingM1}, M5=${missingM5}; from=${new Date(lastBtcBucketM1).toISOString()} to=${new Date(m1).toISOString()}; historical backfill required`);
+  }
+  if (lastBtcBucketM1 === null || m1 > lastBtcBucketM1) lastBtcBucketM1 = m1;
+  if (lastBtcBucketM5 === null || m5 > lastBtcBucketM5) lastBtcBucketM5 = m5;
+}
+
 let marketDataGapEvents = 0;
 let longestProviderSilenceMs = 0;
 let lastProviderGapMs: number | null = null;
@@ -792,6 +820,7 @@ socket.on("rates",(raw:any)=>{ try {
     lastAcceptedTimestamp.set(symbol,timestamp);
     latestTicks[symbol]=tick;
     recordAcceptedTick(tick);
+    observeBtcTick(tick);
     broadcastTick(tick);
   }
 } catch(e){console.error("[MASTER] parse",e);} });
@@ -829,6 +858,13 @@ socket.on("connect_error", e => {
 // Do not fabricate OHLC candles: a reconnect cannot reconstruct missing provider ticks.
 const FEED_SILENCE_ALERT_MS = Math.max(30_000, Number(process.env.FEED_SILENCE_ALERT_MS || 60_000));
 const FEED_SILENCE_RECONNECT = process.env.FEED_SILENCE_RECONNECT === "true";
+// BTCUSD is expected to trade continuously. Reconnect only when BTC is subscribed
+// and has previously delivered a valid tick; never restart merely because FX is closed.
+const BTC_SILENCE_RECONNECT = process.env.BTC_SILENCE_RECONNECT !== "false";
+const BTC_SILENCE_RECONNECT_MS = Math.max(90_000, Number(process.env.BTC_SILENCE_RECONNECT_MS || 90_000));
+let btcSilenceReconnects = 0;
+let lastBtcSilenceReconnectAt: number | null = null;
+
 const FEED_SILENCE_RECONNECT_COOLDOWN_MS = Math.max(300_000, Number(process.env.FEED_SILENCE_RECONNECT_COOLDOWN_MS || 600_000));
 let feedSilenceAlerts = 0;
 let feedSilenceReconnects = 0;
@@ -837,7 +873,20 @@ let lastFeedSilenceReconnectAt: number | null = null;
 // Weekend and feed-wide idle periods can be normal. Only enable reconnect after
 // confirming the provider is expected to stream continuously (e.g. BTCUSD).
 const feedSilenceWatchdog = setInterval(() => {
-  if (shuttingDown || !socket.connected || lastProviderPriceArrivalAt === null) return;
+  if (shuttingDown || !socket.connected) return;
+  const btcSilentFor = lastBtcPriceArrivalAt === null ? null : Date.now() - lastBtcPriceArrivalAt;
+  if (BTC_SILENCE_RECONNECT && PROVIDER_SET.has("BTCUSD") &&
+      btcSilentFor !== null && btcSilentFor >= BTC_SILENCE_RECONNECT_MS &&
+      (lastBtcSilenceReconnectAt === null ||
+       Date.now() - lastBtcSilenceReconnectAt >= FEED_SILENCE_RECONNECT_COOLDOWN_MS)) {
+    lastBtcSilenceReconnectAt = Date.now();
+    btcSilenceReconnects++;
+    console.warn(`[MASTER] BTC_SILENCE_RECONNECT BTCUSD silent ${btcSilentFor}ms; count=${btcSilenceReconnects}; no synthetic candles`);
+    socket.disconnect();
+    socket.connect();
+    return;
+  }
+  if (lastProviderPriceArrivalAt === null) return;
   const now = Date.now();
   const silentFor = now - lastProviderPriceArrivalAt;
   if (silentFor < FEED_SILENCE_ALERT_MS) return;
@@ -919,11 +968,11 @@ const server=http.createServer((req,res)=>{
     res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});
     res.end(JSON.stringify({ok:true,buildTag:"fx-fresh-start-v1-20261106",freshStart:FRESH_START,freshStartAt:FRESH_START?FRESH_START_AT:null,connected:liveRatesConnected,historyPaused:HISTORY_PAUSED,dbProbeOnce:DB_PROBE_ONCE,dbProbeAttempted,dbProbeSucceeded,dbWriting,
       pendingRows:pending.size,retryChunks:retryChunks.length,recoveryMaxBatches:RECOVERY_MAX_BATCHES,recoveryNewRows:RECOVERY_NEW_ROWS,recoveryCheckpointGroups,recoveryCheckpointSaved,dbDrainMs:DB_DRAIN_MS,dbRetryRows:retryChunks.reduce((n,c)=>n+c.length,0),dbBacklogRows:pending.size+retryChunks.reduce((n,c)=>n+c.length,0),liveCandles:liveCandleEngine.size,
-      successfulDbWrites,failedDbWrites,lastDbSqlMs,lastDbSuccessAt,
+      successfulDbWrites,failedDbWrites,lastDbSqlMs,lastDbSuccessAt,btcFeed:{lastPriceArrivalAt:lastBtcPriceArrivalAt,silenceMs:lastBtcPriceArrivalAt===null?null:Date.now()-lastBtcPriceArrivalAt,reconnectCount:btcSilenceReconnects,gapEvents:btcGapEvents,missingM1Slots:btcMissingM1Slots,missingM5Slots:btcMissingM5Slots},
       walBytes,walSequence,walRecoveredTicks,lastWalSyncMs,
       checkpointAt:queueCheckpointAt,checkpointBytes:queueCheckpointBytes}));return;
   }
-  if(url.pathname==="/health"){res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});res.end(JSON.stringify({ok:true,mode:"MASTER_150",freshStart:FRESH_START,freshStartAt:FRESH_START?FRESH_START_AT:null,connected:liveRatesConnected,historyPaused:HISTORY_PAUSED,configured:PROVIDER_INSTRUMENTS.length,providerSubscriptions:providerSubscriptions(),forexSlashSubscriptions,diagnostics:{rawEventCounts:Object.fromEntries(rawEventCounts),rawSymbolCounts:Object.fromEntries(rawSymbolCounts),rawMessageShapes:Object.fromEntries(rawMessageShapes),lastRateAt,lastConnectAt,lastDisconnectAt},clients:totalClients(),receivedSymbols:Object.keys(latestTicks).length,latestTicks,dbWriting,dbPending:[...new Set([...pending.values()].map(b=>b.symbol))],dbPendingRows:pending.size,dbRetryRows:retryChunks.reduce((n,c)=>n+c.length,0),durableQueue:{directory:QUEUE_DIR,checkpointAt:queueCheckpointAt,checkpointBytes:queueCheckpointBytes,lastCheckpointMs:lastQueueCheckpointMs,maxCheckpointMs:maxQueueCheckpointMs,slowCheckpoints:slowQueueCheckpoints,recoveredRows:queueRecoveredRows,walBytes,walSequence,walRecoveredTicks,lastWalSyncMs,fatalError:queueFatalError},dbMetrics:{version:"4.0-priority-preview",v4HistoryPriority:V4_HISTORY_PRIORITY,v4DualWriter:V4_DUAL_WRITER,historyPaused:HISTORY_PAUSED,dbProbeOnce:DB_PROBE_ONCE,dbProbeAttempted,dbProbeSucceeded,v4LiveInFlight,v4HistoryInFlight,v4LiveCommitted,v4HistoryCommitted,v4ConflictDeferrals,v4WriterErrors,dbDrainMs:DB_DRAIN_MS,dbDrainBacklogRows:DB_DRAIN_BACKLOG_ROWS,drainSchedules,recoveryCheckpointGroups,recoveryCheckpointSaved,v4RecentWindowMs:V4_RECENT_WINDOW_MS,v4HistoryQuota:V4_HISTORY_QUOTA,priorityLiveWrites,historyWrites,dbSqlStartedAt,dbSqlAgeMs:dbSqlStartedAt===null?null:Date.now()-dbSqlStartedAt,dbSqlRowsInFlight,dbFlushStartedAt,dbFlushAgeMs:dbFlushStartedAt===null?null:Date.now()-dbFlushStartedAt,flushMs:DB_FLUSH_MS,chunkRows:DB_CHUNK_ROWS,adaptiveChunkRows,slowDbBatches,adaptiveReductions,adaptiveIncreases,successfulDbWrites,failedDbWrites,consecutiveDbFailures,lastDbWriteMs,lastDbSqlMs,lastDbCheckpointMs,maxDbSqlMs,lastDbBatchRows,lastDbBatchAt,lastDbSuccessAt,lastDbFailureAt,shutdownFlushFailed},ingestionDiagnostics:ingestionDiagnostics(),ohlcMetrics:{staleTicksRejected,staleTicksBySymbol:Object.fromEntries(staleTicksBySymbol),acceptedTicksBySymbol:Object.fromEntries(acceptedTicksBySymbol),invalidTimestampsRejected,futureTimestampsRejected,invalidPricesRejected,activeCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)>Date.now()).length,closedPendingCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)<=Date.now()).length},feedSilence:{thresholdMs:FEED_SILENCE_ALERT_MS,alertCount:feedSilenceAlerts,lastAlertAt:lastFeedSilenceAlertAt,silenceMs:lastProviderPriceArrivalAt===null?null:Date.now()-lastProviderPriceArrivalAt,reconnectEnabled:FEED_SILENCE_RECONNECT,reconnectCount:feedSilenceReconnects,lastReconnectAt:lastFeedSilenceReconnectAt},providerInfo:providerInfo||null,providerError:providerError||null,failedDbWrites,receivedCount:Object.fromEntries(receivedCount),unrecognizedSymbols:Object.fromEntries(unrecognizedSymbols),missingConfiguredSymbols:PROVIDER_INSTRUMENTS.filter(s=>!latestTicks[s])}));return;}
+  if(url.pathname==="/health"){res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});res.end(JSON.stringify({ok:true,mode:"MASTER_150",freshStart:FRESH_START,freshStartAt:FRESH_START?FRESH_START_AT:null,connected:liveRatesConnected,historyPaused:HISTORY_PAUSED,configured:PROVIDER_INSTRUMENTS.length,providerSubscriptions:providerSubscriptions(),forexSlashSubscriptions,diagnostics:{rawEventCounts:Object.fromEntries(rawEventCounts),rawSymbolCounts:Object.fromEntries(rawSymbolCounts),rawMessageShapes:Object.fromEntries(rawMessageShapes),lastRateAt,lastConnectAt,lastDisconnectAt},clients:totalClients(),receivedSymbols:Object.keys(latestTicks).length,latestTicks,dbWriting,dbPending:[...new Set([...pending.values()].map(b=>b.symbol))],dbPendingRows:pending.size,dbRetryRows:retryChunks.reduce((n,c)=>n+c.length,0),durableQueue:{directory:QUEUE_DIR,checkpointAt:queueCheckpointAt,checkpointBytes:queueCheckpointBytes,lastCheckpointMs:lastQueueCheckpointMs,maxCheckpointMs:maxQueueCheckpointMs,slowCheckpoints:slowQueueCheckpoints,recoveredRows:queueRecoveredRows,walBytes,walSequence,walRecoveredTicks,lastWalSyncMs,fatalError:queueFatalError},dbMetrics:{version:"4.0-priority-preview",v4HistoryPriority:V4_HISTORY_PRIORITY,v4DualWriter:V4_DUAL_WRITER,historyPaused:HISTORY_PAUSED,dbProbeOnce:DB_PROBE_ONCE,dbProbeAttempted,dbProbeSucceeded,v4LiveInFlight,v4HistoryInFlight,v4LiveCommitted,v4HistoryCommitted,v4ConflictDeferrals,v4WriterErrors,dbDrainMs:DB_DRAIN_MS,dbDrainBacklogRows:DB_DRAIN_BACKLOG_ROWS,drainSchedules,recoveryCheckpointGroups,recoveryCheckpointSaved,v4RecentWindowMs:V4_RECENT_WINDOW_MS,v4HistoryQuota:V4_HISTORY_QUOTA,priorityLiveWrites,historyWrites,dbSqlStartedAt,dbSqlAgeMs:dbSqlStartedAt===null?null:Date.now()-dbSqlStartedAt,dbSqlRowsInFlight,dbFlushStartedAt,dbFlushAgeMs:dbFlushStartedAt===null?null:Date.now()-dbFlushStartedAt,flushMs:DB_FLUSH_MS,chunkRows:DB_CHUNK_ROWS,adaptiveChunkRows,slowDbBatches,adaptiveReductions,adaptiveIncreases,successfulDbWrites,failedDbWrites,consecutiveDbFailures,lastDbWriteMs,lastDbSqlMs,lastDbCheckpointMs,maxDbSqlMs,lastDbBatchRows,lastDbBatchAt,lastDbSuccessAt,lastDbFailureAt,shutdownFlushFailed},ingestionDiagnostics:ingestionDiagnostics(),ohlcMetrics:{staleTicksRejected,staleTicksBySymbol:Object.fromEntries(staleTicksBySymbol),acceptedTicksBySymbol:Object.fromEntries(acceptedTicksBySymbol),invalidTimestampsRejected,futureTimestampsRejected,invalidPricesRejected,activeCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)>Date.now()).length,closedPendingCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)<=Date.now()).length},btcFeed:{lastPriceArrivalAt:lastBtcPriceArrivalAt,silenceMs:lastBtcPriceArrivalAt===null?null:Date.now()-lastBtcPriceArrivalAt,reconnectEnabled:BTC_SILENCE_RECONNECT,reconnectThresholdMs:BTC_SILENCE_RECONNECT_MS,reconnectCount:btcSilenceReconnects,lastReconnectAt:lastBtcSilenceReconnectAt,gapEvents:btcGapEvents,missingM1Slots:btcMissingM1Slots,missingM5Slots:btcMissingM5Slots,lastGap:lastBtcGap,backfillStatus:"requires real historical provider data"},feedSilence:{thresholdMs:FEED_SILENCE_ALERT_MS,alertCount:feedSilenceAlerts,lastAlertAt:lastFeedSilenceAlertAt,silenceMs:lastProviderPriceArrivalAt===null?null:Date.now()-lastProviderPriceArrivalAt,reconnectEnabled:FEED_SILENCE_RECONNECT,reconnectCount:feedSilenceReconnects,lastReconnectAt:lastFeedSilenceReconnectAt},providerInfo:providerInfo||null,providerError:providerError||null,failedDbWrites,receivedCount:Object.fromEntries(receivedCount),unrecognizedSymbols:Object.fromEntries(unrecognizedSymbols),missingConfiguredSymbols:PROVIDER_INSTRUMENTS.filter(s=>!latestTicks[s])}));return;}
   const m=url.pathname.match(/^\/api\/(?:market\/)?([a-z0-9]+)\/stream$/i);
   if(m){ const symbol=normalizeMarketSymbol(m[1]); if(!PROVIDER_SET.has(symbol)){res.writeHead(404,{"Content-Type":"application/json"});res.end(JSON.stringify({ok:false,error:"Unknown symbol"}));return;} res.writeHead(200,{"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache, no-transform",Connection:"keep-alive","X-Accel-Buffering":"no","Access-Control-Allow-Origin":origin,Vary:"Origin"});res.write("retry: 3000\n\n");res.write(`event: status\ndata: ${JSON.stringify({provider:"live-rates",connected:liveRatesConnected,symbol,mode:"MASTER_150"})}\n\n`);if(latestTicks[symbol])res.write(`event: tick\ndata: ${JSON.stringify(latestTicks[symbol])}\n\n`);const set=clientSet(symbol);set.add(res);const keep=setInterval(()=>{try{res.write(`: keepalive ${Date.now()}\n\n`);}catch{}},15000);req.on("close",()=>{clearInterval(keep);set.delete(res);});return; }
   res.writeHead(200,{"Content-Type":"application/json"});res.end(JSON.stringify({ok:true,service:"FX Trade Master Market Collector",mode:"MASTER_150",configured:PROVIDER_INSTRUMENTS.length,health:"/health",streamPattern:"/api/market/{symbol}/stream"}));
