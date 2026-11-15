@@ -277,6 +277,9 @@ React.useEffect(() => {
     startClientX?: number;
     startScrollPosition?: number;
     startBarSpacing?: number;
+    startPriceMin?: number;
+    startPriceMax?: number;
+    startClientY?: number;
   }>({
     active: false,
     lastClientX: 0,
@@ -1272,6 +1275,9 @@ if (o.type === "FIBO") {
   });
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    // The drawing overlay owns this gesture; parent chart handlers must not pan.
+    e.stopPropagation();
+    if (e.button !== 0) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -1384,6 +1390,9 @@ if (o.type === "FIBO") {
         startClientX: e.clientX,
         startScrollPosition: panTimeScale?.scrollPosition(),
         startBarSpacing: panTimeScale?.options().barSpacing,
+        startPriceMin: priceMin,
+        startPriceMax: priceMax,
+        startClientY: e.clientY,
         priceMin,
         priceMax,
       };
@@ -1391,6 +1400,7 @@ if (o.type === "FIBO") {
       return;
     }
 
+    chartPanRef.current.active = false;
     if (activeDrawTool === "HLINE") {
       addObj({
         ...makeBase("HLINE"),
@@ -1517,10 +1527,15 @@ if (o.type === "FIBO") {
 
           if (dy !== 0 && series && min != null && max != null && max > min) {
             const canvasHeight = panCanvasRectRef.current?.height || canvas.clientHeight || 1;
-            const span = max - min;
-            const priceShift = (dy / canvasHeight) * span;
-            const nextMin = min + priceShift;
-            const nextMax = max + priceShift;
+            // Anchor the entire gesture to its initial range. Repeatedly shifting
+            // the previous range makes the scale drift/jump under the pointer.
+            const initialMin = chartPanRef.current.startPriceMin ?? min;
+            const initialMax = chartPanRef.current.startPriceMax ?? max;
+            const span = initialMax - initialMin;
+            const totalDy = clientY - (chartPanRef.current.startClientY ?? clientY);
+            const priceShift = (totalDy / canvasHeight) * span;
+            const nextMin = initialMin + priceShift;
+            const nextMax = initialMax + priceShift;
 
             chartPanRef.current.priceMin = nextMin;
             chartPanRef.current.priceMax = nextMax;
@@ -1734,6 +1749,7 @@ if (o.type === "FIBO") {
   const pendingPointerRef = React.useRef<{ clientX: number; clientY: number; canvas: HTMLCanvasElement } | null>(null);
 
   const handleMouseMove = React.useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    e.stopPropagation();
     pendingPointerRef.current = {
       clientX: e.clientX,
       clientY: e.clientY,
@@ -2079,6 +2095,7 @@ if (o.type === "FIBO") {
       : "crosshair",
   }}
   onWheel={(e) => {
+    e.stopPropagation();
     e.preventDefault();
 
     const chart = chartRef.current;
@@ -2147,8 +2164,8 @@ if (o.type === "FIBO") {
   }}
   onMouseDown={handleMouseDown}
   onMouseMove={handleMouseMove}
-  onMouseUp={handleMouseUp}
-  onMouseLeave={() => {
+  onMouseUp={(e) => { e.stopPropagation(); handleMouseUp(); }}
+  onMouseLeave={(e) => { e.stopPropagation();
     if (isMouseDownRef.current) handleMouseUp();
     setHoverIdFast(null);
   }}
