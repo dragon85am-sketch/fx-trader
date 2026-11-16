@@ -1,0 +1,17 @@
+import { advanceTrade, type Candle, type Levels } from "../lib/fx-scanner/engine";
+const assert=(ok:boolean,msg:string)=>{if(!ok)throw Error("FAIL: "+msg);console.log("PASS: "+msg)};
+const bar=(time:number,low:number,high:number):Candle=>({time,open:100,high,low,close:100});
+const buy:Levels={side:"BUY",entry:100,sl:95,tps:[105,110,115],rr:2};
+const sell:Levels={side:"SELL",entry:100,sl:105,tps:[95,90,85],rr:2};
+const run=(side:"BUY"|"SELL",l:Levels,seq:Candle[])=>advanceTrade([bar(1,99,101),...seq,bar(999,99,101)],side,l,1);
+assert(run("BUY",buy,[bar(2,94,104)]).status==="SL","BUY SL before TP1");
+assert(run("BUY",buy,[bar(2,100,106)]).tp1Hit===true,"BUY TP1 remains active");
+assert(run("BUY",buy,[bar(2,99,106)]).status===null,"BUY same-bar TP1+Entry does not close BE");
+assert(run("BUY",buy,[bar(2,99,106),bar(3,99,104)]).status==="TP1_BE","BUY BE on subsequent candle");
+assert(run("BUY",buy,[bar(2,101,106),bar(3,106,111)]).status==="TP2","BUY TP2 after TP1");
+assert(run("BUY",buy,[bar(2,99,111)]).status===null,"BUY ambiguous TP1/TP2/BE candle stays active");
+assert(run("SELL",sell,[bar(2,96,106)]).status==="SL","SELL SL before TP1");
+assert(run("SELL",sell,[bar(2,94,101)]).status===null,"SELL same-bar TP1+Entry does not close BE");
+assert(run("SELL",sell,[bar(2,94,101),bar(3,96,101)]).status==="TP1_BE","SELL BE on subsequent candle");
+assert(run("SELL",sell,[bar(2,94,99),bar(3,89,94)]).status==="TP2","SELL TP2 after TP1");
+console.log("All 10 OHLC state-machine tests passed.");

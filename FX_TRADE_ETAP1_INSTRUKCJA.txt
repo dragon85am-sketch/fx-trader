@@ -1,0 +1,8 @@
+FX TRADE Scanner PRO - ETAP 1 - STAGING ONLY
+Zmiana: TP1 uzbraja BE; zamkniecie na TP2, BE albo SL.
+Nie wdrazaj na produkcyjny Railway bez sprawdzenia schematu Prisma i kopii bazy.
+Brak schematu Prisma w przeslanej paczce: status TP2 moze wymagac migracji.
+UI i historia moga wymagac dalszego dostosowania do nowego statusu TP2.
+Silnik korzysta z zamknietych swiec OHLC. Gdy TP2 i BE dotkniete sa w tej samej swiecy, BE ma pierwszenstwo.
+Wymagana pelna historia swiec od chwili sygnalu. Przy ucietej historii odtworzenie TP1 jest niewiarygodne.
+Najpierw npm run build i testy staging. To nie jest paczka gotowa do produkcji.

@@ -584,7 +584,8 @@ async function flushDb() {
       // Under backlog, freeze at most half the rows committed during the
       // previous flush. On SQL failure the next cycle freezes zero new rows
       // until persisted retry chunks can be committed again.
-      const backlogMode = !DB_PROBE_ONCE && retryChunks.length > RECOVERY_RETRY_THRESHOLD;
+      const backlogMode = !DB_PROBE_ONCE && retryChunks.length > 0 &&
+         (retryChunks.reduce((n, c) => n + c.length, 0) + pending.size >= DB_DRAIN_BACKLOG_ROWS);
       const freezeBudget = backlogMode
         ? Math.min(V5_BACKLOG_FREEZE_CAP, Math.floor(v5PreviousCommittedRows * V5_FREEZE_SHARE))
         : RECOVERY_NEW_ROWS;
@@ -679,7 +680,7 @@ async function flushDb() {
         } else {
           consecutiveFastBatches = 0;
         }
-        if ((lastDbSqlMs ?? 0) > 5000 || (lastDbCheckpointMs ?? 0) > 1000)
+        if ((lastDbSqlMs ?? 0) > 5000)
           console.warn(`[MASTER] slow DB upsert: sql=${lastDbSqlMs}ms, checkpoint=${lastDbCheckpointMs}ms, total=${lastDbWriteMs}ms, rows=${part.length}, retryChunks=${retryChunks.length}, pending=${pending.size}`);
         // Yield between chunks during overload. Keep all remaining chunks durable.
         if (!shuttingDown && Date.now() - flushStarted >= DB_MAX_FLUSH_WORK_MS) break;
@@ -1025,8 +1026,9 @@ const server=http.createServer((req,res)=>{
   }
   if(url.pathname==="/health/quick") {
     res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});
-    res.end(JSON.stringify({ok:true,buildTag:"fx-fresh-start-v1-20261106",freshStart:FRESH_START,freshStartAt:FRESH_START?FRESH_START_AT:null,connected:liveRatesConnected,historyPaused:HISTORY_PAUSED,dbProbeOnce:DB_PROBE_ONCE,dbProbeAttempted,dbProbeSucceeded,dbWriting,
-      pendingRows:pending.size,retryChunks:retryChunks.length,recoveryMaxBatches:RECOVERY_MAX_BATCHES,recoveryNewRows:RECOVERY_NEW_ROWS,recoveryCheckpointGroups,recoveryCheckpointSaved,acceleratedDrainSchedules,lastBacklogDrainAt,flushDueAt,dbDrainMs:DB_DRAIN_MS,dbRetryRows:retryChunks.reduce((n,c)=>n+c.length,0),dbBacklogRows:pending.size+retryChunks.reduce((n,c)=>n+c.length,0),liveCandles:liveCandleEngine.size,
+    res.end(JSON.stringify({ok:true,buildTag:"fx-v5-backlog-guard-20261116",freshStart:FRESH_START,freshStartAt:FRESH_START?FRESH_START_AT:null,connected:liveRatesConnected,historyPaused:HISTORY_PAUSED,dbProbeOnce:DB_PROBE_ONCE,dbProbeAttempted,dbProbeSucceeded,dbWriting,
+      pendingRows:pending.size,retryChunks:retryChunks.length,recoveryMaxBatches:RECOVERY_MAX_BATCHES,recoveryNewRows:RECOVERY_NEW_ROWS,recoveryCheckpointGroups,recoveryCheckpointSaved,acceleratedDrainSchedules,lastBacklogDrainAt,flushDueAt,dbDrainMs:DB_DRAIN_MS,
+      v5LastFrozenRows,v5LastCommittedRows,v5TotalFrozenRows,v5TotalCommittedRows,v5BacklogLimitedFlushes,adaptiveChunkRows,lastDbBatchRows,lastDbCheckpointMs,dbRetryRows:retryChunks.reduce((n,c)=>n+c.length,0),dbBacklogRows:pending.size+retryChunks.reduce((n,c)=>n+c.length,0),liveCandles:liveCandleEngine.size,
       successfulDbWrites,failedDbWrites,lastDbSqlMs,lastDbSuccessAt,btcFeed:{lastPriceArrivalAt:lastBtcPriceArrivalAt,silenceMs:lastBtcPriceArrivalAt===null?null:Date.now()-lastBtcPriceArrivalAt,reconnectCount:btcSilenceReconnects,gapEvents:btcGapEvents,missingM1Slots:btcMissingM1Slots,missingM5Slots:btcMissingM5Slots},
       walBytes,walSequence,walRecoveredTicks,lastWalSyncMs,
       checkpointAt:queueCheckpointAt,checkpointBytes:queueCheckpointBytes}));return;

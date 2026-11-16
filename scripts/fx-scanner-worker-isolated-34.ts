@@ -1,0 +1,319 @@
+import dotenv from "dotenv";
+import crypto from "node:crypto";
+import { PrismaClient } from "@prisma/client";
+import { FX_SCANNER_SYMBOLS, fxScannerStorageSymbol } from "../lib/fx-scanner/symbols";
+import { advanceTrade, buildLevels, scan4of4, scoreLiquiditySweep, type Candle, type Levels, type Side } from "../lib/fx-scanner/engine";
+// ISOLATED FAZA 3.4 TEST COPY: production env files are NEVER loaded.
+const TEST_URL = process.env.FX_SCANNER_TEST_DATABASE_URL || "";
+const parsedTestUrl = (() => { try { return new URL(TEST_URL); } catch { throw new Error("SAFETY STOP: missing test URL"); } })();
+if (parsedTestUrl.hostname !== "127.0.0.1" || parsedTestUrl.port !== "55432" || parsedTestUrl.pathname !== "/fxtrade_restart_test" || parsedTestUrl.username !== "fxtrade_test") {
+  throw new Error("SAFETY STOP: only 127.0.0.1:55432/fxtrade_restart_test (fxtrade_test) permitted");
+}
+process.env.DATABASE_URL = TEST_URL;
+process.env.DIRECT_URL = TEST_URL;
+process.env.FXTRADE_APP_URL = "";
+process.env.NEXT_PUBLIC_APP_URL = "";
+process.env.FX_SCANNER_WORKER_KEY = "";
+const prisma=new PrismaClient();
+const INTERVALS:{tf:string;db:string;seconds:number}[]=[
+  {tf:"M1",db:"1min",seconds:60},
+  {tf:"M5",db:"5min",seconds:300},
+  {tf:"M15",db:"15min",seconds:900},
+  {tf:"M30",db:"30min",seconds:1800},
+  {tf:"H1",db:"1h",seconds:3600},
+  {tf:"H4",db:"4h",seconds:14400},
+  {tf:"D1",db:"1day",seconds:86400},
+];
+const STALE_MULTIPLIER=Math.max(2,Number(process.env.FX_SCANNER_STALE_MULTIPLIER||3));
+const staleLog=new Map<string,number>();
+function isFresh(cs:Candle[],tfSeconds:number){
+  const latest=cs[cs.length-1];
+  if(!latest)return false;
+  const ageSec=Math.max(0,Math.floor(Date.now()/1000)-latest.time);
+  return ageSec<=tfSeconds*(STALE_MULTIPLIER+1);
+}
+function logStaleOnce(key:string,message:string){
+  const now=Date.now(),prev=staleLog.get(key)||0;
+  if(now-prev>=300_000){console.warn(message);staleLog.set(key,now);}
+}
+const EVERY=Math.max(10_000,Number(process.env.FX_SCANNER_INTERVAL_MS||30_000));
+const APP=(process.env.FXTRADE_APP_URL||process.env.NEXT_PUBLIC_APP_URL||"").replace(/\/$/,"");
+const KEY=process.env.FX_SCANNER_WORKER_KEY||"";
+type PendingSetup={side:Side;levels:Levels;signalTime:number};
+
+async function loadReadySetup(storageSymbol:string,tf:string):Promise<PendingSetup|null>{
+  const row=await prisma.fxScannerReadySetup.findUnique({where:{storageSymbol_tf:{storageSymbol,tf}}});
+  if(!row)return null;
+  return {side:row.side as Side,levels:{side:row.side as Side,entry:row.entry,sl:row.sl,tps:[row.tp1,row.tp2,row.tp3],rr:row.rr},signalTime:Math.floor(row.signalTime.getTime()/1000)};
+}
+async function saveReadySetup(instrument:string,storageSymbol:string,tf:string,setup:PendingSetup){
+  await prisma.fxScannerReadySetup.upsert({
+    where:{storageSymbol_tf:{storageSymbol,tf}},
+    create:{instrument,storageSymbol,tf,side:setup.side,signalTime:new Date(setup.signalTime*1000),entry:setup.levels.entry,sl:setup.levels.sl,tp1:setup.levels.tps[0],tp2:setup.levels.tps[1],tp3:setup.levels.tps[2],rr:setup.levels.rr},
+    update:{instrument,side:setup.side,signalTime:new Date(setup.signalTime*1000),entry:setup.levels.entry,sl:setup.levels.sl,tp1:setup.levels.tps[0],tp2:setup.levels.tps[1],tp3:setup.levels.tps[2],rr:setup.levels.rr},
+  });
+}
+async function clearReadySetup(storageSymbol:string,tf:string){
+  await prisma.fxScannerReadySetup.deleteMany({where:{storageSymbol,tf}});
+}
+type DbC={bucket:Date;open:number|string;high:number|string;low:number|string;close:number|string;ticks:number};
+
+const WEEKLY_TZ = "Europe/Amsterdam";
+const WEEKLY_LOG_TYPE = "FX_WEEKLY_TELEGRAM";
+
+type WeeklyTrade = {
+  instrument: string;
+  status: string;
+  entry: number;
+  sl: number;
+  tp1: number;
+  tp2: number;
+  tp3: number;
+  tp1Hit: boolean;
+  tp2Hit: boolean;
+  tp3Hit: boolean;
+  closedAt: Date | null;
+};
+
+function zonedParts(date: Date, timeZone = WEEKLY_TZ) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone,
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+    hourCycle: "h23", weekday: "short",
+  }).formatToParts(date);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return {
+    year: Number(get("year")), month: Number(get("month")), day: Number(get("day")),
+    hour: Number(get("hour")), minute: Number(get("minute")), second: Number(get("second")),
+    weekday: get("weekday"),
+  };
+}
+
+function zonedLocalToUtc(year: number, month: number, day: number, hour: number, minute = 0, second = 0, timeZone = WEEKLY_TZ) {
+  const target = Date.UTC(year, month - 1, day, hour, minute, second);
+  let guess = target;
+  for (let i = 0; i < 3; i++) {
+    const p = zonedParts(new Date(guess), timeZone);
+    const represented = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
+    guess += target - represented;
+  }
+  return new Date(guess);
+}
+
+function mondayStartForFriday(now: Date) {
+  const p = zonedParts(now);
+  const localMidnight = new Date(Date.UTC(p.year, p.month - 1, p.day));
+  localMidnight.setUTCDate(localMidnight.getUTCDate() - 4);
+  return zonedLocalToUtc(
+    localMidnight.getUTCFullYear(),
+    localMidnight.getUTCMonth() + 1,
+    localMidnight.getUTCDate(),
+    0, 0, 0,
+  );
+}
+
+function weeklyTradeUnits(t: WeeklyTrade): { value: number; unit: "pips" | "pts" } | null {
+  const entry = Number(t.entry);
+  if (!Number.isFinite(entry)) return null;
+  let distance: number | null = null;
+  if (t.status === "SL") distance = Number.isFinite(Number(t.sl)) ? -Math.abs(Number(t.sl) - entry) : null;
+  else if (t.status === "TP2") distance = Number.isFinite(Number(t.tp2)) ? Math.abs(Number(t.tp2) - entry) : null;
+  else if (t.status === "TP3") distance = Number.isFinite(Number(t.tp3)) ? Math.abs(Number(t.tp3) - entry) : null;
+  else if (t.status === "TP1_BE") {
+    const target = t.tp2Hit ? Number(t.tp2) : Number(t.tp1);
+    distance = Number.isFinite(target) ? Math.abs(target - entry) : null;
+  }
+  if (distance == null) return null;
+  const symbol = t.instrument.toUpperCase();
+  if (symbol === "XAUUSD" || symbol === "XAGUSD") return { value: distance / 0.01, unit: "pips" };
+  if (/^[A-Z]{6}$/.test(symbol)) return { value: distance / (symbol.endsWith("JPY") ? 0.01 : 0.0001), unit: "pips" };
+  return { value: distance, unit: "pts" };
+}
+
+function buildWeeklyStats(trades: WeeklyTrade[]) {
+  const rows = new Map<string, { instrument: string; wins: number; losses: number; value: number; unit: "pips" | "pts" }>();
+  let wins = 0, losses = 0, totalPips = 0, totalPoints = 0;
+  for (const t of trades) {
+    const win = t.status === "TP2" || t.status === "TP3";
+    if (win) wins++; else if (t.status === "SL") losses++;
+    const r = weeklyTradeUnits(t);
+    const key = t.instrument.toUpperCase();
+    const unit = r?.unit ?? (key.endsWith("USDT") ? "pts" : "pips");
+    const row = rows.get(key) ?? { instrument: key, wins: 0, losses: 0, value: 0, unit };
+    if (win) row.wins++; else if (t.status === "SL") row.losses++;
+    if (r) {
+      row.value += r.value;
+      if (r.unit === "pips") totalPips += r.value; else totalPoints += r.value;
+    }
+    rows.set(key, row);
+  }
+  const total = wins + losses;
+  return { total, wins, losses, winRate: total ? (wins / total) * 100 : 0, totalPips, totalPoints, rows: [...rows.values()].sort((a,b)=>a.instrument.localeCompare(b.instrument)) };
+}
+
+async function maybeSendWeeklyReport() {
+  const now = new Date();
+  const p = zonedParts(now);
+  if (p.weekday !== "Fri" || p.hour < 23) return;
+
+  const start = mondayStartForFriday(now);
+  const weekKey = `${zonedParts(start).year}-${String(zonedParts(start).month).padStart(2,"0")}-${String(zonedParts(start).day).padStart(2,"0")}`;
+  const marker = `weekly:${weekKey}`;
+  const alreadySent = await prisma.activityLog.findFirst({ where: { type: WEEKLY_LOG_TYPE, message: marker } });
+  if (alreadySent) return;
+
+  const trades = await prisma.fxScannerTrade.findMany({
+    where: { status: { in: ["TP2", "TP3", "TP1_BE", "SL"] }, closedAt: { gte: start, lte: now } },
+    orderBy: { closedAt: "asc" },
+    select: { instrument:true,status:true,entry:true,sl:true,tp1:true,tp2:true,tp3:true,tp1Hit:true,tp2Hit:true,tp3Hit:true,closedAt:true },
+  });
+  const stats = buildWeeklyStats(trades as WeeklyTrade[]);
+  const ok = await telegram({
+    type: "WEEKLY",
+    timeISO: now.toISOString(),
+    weekly: { periodStartISO: start.toISOString(), periodEndISO: now.toISOString(), ...stats },
+  });
+  if (ok) {
+    await prisma.activityLog.create({ data: { type: WEEKLY_LOG_TYPE, message: marker } });
+    console.log(`[FX-WORKER] WEEKLY ${weekKey} sent: ${stats.total} closed trades, WR=${stats.winRate.toFixed(1)}%`);
+  }
+}
+async function candles(symbol:string,interval:string,seconds:number){
+  if(symbol!=="BTCUSD" || interval!=="1min") throw new Error("SAFETY STOP: unexpected scan");
+  const mode=process.env.FX_SCANNER_TEST_CANDLE_MODE;
+  if(mode!=="neutral" && mode!=="be") throw new Error("SAFETY STOP: invalid fixture mode");
+  const now=Math.floor(Date.now()/60000)*60;
+  const cs:Candle[]=Array.from({length:48},(_,i)=>({time:now-(48-i)*60,open:75050,high:75080,low:75020,close:75050,volume:1}));
+  if(mode==="be") cs[46]={...cs[46],low:74995,high:75080};
+  return cs;
+  /* original DB candles deliberately unreachable in isolated test */
+const cutoff=new Date(Math.floor(Date.now()/1000/seconds)*seconds*1000);const rows=await prisma.$queryRaw<DbC[]>`SELECT "bucket","open","high","low","close","ticks" FROM "MarketCandle" WHERE "symbol"=${symbol} AND "interval"=${interval} AND "bucket" < ${cutoff} ORDER BY "bucket" DESC LIMIT 260`;return rows.reverse().map(r=>({time:Math.floor(new Date(r.bucket).getTime()/1000),open:Number(r.open),high:Number(r.high),low:Number(r.low),close:Number(r.close),volume:r.ticks})) as Candle[];}
+async function telegram(payload:any){
+  console.log("[TEST] Telegram blocked",payload?.type); return false;
+
+  const tag=`${payload?.type||"UNKNOWN"} ${payload?.instrument||""} ${payload?.tf||""}`.trim();
+  if(!APP||!KEY){console.error(`[FX-WORKER] TELEGRAM ${tag} ERROR: FXTRADE_APP_URL/FX_SCANNER_WORKER_KEY missing`);return false;}
+  try{
+    const r=await fetch(`${APP}/api/telegram/notify`,{method:"POST",headers:{"content-type":"application/json","x-fx-scanner-worker-key":KEY},body:JSON.stringify(payload)});
+    const body=await r.text();
+    if(!r.ok){console.error(`[FX-WORKER] TELEGRAM ${tag} ERROR HTTP ${r.status}: ${body}`);return false;}
+    console.log(`[FX-WORKER] TELEGRAM ${tag} OK${body?`: ${body.slice(0,240)}`:""}`);
+    return true;
+  }catch(e:any){console.error(`[FX-WORKER] TELEGRAM ${tag} ERROR:`,e?.message||e);return false;}
+}
+// Weekly session policy: crypto continues 24/7; other instruments pause during the FX weekend.
+// Other markets are paused; existing positions and READY records are not deleted.
+const CRYPTO_BASES = new Set(["BTC", "ETH", "SOL", "XRP", "LTC", "BCH", "ADA", "DOGE", "DOT", "AVAX", "LINK"]);
+function isCryptoInstrument(symbol: string): boolean {
+  const normalized = symbol.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  return [...CRYPTO_BASES].some(base => normalized.startsWith(base) && normalized.length > base.length);
+}
+// Standard FX weekly session: Sunday 17:00 through Friday 17:00 New York time.
+// America/New_York handles US DST automatically (Polish clock can shift during DST mismatch weeks).
+// Fresh OHLC is still required before any signal; this is only a session gate.
+function isFxWeeklyClosed(date = new Date()): boolean {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York", weekday: "short", hour: "2-digit", hourCycle: "h23",
+  }).formatToParts(date);
+  const weekday = parts.find(p => p.type === "weekday")?.value;
+  const hour = Number(parts.find(p => p.type === "hour")?.value ?? "0");
+  return weekday === "Sat" || (weekday === "Fri" && hour >= 17) || (weekday === "Sun" && hour < 17);
+}
+// Faza 3.2: modelowe rozliczenie poziomow skanera (nie broker fill).
+function tradeCloseMetrics(
+  status: string,
+  levels: Levels
+): { exitPrice: number; resultR: number; closeReason: string } {
+  const risk = Math.abs(levels.entry - levels.sl);
+  const exitPrice =
+    status === "TP2" ? levels.tps[1] :
+    status === "TP3" ? levels.tps[2] :
+    status === "TP1_BE" ? levels.entry :
+    levels.sl;
+  const direction = levels.side === "BUY" ? 1 : -1;
+  const resultR = risk > 0 ? direction * (exitPrice - levels.entry) / risk : 0;
+  return { exitPrice, resultR, closeReason: status };
+}
+
+async function scanOne(display:string,tf:string,db:string,tfSeconds:number){if(isFxWeeklyClosed()&&!isCryptoInstrument(display)){logStaleOnce(`${display}|${tf}|MARKET_CLOSED`,`[FX-WORKER] MARKET CLOSED (FX WEEKLY SESSION) ${display} ${tf} — scan paused; crypto only`);return;}const storage=fxScannerStorageSymbol(display),cs=await candles(storage,db,tfSeconds);if(cs.length<45){logStaleOnce(`${storage}|${tf}|NODATA`,`[FX-WORKER] NO DATA ${display} ${tf} candles=${cs.length}/45 — scan skipped`);return;}if(!isFresh(cs,tfSeconds)){const latest=cs[cs.length-1];const ageSec=Math.max(0,Math.floor(Date.now()/1000)-latest.time);logStaleOnce(`${storage}|${tf}|STALE`,`[FX-WORKER] STALE ${display} ${tf} age=${ageSec}s limit=${tfSeconds*(STALE_MULTIPLIER+1)}s — 4/4/READY/ENTRY skipped`);return;}const active=await prisma.fxScannerTrade.findFirst({where:{storageSymbol:storage,tf,status:"ACTIVE"},orderBy:{openedAt:"desc"}});if(active){
+  if(!active.telegramSignal){
+    const sent=await telegram({type:"SIGNAL",instrument:active.instrument,side:active.side,tf:active.tf,rr:active.rr,entry:active.entry,sl:active.sl,tp1:active.tp1,tp2:active.tp2,tp3:active.tp3,timeISO:active.openedAt.toISOString()});
+    if(sent)await prisma.fxScannerTrade.update({where:{id:active.id},data:{telegramSignal:true}});
+  }
+  // Levels come exclusively from the persisted trade; never rebuild on subsequent candles.
+  const levels: Levels = {
+    side: active.side as Side,
+    entry: active.entry,
+    sl: active.sl,
+    tps: [active.tp1, active.tp2, active.tp3],
+    rr: active.rr,
+  };
+  const result = advanceTrade(
+    cs, active.side as Side, levels,
+    Math.floor(active.signalTime.getTime() / 1000),
+    active.tp1Hit, active.tp2Hit,
+  );
+  if (result.status) {
+    // Optimistic guard: a second worker/overlapping scan cannot close the same trade twice.
+    const changed = await prisma.fxScannerTrade.updateMany({
+      where: { id: active.id, status: "ACTIVE" },
+      data: {
+        status: result.status,
+        tp1Hit: result.tp1Hit,
+        tp2Hit: result.tp2Hit,
+        tp3Hit: false,
+        ...tradeCloseMetrics(result.status, levels),
+        closedAt: new Date(),
+      },
+    });
+    if (changed.count === 1) {
+      const closed = await prisma.fxScannerTrade.findUnique({ where: { id: active.id } });
+      if (closed && !closed.telegramClosed) {
+        const ok = await telegram({
+          type: "CLOSED", instrument: closed.instrument, side: closed.side, tf: closed.tf,
+          entry: closed.entry, sl: closed.sl, tp1: closed.tp1, tp2: closed.tp2,
+          tp3: closed.tp3, status: closed.status, tp1Hit: closed.tp1Hit,
+          tp2Hit: closed.tp2Hit, tp3Hit: closed.tp3Hit,
+          timeISO: closed.closedAt?.toISOString(),
+        });
+        if (ok) await prisma.fxScannerTrade.update({
+          where: { id: closed.id }, data: { telegramClosed: true },
+        });
+      }
+    }
+  } else if (result.tp1Hit !== active.tp1Hit || result.tp2Hit !== active.tp2Hit) {
+    // TP1 is an ACTIVE milestone. Keep Entry/initial SL/TPs immutable in the DB.
+    await prisma.fxScannerTrade.updateMany({
+      where: { id: active.id, status: "ACTIVE" },
+      data: { tp1Hit: result.tp1Hit, tp2Hit: result.tp2Hit },
+    });
+  }
+  return;
+}
+const found=scan4of4(cs);if(found.side){const sweepScore=scoreLiquiditySweep(cs,found.side);console.log(`[FX-WORKER] SWEEP SCORE ${display} ${tf} ${found.side} ${sweepScore.score}/100 confirmed=${sweepScore.confirmed}`);}if(found.count!==4||!found.side){await clearReadySetup(storage,tf);return;}const signal=cs[cs.length-1];if(!signal)return;let setup=await loadReadySetup(storage,tf);if(!setup||setup.side!==found.side){const lv=buildLevels(cs,found.side);if(!lv)return;setup={side:found.side,levels:lv,signalTime:signal.time};await saveReadySetup(display,storage,tf,setup);console.log(`[FX-WORKER] READY ${display} ${tf} ${found.side} entry=${lv.entry} — persisted, waiting for CLOSED candle confirmation`);return;}if(signal.time<=setup.signalTime)return;const confirmed=setup.side==="BUY"?signal.close>setup.levels.entry:signal.close<setup.levels.entry;if(!confirmed){console.log(`[FX-WORKER] WAIT ENTRY ${display} ${tf} ${setup.side} close=${signal.close} entry=${setup.levels.entry}`);return;}const lv=setup.levels;const signalTime=new Date(signal.time*1000),id=crypto.createHash("sha1").update(`${storage}|${tf}|${setup.side}|${signalTime.toISOString()}`).digest("hex");let trade;try{trade=await prisma.fxScannerTrade.create({data:{id,instrument:display,storageSymbol:storage,tf,side:setup.side,confirmation:4,signalTime,entry:lv.entry,sl:lv.sl,tp1:lv.tps[0],tp2:lv.tps[1],tp3:lv.tps[2],rr:lv.rr}});}catch(e:any){if(e?.code!=="P2002")console.error(`[FX-WORKER] TRADE CREATE ERROR ${display} ${tf}`,e?.message||e);return;}await clearReadySetup(storage,tf);const ok=await telegram({type:"SIGNAL",instrument:trade.instrument,side:trade.side,tf:trade.tf,rr:trade.rr,entry:trade.entry,sl:trade.sl,tp1:trade.tp1,tp2:trade.tp2,tp3:trade.tp3,timeISO:trade.openedAt.toISOString()});if(ok)await prisma.fxScannerTrade.update({where:{id:trade.id},data:{telegramSignal:true}});console.log(`[FX-WORKER] ACTIVE ${display} ${tf} ${setup.side} — candle CLOSED beyond ENTRY`);}
+// Limit catch-up notifications after a restart; never mark an unsent notification as sent.
+// This does not provide exactly-once delivery across crashes or multiple worker replicas.
+const CLOSED_RETRY_BATCH_SIZE = 2;
+async function retryClosedTelegram(){
+  const rows=await prisma.fxScannerTrade.findMany({
+    where:{status:{in:["TP2","TP3","SL","TP1_BE"]},telegramClosed:false},
+    orderBy:{closedAt:"asc"},
+    take:CLOSED_RETRY_BATCH_SIZE,
+  });
+  for(const t of rows){
+    console.log(`[FX-WORKER] CLOSED RETRY attempt tradeId=${t.id} ${t.instrument} ${t.tf} status=${t.status}`);
+    const ok=await telegram({type:"CLOSED",instrument:t.instrument,side:t.side,tf:t.tf,entry:t.entry,sl:t.sl,tp1:t.tp1,tp2:t.tp2,tp3:t.tp3,status:t.status,tp1Hit:t.tp1Hit,tp2Hit:t.tp2Hit,tp3Hit:t.tp3Hit,timeISO:t.closedAt?.toISOString()});
+    if(ok){
+      await prisma.fxScannerTrade.update({where:{id:t.id},data:{telegramClosed:true}});
+      console.log(`[FX-WORKER] CLOSED RETRY marked sent tradeId=${t.id}`);
+    }else{
+      console.warn(`[FX-WORKER] CLOSED RETRY failed tradeId=${t.id}; will retry later`);
+      break;
+    }
+  }
+}
+
+async function cycle(){return await scanOne("BTCUSD","M1","1min",60); /* isolated one-shot */ try{await retryClosedTelegram();}catch(e:any){console.error(`[FX-WORKER] CLOSED TELEGRAM RETRY ERROR`,e?.message||e);}try{await maybeSendWeeklyReport();}catch(e:any){console.error(`[FX-WORKER] WEEKLY ERROR`,e?.message||e);}for(const display of FX_SCANNER_SYMBOLS)for(const x of INTERVALS)try{await scanOne(display,x.tf,x.db,x.seconds)}catch(e:any){console.error(`[FX-WORKER] ${display} ${x.tf}`,e?.message||e);}}
+// Exactly one cycle per child process; no timers, no Telegram, no live APIs.
+cycle().then(async()=>{await prisma.$disconnect();console.log("TEST_WORKER_CYCLE_OK");}).catch(async(e)=>{console.error(e);await prisma.$disconnect();process.exitCode=1;});
