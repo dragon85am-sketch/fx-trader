@@ -351,7 +351,7 @@ let lastDbBatchRows = 0;
 let lastDbBatchAt: number | null = null;
 // V4 history priority is opt-in until production recovery/latency tests pass.
 // One SQL writer and one durable queue remain the source of truth.
-const V4_HISTORY_PRIORITY = process.env.OHLC_V4_HISTORY_PRIORITY === "true";
+const V4_HISTORY_PRIORITY = (process.env.OHLC_V4_HISTORY_PRIORITY || "true").trim().toLowerCase() === "true";
 const V4_RECENT_WINDOW_MS = Math.max(60_000, Math.min(3_600_000, Number(process.env.OHLC_V4_RECENT_WINDOW_MS || 300_000) || 300_000));
 const V4_HISTORY_QUOTA = Math.max(1, Math.min(20, Number(process.env.OHLC_V4_HISTORY_QUOTA || 3) || 3));
 let historyWritesSinceLive = 0;
@@ -565,10 +565,22 @@ async function flushDb() {
     // Drain durable legacy chunks before moving pending rows into new chunks.
     // This avoids a large one-shot queue rewrite near the snapshot size guard.
     // Keep only a bounded number of newly frozen rows per flush.
-    if (DB_PROBE_ONCE || retryChunks.length <= RECOVERY_RETRY_THRESHOLD) {
+    // V4: Freeze a bounded number of pending candles even with a large retry
+    // backlog. Previously the threshold could indefinitely starve fresh candles.
+    // Only one SQL writer is used; immutable chunks and ledger IDs stay intact.
+    {
       const limit = DB_PROBE_ONCE ? pending.size : Math.min(pending.size, RECOVERY_NEW_ROWS);
       const snapshot: Array<[string, TickBatch]> = [];
-      for (const entry of pending.entries()) {
+      // Recent keys first, with stable ordering within each group. An older
+      // immutable chunk touching the same key still commits first because
+      // chooseNextChunk refuses to overtake overlapping keys.
+      const pendingEntries = [...pending.entries()];
+      if (V4_HISTORY_PRIORITY && !DB_PROBE_ONCE) {
+        const recentCutoff = Date.now() - V4_RECENT_WINDOW_MS;
+        pendingEntries.sort((a, b) =>
+          Number(b[1].bucket >= recentCutoff) - Number(a[1].bucket >= recentCutoff));
+      }
+      for (const entry of pendingEntries) {
         if (snapshot.length >= limit) break;
         snapshot.push(entry);
       }
