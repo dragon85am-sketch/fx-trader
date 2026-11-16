@@ -1335,6 +1335,7 @@ externalCrosshairTime,
     if (!pan || !chart) return;
     pan.raf = null;
     const dy = pan.pendingY - pan.startY;
+    if (Math.abs(dy) < 0.5) return;
     // The price shift uses the price/coordinate scale captured at pointer-down;
     // it never accumulates rounding errors from repeated pointer events.
     const shift = (dy / pan.height) * (pan.max - pan.min);
@@ -1984,6 +1985,16 @@ externalCrosshairTime,
       } catch {}
     }
   }, [rightOffset, followOnTick, detached, followLatestBar]);
+
+  // FIX BOX/PAN: drawing tools own the pointer gesture. Native chart dragging
+  // must be disabled while drawing or moving an object, and restored in SELECT.
+  React.useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    chart.applyOptions({
+      handleScroll: { pressedMouseMove: activeDrawTool === "SELECT" },
+    });
+  }, [activeDrawTool]);
 
   // Jedno źródło ustawień Renko. AUTO is LOCKED per symbol/timeframe.
   // Recalculating ATR box-size on every incoming candle rebuilds the entire RENKO
@@ -4210,14 +4221,14 @@ kineticScroll: {
                   pendingY: e.clientY, height: Math.max(1, rect.height),
                   min: bottom, max: top, raf: null,
                 };
-                applyNativeVerticalPan();
+                // Wait for actual vertical movement; no price-scale mutation on mouse-down.
               }
             }
           }}
           onPointerUpCapture={() => {
             const pan = nativeVerticalPanRef.current;
             if (pan?.raf != null) cancelAnimationFrame(pan.raf);
-            if (pan) { pan.raf = null; applyNativeVerticalPan(); }
+            if (pan && pan.pendingY !== pan.startY) { pan.raf = null; applyNativeVerticalPan(); }
             nativeVerticalPanRef.current = null;
             if (!manualPanRef.current) return;
             setFollowOnTick(false);
