@@ -1992,7 +1992,7 @@ externalCrosshairTime,
     const chart = chartRef.current;
     if (!chart) return;
     chart.applyOptions({
-      handleScroll: { pressedMouseMove: activeDrawTool === "SELECT" },
+      handleScroll: { pressedMouseMove: false },
     });
   }, [activeDrawTool]);
 
@@ -2468,7 +2468,7 @@ externalCrosshairTime,
       },
 handleScroll: {
   // V3 TEST: native mouse pan, no custom plot pointer overlay.
-  pressedMouseMove: true,
+  pressedMouseMove: false, // Drawing canvas exclusively owns plot dragging
   horzTouchDrag: true,
   vertTouchDrag: false,
   mouseWheel: true,
@@ -4181,6 +4181,7 @@ kineticScroll: {
             // FIX 4.8: axis overlays have their own pointer gestures. Never start
             // native plot vertical pan for a price/time-axis drag.
             if ((e.target as HTMLElement)?.closest?.('[data-fx-axis-handle]')) return;
+            if ((e.target as HTMLElement)?.closest?.('[data-fx-drawing-canvas]')) return;
             // Detach FOLLOW before lightweight-charts processes native dragging.
             // Do not capture the pointer or preventDefault: chart owns the gesture.
             // V4: no React state changes on pointer-down. Changing follow/detached
@@ -4243,6 +4244,7 @@ kineticScroll: {
             setDetached(true);
           }}
           onPointerMoveCapture={(e) => {
+            if ((e.target as HTMLElement)?.closest?.('[data-fx-drawing-canvas]')) return;
             const pan = nativeVerticalPanRef.current;
             if (pan && pan.pointerId === e.pointerId && (e.buttons & 1)) {
               pan.pendingY = e.clientY;

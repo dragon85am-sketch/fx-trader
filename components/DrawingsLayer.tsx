@@ -1360,21 +1360,13 @@ if (o.type === "FIBO") {
       let priceMax: number | null = null;
 
       try {
-        const chart = chartRef.current;
-        const candles = candlesCacheRef.current;
-        const range = chart?.timeScale().getVisibleLogicalRange();
-
-        if (range && candles.length) {
-          const fromIdx = Math.max(0, Math.floor(Number(range.from)));
-          const toIdx = Math.min(candles.length - 1, Math.ceil(Number(range.to)));
-          const visible = candles.slice(fromIdx, toIdx + 1) as any[];
-          const lows = visible.map((c) => Number(c.low)).filter(Number.isFinite);
-          const highs = visible.map((c) => Number(c.high)).filter(Number.isFinite);
-
-          if (lows.length && highs.length) {
-            priceMin = Math.min(...lows);
-            priceMax = Math.max(...highs);
-          }
+        const series = candleSeriesRef.current;
+        const plotHeight = Math.max(1, e.currentTarget.clientHeight);
+        const top = Number(series?.coordinateToPrice(0));
+        const bottom = Number(series?.coordinateToPrice(plotHeight));
+        if (Number.isFinite(top) && Number.isFinite(bottom) && top > bottom) {
+          priceMin = bottom;
+          priceMax = top;
         }
       } catch {}
 
@@ -2080,6 +2072,7 @@ if (o.type === "FIBO") {
 
 <canvas
   ref={canvasRef}
+  data-fx-drawing-canvas="true"
   className="absolute inset-0 z-[20]"
   style={{
     pointerEvents: "auto",
