@@ -288,6 +288,9 @@ function fatalQueueError(error: unknown): never {
 }
 
 let flushTimer: NodeJS.Timeout | null = null;
+let flushDueAt: number | null = null;
+let acceleratedDrainSchedules = 0;
+let lastBacklogDrainAt: number | null = null;
 let dbWriting = false;
 // V2.2: in-flight diagnostics; no changes to WAL, batch identity or SQL semantics.
 let dbSqlStartedAt: number | null = null;
@@ -357,7 +360,7 @@ let historyWrites = 0;
 // V4 stage 4a: drain persisted backlog faster while keeping SQL work bounded.
 // This changes scheduling only; WAL format, chunk IDs and SQL semantics are unchanged.
 const DB_DRAIN_MS = Math.max(500, Math.min(30_000, Number(process.env.OHLC_DB_DRAIN_MS || 750) || 750));
-const DB_DRAIN_BACKLOG_ROWS = Math.max(1, Math.min(1_000_000, Number(process.env.OHLC_DB_DRAIN_BACKLOG_ROWS || 1000) || 1000));
+const DB_DRAIN_BACKLOG_ROWS = Math.max(1, Math.min(1_000_000, Number(process.env.OHLC_DB_DRAIN_BACKLOG_ROWS || 250) || 250));
 let drainSchedules = 0;
 // Stage 4B: opt-in two independent asynchronous SQL lanes; one queue owner.
 // No second process touches state.json/ticks.wal. Disabled by default.
@@ -446,9 +449,19 @@ function mergeBatch(a: TickBatch, b: TickBatch): TickBatch {
 }
 
 function scheduleFlush(delayMs = DB_FLUSH_MS) {
-  if (!flushTimer && !shuttingDown && !HISTORY_PAUSED && !(DB_PROBE_ONCE && dbProbeAttempted)) {
-    flushTimer = setTimeout(() => { flushTimer = null; void flushDb(); }, delayMs);
-  }
+  if (shuttingDown || HISTORY_PAUSED || (DB_PROBE_ONCE && dbProbeAttempted)) return;
+  const desiredAt = Date.now() + Math.max(0, delayMs);
+  // A new tick must not postpone an already scheduled flush. Conversely, a
+  // backlog-drain request may bring a pending normal flush forward safely.
+  if (flushTimer && flushDueAt !== null && flushDueAt <= desiredAt) return;
+  if (flushTimer) clearTimeout(flushTimer);
+  flushDueAt = desiredAt;
+  flushTimer = setTimeout(() => {
+    flushTimer = null;
+    flushDueAt = null;
+    if (dbWriting) return; // in-flight writer schedules the next drain in finally
+    void flushDb();
+  }, Math.max(0, desiredAt - Date.now()));
 }
 
 function aggregateTick(t: Tick) {
@@ -487,7 +500,14 @@ function queueDbTick(t: Tick) {
     // Publish LIVE only after the tick has been fsynced to the WAL.
     liveCandleEngine.accept(t);
   } catch (e) { fatalQueueError(e); }
-  scheduleFlush();
+  // Keep normal aggregation for healthy queues. Under backlog, request a
+  // faster drain without changing WAL, candle buckets or durable batch IDs.
+  const backlog = pending.size + retryChunks.reduce((n, c) => n + c.length, 0);
+  const accelerated = backlog >= DB_DRAIN_BACKLOG_ROWS && retryChunks.length > 0;
+  if (accelerated) {
+    acceleratedDrainSchedules++;
+    scheduleFlush(DB_DRAIN_MS);
+  } else scheduleFlush();
 }
 
 type DurableBatch = { id: string; batch: TickBatch };
@@ -652,6 +672,7 @@ async function flushDb() {
     dbSqlRowsInFlight = 0;
     dbFlushStartedAt = null;
     if (pending.size || retryChunks.length) {
+      lastBacklogDrainAt = Date.now();
       const retryMs = consecutiveDbFailures
         ? Math.min(DB_RETRY_MAX_MS, DB_FLUSH_MS * 2 ** Math.min(consecutiveDbFailures - 1, 3))
         : (retryChunks.reduce((n, c) => n + c.length, 0) + pending.size >= DB_DRAIN_BACKLOG_ROWS ? DB_DRAIN_MS : DB_FLUSH_MS);
@@ -967,12 +988,12 @@ const server=http.createServer((req,res)=>{
   if(url.pathname==="/health/quick") {
     res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});
     res.end(JSON.stringify({ok:true,buildTag:"fx-fresh-start-v1-20261106",freshStart:FRESH_START,freshStartAt:FRESH_START?FRESH_START_AT:null,connected:liveRatesConnected,historyPaused:HISTORY_PAUSED,dbProbeOnce:DB_PROBE_ONCE,dbProbeAttempted,dbProbeSucceeded,dbWriting,
-      pendingRows:pending.size,retryChunks:retryChunks.length,recoveryMaxBatches:RECOVERY_MAX_BATCHES,recoveryNewRows:RECOVERY_NEW_ROWS,recoveryCheckpointGroups,recoveryCheckpointSaved,dbDrainMs:DB_DRAIN_MS,dbRetryRows:retryChunks.reduce((n,c)=>n+c.length,0),dbBacklogRows:pending.size+retryChunks.reduce((n,c)=>n+c.length,0),liveCandles:liveCandleEngine.size,
+      pendingRows:pending.size,retryChunks:retryChunks.length,recoveryMaxBatches:RECOVERY_MAX_BATCHES,recoveryNewRows:RECOVERY_NEW_ROWS,recoveryCheckpointGroups,recoveryCheckpointSaved,acceleratedDrainSchedules,lastBacklogDrainAt,flushDueAt,dbDrainMs:DB_DRAIN_MS,dbRetryRows:retryChunks.reduce((n,c)=>n+c.length,0),dbBacklogRows:pending.size+retryChunks.reduce((n,c)=>n+c.length,0),liveCandles:liveCandleEngine.size,
       successfulDbWrites,failedDbWrites,lastDbSqlMs,lastDbSuccessAt,btcFeed:{lastPriceArrivalAt:lastBtcPriceArrivalAt,silenceMs:lastBtcPriceArrivalAt===null?null:Date.now()-lastBtcPriceArrivalAt,reconnectCount:btcSilenceReconnects,gapEvents:btcGapEvents,missingM1Slots:btcMissingM1Slots,missingM5Slots:btcMissingM5Slots},
       walBytes,walSequence,walRecoveredTicks,lastWalSyncMs,
       checkpointAt:queueCheckpointAt,checkpointBytes:queueCheckpointBytes}));return;
   }
-  if(url.pathname==="/health"){res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});res.end(JSON.stringify({ok:true,mode:"MASTER_150",freshStart:FRESH_START,freshStartAt:FRESH_START?FRESH_START_AT:null,connected:liveRatesConnected,historyPaused:HISTORY_PAUSED,configured:PROVIDER_INSTRUMENTS.length,providerSubscriptions:providerSubscriptions(),forexSlashSubscriptions,diagnostics:{rawEventCounts:Object.fromEntries(rawEventCounts),rawSymbolCounts:Object.fromEntries(rawSymbolCounts),rawMessageShapes:Object.fromEntries(rawMessageShapes),lastRateAt,lastConnectAt,lastDisconnectAt},clients:totalClients(),receivedSymbols:Object.keys(latestTicks).length,latestTicks,dbWriting,dbPending:[...new Set([...pending.values()].map(b=>b.symbol))],dbPendingRows:pending.size,dbRetryRows:retryChunks.reduce((n,c)=>n+c.length,0),durableQueue:{directory:QUEUE_DIR,checkpointAt:queueCheckpointAt,checkpointBytes:queueCheckpointBytes,lastCheckpointMs:lastQueueCheckpointMs,maxCheckpointMs:maxQueueCheckpointMs,slowCheckpoints:slowQueueCheckpoints,recoveredRows:queueRecoveredRows,walBytes,walSequence,walRecoveredTicks,lastWalSyncMs,fatalError:queueFatalError},dbMetrics:{version:"4.0-priority-preview",v4HistoryPriority:V4_HISTORY_PRIORITY,v4DualWriter:V4_DUAL_WRITER,historyPaused:HISTORY_PAUSED,dbProbeOnce:DB_PROBE_ONCE,dbProbeAttempted,dbProbeSucceeded,v4LiveInFlight,v4HistoryInFlight,v4LiveCommitted,v4HistoryCommitted,v4ConflictDeferrals,v4WriterErrors,dbDrainMs:DB_DRAIN_MS,dbDrainBacklogRows:DB_DRAIN_BACKLOG_ROWS,drainSchedules,recoveryCheckpointGroups,recoveryCheckpointSaved,v4RecentWindowMs:V4_RECENT_WINDOW_MS,v4HistoryQuota:V4_HISTORY_QUOTA,priorityLiveWrites,historyWrites,dbSqlStartedAt,dbSqlAgeMs:dbSqlStartedAt===null?null:Date.now()-dbSqlStartedAt,dbSqlRowsInFlight,dbFlushStartedAt,dbFlushAgeMs:dbFlushStartedAt===null?null:Date.now()-dbFlushStartedAt,flushMs:DB_FLUSH_MS,chunkRows:DB_CHUNK_ROWS,adaptiveChunkRows,slowDbBatches,adaptiveReductions,adaptiveIncreases,successfulDbWrites,failedDbWrites,consecutiveDbFailures,lastDbWriteMs,lastDbSqlMs,lastDbCheckpointMs,maxDbSqlMs,lastDbBatchRows,lastDbBatchAt,lastDbSuccessAt,lastDbFailureAt,shutdownFlushFailed},ingestionDiagnostics:ingestionDiagnostics(),ohlcMetrics:{staleTicksRejected,staleTicksBySymbol:Object.fromEntries(staleTicksBySymbol),acceptedTicksBySymbol:Object.fromEntries(acceptedTicksBySymbol),invalidTimestampsRejected,futureTimestampsRejected,invalidPricesRejected,activeCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)>Date.now()).length,closedPendingCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)<=Date.now()).length},btcFeed:{lastPriceArrivalAt:lastBtcPriceArrivalAt,silenceMs:lastBtcPriceArrivalAt===null?null:Date.now()-lastBtcPriceArrivalAt,reconnectEnabled:BTC_SILENCE_RECONNECT,reconnectThresholdMs:BTC_SILENCE_RECONNECT_MS,reconnectCount:btcSilenceReconnects,lastReconnectAt:lastBtcSilenceReconnectAt,gapEvents:btcGapEvents,missingM1Slots:btcMissingM1Slots,missingM5Slots:btcMissingM5Slots,lastGap:lastBtcGap,backfillStatus:"requires real historical provider data"},feedSilence:{thresholdMs:FEED_SILENCE_ALERT_MS,alertCount:feedSilenceAlerts,lastAlertAt:lastFeedSilenceAlertAt,silenceMs:lastProviderPriceArrivalAt===null?null:Date.now()-lastProviderPriceArrivalAt,reconnectEnabled:FEED_SILENCE_RECONNECT,reconnectCount:feedSilenceReconnects,lastReconnectAt:lastFeedSilenceReconnectAt},providerInfo:providerInfo||null,providerError:providerError||null,failedDbWrites,receivedCount:Object.fromEntries(receivedCount),unrecognizedSymbols:Object.fromEntries(unrecognizedSymbols),missingConfiguredSymbols:PROVIDER_INSTRUMENTS.filter(s=>!latestTicks[s])}));return;}
+  if(url.pathname==="/health"){res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});res.end(JSON.stringify({ok:true,mode:"MASTER_150",freshStart:FRESH_START,freshStartAt:FRESH_START?FRESH_START_AT:null,connected:liveRatesConnected,historyPaused:HISTORY_PAUSED,configured:PROVIDER_INSTRUMENTS.length,providerSubscriptions:providerSubscriptions(),forexSlashSubscriptions,diagnostics:{rawEventCounts:Object.fromEntries(rawEventCounts),rawSymbolCounts:Object.fromEntries(rawSymbolCounts),rawMessageShapes:Object.fromEntries(rawMessageShapes),lastRateAt,lastConnectAt,lastDisconnectAt},clients:totalClients(),receivedSymbols:Object.keys(latestTicks).length,latestTicks,dbWriting,dbPending:[...new Set([...pending.values()].map(b=>b.symbol))],dbPendingRows:pending.size,dbRetryRows:retryChunks.reduce((n,c)=>n+c.length,0),durableQueue:{directory:QUEUE_DIR,checkpointAt:queueCheckpointAt,checkpointBytes:queueCheckpointBytes,lastCheckpointMs:lastQueueCheckpointMs,maxCheckpointMs:maxQueueCheckpointMs,slowCheckpoints:slowQueueCheckpoints,recoveredRows:queueRecoveredRows,walBytes,walSequence,walRecoveredTicks,lastWalSyncMs,fatalError:queueFatalError},dbMetrics:{version:"4.0-priority-preview",v4HistoryPriority:V4_HISTORY_PRIORITY,v4DualWriter:V4_DUAL_WRITER,historyPaused:HISTORY_PAUSED,dbProbeOnce:DB_PROBE_ONCE,dbProbeAttempted,dbProbeSucceeded,v4LiveInFlight,v4HistoryInFlight,v4LiveCommitted,v4HistoryCommitted,v4ConflictDeferrals,v4WriterErrors,dbDrainMs:DB_DRAIN_MS,dbDrainBacklogRows:DB_DRAIN_BACKLOG_ROWS,drainSchedules,acceleratedDrainSchedules,lastBacklogDrainAt,flushDueAt,recoveryCheckpointGroups,recoveryCheckpointSaved,v4RecentWindowMs:V4_RECENT_WINDOW_MS,v4HistoryQuota:V4_HISTORY_QUOTA,priorityLiveWrites,historyWrites,dbSqlStartedAt,dbSqlAgeMs:dbSqlStartedAt===null?null:Date.now()-dbSqlStartedAt,dbSqlRowsInFlight,dbFlushStartedAt,dbFlushAgeMs:dbFlushStartedAt===null?null:Date.now()-dbFlushStartedAt,flushMs:DB_FLUSH_MS,chunkRows:DB_CHUNK_ROWS,adaptiveChunkRows,slowDbBatches,adaptiveReductions,adaptiveIncreases,successfulDbWrites,failedDbWrites,consecutiveDbFailures,lastDbWriteMs,lastDbSqlMs,lastDbCheckpointMs,maxDbSqlMs,lastDbBatchRows,lastDbBatchAt,lastDbSuccessAt,lastDbFailureAt,shutdownFlushFailed},ingestionDiagnostics:ingestionDiagnostics(),ohlcMetrics:{staleTicksRejected,staleTicksBySymbol:Object.fromEntries(staleTicksBySymbol),acceptedTicksBySymbol:Object.fromEntries(acceptedTicksBySymbol),invalidTimestampsRejected,futureTimestampsRejected,invalidPricesRejected,activeCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)>Date.now()).length,closedPendingCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)<=Date.now()).length},btcFeed:{lastPriceArrivalAt:lastBtcPriceArrivalAt,silenceMs:lastBtcPriceArrivalAt===null?null:Date.now()-lastBtcPriceArrivalAt,reconnectEnabled:BTC_SILENCE_RECONNECT,reconnectThresholdMs:BTC_SILENCE_RECONNECT_MS,reconnectCount:btcSilenceReconnects,lastReconnectAt:lastBtcSilenceReconnectAt,gapEvents:btcGapEvents,missingM1Slots:btcMissingM1Slots,missingM5Slots:btcMissingM5Slots,lastGap:lastBtcGap,backfillStatus:"requires real historical provider data"},feedSilence:{thresholdMs:FEED_SILENCE_ALERT_MS,alertCount:feedSilenceAlerts,lastAlertAt:lastFeedSilenceAlertAt,silenceMs:lastProviderPriceArrivalAt===null?null:Date.now()-lastProviderPriceArrivalAt,reconnectEnabled:FEED_SILENCE_RECONNECT,reconnectCount:feedSilenceReconnects,lastReconnectAt:lastFeedSilenceReconnectAt},providerInfo:providerInfo||null,providerError:providerError||null,failedDbWrites,receivedCount:Object.fromEntries(receivedCount),unrecognizedSymbols:Object.fromEntries(unrecognizedSymbols),missingConfiguredSymbols:PROVIDER_INSTRUMENTS.filter(s=>!latestTicks[s])}));return;}
   const m=url.pathname.match(/^\/api\/(?:market\/)?([a-z0-9]+)\/stream$/i);
   if(m){ const symbol=normalizeMarketSymbol(m[1]); if(!PROVIDER_SET.has(symbol)){res.writeHead(404,{"Content-Type":"application/json"});res.end(JSON.stringify({ok:false,error:"Unknown symbol"}));return;} res.writeHead(200,{"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache, no-transform",Connection:"keep-alive","X-Accel-Buffering":"no","Access-Control-Allow-Origin":origin,Vary:"Origin"});res.write("retry: 3000\n\n");res.write(`event: status\ndata: ${JSON.stringify({provider:"live-rates",connected:liveRatesConnected,symbol,mode:"MASTER_150"})}\n\n`);if(latestTicks[symbol])res.write(`event: tick\ndata: ${JSON.stringify(latestTicks[symbol])}\n\n`);const set=clientSet(symbol);set.add(res);const keep=setInterval(()=>{try{res.write(`: keepalive ${Date.now()}\n\n`);}catch{}},15000);req.on("close",()=>{clearInterval(keep);set.delete(res);});return; }
   res.writeHead(200,{"Content-Type":"application/json"});res.end(JSON.stringify({ok:true,service:"FX Trade Master Market Collector",mode:"MASTER_150",configured:PROVIDER_INSTRUMENTS.length,health:"/health",streamPattern:"/api/market/{symbol}/stream"}));
@@ -998,7 +1019,7 @@ async function shutdown(signal:string){
   clearInterval(feedSilenceWatchdog);
   socket.removeAllListeners("rates");
   socket.disconnect();
-  if(flushTimer){clearTimeout(flushTimer);flushTimer=null;}
+  if(flushTimer){clearTimeout(flushTimer);flushTimer=null;flushDueAt=null;}
   // An in-flight flush must finish before a final snapshot is taken.
   const waitUntil=Date.now()+20_000;
   while(dbWriting && Date.now()<waitUntil) await new Promise(r=>setTimeout(r,100));
