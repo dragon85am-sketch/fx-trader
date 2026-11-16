@@ -383,6 +383,17 @@ let v4WriterErrors = 0;
 const RECOVERY_MAX_BATCHES = Math.max(1, Math.min(8, Number(process.env.OHLC_RECOVERY_MAX_BATCHES || 8) || 8));
 const RECOVERY_NEW_ROWS = FRESH_START ? 512 : Math.max(1, Math.min(512, Number(process.env.OHLC_RECOVERY_NEW_ROWS || 128) || 128));
 const RECOVERY_RETRY_THRESHOLD = Math.max(0, Math.min(10000, Number(process.env.OHLC_RECOVERY_RETRY_THRESHOLD || 1000) || 1000));
+// V5: Freeze fewer new rows than the previous flush actually committed.
+// This prevents a 512-row inflow from outrunning 8 legacy SQL chunks.
+// Existing retry chunks remain immutable, and all pending ticks remain in WAL.
+const V5_BACKLOG_FREEZE_CAP = Math.max(1, Math.min(64, Number(process.env.OHLC_V5_BACKLOG_FREEZE_CAP || 16) || 16));
+const V5_FREEZE_SHARE = Math.max(0.1, Math.min(0.75, Number(process.env.OHLC_V5_FREEZE_SHARE || 0.5) || 0.5));
+let v5PreviousCommittedRows = V5_BACKLOG_FREEZE_CAP;
+let v5LastFrozenRows = 0;
+let v5TotalFrozenRows = 0;
+let v5TotalCommittedRows = 0;
+let v5LastCommittedRows = 0;
+let v5BacklogLimitedFlushes = 0;
 let recoveryBatchesThisFlush = 0;
 let recoveryCheckpointGroups = 0;
 let recoveryCheckpointSaved = 0;
@@ -560,6 +571,7 @@ async function flushDb() {
   const flushStarted = Date.now();
   dbFlushStartedAt = flushStarted;
   let committedSinceCheckpoint = 0;
+  let committedRowsThisFlush = 0;
   try {
     // Retry immutable failed chunks first. Never merge them with fresh ticks.
     // Drain durable legacy chunks before moving pending rows into new chunks.
@@ -569,7 +581,15 @@ async function flushDb() {
     // backlog. Previously the threshold could indefinitely starve fresh candles.
     // Only one SQL writer is used; immutable chunks and ledger IDs stay intact.
     {
-      const limit = DB_PROBE_ONCE ? pending.size : Math.min(pending.size, RECOVERY_NEW_ROWS);
+      // Under backlog, freeze at most half the rows committed during the
+      // previous flush. On SQL failure the next cycle freezes zero new rows
+      // until persisted retry chunks can be committed again.
+      const backlogMode = !DB_PROBE_ONCE && retryChunks.length > RECOVERY_RETRY_THRESHOLD;
+      const freezeBudget = backlogMode
+        ? Math.min(V5_BACKLOG_FREEZE_CAP, Math.floor(v5PreviousCommittedRows * V5_FREEZE_SHARE))
+        : RECOVERY_NEW_ROWS;
+      const limit = DB_PROBE_ONCE ? pending.size : Math.min(pending.size, freezeBudget);
+      if (backlogMode) v5BacklogLimitedFlushes++;
       const snapshot: Array<[string, TickBatch]> = [];
       // Recent keys first, with stable ordering within each group. An older
       // immutable chunk touching the same key still commits first because
@@ -585,6 +605,8 @@ async function flushDb() {
         snapshot.push(entry);
       }
       for (const [key] of snapshot) pending.delete(key);
+      v5LastFrozenRows = snapshot.length;
+      v5TotalFrozenRows += snapshot.length;
       const chunkRowsForThisFlush = adaptiveChunkRows;
       for (let i = 0; i < snapshot.length; i += chunkRowsForThisFlush)
         retryChunks.push(snapshot.slice(i, i + chunkRowsForThisFlush).map(([, batch]) => ({ id: crypto.randomUUID(), batch })));
@@ -633,6 +655,8 @@ async function flushDb() {
         lastDbWriteMs = Date.now() - started;
         lastDbSuccessAt = Date.now();
         successfulDbWrites++;
+        committedRowsThisFlush += part.length;
+        v5TotalCommittedRows += part.length;
         recoveryBatchesThisFlush++;
         if (DB_PROBE_ONCE) dbProbeSucceeded = true;
         consecutiveDbFailures = 0;
@@ -679,6 +703,8 @@ async function flushDb() {
       recoveryCheckpointGroups++;
       recoveryCheckpointSaved += committedSinceCheckpoint;
     }
+    v5LastCommittedRows = committedRowsThisFlush;
+    v5PreviousCommittedRows = committedRowsThisFlush;
     dbWriting = false;
     dbSqlStartedAt = null;
     dbSqlRowsInFlight = 0;
@@ -1005,7 +1031,7 @@ const server=http.createServer((req,res)=>{
       walBytes,walSequence,walRecoveredTicks,lastWalSyncMs,
       checkpointAt:queueCheckpointAt,checkpointBytes:queueCheckpointBytes}));return;
   }
-  if(url.pathname==="/health"){res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});res.end(JSON.stringify({ok:true,mode:"MASTER_150",freshStart:FRESH_START,freshStartAt:FRESH_START?FRESH_START_AT:null,connected:liveRatesConnected,historyPaused:HISTORY_PAUSED,configured:PROVIDER_INSTRUMENTS.length,providerSubscriptions:providerSubscriptions(),forexSlashSubscriptions,diagnostics:{rawEventCounts:Object.fromEntries(rawEventCounts),rawSymbolCounts:Object.fromEntries(rawSymbolCounts),rawMessageShapes:Object.fromEntries(rawMessageShapes),lastRateAt,lastConnectAt,lastDisconnectAt},clients:totalClients(),receivedSymbols:Object.keys(latestTicks).length,latestTicks,dbWriting,dbPending:[...new Set([...pending.values()].map(b=>b.symbol))],dbPendingRows:pending.size,dbRetryRows:retryChunks.reduce((n,c)=>n+c.length,0),durableQueue:{directory:QUEUE_DIR,checkpointAt:queueCheckpointAt,checkpointBytes:queueCheckpointBytes,lastCheckpointMs:lastQueueCheckpointMs,maxCheckpointMs:maxQueueCheckpointMs,slowCheckpoints:slowQueueCheckpoints,recoveredRows:queueRecoveredRows,walBytes,walSequence,walRecoveredTicks,lastWalSyncMs,fatalError:queueFatalError},dbMetrics:{version:"4.0-priority-preview",v4HistoryPriority:V4_HISTORY_PRIORITY,v4DualWriter:V4_DUAL_WRITER,historyPaused:HISTORY_PAUSED,dbProbeOnce:DB_PROBE_ONCE,dbProbeAttempted,dbProbeSucceeded,v4LiveInFlight,v4HistoryInFlight,v4LiveCommitted,v4HistoryCommitted,v4ConflictDeferrals,v4WriterErrors,dbDrainMs:DB_DRAIN_MS,dbDrainBacklogRows:DB_DRAIN_BACKLOG_ROWS,drainSchedules,acceleratedDrainSchedules,lastBacklogDrainAt,flushDueAt,recoveryCheckpointGroups,recoveryCheckpointSaved,v4RecentWindowMs:V4_RECENT_WINDOW_MS,v4HistoryQuota:V4_HISTORY_QUOTA,priorityLiveWrites,historyWrites,dbSqlStartedAt,dbSqlAgeMs:dbSqlStartedAt===null?null:Date.now()-dbSqlStartedAt,dbSqlRowsInFlight,dbFlushStartedAt,dbFlushAgeMs:dbFlushStartedAt===null?null:Date.now()-dbFlushStartedAt,flushMs:DB_FLUSH_MS,chunkRows:DB_CHUNK_ROWS,adaptiveChunkRows,slowDbBatches,adaptiveReductions,adaptiveIncreases,successfulDbWrites,failedDbWrites,consecutiveDbFailures,lastDbWriteMs,lastDbSqlMs,lastDbCheckpointMs,maxDbSqlMs,lastDbBatchRows,lastDbBatchAt,lastDbSuccessAt,lastDbFailureAt,shutdownFlushFailed},ingestionDiagnostics:ingestionDiagnostics(),ohlcMetrics:{staleTicksRejected,staleTicksBySymbol:Object.fromEntries(staleTicksBySymbol),acceptedTicksBySymbol:Object.fromEntries(acceptedTicksBySymbol),invalidTimestampsRejected,futureTimestampsRejected,invalidPricesRejected,activeCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)>Date.now()).length,closedPendingCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)<=Date.now()).length},btcFeed:{lastPriceArrivalAt:lastBtcPriceArrivalAt,silenceMs:lastBtcPriceArrivalAt===null?null:Date.now()-lastBtcPriceArrivalAt,reconnectEnabled:BTC_SILENCE_RECONNECT,reconnectThresholdMs:BTC_SILENCE_RECONNECT_MS,reconnectCount:btcSilenceReconnects,lastReconnectAt:lastBtcSilenceReconnectAt,gapEvents:btcGapEvents,missingM1Slots:btcMissingM1Slots,missingM5Slots:btcMissingM5Slots,lastGap:lastBtcGap,backfillStatus:"requires real historical provider data"},feedSilence:{thresholdMs:FEED_SILENCE_ALERT_MS,alertCount:feedSilenceAlerts,lastAlertAt:lastFeedSilenceAlertAt,silenceMs:lastProviderPriceArrivalAt===null?null:Date.now()-lastProviderPriceArrivalAt,reconnectEnabled:FEED_SILENCE_RECONNECT,reconnectCount:feedSilenceReconnects,lastReconnectAt:lastFeedSilenceReconnectAt},providerInfo:providerInfo||null,providerError:providerError||null,failedDbWrites,receivedCount:Object.fromEntries(receivedCount),unrecognizedSymbols:Object.fromEntries(unrecognizedSymbols),missingConfiguredSymbols:PROVIDER_INSTRUMENTS.filter(s=>!latestTicks[s])}));return;}
+  if(url.pathname==="/health"){res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});res.end(JSON.stringify({ok:true,mode:"MASTER_150",freshStart:FRESH_START,freshStartAt:FRESH_START?FRESH_START_AT:null,connected:liveRatesConnected,historyPaused:HISTORY_PAUSED,configured:PROVIDER_INSTRUMENTS.length,providerSubscriptions:providerSubscriptions(),forexSlashSubscriptions,diagnostics:{rawEventCounts:Object.fromEntries(rawEventCounts),rawSymbolCounts:Object.fromEntries(rawSymbolCounts),rawMessageShapes:Object.fromEntries(rawMessageShapes),lastRateAt,lastConnectAt,lastDisconnectAt},clients:totalClients(),receivedSymbols:Object.keys(latestTicks).length,latestTicks,dbWriting,dbPending:[...new Set([...pending.values()].map(b=>b.symbol))],dbPendingRows:pending.size,dbRetryRows:retryChunks.reduce((n,c)=>n+c.length,0),durableQueue:{directory:QUEUE_DIR,checkpointAt:queueCheckpointAt,checkpointBytes:queueCheckpointBytes,lastCheckpointMs:lastQueueCheckpointMs,maxCheckpointMs:maxQueueCheckpointMs,slowCheckpoints:slowQueueCheckpoints,recoveredRows:queueRecoveredRows,walBytes,walSequence,walRecoveredTicks,lastWalSyncMs,fatalError:queueFatalError},dbMetrics:{version:"5.0-controlled-recovery",v5BacklogFreezeCap:V5_BACKLOG_FREEZE_CAP,v5FreezeShare:V5_FREEZE_SHARE,v5PreviousCommittedRows,v5LastFrozenRows,v5LastCommittedRows,v5TotalFrozenRows,v5TotalCommittedRows,v5BacklogLimitedFlushes,v4HistoryPriority:V4_HISTORY_PRIORITY,v4DualWriter:V4_DUAL_WRITER,historyPaused:HISTORY_PAUSED,dbProbeOnce:DB_PROBE_ONCE,dbProbeAttempted,dbProbeSucceeded,v4LiveInFlight,v4HistoryInFlight,v4LiveCommitted,v4HistoryCommitted,v4ConflictDeferrals,v4WriterErrors,dbDrainMs:DB_DRAIN_MS,dbDrainBacklogRows:DB_DRAIN_BACKLOG_ROWS,drainSchedules,acceleratedDrainSchedules,lastBacklogDrainAt,flushDueAt,recoveryCheckpointGroups,recoveryCheckpointSaved,v4RecentWindowMs:V4_RECENT_WINDOW_MS,v4HistoryQuota:V4_HISTORY_QUOTA,priorityLiveWrites,historyWrites,dbSqlStartedAt,dbSqlAgeMs:dbSqlStartedAt===null?null:Date.now()-dbSqlStartedAt,dbSqlRowsInFlight,dbFlushStartedAt,dbFlushAgeMs:dbFlushStartedAt===null?null:Date.now()-dbFlushStartedAt,flushMs:DB_FLUSH_MS,chunkRows:DB_CHUNK_ROWS,adaptiveChunkRows,slowDbBatches,adaptiveReductions,adaptiveIncreases,successfulDbWrites,failedDbWrites,consecutiveDbFailures,lastDbWriteMs,lastDbSqlMs,lastDbCheckpointMs,maxDbSqlMs,lastDbBatchRows,lastDbBatchAt,lastDbSuccessAt,lastDbFailureAt,shutdownFlushFailed},ingestionDiagnostics:ingestionDiagnostics(),ohlcMetrics:{staleTicksRejected,staleTicksBySymbol:Object.fromEntries(staleTicksBySymbol),acceptedTicksBySymbol:Object.fromEntries(acceptedTicksBySymbol),invalidTimestampsRejected,futureTimestampsRejected,invalidPricesRejected,activeCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)>Date.now()).length,closedPendingCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)<=Date.now()).length},btcFeed:{lastPriceArrivalAt:lastBtcPriceArrivalAt,silenceMs:lastBtcPriceArrivalAt===null?null:Date.now()-lastBtcPriceArrivalAt,reconnectEnabled:BTC_SILENCE_RECONNECT,reconnectThresholdMs:BTC_SILENCE_RECONNECT_MS,reconnectCount:btcSilenceReconnects,lastReconnectAt:lastBtcSilenceReconnectAt,gapEvents:btcGapEvents,missingM1Slots:btcMissingM1Slots,missingM5Slots:btcMissingM5Slots,lastGap:lastBtcGap,backfillStatus:"requires real historical provider data"},feedSilence:{thresholdMs:FEED_SILENCE_ALERT_MS,alertCount:feedSilenceAlerts,lastAlertAt:lastFeedSilenceAlertAt,silenceMs:lastProviderPriceArrivalAt===null?null:Date.now()-lastProviderPriceArrivalAt,reconnectEnabled:FEED_SILENCE_RECONNECT,reconnectCount:feedSilenceReconnects,lastReconnectAt:lastFeedSilenceReconnectAt},providerInfo:providerInfo||null,providerError:providerError||null,failedDbWrites,receivedCount:Object.fromEntries(receivedCount),unrecognizedSymbols:Object.fromEntries(unrecognizedSymbols),missingConfiguredSymbols:PROVIDER_INSTRUMENTS.filter(s=>!latestTicks[s])}));return;}
   const m=url.pathname.match(/^\/api\/(?:market\/)?([a-z0-9]+)\/stream$/i);
   if(m){ const symbol=normalizeMarketSymbol(m[1]); if(!PROVIDER_SET.has(symbol)){res.writeHead(404,{"Content-Type":"application/json"});res.end(JSON.stringify({ok:false,error:"Unknown symbol"}));return;} res.writeHead(200,{"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache, no-transform",Connection:"keep-alive","X-Accel-Buffering":"no","Access-Control-Allow-Origin":origin,Vary:"Origin"});res.write("retry: 3000\n\n");res.write(`event: status\ndata: ${JSON.stringify({provider:"live-rates",connected:liveRatesConnected,symbol,mode:"MASTER_150"})}\n\n`);if(latestTicks[symbol])res.write(`event: tick\ndata: ${JSON.stringify(latestTicks[symbol])}\n\n`);const set=clientSet(symbol);set.add(res);const keep=setInterval(()=>{try{res.write(`: keepalive ${Date.now()}\n\n`);}catch{}},15000);req.on("close",()=>{clearInterval(keep);set.delete(res);});return; }
   res.writeHead(200,{"Content-Type":"application/json"});res.end(JSON.stringify({ok:true,service:"FX Trade Master Market Collector",mode:"MASTER_150",configured:PROVIDER_INSTRUMENTS.length,health:"/health",streamPattern:"/api/market/{symbol}/stream"}));
