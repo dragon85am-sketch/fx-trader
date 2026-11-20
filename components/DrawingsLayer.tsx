@@ -969,6 +969,44 @@ if (o.type === "FIBO") {
       if (tps[2] != null && tps[1] != null) bands.push({from:tps[2],to:tps[1],kind:"TP3"});
     }
 
+    // AUTO ATR14: visual-only cushions around fixed ENTRY/SL/TP prices.
+    // Never change the actual levels or risk/reward calculation.
+    const candlesForAtr = candlesCacheRef.current;
+    const closed = candlesForAtr.length > 1 ? candlesForAtr.slice(0, -1) : candlesForAtr;
+    const recent = closed.slice(-80);
+    const trValues: number[] = [];
+    for (let i = 1; i < recent.length; i++) {
+      const c = recent[i] as any;
+      const prev = recent[i - 1] as any;
+      const high = Number(c.high), low = Number(c.low), prevClose = Number(prev.close);
+      if ([high, low, prevClose].every(Number.isFinite)) {
+        trValues.push(Math.max(high - low, Math.abs(high - prevClose), Math.abs(low - prevClose)));
+      }
+    }
+    let atr14 = 0;
+    if (trValues.length >= 14) {
+      atr14 = trValues.slice(0, 14).reduce((a, b) => a + b, 0) / 14;
+      for (let i = 14; i < trValues.length; i++) {
+        atr14 = (atr14 * 13 + trValues[i]) / 14;
+      }
+    }
+    const averageRange = trValues.length
+      ? trValues.slice(-14).reduce((a, b) => a + b, 0) / Math.min(14, trValues.length)
+      : 0;
+    const volatility = Math.max(atr14, averageRange * 0.75);
+    const halfBand = Math.max(
+      risk * 0.025,
+      Math.min(risk * 0.30, volatility * 0.40)
+    );
+    const zoneCenters: Array<{ kind: "ENTRY" | "SL" | "TP1" | "TP2" | "TP3"; price: number }> = [
+      { kind: "ENTRY", price: levels.entry },
+      { kind: "SL", price: levels.sl },
+      ...tps.map((price, i) => ({
+        kind: `TP${i + 1}` as "TP1" | "TP2" | "TP3",
+        price,
+      })),
+    ];
+
     const fillFor = (k:string) => k === "SL" ? "rgba(239,68,68,.14)" : k === "ENTRY" ? (side === "BUY" ? "rgba(16,185,129,.20)" : "rgba(239,68,68,.20)") : "rgba(16,185,129,.10)";
     const strokeFor = (k:string) => k === "SL" ? "rgba(239,68,68,.82)" : k === "ENTRY" ? (side === "BUY" ? "rgba(16,185,129,.95)" : "rgba(239,68,68,.95)") : "rgba(16,185,129,.60)";
 
@@ -983,6 +1021,27 @@ if (o.type === "FIBO") {
       const h = Math.max(b.kind === "ENTRY" ? 18 : 6, Math.abs(Number(y2)-Number(y1)));
       ctx.fillStyle = fillFor(b.kind); ctx.strokeStyle = strokeFor(b.kind); ctx.lineWidth = b.kind === "ENTRY" ? 2 : 1;
       ctx.beginPath(); ctx.roundRect(x, top, w, h, b.kind === "ENTRY" ? 10 : 6); ctx.fill(); ctx.stroke();
+    }
+
+    // Highlight ATR-sized zones centered on the original fixed price lines.
+    // Existing SL/TP risk blocks remain untouched behind these bands.
+    for (const z of zoneCenters) {
+      const topPrice = z.price + halfBand;
+      const bottomPrice = z.price - halfBand;
+      const yTop = series.priceToCoordinate(topPrice);
+      const yBottom = series.priceToCoordinate(bottomPrice);
+      const yCenter = series.priceToCoordinate(z.price);
+      if (yTop == null || yBottom == null || yCenter == null) continue;
+      const rawH = Math.abs(Number(yBottom) - Number(yTop));
+      const height = Math.max(18, rawH);
+      const top = Number(yCenter) - height / 2;
+      ctx.fillStyle = fillFor(z.kind);
+      ctx.strokeStyle = strokeFor(z.kind);
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.roundRect(x, top, w, height, 7);
+      ctx.fill();
+      ctx.stroke();
     }
 
     const lineItems: Array<[string,number,string,number]> = [["ENTRY",levels.entry,side === "BUY" ? "rgba(16,185,129,.98)" : "rgba(239,68,68,.98)",3],["SL",levels.sl,"rgba(239,68,68,.98)",3]];
