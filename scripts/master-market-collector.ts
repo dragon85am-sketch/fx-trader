@@ -64,7 +64,7 @@ function v54Diagnostics() {
     walSlowCount: v54WalSlowCount, checkpointTotalMs: v54CheckpointTotalMs,
     checkpointSlowCount: v54CheckpointSlowCount, lastCheckpointParts: v54LastCheckpointParts,
     lastSlowSql: v54LastSlowSql,
-    note: "CPU and synchronous I/O are correlated over the SQL await; not proof of causation. No durability or SQL behavior changed." };
+    note: "WAL wall time is asynchronous in V5.6; correlation is not causation." };
 }
 // V5.5: attribution of synchronous WAL phases, measured without changing I/O ordering.
 let v55WalOpenMs = 0;
@@ -83,7 +83,7 @@ function v55Diagnostics() {
     walOpenTotalMs: Math.round(v55WalOpenMs), walWriteTotalMs: Math.round(v55WalWriteMs),
     walFsyncTotalMs: Math.round(v55WalFsyncMs), walCloseTotalMs: Math.round(v55WalCloseMs),
     walMaxFsyncMs: Math.round(v55WalMaxFsyncMs), lastWalSlow: v55LastWalSlow, lastSql: v55LastSql,
-    note: "WAL timings are synchronous wall times inside the SQL await window; residual is not pure database time. No I/O, durability, or SQL behavior changed."
+    note: "Legacy counters now measure async WAL wall time; overlap is not blocking or causal attribution. residualWallMs is unadjusted SQL wall time."
   };
 }
 
@@ -254,6 +254,25 @@ function validateBatch(value: any): value is TickBatch {
     value.bucket > 0 && value.firstAt > 0 && value.lastAt >= value.firstAt &&
     value.open > 0 && value.close > 0 && value.high >= Math.max(value.open, value.close) &&
     value.low <= Math.min(value.open, value.close) && value.ticks > 0;
+}
+
+// V5.6: single FIFO owner for WAL append + durable acceptance + checkpoints.
+// SQL awaits stay outside this queue. Checkpoint remains synchronous in this stage.
+let v56Tail: Promise<void> = Promise.resolve();
+let v56Queued = 0;
+let v56Peak = 0;
+const V56_MAX_QUEUED = 10000;
+function v56Serial(work: () => void | Promise<void>): Promise<void> {
+  v56Queued++;
+  v56Peak = Math.max(v56Peak, v56Queued);
+  const job = v56Tail.then(work).catch(e => fatalQueueError(e));
+  v56Tail = job.then(() => { v56Queued--; });
+  return v56Tail;
+}
+function v56Diagnostics() {
+  return { version: "5.6-async-wal", queued: v56Queued, peakQueued: v56Peak,
+    maxQueued: V56_MAX_QUEUED, checkpointMode: "serialized-sync",
+    note: "Async WAL wall time overlaps SQL; it is not event-loop blocking time" };
 }
 
 function saveQueue(): void {
@@ -613,7 +632,7 @@ function aggregateTick(t: Tick) {
   }
 }
 
-function queueDbTick(t: Tick) {
+async function queueDbTick(t: Tick) {
   try {
     // Checkpoint first, then derive the next sequence from the durable state.
     // Include a checksum for new records; legacy WAL lines remain readable.
@@ -624,16 +643,16 @@ function queueDbTick(t: Tick) {
     const record = JSON.stringify({ seq, tick: t, sha256 }) + "\n";
     const bytes = Buffer.byteLength(record);
     const started = performance.now();
-    const fd = fs.openSync(WAL_FILE, "a", 0o600);
+    const fd = await fs.promises.open(WAL_FILE, "a", 0o600);
     const openedAt = performance.now();
     let writtenAt = openedAt;
     let syncedAt = openedAt;
     try {
-      fs.writeFileSync(fd, record);
+      await fd.writeFile(record);
       writtenAt = performance.now();
-      fs.fsyncSync(fd);
+      await fd.sync();
       syncedAt = performance.now();
-    } finally { fs.closeSync(fd); }
+    } finally { await fd.close(); }
     const closedAt = performance.now();
     const walOpenMs = openedAt - started;
     const walWriteMs = writtenAt - openedAt;
@@ -760,7 +779,7 @@ async function flushDb() {
       for (let i = 0; i < snapshot.length; i += chunkRowsForThisFlush)
         retryChunks.push(snapshot.slice(i, i + chunkRowsForThisFlush).map(([, batch]) => ({ id: crypto.randomUUID(), batch })));
       // Persist IDs before any SQL; on error stop rather than risk unprotected writes.
-      if (snapshot.length) try { saveQueue(); } catch (e) { fatalQueueError(e); }
+      if (snapshot.length) try { await v56Serial(saveQueue); } catch (e) { fatalQueueError(e); }
     }
     recoveryBatchesThisFlush = 0;
     while (retryChunks.length) {
@@ -823,9 +842,9 @@ async function flushDb() {
             walFsyncMs: Math.round(v55WalFsyncMs-v55WalFsyncStart),
             walCount: v55WalSamples-v55WalCountStart, checkpointWallMs: checkpointWall,
             cpuMs: Math.round(v54CpuMs), loopMaxMs: Math.round(v53LoopMaxMs),
-            residualWallMs: Math.max(0,sqlFinished-started-walWall-checkpointWall)
+            residualWallMs: sqlFinished-started
           };
-          console.warn(`[MASTER V5.5] IO_ATTRIBUTION sqlMs=${v55LastSql.sqlWallMs} walMs=${v55LastSql.walWallMs} fsyncMs=${v55LastSql.walFsyncMs} walCount=${v55LastSql.walCount} checkpointMs=${v55LastSql.checkpointWallMs} residualMs=${v55LastSql.residualWallMs}`);
+          console.warn(`[MASTER V5.6] ASYNC_IO_OVERLAP sqlMs=${v55LastSql.sqlWallMs} walMs=${v55LastSql.walWallMs} fsyncMs=${v55LastSql.walFsyncMs} walCount=${v55LastSql.walCount} checkpointMs=${v55LastSql.checkpointWallMs} unadjustedSqlMs=${v55LastSql.residualWallMs}`);
           console.warn(`[MASTER V5.4] SQL_CORRELATION sqlMs=${v54LastSlowSql.sqlMs} cpuMs=${v54LastSlowSql.cpuMs} walSyncMs=${v54LastSlowSql.walSyncMsDuringSql} checkpointMs=${v54LastSlowSql.checkpointMsDuringSql} loopMaxMs=${v54LastSlowSql.loopMaxMs} rows=${part.length}`);
           console.warn(`[MASTER V5.3] SQL_WAIT sqlMs=${v53LastSlow.sqlMs} loopMaxMs=${v53LastSlow.loopMaxMs} loopUtil=${v53LastSlow.eventLoopUtilization} rows=${part.length}`);
         }
@@ -890,7 +909,7 @@ async function flushDb() {
     // WAL fsync remains per accepted tick and is unchanged.
     if (committedSinceCheckpoint > 0) {
       const checkpointStarted = Date.now();
-      try { saveQueue(); } catch (e) { fatalQueueError(e); }
+      try { await v56Serial(saveQueue); } catch (e) { fatalQueueError(e); }
       lastDbCheckpointMs = Date.now() - checkpointStarted;
       recoveryCheckpointGroups++;
       recoveryCheckpointSaved += committedSinceCheckpoint;
@@ -932,7 +951,7 @@ async function flushDbV4() {
     for (let i = 0; i < snapshot.length; i += chunkSize)
       retryChunks.push(snapshot.slice(i, i + chunkSize).map(([, batch]) => ({ id: crypto.randomUUID(), batch })));
     // Persist immutable IDs before starting either lane.
-    try { saveQueue(); } catch (e) { fatalQueueError(e); }
+    try { await v56Serial(saveQueue); } catch (e) { fatalQueueError(e); }
 
     const rowKey = (row: DurableBatch) => batchKey(row.batch);
     const recent = (chunk: DurableBatch[]) => chunk.some(row =>
@@ -988,7 +1007,7 @@ async function flushDbV4() {
           retryChunks.splice(idx, 1);
           // The SQL ledger makes a crash before this checkpoint idempotent.
           const checkpointStarted = Date.now();
-          try { saveQueue(); } catch (e) { fatalQueueError(e); }
+          try { await v56Serial(saveQueue); } catch (e) { fatalQueueError(e); }
           lastDbCheckpointMs = Date.now() - checkpointStarted;
           if (duration > DB_SLOW_MS) {
             slowDbBatches++;
@@ -1065,17 +1084,21 @@ socket.on("rates",(raw:any)=>{ try {
     if(timestamp > Date.now() + MAX_FUTURE_TICK_MS){ futureTimestampsRejected++; continue; }
     // Fresh-start guard: ignore historical/replayed provider ticks from before this process started.
     if (FRESH_START && timestamp < FRESH_START_AT) { staleTicksRejected++; continue; }
-    const last=lastAcceptedTimestamp.get(symbol);
-    if(last !== undefined && timestamp < last){ staleTicksRejected++; staleTicksBySymbol.set(symbol, (staleTicksBySymbol.get(symbol) || 0) + 1); continue; }
-    const tick={symbol,price,timestamp};
-    // Durability first: do not expose or acknowledge a tick before WAL fsync.
-    // queueDbTick stops the process if the durable write fails.
-    queueDbTick(tick);
-    lastAcceptedTimestamp.set(symbol,timestamp);
-    latestTicks[symbol]=tick;
-    recordAcceptedTick(tick);
-    observeBtcTick(tick);
-    broadcastTick(tick);
+    if (shuttingDown) continue;
+    if (v56Queued >= V56_MAX_QUEUED) fatalQueueError(new Error("V5.6 WAL ingress queue limit exceeded; unaccepted ticks require provider backfill"));
+    void v56Serial(async () => {
+      const last=lastAcceptedTimestamp.get(symbol);
+      if(last !== undefined && timestamp < last){ staleTicksRejected++; staleTicksBySymbol.set(symbol, (staleTicksBySymbol.get(symbol) || 0) + 1); return; }
+      const tick={symbol,price,timestamp};
+      // Durability first: do not expose or acknowledge a tick before WAL fsync.
+      // queueDbTick stops the process if the durable write fails.
+      await queueDbTick(tick);
+      lastAcceptedTimestamp.set(symbol,timestamp);
+      latestTicks[symbol]=tick;
+      recordAcceptedTick(tick);
+      observeBtcTick(tick);
+      broadcastTick(tick);
+    });
   }
 } catch(e){console.error("[MASTER] parse",e);} });
 // Count event names only, not raw payloads (which might contain credentials).
@@ -1220,14 +1243,14 @@ const server=http.createServer((req,res)=>{
   }
   if(url.pathname==="/health/quick") {
     res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});
-    res.end(JSON.stringify({ok:true,buildTag:"fx-v5.5-passive-wal-phase-attribution-20261120",freshStart:FRESH_START,freshStartAt:FRESH_START?FRESH_START_AT:null,connected:liveRatesConnected,historyPaused:HISTORY_PAUSED,dbProbeOnce:DB_PROBE_ONCE,dbProbeAttempted,dbProbeSucceeded,dbWriting,
+    res.end(JSON.stringify({ok:true,buildTag:"fx-v5.6-async-wal-20261125",freshStart:FRESH_START,freshStartAt:FRESH_START?FRESH_START_AT:null,connected:liveRatesConnected,historyPaused:HISTORY_PAUSED,dbProbeOnce:DB_PROBE_ONCE,dbProbeAttempted,dbProbeSucceeded,dbWriting,
       pendingRows:pending.size,retryChunks:retryChunks.length,recoveryMaxBatches:RECOVERY_MAX_BATCHES,recoveryNewRows:RECOVERY_NEW_ROWS,recoveryCheckpointGroups,recoveryCheckpointSaved,acceleratedDrainSchedules,lastBacklogDrainAt,flushDueAt,dbDrainMs:DB_DRAIN_MS,
       v5LastFrozenRows,v5LastCommittedRows,v5TotalFrozenRows,v5TotalCommittedRows,v5BacklogLimitedFlushes,adaptiveChunkRows,lastDbBatchRows,lastDbCheckpointMs,dbRetryRows:retryChunks.reduce((n,c)=>n+c.length,0),dbBacklogRows:pending.size+retryChunks.reduce((n,c)=>n+c.length,0),liveCandles:liveCandleEngine.size,
-      successfulDbWrites,failedDbWrites,lastDbSqlMs,lastDbSuccessAt,sqlLatency:dbSqlLatencyDiagnostics(),v53Latency:v53LatencyDiagnostics(),v54Diagnostics:v54Diagnostics(),v55Diagnostics:v55Diagnostics(),dbPoolConfig,prismaErrorCounts,lastPrismaError,btcFeed:{lastPriceArrivalAt:lastBtcPriceArrivalAt,silenceMs:lastBtcPriceArrivalAt===null?null:Date.now()-lastBtcPriceArrivalAt,reconnectCount:btcSilenceReconnects,gapEvents:btcGapEvents,missingM1Slots:btcMissingM1Slots,missingM5Slots:btcMissingM5Slots},
+      successfulDbWrites,failedDbWrites,lastDbSqlMs,lastDbSuccessAt,sqlLatency:dbSqlLatencyDiagnostics(),v53Latency:v53LatencyDiagnostics(),v54Diagnostics:v54Diagnostics(),v55Diagnostics:v55Diagnostics(),v56Diagnostics:v56Diagnostics(),dbPoolConfig,prismaErrorCounts,lastPrismaError,btcFeed:{lastPriceArrivalAt:lastBtcPriceArrivalAt,silenceMs:lastBtcPriceArrivalAt===null?null:Date.now()-lastBtcPriceArrivalAt,reconnectCount:btcSilenceReconnects,gapEvents:btcGapEvents,missingM1Slots:btcMissingM1Slots,missingM5Slots:btcMissingM5Slots},
       walBytes,walSequence,walRecoveredTicks,lastWalSyncMs,
       checkpointAt:queueCheckpointAt,checkpointBytes:queueCheckpointBytes}));return;
   }
-  if(url.pathname==="/health"){res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});res.end(JSON.stringify({ok:true,mode:"MASTER_150",freshStart:FRESH_START,freshStartAt:FRESH_START?FRESH_START_AT:null,connected:liveRatesConnected,historyPaused:HISTORY_PAUSED,configured:PROVIDER_INSTRUMENTS.length,providerSubscriptions:providerSubscriptions(),forexSlashSubscriptions,diagnostics:{rawEventCounts:Object.fromEntries(rawEventCounts),rawSymbolCounts:Object.fromEntries(rawSymbolCounts),rawMessageShapes:Object.fromEntries(rawMessageShapes),lastRateAt,lastConnectAt,lastDisconnectAt},clients:totalClients(),receivedSymbols:Object.keys(latestTicks).length,latestTicks,dbWriting,dbPending:[...new Set([...pending.values()].map(b=>b.symbol))],dbPendingRows:pending.size,dbRetryRows:retryChunks.reduce((n,c)=>n+c.length,0),durableQueue:{directory:QUEUE_DIR,checkpointAt:queueCheckpointAt,checkpointBytes:queueCheckpointBytes,lastCheckpointMs:lastQueueCheckpointMs,maxCheckpointMs:maxQueueCheckpointMs,slowCheckpoints:slowQueueCheckpoints,recoveredRows:queueRecoveredRows,walBytes,walSequence,walRecoveredTicks,lastWalSyncMs,fatalError:queueFatalError},dbMetrics:{version:"5.5-passive-wal-phase-attribution",v5BacklogFreezeCap:V5_BACKLOG_FREEZE_CAP,v5FreezeShare:V5_FREEZE_SHARE,v5PreviousCommittedRows,v5LastFrozenRows,v5LastCommittedRows,v5TotalFrozenRows,v5TotalCommittedRows,v5BacklogLimitedFlushes,v4HistoryPriority:V4_HISTORY_PRIORITY,v4DualWriter:V4_DUAL_WRITER,historyPaused:HISTORY_PAUSED,dbProbeOnce:DB_PROBE_ONCE,dbProbeAttempted,dbProbeSucceeded,v4LiveInFlight,v4HistoryInFlight,v4LiveCommitted,v4HistoryCommitted,v4ConflictDeferrals,v4WriterErrors,dbDrainMs:DB_DRAIN_MS,dbDrainBacklogRows:DB_DRAIN_BACKLOG_ROWS,drainSchedules,acceleratedDrainSchedules,lastBacklogDrainAt,flushDueAt,recoveryCheckpointGroups,recoveryCheckpointSaved,v4RecentWindowMs:V4_RECENT_WINDOW_MS,v4HistoryQuota:V4_HISTORY_QUOTA,priorityLiveWrites,historyWrites,dbSqlStartedAt,dbSqlAgeMs:dbSqlStartedAt===null?null:Date.now()-dbSqlStartedAt,dbSqlRowsInFlight,dbFlushStartedAt,dbFlushAgeMs:dbFlushStartedAt===null?null:Date.now()-dbFlushStartedAt,flushMs:DB_FLUSH_MS,chunkRows:DB_CHUNK_ROWS,adaptiveChunkRows,slowDbBatches,adaptiveReductions,adaptiveIncreases,successfulDbWrites,failedDbWrites,consecutiveDbFailures,lastDbWriteMs,lastDbSqlMs,lastDbCheckpointMs,maxDbSqlMs,lastDbBatchRows,lastDbBatchAt,lastDbSuccessAt,lastDbFailureAt,sqlLatency:dbSqlLatencyDiagnostics(),v53Latency:v53LatencyDiagnostics(),v54Diagnostics:v54Diagnostics(),v55Diagnostics:v55Diagnostics(),dbPoolConfig,prismaErrorCounts,lastPrismaError,shutdownFlushFailed},ingestionDiagnostics:ingestionDiagnostics(),ohlcMetrics:{staleTicksRejected,staleTicksBySymbol:Object.fromEntries(staleTicksBySymbol),acceptedTicksBySymbol:Object.fromEntries(acceptedTicksBySymbol),invalidTimestampsRejected,futureTimestampsRejected,invalidPricesRejected,activeCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)>Date.now()).length,closedPendingCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)<=Date.now()).length},btcFeed:{lastPriceArrivalAt:lastBtcPriceArrivalAt,silenceMs:lastBtcPriceArrivalAt===null?null:Date.now()-lastBtcPriceArrivalAt,reconnectEnabled:BTC_SILENCE_RECONNECT,reconnectThresholdMs:BTC_SILENCE_RECONNECT_MS,reconnectCount:btcSilenceReconnects,lastReconnectAt:lastBtcSilenceReconnectAt,gapEvents:btcGapEvents,missingM1Slots:btcMissingM1Slots,missingM5Slots:btcMissingM5Slots,lastGap:lastBtcGap,backfillStatus:"requires real historical provider data"},feedSilence:{thresholdMs:FEED_SILENCE_ALERT_MS,alertCount:feedSilenceAlerts,lastAlertAt:lastFeedSilenceAlertAt,silenceMs:lastProviderPriceArrivalAt===null?null:Date.now()-lastProviderPriceArrivalAt,reconnectEnabled:FEED_SILENCE_RECONNECT,reconnectCount:feedSilenceReconnects,lastReconnectAt:lastFeedSilenceReconnectAt},providerInfo:providerInfo||null,providerError:providerError||null,failedDbWrites,receivedCount:Object.fromEntries(receivedCount),unrecognizedSymbols:Object.fromEntries(unrecognizedSymbols),missingConfiguredSymbols:PROVIDER_INSTRUMENTS.filter(s=>!latestTicks[s])}));return;}
+  if(url.pathname==="/health"){res.writeHead(200,{"Content-Type":"application/json","Cache-Control":"no-store"});res.end(JSON.stringify({ok:true,mode:"MASTER_150",freshStart:FRESH_START,freshStartAt:FRESH_START?FRESH_START_AT:null,connected:liveRatesConnected,historyPaused:HISTORY_PAUSED,configured:PROVIDER_INSTRUMENTS.length,providerSubscriptions:providerSubscriptions(),forexSlashSubscriptions,diagnostics:{rawEventCounts:Object.fromEntries(rawEventCounts),rawSymbolCounts:Object.fromEntries(rawSymbolCounts),rawMessageShapes:Object.fromEntries(rawMessageShapes),lastRateAt,lastConnectAt,lastDisconnectAt},clients:totalClients(),receivedSymbols:Object.keys(latestTicks).length,latestTicks,dbWriting,dbPending:[...new Set([...pending.values()].map(b=>b.symbol))],dbPendingRows:pending.size,dbRetryRows:retryChunks.reduce((n,c)=>n+c.length,0),durableQueue:{directory:QUEUE_DIR,checkpointAt:queueCheckpointAt,checkpointBytes:queueCheckpointBytes,lastCheckpointMs:lastQueueCheckpointMs,maxCheckpointMs:maxQueueCheckpointMs,slowCheckpoints:slowQueueCheckpoints,recoveredRows:queueRecoveredRows,walBytes,walSequence,walRecoveredTicks,lastWalSyncMs,fatalError:queueFatalError},dbMetrics:{version:"5.6-async-wal",v5BacklogFreezeCap:V5_BACKLOG_FREEZE_CAP,v5FreezeShare:V5_FREEZE_SHARE,v5PreviousCommittedRows,v5LastFrozenRows,v5LastCommittedRows,v5TotalFrozenRows,v5TotalCommittedRows,v5BacklogLimitedFlushes,v4HistoryPriority:V4_HISTORY_PRIORITY,v4DualWriter:V4_DUAL_WRITER,historyPaused:HISTORY_PAUSED,dbProbeOnce:DB_PROBE_ONCE,dbProbeAttempted,dbProbeSucceeded,v4LiveInFlight,v4HistoryInFlight,v4LiveCommitted,v4HistoryCommitted,v4ConflictDeferrals,v4WriterErrors,dbDrainMs:DB_DRAIN_MS,dbDrainBacklogRows:DB_DRAIN_BACKLOG_ROWS,drainSchedules,acceleratedDrainSchedules,lastBacklogDrainAt,flushDueAt,recoveryCheckpointGroups,recoveryCheckpointSaved,v4RecentWindowMs:V4_RECENT_WINDOW_MS,v4HistoryQuota:V4_HISTORY_QUOTA,priorityLiveWrites,historyWrites,dbSqlStartedAt,dbSqlAgeMs:dbSqlStartedAt===null?null:Date.now()-dbSqlStartedAt,dbSqlRowsInFlight,dbFlushStartedAt,dbFlushAgeMs:dbFlushStartedAt===null?null:Date.now()-dbFlushStartedAt,flushMs:DB_FLUSH_MS,chunkRows:DB_CHUNK_ROWS,adaptiveChunkRows,slowDbBatches,adaptiveReductions,adaptiveIncreases,successfulDbWrites,failedDbWrites,consecutiveDbFailures,lastDbWriteMs,lastDbSqlMs,lastDbCheckpointMs,maxDbSqlMs,lastDbBatchRows,lastDbBatchAt,lastDbSuccessAt,lastDbFailureAt,sqlLatency:dbSqlLatencyDiagnostics(),v53Latency:v53LatencyDiagnostics(),v54Diagnostics:v54Diagnostics(),v55Diagnostics:v55Diagnostics(),v56Diagnostics:v56Diagnostics(),dbPoolConfig,prismaErrorCounts,lastPrismaError,shutdownFlushFailed},ingestionDiagnostics:ingestionDiagnostics(),ohlcMetrics:{staleTicksRejected,staleTicksBySymbol:Object.fromEntries(staleTicksBySymbol),acceptedTicksBySymbol:Object.fromEntries(acceptedTicksBySymbol),invalidTimestampsRejected,futureTimestampsRejected,invalidPricesRejected,activeCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)>Date.now()).length,closedPendingCandles:[...pending.values()].filter(b=>b.bucket+Number(frames.find(f=>f[0]===b.interval)?.[1]??0)<=Date.now()).length},btcFeed:{lastPriceArrivalAt:lastBtcPriceArrivalAt,silenceMs:lastBtcPriceArrivalAt===null?null:Date.now()-lastBtcPriceArrivalAt,reconnectEnabled:BTC_SILENCE_RECONNECT,reconnectThresholdMs:BTC_SILENCE_RECONNECT_MS,reconnectCount:btcSilenceReconnects,lastReconnectAt:lastBtcSilenceReconnectAt,gapEvents:btcGapEvents,missingM1Slots:btcMissingM1Slots,missingM5Slots:btcMissingM5Slots,lastGap:lastBtcGap,backfillStatus:"requires real historical provider data"},feedSilence:{thresholdMs:FEED_SILENCE_ALERT_MS,alertCount:feedSilenceAlerts,lastAlertAt:lastFeedSilenceAlertAt,silenceMs:lastProviderPriceArrivalAt===null?null:Date.now()-lastProviderPriceArrivalAt,reconnectEnabled:FEED_SILENCE_RECONNECT,reconnectCount:feedSilenceReconnects,lastReconnectAt:lastFeedSilenceReconnectAt},providerInfo:providerInfo||null,providerError:providerError||null,failedDbWrites,receivedCount:Object.fromEntries(receivedCount),unrecognizedSymbols:Object.fromEntries(unrecognizedSymbols),missingConfiguredSymbols:PROVIDER_INSTRUMENTS.filter(s=>!latestTicks[s])}));return;}
   const m=url.pathname.match(/^\/api\/(?:market\/)?([a-z0-9]+)\/stream$/i);
   if(m){ const symbol=normalizeMarketSymbol(m[1]); if(!PROVIDER_SET.has(symbol)){res.writeHead(404,{"Content-Type":"application/json"});res.end(JSON.stringify({ok:false,error:"Unknown symbol"}));return;} res.writeHead(200,{"Content-Type":"text/event-stream; charset=utf-8","Cache-Control":"no-cache, no-transform",Connection:"keep-alive","X-Accel-Buffering":"no","Access-Control-Allow-Origin":origin,Vary:"Origin"});res.write("retry: 3000\n\n");res.write(`event: status\ndata: ${JSON.stringify({provider:"live-rates",connected:liveRatesConnected,symbol,mode:"MASTER_150"})}\n\n`);if(latestTicks[symbol])res.write(`event: tick\ndata: ${JSON.stringify(latestTicks[symbol])}\n\n`);const set=clientSet(symbol);set.add(res);const keep=setInterval(()=>{try{res.write(`: keepalive ${Date.now()}\n\n`);}catch{}},15000);req.on("close",()=>{clearInterval(keep);set.delete(res);});return; }
   res.writeHead(200,{"Content-Type":"application/json"});res.end(JSON.stringify({ok:true,service:"FX Trade Master Market Collector",mode:"MASTER_150",configured:PROVIDER_INSTRUMENTS.length,health:"/health",streamPattern:"/api/market/{symbol}/stream"}));
@@ -1235,7 +1258,7 @@ const server=http.createServer((req,res)=>{
 // Fail startup if the persistent volume is absent, read-only, or contains invalid data.
 try { recoverQueue(); } catch (e) { fatalQueueError(e); }
 server.listen(PORT,"0.0.0.0",()=>{
-  console.log(`[MASTER] build=fx-fresh-start-v1-20261106; HTTP/SSE :${PORT}; OHLC flush=${DB_FLUSH_MS}ms; chunk max=${DB_CHUNK_ROWS}`);
+  console.log(`[MASTER] build=fx-v5.6-async-wal-20261125; HTTP/SSE :${PORT}; OHLC flush=${DB_FLUSH_MS}ms; chunk max=${DB_CHUNK_ROWS}`);
   if (HISTORY_PAUSED) console.warn("[MASTER] HISTORY_PAUSED=true: SQL writes disabled; WAL and LIVE remain active");
   else if (DB_PROBE_ONCE) console.warn("[MASTER PROBE] one durable chunk (max 64 rows) then SQL stops until restart");
   if (!HISTORY_PAUSED && !DB_PROBE_ONCE) console.warn(`[MASTER RECOVERY] bounded SQL drain enabled; maxBatches=${RECOVERY_MAX_BATCHES}; newRows=${RECOVERY_NEW_ROWS}; dualWriter=${V4_DUAL_WRITER}`);
@@ -1254,6 +1277,8 @@ async function shutdown(signal:string){
   socket.removeAllListeners("rates");
   socket.disconnect();
   if(flushTimer){clearTimeout(flushTimer);flushTimer=null;flushDueAt=null;}
+  // Drain received but not yet accepted ticks before final SQL flush.
+  await v56Tail;
   // An in-flight flush must finish before a final snapshot is taken.
   const waitUntil=Date.now()+20_000;
   while(dbWriting && Date.now()<waitUntil) await new Promise(r=>setTimeout(r,100));
